@@ -704,7 +704,7 @@ textarea{resize:vertical;min-height:70px;}
 // Reemplazá SURL y SKEY con tu proyecto Supabase
 // ═══════════════════════════════════════════════
 const SURL = 'https://xycagqxhpwrbdurrjkdl.supabase.co';
-const SKEY = 'sb_publishable_Gy0Uk7C2yQ8i8WnmxzN_Aw_1CzEGQkT';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Y2FncXhocHdyYmR1cnJqa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNDMxMTgsImV4cCI6MjA4ODgxOTExOH0.AfXJcUn2hNsLX8ooO1jwOF1ogTqDnSp1Up-Fv2tnKDQ';
 
 // ═══ CREDENCIALES SUPERADMIN (cambiá esto) ═══
 const SUPER_EMAIL = 'superadmin@sistema.com';
@@ -963,7 +963,7 @@ async function dbUpsert(table, item){
       id: item.id,
       data: item,
       tenant_id: currentTenant.id
-    }, { onConflict: 'id,tenant_id' });
+    }, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
   }catch(e){ console.error('Upsert error', e); setSyncErr(); return false; }
@@ -979,26 +979,18 @@ async function dbDelete(table, id){
 }
 
 async function dbSetConfig(key, value){
-  setSyncing();
   try{
-    const { error } = await sb.from('config').upsert({
-      key: key + '_' + currentTenant.id,
-      value,
-      tenant_id: currentTenant.id
-    }, { onConflict: 'key' });
-    if(error) throw error;
+    const k = key + '_' + currentTenant.id;
+    localStorage.setItem(k, JSON.stringify(value));
     setSynced();
   }catch(e){ setSyncErr(); }
 }
 
 async function dbGetConfig(key){
   try{
-    const { data, error } = await sb.from('config')
-      .select('value')
-      .eq('key', key + '_' + currentTenant.id)
-      .single();
-    if(error) return null;
-    return data?.value;
+    const k = key + '_' + currentTenant.id;
+    const v = localStorage.getItem(k);
+    return v ? JSON.parse(v) : null;
   }catch(e){ return null; }
 }
 
@@ -1052,7 +1044,7 @@ async function doUndo(){
     const dbIds = data.map(r=>r.id);
     const newIds = u.data.map(r=>r.id);
     for(const id of dbIds){ if(!newIds.includes(id)) await sb.from(u.key).delete().eq('id',id).eq('tenant_id',currentTenant.id); }
-    for(const item of u.data) await sb.from(u.key).upsert({id:item.id, data:item, tenant_id:currentTenant.id},{onConflict:'id,tenant_id'});
+    for(const item of u.data) await sb.from(u.key).upsert({id:item.id, data:item, tenant_id:currentTenant.id},{onConflict:'id'});
     setSynced();
   }catch(e){ setSyncErr(); }
   renderAll();
