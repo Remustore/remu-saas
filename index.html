@@ -588,7 +588,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mb" id="mVenta"><div class="md"><div class="mh"><div class="mt2" id="mVentaTitle">Registrar Venta</div><button class="xbtn" onclick="closeM('mVenta')">✕</button></div>
 <div class="mc"><input type="hidden" id="vId">
 <div class="fr full"><div><label>Tipo</label><select id="vTipo" onchange="uVUI()"><option value="producto">Producto / Accesorio</option><option value="equipo">Equipo</option><option value="servicio">Servicio técnico</option></select></div></div>
-<div id="vPR"><label>Producto</label><select id="vProd"></select></div>
+<div id="vPR"><label>Categoría</label><select id="vCatFilt" onchange="filtrarProdVenta()"><option value="">Todas</option><option value="Accesorios">Accesorios</option><option value="Repuestos">Repuestos</option><option value="Otros">Otros</option></select><label>Producto</label><select id="vProd"></select></div>
 <div id="vER" style="display:none"><label>Equipo</label><select id="vEq"></select>
 <div class="fr"><div><label>% Comisión sobre precio venta</label><input type="number" id="vCom" placeholder="0" oninput="calcComision()"></div><div><label>Comisión calculada ($)</label><input type="number" id="vComCalc" readonly style="background:var(--car2)"></div></div></div>
 <div id="vSR" style="display:none"><label>Descripción</label><input id="vSDesc" placeholder="Ej: Cambio de pantalla"></div>
@@ -1209,7 +1209,8 @@ function rEquipos(){
 
 // ═══ VENTAS ═══
 function popVSels(){
-  document.getElementById('vProd').innerHTML = S.stock.filter(s=>s.cantidad>0).map(s=>`<option value="${s.id}">${s.nombre} (×${s.cantidad}) — ${fmt(s.precio)}</option>`).join('')||'<option>Sin stock</option>';
+  const catF = document.getElementById('vCatFilt')?.value||'';
+  document.getElementById('vProd').innerHTML = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF)).map(s=>`<option value="${s.id}">${s.nombre} (×${s.cantidad}) — ${fmt(s.precio)}</option>`).join('')||'<option>Sin stock</option>';
   document.getElementById('vEq').innerHTML = S.equipos.filter(e=>e.estado==='disponible').map(e=>`<option value="${e.id}">${e.modelo} ${e.memoria}${e.tipo==='usado'?' (Usado)':''} — ${fmt(e.precio)}</option>`).join('')||'<option>Sin equipos</option>';
 }
 
@@ -1218,6 +1219,11 @@ function uVUI(){
   document.getElementById('vPR').style.display = t==='producto'?'':'none';
   document.getElementById('vER').style.display = t==='equipo'?'':'none';
   document.getElementById('vSR').style.display = t==='servicio'?'':'none';
+}
+
+function filtrarProdVenta(){
+  const catF = document.getElementById('vCatFilt')?.value||'';
+  document.getElementById('vProd').innerHTML = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF)).map(s=>`<option value="${s.id}">${s.nombre} (×${s.cantidad}) — ${fmt(s.precio)}</option>`).join('')||'<option>Sin stock</option>';
 }
 
 function calcComision(){
@@ -1257,9 +1263,28 @@ async function saveVenta(){
 }
 
 async function delVenta(id){
-  if(!confirm('¿Eliminar esta venta?')) return;
+  if(!confirm('¿Eliminar esta venta? El stock se reintegrará automáticamente.')) return;
+  const venta = S.ventas.find(v=>v.id===id);
   const snap = JSON.parse(JSON.stringify(S.ventas));
-  S.ventas = S.ventas.filter(v=>v.id!==id); await dbDelete('ventas',id); pushUndo('Eliminar venta','ventas',snap); rVentas();
+  const snapStock = JSON.parse(JSON.stringify(S.stock));
+  // Reintegrar stock si era venta de producto
+  if(venta && venta.tipo==='producto'){
+    const prod = S.stock.find(s=>s.nombre===venta.nombre);
+    if(prod){
+      prod.cantidad += (venta.cantidad||1);
+      prod.vendidos = Math.max(0,(prod.vendidos||0)-(venta.cantidad||1));
+      await dbUpsert('stock', prod);
+    }
+  }
+  // Reintegrar equipo si era venta de equipo
+  if(venta && venta.tipo==='equipo'){
+    const eq = S.equipos.find(e=>e.modelo+' '+e.memoria===venta.nombre);
+    if(eq){ eq.estado='disponible'; await dbUpsert('equipos',eq); }
+  }
+  S.ventas = S.ventas.filter(v=>v.id!==id);
+  await dbDelete('ventas',id);
+  pushUndo('Eliminar venta','ventas',snap);
+  rVentas(); rStock();
 }
 
 function rVentas(){
