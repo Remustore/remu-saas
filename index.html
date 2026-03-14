@@ -312,9 +312,9 @@ textarea{resize:vertical;min-height:70px;}
           <div class="modules-grid">
             <label class="mod-check"><input type="checkbox" id="mDash" checked> Dashboard</label>
             <label class="mod-check"><input type="checkbox" id="mVentas" checked> Ventas</label>
-            <label class="mod-check"><input type="checkbox" id="mStock" checked> Stock</label>
+            <label class="mod-check"><input type="checkbox" id="chkStock" checked> Stock</label>
             <label class="mod-check"><input type="checkbox" id="mEquipos"> Equipos</label>
-            <label class="mod-check"><input type="checkbox" id="mTaller" checked> Taller/Servicios</label>
+            <label class="mod-check"><input type="checkbox" id="chkTaller" checked> Taller/Servicios</label>
             <label class="mod-check"><input type="checkbox" id="mGastos" checked> Gastos</label>
             <label class="mod-check"><input type="checkbox" id="mAnalisis" checked> Análisis</label>
             <label class="mod-check"><input type="checkbox" id="mPrecios"> Lista de precios</label>
@@ -843,9 +843,9 @@ async function crearTenant(){
 
   const modulos = {
     ventas:     document.getElementById('mVentas').checked,
-    stock:      document.getElementById('mStock').checked,
+    stock:      document.getElementById('chkStock').checked,
     equipos:    document.getElementById('mEquipos').checked,
-    taller:     document.getElementById('mTaller').checked,
+    taller:     document.getElementById('chkTaller').checked,
     gastos:     document.getElementById('mGastos').checked,
     analisis:   document.getElementById('mAnalisis').checked,
     precios:    document.getElementById('mPrecios').checked,
