@@ -320,6 +320,20 @@ textarea{resize:vertical;min-height:70px;}
 /* Overlay sidebar mobile */
 #sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;}
 
+/* BUSCADOR GLOBAL */
+#globalSearchWrap{position:relative;flex:1;max-width:320px;}
+#globalSearch{width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:7px 12px 7px 32px;border-radius:8px;font-family:var(--fb);font-size:.82rem;outline:none;transition:border .15s;}
+#globalSearch:focus{border-color:var(--gld);}
+#gsIcon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--mut);font-size:.85rem;pointer-events:none;}
+#gsResults{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;z-index:500;max-height:360px;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.gsr-section{padding:8px 12px 4px;font-size:.6rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;}
+.gsr-item{padding:9px 14px;cursor:pointer;font-size:.82rem;display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid var(--bor);}
+.gsr-item:last-child{border-bottom:none;}
+.gsr-item:hover{background:var(--car);}
+.gsr-item .gsr-name{font-weight:500;}
+.gsr-item .gsr-sub{font-size:.72rem;color:var(--tx2);}
+.gsr-empty{padding:16px;text-align:center;color:var(--mut);font-size:.8rem;}
+
 /* TOAST */
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--car2);border:1px solid var(--gld);color:var(--tx);padding:10px 20px;border-radius:10px;font-size:.82rem;z-index:500;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -455,6 +469,11 @@ textarea{resize:vertical;min-height:70px;}
     <div style="display:flex;align-items:center;gap:12px">
       <button id="hbg" onclick="toggleSB()">☰</button>
       <div class="tb-title" id="tbTitle">Dashboard</div>
+    </div>
+    <div id="globalSearchWrap">
+      <span id="gsIcon">⌕</span>
+      <input id="globalSearch" placeholder="Buscar producto, cliente, trabajo..." oninput="gsSearch(this.value)" onfocus="gsSearch(this.value)" onblur="setTimeout(()=>{document.getElementById('gsResults').style.display='none'},200)">
+      <div id="gsResults"></div>
     </div>
     <div class="tb-right">
       <div class="tb-date" id="tbDate"></div>
@@ -1621,7 +1640,10 @@ function rDash(){
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topS').innerHTML=top.length?top.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${n}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} uds</div></div>`).join(''):emp('📉','Sin ventas registradas');
   const als=[];
-  S.stock.filter(s=>s.cantidad<=s.minimo).forEach(s=>als.push({t:'w',m:`<strong>${s.nombre}</strong>: stock bajo (${s.cantidad} uds)`}));
+  const stockBajoItems=[...new Map(S.stock.filter(s=>s.cantidad<=s.minimo).map(s=>[s.nombre,s])).values()].slice(0,5);
+  stockBajoItems.forEach(s=>als.push({t:'w',m:`<strong>${s.nombre}</strong>: stock bajo (${s.cantidad} uds)`}));
+  const totalBajo=S.stock.filter(s=>s.cantidad<=s.minimo).length;
+  if(totalBajo>5)als.push({t:'w',m:`...y ${totalBajo-5} productos más con stock bajo`});
   S.reparaciones.filter(r=>r.estado==='listo').forEach(r=>als.push({t:'o',m:`<strong>${r.cliente}</strong> — trabajo listo para entregar`}));
   if(gan<0)als.push({t:'b',m:`Los gastos superan las ventas en <strong>${fmt(Math.abs(gan))}</strong>`});
   if(meta>0&&pct>=100)als.push({t:'o',m:`¡Meta de ${fmt(meta)} alcanzada! 🎉`});
@@ -1920,6 +1942,49 @@ function verHistorial(nombre){
   }
   overlay.innerHTML = `<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">${html}<div style="padding:14px;text-align:right"><button class="btn" onclick="document.getElementById('cliOverlay').remove()">Cerrar</button></div></div>`;
   overlay.style.display = 'flex';
+}
+
+function gsSearch(q){
+  const box = document.getElementById('gsResults');
+  if(!q || q.length < 2){ box.style.display='none'; return; }
+  const ql = q.toLowerCase();
+  const results = [];
+
+  // Stock
+  const stocks = S.stock.filter(s=>s.nombre&&s.nombre.toLowerCase().includes(ql)).slice(0,4);
+  if(stocks.length){
+    results.push('<div class="gsr-section">📦 Stock</div>');
+    stocks.forEach(s=>results.push(`<div class="gsr-item" onclick="go('stock');document.getElementById('sQ').value='${s.nombre.replace(/'/g,"\'")}';rStock();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+      <div><div class="gsr-name">${s.nombre}</div><div class="gsr-sub">${s.categoria} · ${s.cantidad} uds · ${fmt(s.precio)}</div></div>
+      <span class="bx ${s.cantidad<=s.minimo?'brd':'bgr'}">${s.cantidad<=s.minimo?'Bajo':'OK'}</span>
+    </div>`));
+  }
+
+  // Clientes / Taller
+  const clientes = getClientes().filter(c=>c.nombre.toLowerCase().includes(ql)||c.tel.includes(ql)).slice(0,3);
+  if(clientes.length){
+    results.push('<div class="gsr-section">👥 Clientes</div>');
+    clientes.forEach(c=>results.push(`<div class="gsr-item" onclick="go('clientes');document.getElementById('cliQ').value='${c.nombre.replace(/'/g,"\'")}';rClientes();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+      <div><div class="gsr-name">${c.nombre}</div><div class="gsr-sub">${c.tel||'Sin tel'} · ${c.trabajos.length} trabajos</div></div>
+    </div>`));
+  }
+
+  // Trabajos activos
+  const trabajos = S.reparaciones.filter(r=>r.estado!=='entregado'&&((r.cliente&&r.cliente.toLowerCase().includes(ql))||(r.equipo&&r.equipo.toLowerCase().includes(ql))||(r.falla&&r.falla.toLowerCase().includes(ql)))).slice(0,3);
+  if(trabajos.length){
+    results.push('<div class="gsr-section">🔧 Trabajos</div>');
+    trabajos.forEach(t=>results.push(`<div class="gsr-item" onclick="go('taller');document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+      <div><div class="gsr-name">${t.cliente}</div><div class="gsr-sub">${t.equipo||''} · ${t.falla||''} · ${t.estado}</div></div>
+      <span class="bx byw">${t.estado}</span>
+    </div>`));
+  }
+
+  if(!results.length){
+    box.innerHTML = '<div class="gsr-empty">Sin resultados para "'+q+'"</div>';
+  } else {
+    box.innerHTML = results.join('');
+  }
+  box.style.display = 'block';
 }
 
 function toggleTheme(){
