@@ -447,6 +447,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ns">Operaciones</div>
   <div class="ni" onclick="go('taller')" id="nav-taller"><span class="nico">◉</span>Taller/Servicios</div>
   <div class="ni" onclick="go('clientes')" id="nav-clientes"><span class="nico">👥</span>Clientes</div>
+  <div class="ni" onclick="go('auditoria')" id="nav-auditoria"><span class="nico">📋</span>Control Stock</div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
   <div class="ni" onclick="go('analisis')" id="nav-analisis"><span class="nico">◈</span>Análisis</div>
@@ -601,6 +602,26 @@ textarea{resize:vertical;min-height:70px;}
           <div class="srch"><span>⌕</span><input id="cliQ" placeholder="Buscar cliente..." oninput="rClientes()"></div>
         </div>
         <div id="cliList"></div>
+      </div>
+    </div>
+
+    <!-- AUDITORIA -->
+    <div class="sec" id="sec-auditoria">
+      <div class="pt">Control diario de stock</div>
+      <div class="ps">Verificación rotativa de inventario</div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:.75rem;color:var(--tx2)" id="audFecha"></div>
+            <div style="font-size:.82rem;margin-top:4px" id="audProgreso"></div>
+          </div>
+          <button class="btn bgh bsm" onclick="nuevaAuditoria()">↺ Nueva ronda</button>
+        </div>
+      </div>
+      <div id="audItems"></div>
+      <div class="card" style="margin-top:14px">
+        <h3 style="margin-bottom:12px">📜 Historial de verificaciones</h3>
+        <div id="audHistorial"></div>
       </div>
     </div>
 
@@ -939,7 +960,7 @@ function setupApp(){
   const mods = currentTenant.modulos || {};
   const modMap = {
     ventas: ['nav-ventas','sec-ventas'],
-    stock:  ['nav-stock','sec-stock'],
+    stock:  ['nav-stock','sec-stock','nav-auditoria','sec-auditoria'],
     equipos:['nav-equipos','sec-equipos'],
     taller: ['nav-taller','sec-taller','nav-clientes','sec-clientes'],
     gastos: ['nav-gastos','sec-gastos'],
@@ -1203,7 +1224,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1212,7 +1233,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -1875,7 +1896,187 @@ function fillObjetivosModal(){
   document.getElementById('objRepCant').value=obj.repCant||7;document.getElementById('objRepPre').value=obj.repPre||40000;document.getElementById('objAccCant').value=obj.accCant||10;document.getElementById('objAccPre').value=obj.accPre||10000;document.getElementById('objEqCant').value=obj.eqCant||1;document.getElementById('objEqPre').value=obj.eqPre||0;
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rGastos(); rPrecios(); rInversores(); }
+// ═══ CONTROL DIARIO DE STOCK ═══
+const AUD_KEY = 'auditoria';
+const PRODS_POR_DIA = 5;
+
+function getAuditoria(){
+  const raw = localStorage.getItem(AUD_KEY + '_' + (window.currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : { fecha: '', items: [], historial: [] };
+}
+
+function saveAuditoria(aud){
+  localStorage.setItem(AUD_KEY + '_' + (window.currentTenant?.id||''), JSON.stringify(aud));
+}
+
+function generarRonda(){
+  // Rotar productos — ordenar por fecha de última verificación (los menos verificados primero)
+  const aud = getAuditoria();
+  const verificados = {};
+  aud.historial.forEach(h => { verificados[h.productoId] = h.fecha; });
+  
+  const productosOrdenados = S.stock
+    .filter(s => s.nombre)
+    .sort((a, b) => {
+      const fa = verificados[a.id] || '0000-00-00';
+      const fb = verificados[b.id] || '0000-00-00';
+      return fa.localeCompare(fb);
+    });
+
+  const seleccionados = productosOrdenados.slice(0, PRODS_POR_DIA).map(s => ({
+    productoId: s.id,
+    nombre: s.nombre,
+    cantidadSistema: s.cantidad,
+    cantidadReal: null,
+    motivo: '',
+    verificado: false
+  }));
+
+  const nueva = { fecha: tod(), items: seleccionados, historial: aud.historial };
+  saveAuditoria(nueva);
+  return nueva;
+}
+
+function nuevaAuditoria(){
+  if(!confirm('¿Generar una nueva ronda de verificación para hoy?')) return;
+  generarRonda();
+  rAuditoria();
+  showToast('Nueva ronda generada ✓');
+}
+
+function rAuditoria(){
+  let aud = getAuditoria();
+  
+  // Si no hay ronda para hoy, generarla automáticamente
+  if(aud.fecha !== tod() || !aud.items.length){
+    aud = generarRonda();
+  }
+
+  const fechaEl = document.getElementById('audFecha');
+  const progEl = document.getElementById('audProgreso');
+  const itemsEl = document.getElementById('audItems');
+  const histEl = document.getElementById('audHistorial');
+  if(!itemsEl) return;
+
+  const verificados = aud.items.filter(i=>i.verificado).length;
+  if(fechaEl) fechaEl.textContent = 'Ronda del ' + fD(aud.fecha);
+  if(progEl) progEl.innerHTML = `<strong>${verificados}/${aud.items.length}</strong> productos verificados hoy`;
+
+  // Render items
+  itemsEl.innerHTML = aud.items.map((item, idx) => `
+    <div class="card" style="margin-bottom:10px;border-left:3px solid ${item.verificado?'var(--ok)':item.cantidadReal!==null?'var(--wrn)':'var(--bor)'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.9rem">${item.nombre}</div>
+          <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">Sistema: <strong>${item.cantidadSistema} uds</strong></div>
+        </div>
+        ${item.verificado 
+          ? `<span class="bx bgr">✓ Verificado</span>` 
+          : `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <div>
+                <div style="font-size:.65rem;color:var(--tx2);margin-bottom:3px">Cantidad real</div>
+                <input type="number" value="${item.cantidadReal??''}" placeholder="Contá..." 
+                  style="width:90px;padding:6px 10px;font-size:.85rem" 
+                  oninput="audSetCantidad(${idx}, this.value)"
+                  onchange="audSetCantidad(${idx}, this.value)">
+              </div>
+            </div>`
+        }
+      </div>
+      ${!item.verificado && item.cantidadReal !== null && item.cantidadReal != item.cantidadSistema ? `
+        <div style="margin-top:10px">
+          <label style="color:var(--bad)">⚠ Diferencia de ${Math.abs(item.cantidadReal-item.cantidadSistema)} uds — Motivo obligatorio</label>
+          <input placeholder="Ej: vendido sin registrar, roto, diferencia de conteo..." 
+            value="${item.motivo||''}"
+            oninput="audSetMotivo(${idx}, this.value)"
+            style="margin-top:4px">
+        </div>
+      ` : ''}
+      ${!item.verificado && item.cantidadReal !== null ? `
+        <div style="margin-top:10px;text-align:right">
+          <button class="btn bg bsm" onclick="audConfirmar(${idx})">Confirmar ✓</button>
+        </div>
+      ` : ''}
+    </div>
+  `).join('');
+
+  // Historial
+  const hist = aud.historial.slice(-20).reverse();
+  if(histEl){
+    histEl.innerHTML = hist.length ? hist.map(h=>`
+      <div style="padding:9px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:.8rem">
+        <div>
+          <span style="font-weight:500">${h.nombre}</span>
+          <span style="color:var(--tx2);margin-left:8px">${fD(h.fecha)}</span>
+        </div>
+        <div style="text-align:right">
+          ${h.diferencia!==0 
+            ? `<span style="color:var(--bad)">Sistema: ${h.cantidadSistema} → Real: ${h.cantidadReal} <span class="bx brd">Diff ${h.diferencia>0?'+':''}${h.diferencia}</span></span>`
+            : `<span style="color:var(--ok)">✓ Correcto (${h.cantidadReal} uds)</span>`
+          }
+        </div>
+      </div>
+    `).join('') : '<div style="color:var(--mut);font-size:.8rem;padding:12px 0">Sin verificaciones aún</div>';
+  }
+}
+
+function audSetCantidad(idx, val){
+  const aud = getAuditoria();
+  aud.items[idx].cantidadReal = val===''?null:parseInt(val);
+  saveAuditoria(aud);
+  rAuditoria();
+}
+
+function audSetMotivo(idx, val){
+  const aud = getAuditoria();
+  aud.items[idx].motivo = val;
+  saveAuditoria(aud);
+}
+
+async function audConfirmar(idx){
+  const aud = getAuditoria();
+  const item = aud.items[idx];
+  const diferencia = item.cantidadReal - item.cantidadSistema;
+  
+  // Motivo obligatorio si hay diferencia
+  if(diferencia !== 0 && !item.motivo.trim()){
+    alert('Debés ingresar el motivo de la diferencia antes de confirmar.');
+    return;
+  }
+
+  // Si hay diferencia, actualizar stock en Supabase
+  if(diferencia !== 0){
+    const prod = S.stock.find(s=>s.id===item.productoId);
+    if(prod){
+      prod.cantidad = item.cantidadReal;
+      await dbUpsert('stock', prod);
+      rStock();
+    }
+  }
+
+  // Agregar al historial
+  aud.historial.push({
+    productoId: item.productoId,
+    nombre: item.nombre,
+    fecha: tod(),
+    cantidadSistema: item.cantidadSistema,
+    cantidadReal: item.cantidadReal,
+    diferencia,
+    motivo: item.motivo || ''
+  });
+
+  item.verificado = true;
+  saveAuditoria(aud);
+  
+  const msg = diferencia !== 0 
+    ? `Stock corregido: ${item.nombre} → ${item.cantidadReal} uds`
+    : `Verificado ✓: ${item.nombre}`;
+  showToast(msg);
+  rAuditoria();
+  rDash();
+}
+
+function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); }
 
 function getClientes(){
   const mapa = {};
@@ -2042,7 +2243,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
