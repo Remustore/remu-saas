@@ -432,6 +432,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('equipos')" id="nav-equipos"><span class="nico">▤</span>Equipos</div>
   <div class="ns">Operaciones</div>
   <div class="ni" onclick="go('taller')" id="nav-taller"><span class="nico">◉</span>Taller/Servicios</div>
+  <div class="ni" onclick="go('clientes')" id="nav-clientes"><span class="nico">👥</span>Clientes</div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
   <div class="ni" onclick="go('analisis')" id="nav-analisis"><span class="nico">◈</span>Análisis</div>
@@ -570,6 +571,18 @@ textarea{resize:vertical;min-height:70px;}
       <div class="pt" id="tallerTitle">Taller / Servicios</div><div class="ps" id="tallerSub">Seguimiento de trabajos</div>
       <div class="ch"><div></div><button class="btn bg" onclick="openM('mTaller',null)">+ Nuevo trabajo</button></div>
       <div class="kan" id="kan"></div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="sec" id="sec-clientes">
+      <div class="pt">Clientes</div>
+      <div class="ps">Historial y datos de contacto</div>
+      <div class="card">
+        <div class="ch">
+          <div class="srch"><span>⌕</span><input id="cliQ" placeholder="Buscar cliente..." oninput="rClientes()"></div>
+        </div>
+        <div id="cliList"></div>
+      </div>
     </div>
 
     <!-- GASTOS -->
@@ -909,7 +922,7 @@ function setupApp(){
     ventas: ['nav-ventas','sec-ventas'],
     stock:  ['nav-stock','sec-stock'],
     equipos:['nav-equipos','sec-equipos'],
-    taller: ['nav-taller','sec-taller'],
+    taller: ['nav-taller','sec-taller','nav-clientes','sec-clientes'],
     gastos: ['nav-gastos','sec-gastos'],
     analisis:['nav-analisis','sec-analisis'],
     precios:['nav-precios','sec-precios','ns-precios'],
@@ -1171,7 +1184,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1180,7 +1193,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -1840,7 +1853,74 @@ function fillObjetivosModal(){
   document.getElementById('objRepCant').value=obj.repCant||7;document.getElementById('objRepPre').value=obj.repPre||40000;document.getElementById('objAccCant').value=obj.accCant||10;document.getElementById('objAccPre').value=obj.accPre||10000;document.getElementById('objEqCant').value=obj.eqCant||1;document.getElementById('objEqPre').value=obj.eqPre||0;
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rGastos(); rPrecios(); rInversores(); }
+function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rGastos(); rPrecios(); rInversores(); }
+
+function getClientes(){
+  const mapa = {};
+  S.reparaciones.forEach(r=>{
+    if(!r.cliente) return;
+    const k = r.cliente.toLowerCase();
+    if(!mapa[k]){
+      mapa[k] = { nombre: r.cliente, tel: r.tel||'', trabajos: [], ultimaVisita: r.fecha||'' };
+    }
+    mapa[k].trabajos.push(r);
+    if((r.fecha||'') > mapa[k].ultimaVisita) mapa[k].ultimaVisita = r.fecha;
+    if(r.tel && !mapa[k].tel) mapa[k].tel = r.tel;
+  });
+  return Object.values(mapa).sort((a,b)=>b.ultimaVisita.localeCompare(a.ultimaVisita));
+}
+
+function rClientes(){
+  const q = (document.getElementById('cliQ')?.value||'').toLowerCase();
+  const clientes = getClientes().filter(c=>!q||c.nombre.toLowerCase().includes(q)||c.tel.includes(q));
+  const box = document.getElementById('cliList');
+  if(!box) return;
+  if(!clientes.length){ box.innerHTML=`<div class="emp"><div class="ei">👥</div><div>Sin clientes registrados</div><div style="font-size:.75rem;color:var(--mut)">Los clientes se agregan automáticamente al crear trabajos en Taller</div></div>`; return; }
+  box.innerHTML = clientes.map(c=>{
+    const activos = c.trabajos.filter(t=>t.estado!=='entregado').length;
+    const total = c.trabajos.reduce((a,t)=>a+(t.presupuesto||0),0);
+    return `<div style="padding:14px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;font-size:.9rem">${c.nombre}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${c.tel?'📱 '+c.tel:'Sin teléfono'} · ${c.trabajos.length} trabajo${c.trabajos.length!==1?'s':''} · Última visita: ${c.ultimaVisita?fD(c.ultimaVisita):'—'}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        ${activos>0?`<span class="bx byw">${activos} activo${activos!==1?'s':''}</span>`:''}
+        <span style="font-size:.8rem;color:var(--gld);font-weight:600">${fmt(total)}</span>
+        ${c.tel?`<button class="btn bs bsm" onclick="window.open('https://wa.me/54${c.tel.replace(/\D/g,'')}')">📲 WA</button>`:''}
+        <button class="btn be bsm" onclick="verHistorial('${c.nombre.replace(/'/g,"\'")}')">Historial</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function verHistorial(nombre){
+  const trabajos = S.reparaciones.filter(r=>r.cliente===nombre).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const ventas = S.ventas ? [] : [];
+  const html = `<div style="padding:16px">
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:12px">📋 Historial — ${nombre}</div>
+    ${trabajos.map(t=>`<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem">
+        <span style="font-weight:600">${t.equipo||'Trabajo'}</span>
+        <span class="bx ${t.estado==='entregado'?'bgx':t.estado==='listo'?'bgr':t.estado==='proceso'?'byw':'bbl'}">${t.estado}</span>
+      </div>
+      <div style="font-size:.75rem;color:var(--tx2);margin-top:4px">${t.falla||''} · ${fD(t.fecha)} · ${fmt(t.presupuesto||0)}</div>
+    </div>`).join('')}
+    ${!trabajos.length?'<div style="color:var(--mut);font-size:.82rem">Sin trabajos</div>':''}
+  </div>`;
+  
+  // Show in a modal-like overlay
+  let overlay = document.getElementById('cliOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'cliOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:480px;max-height:80vh;overflow-y:auto">${html}<div style="padding:14px;text-align:right"><button class="btn" onclick="document.getElementById('cliOverlay').remove()">Cerrar</button></div></div>`;
+  overlay.style.display = 'flex';
+}
 
 function toggleTheme(){
   document.body.classList.toggle('light-mode');
@@ -1897,7 +1977,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
