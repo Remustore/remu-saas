@@ -320,11 +320,20 @@ textarea{resize:vertical;min-height:70px;}
 /* Overlay sidebar mobile */
 #sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;}
 
+/* TOAST */
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--car2);border:1px solid var(--gld);color:var(--tx);padding:10px 20px;border-radius:10px;font-size:.82rem;z-index:500;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#toast.ok{border-color:var(--ok);color:var(--ok);}
+#toast.err{border-color:var(--bad);color:var(--bad);}
+
 /* MÓDULOS deshabilitados */
 .module-disabled{display:none !important;}
 </style>
 </head>
 <body>
+
+<!-- TOAST -->
+<div id="toast"></div>
 
 <!-- LOADING -->
 <div id="loadingScreen">
@@ -573,7 +582,21 @@ textarea{resize:vertical;min-height:70px;}
 
     <!-- ANÁLISIS -->
     <div class="sec" id="sec-analisis">
-      <div class="pt">Análisis del negocio</div><div class="ps">Rentabilidad y métricas clave</div>
+      <div class="pt">Análisis del negocio</div>
+      <div class="ps">Rentabilidad y métricas clave</div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="tab active" onclick="setAnFilt('mes',this)">Este mes</button>
+          <button class="tab" onclick="setAnFilt('semana',this)">Esta semana</button>
+          <button class="tab" onclick="setAnFilt('hoy',this)">Hoy</button>
+          <button class="tab" onclick="setAnFilt('custom',this)">Personalizado</button>
+          <div id="anCustom" style="display:none;gap:8px;display:none;align-items:center">
+            <input type="date" id="anDesde" style="width:140px;padding:6px 10px" onchange="rAnalisis()">
+            <span style="color:var(--tx2)">→</span>
+            <input type="date" id="anHasta" style="width:140px;padding:6px 10px" onchange="rAnalisis()">
+          </div>
+        </div>
+      </div>
       <div class="tabs" id="atabs" style="margin-bottom:16px">
         <button class="tab active" onclick="setAT('general',0)">📊 General</button>
         <button class="tab" onclick="setAT('reparaciones',1)" id="tabRep">🔧 Servicios</button>
@@ -681,7 +704,10 @@ textarea{resize:vertical;min-height:70px;}
 <!-- Taller -->
 <div class="mb" id="mTaller"><div class="md"><div class="mh"><div class="mt2" id="mTallerTitle">Nuevo trabajo</div><button class="xbtn" onclick="closeM('mTaller')">✕</button></div>
 <div class="mc"><input type="hidden" id="tId">
-<div class="fr"><div><label>Cliente</label><input id="tCli" placeholder="Nombre del cliente"></div><div><label>Teléfono / WA</label><input id="tTel" placeholder="11 2345 6789"></div></div>
+<div class="fr"><div><label>Cliente</label>
+<input id="tCli" placeholder="Nombre del cliente" oninput="autocompleteCli(this.value)" autocomplete="off">
+<div id="cliSugg" style="position:absolute;background:var(--car2);border:1px solid var(--bor2);border-radius:8px;z-index:400;max-height:150px;overflow-y:auto;width:100%;display:none;"></div>
+</div><div><label>Teléfono / WA</label><input id="tTel" placeholder="11 2345 6789"></div></div>
 <div class="fr"><div><label>Equipo / Trabajo</label><input id="tEq" placeholder="Ej: iPhone 13, corte de pelo..."></div><div><label>IMEI (opcional)</label><input id="tIme" placeholder="Solo para celulares"></div></div>
 <div class="fr full"><div><label>Falla / Descripción</label><input id="tFal" placeholder="¿Qué necesita?"></div></div>
 <div class="fr"><div><label>Presupuesto cobrado al cliente ($)</label><input type="number" id="tPre" placeholder="0" oninput="calcGanTaller()"></div><div><label>Estado</label><select id="tEst"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
@@ -803,8 +829,18 @@ let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 
 // ═══ SYNC UI ═══
 function setSyncing(){ document.getElementById('syncDot').className='sync-dot syncing'; document.getElementById('syncTxt').textContent='Guardando...'; }
-function setSynced(){ document.getElementById('syncDot').className='sync-dot'; document.getElementById('syncTxt').textContent='Conectado'; }
-function setSyncErr(){ document.getElementById('syncDot').style.background='var(--bad)'; document.getElementById('syncTxt').textContent='Error'; }
+function setSynced(msg){ document.getElementById('syncDot').className='sync-dot'; document.getElementById('syncTxt').textContent='Conectado'; if(msg) showToast(msg,'ok'); }
+function setSyncErr(){ document.getElementById('syncDot').style.background='var(--bad)'; document.getElementById('syncTxt').textContent='Error'; showToast('Error al guardar','err'); }
+
+let toastTimer;
+function showToast(msg, type='ok'){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.className=''; }, 2500);
+}
+
 
 // ═══ AUTH ═══
 async function doLogin(){
@@ -1204,7 +1240,7 @@ async function saveStock(){
     const item={id:Date.now(),...obj,vendidos:0};
     S.stock.push(item); await dbUpsert('stock',item); pushUndo('Agregar producto','stock',snap);
   }
-  closeM('mStock'); rStock();
+  closeM('mStock'); rStock(); showToast('Producto guardado ✓');
 }
 
 async function delStock(id){
@@ -1249,7 +1285,7 @@ async function saveEquipo(){
     const item={id:Date.now(),...obj,estado:'disponible',fecha:tod()};
     S.equipos.push(item); await dbUpsert('equipos',item); pushUndo('Agregar equipo','equipos',snap);
   }
-  closeM('mEquipo'); rEquipos();
+  closeM('mEquipo'); rEquipos(); showToast('Equipo guardado ✓');
 }
 
 async function delEquipo(id){
@@ -1338,7 +1374,7 @@ async function saveVenta(){
     const item = {id:Date.now(),tipo,nombre,cantidad:cant,precio,total:cant*precio,costo:costoU*cant,metodo,fecha,comPct,comision};
     S.ventas.unshift(item); await dbUpsert('ventas',item); pushUndo('Registrar venta','ventas',snap);
   }
-  closeM('mVenta'); rVentas();
+  closeM('mVenta'); rVentas(); showToast('Venta registrada ✓');
 }
 
 async function delVenta(id){
@@ -1382,6 +1418,22 @@ function rVentas(){
 // ═══ TALLER ═══
 const ESTS = [{k:'recibido',l:'Recibido',c:'bbl'},{k:'proceso',l:'En proceso',c:'byw'},{k:'listo',l:'✓ Listo',c:'bgr'},{k:'entregado',l:'Entregado',c:'bgx'}];
 
+function autocompleteCli(val){
+  const box = document.getElementById('cliSugg');
+  if(!val || val.length < 2){ box.style.display='none'; return; }
+  const clientes = [...new Set(S.reparaciones.map(r=>r.cliente).filter(c=>c&&c.toLowerCase().includes(val.toLowerCase())))].slice(0,5);
+  if(!clientes.length){ box.style.display='none'; return; }
+  box.style.display='block';
+  box.innerHTML = clientes.map(c=>`<div onclick="selCli('${c.replace(/'/g,"\'")}')" style="padding:9px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--bor)">${c}</div>`).join('');
+}
+function selCli(nombre){
+  document.getElementById('tCli').value = nombre;
+  document.getElementById('cliSugg').style.display='none';
+  // Auto-fill phone if exists
+  const prev = S.reparaciones.find(r=>r.cliente===nombre);
+  if(prev && prev.tel) document.getElementById('tTel').value = prev.tel;
+}
+
 function calcGanTaller(){
   const pre=parseFloat(document.getElementById('tPre').value)||0;
   const rep=parseFloat(document.getElementById('tCosRep').value)||0;
@@ -1414,7 +1466,7 @@ async function saveTaller(){
     const item={id:Date.now(),...obj,historial:[{estado:obj.estado,nota:'Ingreso',fecha:tod()}],fecha:tod()};
     S.reparaciones.unshift(item);await dbUpsert('reparaciones',item);pushUndo('Nuevo trabajo','reparaciones',snap);
   }
-  closeM('mTaller');rTaller();
+  closeM('mTaller'); rTaller(); showToast('Trabajo guardado ✓');
 }
 
 async function delRep(id){
@@ -1481,7 +1533,7 @@ async function saveGasto(){
   }else{
     const item={id:Date.now(),...obj};S.gastos.unshift(item);await dbUpsert('gastos',item);pushUndo('Nuevo gasto','gastos',snap);
   }
-  closeM('mGasto');rGastos();
+  closeM('mGasto'); rGastos(); showToast('Gasto registrado ✓');
 }
 
 async function delGasto(id){
@@ -1604,16 +1656,61 @@ function rAnalisisRep(){
   document.getElementById('tbRepAn').innerHTML=reps.map(r=>`<tr><td>${fD(r.fecha)}</td><td>${r.cliente}</td><td style="font-size:.75rem">${r.equipo||'—'}</td><td style="color:var(--gld);font-weight:600">${fmt(r.presupuesto)}</td><td>${fmt(r.costoRep||0)}</td><td>${fmt(r.flete||0)}</td><td style="font-weight:700;color:${(r.margen||0)>=50?'var(--ok)':(r.margen||0)>=30?'var(--wrn)':'var(--bad)'}">${fmt(r.ganancia||r.presupuesto)}</td><td><span style="padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700;background:${(r.margen||0)>=50?'rgba(74,222,128,.15)':(r.margen||0)>=30?'rgba(250,204,21,.15)':'rgba(248,113,113,.15)'};color:${(r.margen||0)>=50?'var(--ok)':(r.margen||0)>=30?'var(--wrn)':'var(--bad)'}">${r.margen||0}%</span></td></tr>`).join('');
 }
 
+let anFilt = 'mes';
+function setAnFilt(f, btn){
+  anFilt = f;
+  document.querySelectorAll('#sec-analisis .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const custom = document.getElementById('anCustom');
+  if(custom) custom.style.display = f==='custom' ? 'flex' : 'none';
+  rAnalisis();
+}
+
+function getAnRango(){
+  const hoy = tod();
+  if(anFilt==='hoy') return hoy;
+  if(anFilt==='semana'){
+    const d = new Date(); d.setDate(d.getDate()-7);
+    return d.toISOString().slice(0,10);
+  }
+  if(anFilt==='custom'){
+    return document.getElementById('anDesde')?.value || mes();
+  }
+  return mes(); // default: mes actual
+}
+
+function filtrarPorRango(items, campoFecha){
+  if(anFilt==='mes') return items.filter(i=>i[campoFecha]&&i[campoFecha].startsWith(mes()));
+  if(anFilt==='hoy') return items.filter(i=>i[campoFecha]===tod());
+  if(anFilt==='semana'){
+    const desde = getAnRango();
+    return items.filter(i=>i[campoFecha]&&i[campoFecha]>=desde);
+  }
+  if(anFilt==='custom'){
+    const desde = document.getElementById('anDesde')?.value;
+    const hasta = document.getElementById('anHasta')?.value;
+    return items.filter(i=>{
+      if(!i[campoFecha]) return false;
+      if(desde && i[campoFecha] < desde) return false;
+      if(hasta && i[campoFecha] > hasta) return false;
+      return true;
+    });
+  }
+  return items;
+}
+
 function rAnalisis(){
-  const m=mes();
-  const tV=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m)).reduce((a,v)=>a+v.total,0);
-  const tG=S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m)).reduce((a,g)=>a+g.monto,0);
-  const tC=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m)).reduce((a,v)=>a+(v.costo||0),0);
-  const tR=S.reparaciones.filter(r=>r.estado==='entregado'&&r.fecha&&r.fecha.startsWith(m)).reduce((a,r)=>a+(r.presupuesto||0),0);
+  const vFilt = filtrarPorRango(S.ventas, 'fecha');
+  const gFilt = filtrarPorRango(S.gastos, 'fecha');
+  const rFilt = filtrarPorRango(S.reparaciones.filter(r=>r.estado==='entregado'), 'fecha');
+  const tV=vFilt.reduce((a,v)=>a+v.total,0);
+  const tG=gFilt.reduce((a,g)=>a+g.monto,0);
+  const tC=vFilt.reduce((a,v)=>a+(v.costo||0),0);
+  const tR=rFilt.reduce((a,r)=>a+(r.presupuesto||0),0);
   const prods=S.stock.filter(s=>s.costo>0&&s.precio>0).map(s=>({n:s.nombre,mg:Math.round((s.precio-s.costo)/s.precio*100)})).sort((a,b)=>b.mg-a.mg).slice(0,8);
   document.getElementById('rent').innerHTML=prods.length?prods.map(p=>`<div class="pb2"><div class="pn2" title="${p.n}">${p.n}</div><div class="pt2"><div class="pb"><div class="pf ${p.mg>30?'ok2':p.mg>15?'':'bad2'}" style="width:${Math.min(100,p.mg)}%"></div></div></div><div class="pv2">${p.mg}%</div></div>`).join(''):emp('📈','Cargá productos con precio y costo');
   document.getElementById('resFin').innerHTML=`<div class="fi2"><span>Ventas productos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Ingresos taller</span><span style="color:var(--ok);font-weight:600">${fmt(tR)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:var(--gld);font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(tV+tR-tC-tG)}</span></div>`;
-  const mets={};S.ventas.forEach(v=>{mets[v.metodo]=(mets[v.metodo]||0)+v.total;});
+  const mets={};vFilt.forEach(v=>{mets[v.metodo]=(mets[v.metodo]||0)+v.total;});
   const totP=Object.values(mets).reduce((a,b)=>a+b,0);
   document.getElementById('pagos').innerHTML=totP?Object.entries(mets).sort((a,b)=>b[1]-a[1]).map(([met,tot])=>{const p=Math.round(tot/totP*100);return`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.79rem"><span>${met}</span><span style="color:var(--gld);font-weight:600">${fmt(tot)} (${p}%)</span></div><div class="pb"><div class="pf" style="width:${p}%"></div></div></div>`;}).join(''):emp('💳','Sin ventas');
 }
