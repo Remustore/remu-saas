@@ -344,6 +344,7 @@ textarea{resize:vertical;min-height:70px;}
 /* MÓDULOS deshabilitados */
 .module-disabled{display:none !important;}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -637,8 +638,16 @@ textarea{resize:vertical;min-height:70px;}
 
     <!-- ANÁLISIS -->
     <div class="sec" id="sec-analisis">
-      <div class="pt">Análisis del negocio</div>
-      <div class="ps">Rentabilidad y métricas clave</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:2px">
+        <div>
+          <div class="pt">Análisis del negocio</div>
+          <div class="ps" style="margin-bottom:0">Rentabilidad y métricas clave</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bgh bsm" onclick="exportarExcel()">📊 Excel</button>
+          <button class="btn bgh bsm" onclick="exportarPDF()">📄 PDF</button>
+        </div>
+      </div>
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
           <button class="tab active" onclick="setAnFilt('mes',this)">Este mes</button>
@@ -2099,6 +2108,155 @@ async function audConfirmar(idx){
   showToast(msg);
   rAuditoria();
   rDash();
+}
+
+// ═══ EXPORTAR REPORTES ═══
+function getFiltLabel(){
+  if(anFilt==='hoy') return 'Hoy ' + tod();
+  if(anFilt==='semana') return 'Última semana';
+  if(anFilt==='custom'){
+    const d = document.getElementById('anDesde')?.value;
+    const h = document.getElementById('anHasta')?.value;
+    return (d||'') + ' al ' + (h||'');
+  }
+  return 'Mes ' + mes();
+}
+
+function exportarExcel(){
+  if(typeof XLSX === 'undefined'){ showToast('Cargando Excel...'); setTimeout(exportarExcel, 1000); return; }
+  
+  const vFilt = filtrarPorRango(S.ventas, 'fecha');
+  const gFilt = filtrarPorRango(S.gastos, 'fecha');
+  const label = getFiltLabel();
+  const wb = XLSX.utils.book_new();
+
+  // Hoja 1: Ventas
+  const ventasData = [
+    ['Fecha', 'Producto/Servicio', 'Tipo', 'Cantidad', 'Precio Unit.', 'Total', 'Costo', 'Ganancia', 'Método de pago'],
+    ...vFilt.map(v => [
+      v.fecha, v.nombre, v.tipo, v.cantidad,
+      v.precio, v.total, v.costo||0,
+      v.total-(v.costo||0), v.metodo
+    ])
+  ];
+  if(vFilt.length){
+    const totalV = vFilt.reduce((a,v)=>a+v.total,0);
+    const totalC = vFilt.reduce((a,v)=>a+(v.costo||0),0);
+    ventasData.push(['','','','','TOTAL',totalV,totalC,totalV-totalC,'']);
+  }
+  const ws1 = XLSX.utils.aoa_to_sheet(ventasData);
+  ws1['!cols'] = [{wch:12},{wch:35},{wch:12},{wch:8},{wch:14},{wch:14},{wch:12},{wch:12},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Ventas');
+
+  // Hoja 2: Gastos
+  const gastosData = [
+    ['Fecha', 'Concepto', 'Tipo', 'Monto', 'Notas'],
+    ...gFilt.map(g => [g.fecha, g.concepto, g.tipo, g.monto, g.notas||''])
+  ];
+  if(gFilt.length){
+    gastosData.push(['','','TOTAL',gFilt.reduce((a,g)=>a+g.monto,0),'']);
+  }
+  const ws2 = XLSX.utils.aoa_to_sheet(gastosData);
+  ws2['!cols'] = [{wch:12},{wch:35},{wch:18},{wch:14},{wch:30}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Gastos');
+
+  // Hoja 3: Stock actual
+  const stockData = [
+    ['Producto', 'Categoría', 'Stock actual', 'Stock mínimo', 'Precio venta', 'Costo', 'Ganancia $', 'Margen %', 'Estado'],
+    ...S.stock.map(s => {
+      const mg = s.precio&&s.costo ? Math.round((s.precio-s.costo)/s.precio*100) : 0;
+      return [s.nombre, s.categoria, s.cantidad, s.minimo, s.precio, s.costo, s.precio-s.costo, mg+'%', s.cantidad<=s.minimo?'BAJO':'OK'];
+    })
+  ];
+  const ws3 = XLSX.utils.aoa_to_sheet(stockData);
+  ws3['!cols'] = [{wch:40},{wch:14},{wch:12},{wch:12},{wch:14},{wch:12},{wch:12},{wch:10},{wch:8}];
+  XLSX.utils.book_append_sheet(wb, ws3, 'Stock');
+
+  // Hoja 4: Resumen
+  const tV = vFilt.reduce((a,v)=>a+v.total,0);
+  const tC = vFilt.reduce((a,v)=>a+(v.costo||0),0);
+  const tG = gFilt.reduce((a,g)=>a+g.monto,0);
+  const resData = [
+    ['RESUMEN FINANCIERO — ' + label],
+    [''],
+    ['Concepto', 'Monto'],
+    ['Ingresos por ventas', tV],
+    ['Costo de mercadería', tC],
+    ['Gastos operativos', tG],
+    ['Ganancia bruta', tV-tC],
+    ['Resultado neto', tV-tC-tG],
+    ['Margen neto %', tV>0?Math.round((tV-tC-tG)/tV*100)+'%':'0%'],
+    [''],
+    ['Cantidad de ventas', vFilt.length],
+    ['Cantidad de gastos', gFilt.length],
+  ];
+  const ws4 = XLSX.utils.aoa_to_sheet(resData);
+  ws4['!cols'] = [{wch:30},{wch:18}];
+  XLSX.utils.book_append_sheet(wb, ws4, 'Resumen');
+
+  const fecha = tod().replace(/-/g,'');
+  XLSX.writeFile(wb, `Reporte_${currentTenant?.nombre||'negocio'}_${fecha}.xlsx`);
+  showToast('Excel descargado ✓');
+}
+
+function exportarPDF(){
+  const vFilt = filtrarPorRango(S.ventas, 'fecha');
+  const gFilt = filtrarPorRango(S.gastos, 'fecha');
+  const tV = vFilt.reduce((a,v)=>a+v.total,0);
+  const tC = vFilt.reduce((a,v)=>a+(v.costo||0),0);
+  const tG = gFilt.reduce((a,g)=>a+g.monto,0);
+  const label = getFiltLabel();
+  const negocio = currentTenant?.nombre || 'Mi Negocio';
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+  <title>Reporte ${negocio}</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;color:#1a1a1a;padding:20px;}
+    h1{font-size:18px;margin-bottom:4px;} h2{font-size:14px;margin:20px 0 8px;border-bottom:2px solid #c9a84c;padding-bottom:4px;}
+    .sub{color:#666;font-size:11px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px;}
+    th{background:#1a1a1a;color:#fff;padding:6px 8px;text-align:left;font-size:11px;}
+    td{padding:5px 8px;border-bottom:1px solid #e0e0e0;font-size:11px;}
+    tr:nth-child(even){background:#f9f9f9;}
+    .total{font-weight:bold;background:#f5f0e8;}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+    .scard{border:1px solid #ddd;border-radius:6px;padding:12px;text-align:center;}
+    .scard .val{font-size:18px;font-weight:bold;color:#c9a84c;}
+    .scard .lbl{font-size:10px;color:#666;margin-top:4px;}
+    .ok{color:green;} .bajo{color:red;}
+    @media print{body{padding:10px;}}
+  </style></head><body>
+  <h1>📊 Reporte — ${negocio}</h1>
+  <div class="sub">Período: ${label} · Generado el ${new Date().toLocaleDateString('es-AR')}</div>
+  
+  <div class="summary">
+    <div class="scard"><div class="val">$${tV.toLocaleString('es-AR')}</div><div class="lbl">Ingresos</div></div>
+    <div class="scard"><div class="val">$${(tC+tG).toLocaleString('es-AR')}</div><div class="lbl">Costos + Gastos</div></div>
+    <div class="scard"><div class="val" style="color:${tV-tC-tG>=0?'green':'red'}">$${(tV-tC-tG).toLocaleString('es-AR')}</div><div class="lbl">Resultado neto</div></div>
+  </div>
+
+  <h2>💰 Ventas (${vFilt.length})</h2>
+  <table><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th></tr>
+  ${vFilt.map(v=>`<tr><td>${v.fecha}</td><td>${v.nombre}</td><td>${v.cantidad}</td><td>$${(v.precio||0).toLocaleString('es-AR')}</td><td>$${(v.total||0).toLocaleString('es-AR')}</td><td>${v.metodo}</td></tr>`).join('')}
+  <tr class="total"><td colspan="4">TOTAL</td><td>$${tV.toLocaleString('es-AR')}</td><td></td></tr></table>
+
+  <h2>💸 Gastos (${gFilt.length})</h2>
+  <table><tr><th>Fecha</th><th>Concepto</th><th>Tipo</th><th>Monto</th></tr>
+  ${gFilt.map(g=>`<tr><td>${g.fecha}</td><td>${g.concepto}</td><td>${g.tipo}</td><td>$${(g.monto||0).toLocaleString('es-AR')}</td></tr>`).join('')}
+  <tr class="total"><td colspan="3">TOTAL</td><td>$${tG.toLocaleString('es-AR')}</td></tr></table>
+
+  <h2>📦 Stock actual</h2>
+  <table><tr><th>Producto</th><th>Cat.</th><th>Stock</th><th>Precio</th><th>Estado</th></tr>
+  ${S.stock.map(s=>`<tr><td>${s.nombre}</td><td>${s.categoria}</td><td>${s.cantidad}</td><td>$${(s.precio||0).toLocaleString('es-AR')}</td><td class="${s.cantidad<=s.minimo?'bajo':'ok'}">${s.cantidad<=s.minimo?'BAJO':'OK'}</td></tr>`).join('')}
+  </table>
+  </body></html>`;
+
+  const win = window.open('','_blank');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(()=>win.print(), 500);
+  showToast('PDF listo para imprimir ✓');
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); }
