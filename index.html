@@ -16,6 +16,11 @@
   --fh:'Playfair Display',serif;--fb:'Outfit',sans-serif;--r:10px;
   --accent:#c9a84c;
 }
+body.light-mode{
+  --bg:#f5f2ee;--sur:#ede9e3;--car:#e8e3db;--car2:#dfd9cf;
+  --bor:#ccc5b8;--bor2:#b8b0a0;
+  --tx:#1a1710;--tx2:#5c5040;--mut:#9a8e7a;
+}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;min-height:100vh;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -383,7 +388,7 @@ textarea{resize:vertical;min-height:70px;}
     <div class="tb-right">
       <div class="tb-date" id="tbDate"></div>
       <div class="tb-sync"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">Conectado</span></div>
-      <div class="tb-user" id="tbUser"></div>
+      <div class="tb-user" id="tbUser"></div><button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bor2);color:var(--tx2);padding:5px 10px;border-radius:7px;font-size:.75rem;cursor:pointer;margin-left:8px" title="Alternar modo">🌙</button>
       <button style="background:none;border:1px solid var(--bor);color:var(--tx2);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" onclick="descargarBackup()">💾</button>
     </div>
   </div>
@@ -391,8 +396,24 @@ textarea{resize:vertical;min-height:70px;}
   <div class="cnt">
     <!-- DASHBOARD -->
     <div class="sec active" id="sec-dashboard">
-      <div class="pt">Dashboard</div>
+      <div class="pt" id="dashGreeting">Buenos días</div>
       <div class="ps" id="dashSub">Resumen del negocio</div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+          <div style="text-align:center;padding:16px 8px">
+            <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">💰 Vendido hoy</div>
+            <div id="bigVentaHoy" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--ok)">$0</div>
+          </div>
+          <div style="text-align:center;padding:16px 8px;border-left:1px solid var(--bor);border-right:1px solid var(--bor)">
+            <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">🔧 Listos p/ entregar</div>
+            <div id="bigTrabajosListos" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--wrn)">0</div>
+          </div>
+          <div style="text-align:center;padding:16px 8px">
+            <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">📦 Stock bajo mínimo</div>
+            <div id="bigStockBajo" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--bad)">0</div>
+          </div>
+        </div>
+      </div>
       <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bgh bsm" onclick="openM('mObjetivos',null)">⚙ Configurar</button></div><div class="g3" id="objHoy"></div></div>
       <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button></div><div class="g4" id="cajasGrid"></div></div>
       <div class="g2" style="margin-bottom:14px">
@@ -772,6 +793,7 @@ async function doLogin(){
 }
 
 function setupApp(){
+  initTheme();
   // Aplicar nombre del negocio
   const n = currentTenant.nombre || 'Mi Negocio';
   const r = currentTenant.rubro || 'Sistema de Gestión';
@@ -1455,7 +1477,7 @@ async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').
 
 // ═══ DASHBOARD ═══
 function rDash(){
-  rObjetivos(); rCajas();
+  updateGreeting(); updateBigNumbers(); rObjetivos(); rCajas();
   const m=mes();
   const vm=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
@@ -1659,6 +1681,45 @@ function fillObjetivosModal(){
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rGastos(); rPrecios(); rInversores(); }
+
+function toggleTheme(){
+  document.body.classList.toggle('light-mode');
+  const btn = document.getElementById('themeToggle');
+  const isLight = document.body.classList.contains('light-mode');
+  btn.textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+
+function initTheme(){
+  const saved = localStorage.getItem('theme');
+  if(saved === 'light'){
+    document.body.classList.add('light-mode');
+    const btn = document.getElementById('themeToggle');
+    if(btn) btn.textContent = '🌙';
+  }
+}
+
+function updateGreeting(){
+  const h = new Date().getHours();
+  const name = currentTenant?.nombre || '';
+  let saludo = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const el = document.getElementById('dashGreeting');
+  if(el) el.textContent = saludo + (name ? ', ' + name : '');
+}
+
+function updateBigNumbers(){
+  const hoy = tod();
+  const ventasHoy = S.ventas.filter(v=>v.fecha===hoy);
+  const totalHoy = ventasHoy.reduce((a,v)=>a+v.total,0);
+  const trabajosListos = S.reparaciones.filter(r=>r.estado==='listo').length;
+  const stockBajo = S.stock.filter(s=>s.cantidad<=s.minimo).length;
+  const bvh = document.getElementById('bigVentaHoy');
+  const btl = document.getElementById('bigTrabajosListos');
+  const bsb = document.getElementById('bigStockBajo');
+  if(bvh) bvh.textContent = fmt(totalHoy);
+  if(btl) btl.textContent = trabajosListos;
+  if(bsb) bsb.textContent = stockBajo;
+}
 
 // ═══ AUTO-REFRESCO ═══
 async function silentRefresh(){
