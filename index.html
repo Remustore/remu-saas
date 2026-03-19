@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#080808">
 <title id="pageTitle">Sistema de Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -253,12 +257,68 @@ textarea{resize:vertical;min-height:70px;}
 
 /* RESPONSIVE */
 @media(max-width:768px){
-  #sb{transform:translateX(-100%);}
-  #sb.open{transform:translateX(0);}
+  /* Sidebar */
+  #sb{transform:translateX(-100%);width:240px;}
+  #sb.open{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,.5);}
   #mn{margin-left:0;}
-  #hbg{display:block;}
-  .cnt{padding:16px;}
+  #hbg{display:block !important;}
+  .cnt{padding:12px;}
+  
+  /* Overlay when sidebar open */
+  #sbOverlay{display:block;}
+  
+  /* Topbar compacto */
+  .topbar{padding:10px 14px;}
+  .tb-date{display:none;}
+  .tb-user{font-size:.65rem;padding:3px 8px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  
+  /* Títulos */
+  .pt{font-size:1.1rem;}
+  
+  /* Cards */
+  .card{padding:14px;}
+  
+  /* Tablas → scroll horizontal */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:500px;}
+  th,td{padding:8px 8px;font-size:.75rem;}
+  
+  /* Botones más grandes para touch */
+  .btn{padding:10px 16px;font-size:.82rem;}
+  .bsm{padding:8px 12px;font-size:.75rem;}
+  
+  /* Grids */
+  .g2,.g3,.g4{grid-template-columns:1fr;}
+  
+  /* 3 números grandes del dashboard */
+  #sec-dashboard .card:first-of-type > div{grid-template-columns:1fr !important;}
+  
+  /* Kanban en celular → 1 columna */
+  .kan{grid-template-columns:1fr;}
+  
+  /* Modal full bottom sheet */
+  .mb{padding:0;align-items:flex-end;}
+  .md{border-radius:16px 16px 0 0;max-height:92vh;}
+  
+  /* Formularios */
+  .fr{grid-template-columns:1fr;}
+  input,select,textarea{font-size:16px;} /* evita zoom en iOS */
+  
+  /* Undo bar */
+  #undoBar{width:90%;left:5%;transform:none;bottom:16px;}
+  
+  /* Search bar full width */
+  .srch{max-width:100%;}
+  .ch{flex-direction:column;align-items:flex-start;}
+  .ch .btn{width:100%;justify-content:center;}
+  
+  /* Tabs scroll horizontal */
+  .tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;}
+  .tab{white-space:nowrap;flex-shrink:0;}
 }
+
+/* Overlay sidebar mobile */
+#sbOverlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;}
 
 /* MÓDULOS deshabilitados */
 .module-disabled{display:none !important;}
@@ -349,6 +409,7 @@ textarea{resize:vertical;min-height:70px;}
 </div>
 
 <!-- SIDEBAR -->
+<div id="sbOverlay" onclick="toggleSB()"></div>
 <div id="sb">
   <div class="la">
     <div class="lm" id="sbLogo">SISTEMA</div>
@@ -1088,15 +1149,11 @@ function go(id){
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
 
-function toggleSB(){ document.getElementById('sb').classList.toggle('open'); }
-
-function openM(id, editId){
-  document.getElementById(id).classList.add('open');
-  if(id==='mVenta'){ document.getElementById('vFec').value=tod(); popVSels(); }
-  if(id==='mGasto') document.getElementById('gFec').value=tod();
-  if(id==='mMovCaja') document.getElementById('mcFec').value=tod();
-  if(id==='mObjetivos') fillObjetivosModal();
-  if(editId) fillEdit(id,editId); else clearMod(id);
+function toggleSB(){
+  const sb = document.getElementById('sb');
+  const ov = document.getElementById('sbOverlay');
+  sb.classList.toggle('open');
+  if(ov) ov.style.display = sb.classList.contains('open') ? 'block' : 'none';
 }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.mb').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
