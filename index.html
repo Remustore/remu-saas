@@ -519,8 +519,18 @@ textarea{resize:vertical;min-height:70px;}
           </div>
         </div>
       </div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mVenta',null);go('ventas')">
+            <span style="font-size:1.1rem">💰</span> Registrar venta
+          </button>
+          <button class="btn bgh" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mTaller',null);go('taller')">
+            <span style="font-size:1.1rem">🔧</span> Nuevo trabajo
+          </button>
+        </div>
+      </div>
       <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bgh bsm" onclick="openM('mObjetivos',null)">⚙ Configurar</button></div><div class="g3" id="objHoy"></div></div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button></div><div class="g4" id="cajasGrid"></div></div>
+      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card">
           <div class="ch"><h3>Meta mensual</h3></div>
@@ -782,7 +792,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="fr"><div><label>% Comisión sobre precio venta</label><input type="number" id="vCom" placeholder="0" oninput="calcComision()"></div><div><label>Comisión calculada ($)</label><input type="number" id="vComCalc" readonly style="background:var(--car2)"></div></div></div>
 <div id="vSR" style="display:none"><label>Descripción</label><input id="vSDesc" placeholder="Ej: Cambio de pantalla"></div>
 <div class="fr"><div><label>Cantidad</label><input type="number" id="vCant" value="1" oninput="calcComision()"></div><div><label>Precio unitario ($)</label><input type="number" id="vPre" placeholder="0" oninput="calcComision()"></div></div>
-<div class="fr"><div><label>Método de pago</label><select id="vMet"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Mercado Pago</option></select></div><div><label>Fecha</label><input type="date" id="vFec"></div></div>
+<div class="fr"><div><label>Método de pago</label><select id="vMet"><option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Tarjeta Marcos Juárez</option><option>Tarjeta Coyspu</option></select></div><div><label>Fecha</label><input type="date" id="vFec"></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mVenta')">Cancelar</button><button class="btn bg" onclick="saveVenta()">Guardar</button></div></div></div>
 
 <!-- Taller -->
@@ -2431,6 +2441,68 @@ function toggleTheme(){
   const isLight = document.body.classList.contains('light-mode');
   btn.textContent = isLight ? '🌙' : '☀️';
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+
+function cierreDiario(){
+  const hoy = tod();
+  const ventasHoy = S.ventas.filter(v=>v.fecha===hoy);
+  const trabajosHoy = S.reparaciones.filter(r=>r.fecha===hoy);
+  const gastosHoy = S.gastos.filter(g=>g.fecha===hoy);
+  
+  const totalVentas = ventasHoy.reduce((a,v)=>a+v.total,0);
+  const totalGastos = gastosHoy.reduce((a,g)=>a+g.monto,0);
+  const totalTaller = trabajosHoy.reduce((a,r)=>a+(r.presupuesto||0),0);
+  
+  // Agrupar por método de pago
+  const porMetodo = {};
+  ventasHoy.forEach(v=>{ porMetodo[v.metodo]=(porMetodo[v.metodo]||0)+v.total; });
+  
+  const listaPagos = Object.entries(porMetodo).map(([m,t])=>`<tr><td>${m}</td><td style="text-align:right;font-weight:600;color:var(--ok)">$${t.toLocaleString('es-AR')}</td></tr>`).join('');
+  
+  const html = `<div style="padding:16px">
+    <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;margin-bottom:4px">📋 Cierre del día — ${fD(hoy)}</div>
+    <div style="font-size:.75rem;color:var(--tx2);margin-bottom:16px">${currentTenant?.nombre||''}</div>
+    
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Ventas</div>
+        <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--ok)">$${totalVentas.toLocaleString('es-AR')}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${ventasHoy.length} operaciones</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Taller</div>
+        <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--gld)">$${totalTaller.toLocaleString('es-AR')}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${trabajosHoy.length} trabajos</div>
+      </div>
+    </div>
+    
+    ${listaPagos ? `<div style="margin-bottom:16px">
+      <div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Desglose por método de pago</div>
+      <table style="width:100%;border-collapse:collapse">${listaPagos}</table>
+    </div>` : ''}
+    
+    <div style="border-top:1px solid var(--bor);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:.72rem;color:var(--tx2)">Gastos del día</div>
+        <div style="font-weight:600;color:var(--bad)">- $${totalGastos.toLocaleString('es-AR')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:.72rem;color:var(--tx2)">Resultado neto</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:${totalVentas+totalTaller-totalGastos>=0?'var(--gld)':'var(--bad)'}">$${(totalVentas+totalTaller-totalGastos).toLocaleString('es-AR')}</div>
+      </div>
+    </div>
+  </div>`;
+  
+  let overlay = document.getElementById('cierreOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'cierreOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">${html}<div style="padding:14px;text-align:right;border-top:1px solid var(--bor)"><button class="btn" onclick="document.getElementById('cierreOverlay').remove()">Cerrar</button></div></div>`;
+  overlay.style.display = 'flex';
 }
 
 function applyColor(color){
