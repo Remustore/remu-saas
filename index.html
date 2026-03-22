@@ -946,18 +946,7 @@ textarea{resize:vertical;min-height:70px;}
     <!-- PRECIOS -->
     <div class="sec" id="sec-precios">
       <div class="pt">Lista de Precios</div><div class="ps" id="preciosSub">Servicios visibles para clientes</div>
-      <div class="card" style="margin-bottom:14px;border-left:3px solid var(--gld)">
-        <div style="font-size:.78rem;font-weight:600;color:var(--gld);margin-bottom:8px">⚠️ Importante — Leer antes de contratar</div>
-        <div style="font-size:.78rem;color:var(--tx2);line-height:1.6">
-          Nuestra prioridad es entregar trabajos con <strong style="color:var(--tx)">transplante de IC y Flex</strong> logrando que tu equipo <strong style="color:var(--tx)">NO MARQUE CARTELES</strong>, pero siempre está la posibilidad de que un flex o un IC se dañe por golpe. Por lo que si se daña por golpe el mismo sería irreparable y su equipo será reparado pero quedará marcando <strong style="color:var(--wrn)">PIEZA DESCONOCIDA</strong>.
-        </div>
-        <div style="margin-top:10px;font-size:.78rem;color:var(--tx2)">
-          ⏰ <strong style="color:var(--tx)">Tiempo de reparación:</strong> 2 a 3 días hábiles
-        </div>
-        <div style="margin-top:6px;font-size:.78rem;color:var(--tx2)">
-          🔋 <strong style="color:var(--tx)">Cambio de baterías:</strong> disponible con restablecimiento de fábrica (mantiene originalidad) o con batería pre-programada.
-        </div>
-      </div>
+      <div id="preciosNotice" style="margin-bottom:14px"></div>
       <div class="card">
         <div style="margin-bottom:12px">
           <div class="tabs" id="prTabs" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px">
@@ -2298,6 +2287,17 @@ function setupPreciosTabs(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
   const tabsEl = document.getElementById('prTabs');
+  
+  // Dynamic notice
+  const notice = document.getElementById('preciosNotice');
+  if(notice){
+    if(esSalon){
+      notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">💅 Lista de servicios de ' + (currentTenant?.nombre||'el salón') + '</strong><br>Los precios pueden variar según el largo, tipo de cabello y técnica aplicada. Consultanos para presupuestos personalizados.</div>';
+    } else {
+      notice.innerHTML = '<div style="background:var(--gld2);border-left:3px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">⚠️ Importante — Leer antes de contratar</strong><br>Nuestra prioridad es entregar trabajos con <strong>transplante de IC y Flex</strong> logrando que tu equipo <strong>NO MARQUE CARTELES</strong>. Si se daña por golpe quedará marcando <strong style="color:var(--wrn)">PIEZA DESCONOCIDA</strong>.<br><br>⏰ <strong>Tiempo de reparación:</strong> 2 a 3 días hábiles · 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica o pre-programada.</div>';
+    }
+  }
+  
   if(!tabsEl) return;
   if(esSalon){
     tabsEl.innerHTML = `
