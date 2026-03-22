@@ -730,6 +730,18 @@ textarea{resize:vertical;min-height:70px;}
     <!-- PRECIOS -->
     <div class="sec" id="sec-precios">
       <div class="pt">Lista de Precios</div><div class="ps" id="preciosSub">Servicios visibles para clientes</div>
+      <div class="card" style="margin-bottom:14px;border-left:3px solid var(--gld)">
+        <div style="font-size:.78rem;font-weight:600;color:var(--gld);margin-bottom:8px">⚠️ Importante — Leer antes de contratar</div>
+        <div style="font-size:.78rem;color:var(--tx2);line-height:1.6">
+          Nuestra prioridad es entregar trabajos con <strong style="color:var(--tx)">transplante de IC y Flex</strong> logrando que tu equipo <strong style="color:var(--tx)">NO MARQUE CARTELES</strong>, pero siempre está la posibilidad de que un flex o un IC se dañe por golpe. Por lo que si se daña por golpe el mismo sería irreparable y su equipo será reparado pero quedará marcando <strong style="color:var(--wrn)">PIEZA DESCONOCIDA</strong>.
+        </div>
+        <div style="margin-top:10px;font-size:.78rem;color:var(--tx2)">
+          ⏰ <strong style="color:var(--tx)">Tiempo de reparación:</strong> 2 a 3 días hábiles
+        </div>
+        <div style="margin-top:6px;font-size:.78rem;color:var(--tx2)">
+          🔋 <strong style="color:var(--tx)">Cambio de baterías:</strong> disponible con restablecimiento de fábrica (mantiene originalidad) o con batería pre-programada.
+        </div>
+      </div>
       <div class="card">
         <div class="ch">
           <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rPrecios()" id="prQ"></div>
@@ -832,6 +844,7 @@ textarea{resize:vertical;min-height:70px;}
     <div style="font-size:.8rem" id="tGanPct">0%</div>
   </div>
 </div>
+<div class="fr full"><div><label>Fecha estimada de entrega</label><input type="date" id="tFechaEnt" placeholder="Fecha estimada"></div></div>
 <div class="fr"><div><label>Costo del repuesto ($)</label><input type="number" id="tCosRep" placeholder="0" oninput="calcGanTaller()"></div><div><label>Flete / Comisionista ($)</label><input type="number" id="tFlete" placeholder="0" oninput="calcGanTaller()"></div></div>
 <div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">
   <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;font-weight:600">🔍 Estado del equipo al ingreso</div>
