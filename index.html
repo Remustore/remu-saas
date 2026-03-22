@@ -567,15 +567,15 @@ textarea{resize:vertical;min-height:70px;}
       <div class="card" style="margin-bottom:14px">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
           <div style="text-align:center;padding:16px 8px">
-            <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">💰 Vendido hoy</div>
+            <div id="labelVentaHoy" style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">💰 Vendido hoy</div>
             <div id="bigVentaHoy" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--ok)">$0</div>
           </div>
           <div style="text-align:center;padding:16px 8px;border-left:1px solid var(--bor);border-right:1px solid var(--bor)">
-            <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">🔧 Listos p/ entregar</div>
+            <div id="labelTrabajosListos" style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">🔧 Listos p/ entregar</div>
             <div id="bigTrabajosListos" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--wrn)">0</div>
           </div>
           <div style="text-align:center;padding:16px 8px">
-            <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">📦 Stock bajo mínimo</div>
+            <div id="labelStockBajo" style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">📦 Stock bajo mínimo</div>
             <div id="bigStockBajo" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--bad)">0</div>
           </div>
         </div>
@@ -637,7 +637,7 @@ textarea{resize:vertical;min-height:70px;}
 
     <!-- STOCK -->
     <div class="sec" id="sec-stock">
-      <div class="pt">Stock</div><div class="ps" id="stockSub">Accesorios y productos</div>
+      <div class="pt">Stock</div><div class="ps" id="stockSub">Productos</div>
       <div id="stockAlertBanner" style="display:none;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.82rem;color:var(--bad)"></div>
       <div class="card">
         <div class="ch">
@@ -1359,10 +1359,35 @@ function setupApp(){
   const r = currentTenant.rubro || 'Sistema de Gestión';
   document.getElementById('sbLogo').textContent = n.toUpperCase();
   document.getElementById('sbSub').textContent = r;
+  // Adaptar subtítulo de stock
+  const stockSubEl = document.getElementById('stockSub');
+  if(stockSubEl){
+    const rubroS = (currentTenant.rubro||'').toLowerCase();
+    if(rubroS.includes('salon')||rubroS.includes('belleza')) stockSubEl.textContent = 'Productos y artículos del salón';
+    else if(rubroS.includes('deco')||rubroS.includes('perfum')) stockSubEl.textContent = 'Deco, perfumes y accesorios';
+  }
   document.getElementById('tbUser').textContent = '👑 ' + (currentUser.email || '');
   document.getElementById('sbBizName').textContent = n;
   document.getElementById('sbUserEmail').textContent = currentUser.email || '';
   document.getElementById('dashSub').textContent = 'Visión general — ' + n;
+  
+  // Adaptar labels del dashboard según el rubro
+  const rubro = (currentTenant.rubro||'').toLowerCase();
+  const esSalon = rubro.includes('salon') || rubro.includes('salón') || rubro.includes('belleza') || rubro.includes('peluq') || rubro.includes('manicur');
+  const esDeco = rubro.includes('deco') || rubro.includes('perfum') || rubro.includes('hogar');
+  
+  const lbl2 = document.getElementById('labelTrabajosListos');
+  const lbl3 = document.getElementById('labelStockBajo');
+  const lbl1 = document.getElementById('labelVentaHoy');
+  
+  if(esSalon){
+    if(lbl2) lbl2.innerHTML = '📅 Turnos hoy';
+    if(lbl3) lbl3.innerHTML = '✓ Turnos terminados';
+    if(lbl1) lbl1.innerHTML = '💰 Facturado hoy';
+  } else if(esDeco){
+    if(lbl2) lbl2.innerHTML = '📦 Productos bajo mínimo';
+    if(lbl3) lbl3.innerHTML = '🛍 Ventas de hoy';
+  }
   document.getElementById('pageTitle').textContent = n;
   document.title = n;
 
@@ -4424,14 +4449,30 @@ function updateBigNumbers(){
   const hoy = tod();
   const ventasHoy = S.ventas.filter(v=>v.fecha===hoy);
   const totalHoy = ventasHoy.reduce((a,v)=>a+v.total,0);
-  const trabajosListos = S.reparaciones.filter(r=>r.estado==='listo').length;
-  const stockBajo = S.stock.filter(s=>s.cantidad<=s.minimo).length;
   const bvh = document.getElementById('bigVentaHoy');
   const btl = document.getElementById('bigTrabajosListos');
   const bsb = document.getElementById('bigStockBajo');
-  if(bvh) bvh.textContent = fmt(totalHoy);
-  if(btl) btl.textContent = trabajosListos;
-  if(bsb) bsb.textContent = stockBajo;
+  
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esSalon = rubro.includes('salon')||rubro.includes('salón')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
+  
+  if(esSalon){
+    // Para salón: turnos hoy / turnos terminados hoy
+    const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado!=='cancelado').length : 0;
+    const turnosTerminados = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').length : 0;
+    // Facturado por turnos terminados
+    const facturadoTurnos = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
+    const totalFact = totalHoy + facturadoTurnos;
+    if(bvh) bvh.textContent = fmt(totalFact);
+    if(btl) btl.textContent = turnosHoy;
+    if(bsb) bsb.textContent = turnosTerminados;
+  } else {
+    const trabajosListos = S.reparaciones.filter(r=>r.estado==='listo').length;
+    const stockBajo = S.stock.filter(s=>s.cantidad<=s.minimo).length;
+    if(bvh) bvh.textContent = fmt(totalHoy);
+    if(btl) btl.textContent = trabajosListos;
+    if(bsb) bsb.textContent = stockBajo;
+  }
 }
 
 // ═══ AUTO-REFRESCO ═══
