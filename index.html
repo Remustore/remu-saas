@@ -422,7 +422,21 @@ textarea{resize:vertical;min-height:70px;}
               <div onclick="document.getElementById('saColor').value='#9b4cc9';previewColor('#9b4cc9')" style="width:24px;height:24px;border-radius:50%;background:#9b4cc9;cursor:pointer" title="Violeta"></div>
             </div>
           </div>
-          <button class="sa-btn" onclick="crearTenant()">Crear cliente</button>
+          <label>Rol del usuario</label>
+          <select id="saRol" onchange="toggleRolFields(this.value)" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;">
+            <option value="admin">👑 Administrador — acceso completo</option>
+            <option value="empleado">👤 Empleado — solo sus turnos</option>
+          </select>
+          <div id="saEmpleadoFields" style="display:none;margin-top:8px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">
+            <div style="font-size:.72rem;color:var(--gld);margin-bottom:8px;font-weight:600">👤 Datos del empleado</div>
+            <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Negocio al que pertenece</label>
+            <select id="saTenantExistente" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:8px">
+              <option value="">Cargando...</option>
+            </select>
+            <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px;margin-top:8px">Nombre del empleado (para filtrar turnos)</label>
+            <input id="saNombreEmpleado" placeholder="Ej: María, Dueña 1..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;">
+          </div>
+          <button class="sa-btn" onclick="crearUsuario()">Crear usuario</button>
           <div id="saMsg" class="sa-msg"></div>
         </div>
       </div>
@@ -1147,6 +1161,17 @@ async function doLogin(){
   if(email === SUPER_EMAIL.toLowerCase() && pass === SUPER_PASS){
     currentRole = 'superadmin';
     document.getElementById('loginScreen').style.display='none';
+  
+  // Si es empleado, ocultar todo excepto turnos
+  if(currentRole === 'empleado'){
+    const modMap2 = ['nav-ventas','nav-stock','nav-equipos','nav-gastos','nav-analisis','nav-precios','nav-inversores','nav-clientes','nav-auditoria'];
+    modMap2.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    // Auto-filtrar turnos por nombre del empleado
+    if(window.currentEmpleadoNombre){
+      turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
+    }
+    go('turnos');
+  }
   // Auto backup diario
   const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
   const lastBackup = localStorage.getItem(hoyKey);
@@ -1185,7 +1210,10 @@ async function doLogin(){
     if(!td.activo) throw new Error('Cuenta desactivada. Contactá al administrador.');
 
     currentTenant = td;
-    currentRole = 'admin';
+    const rolUsuario = data.user.user_metadata?.rol || 'admin';
+    const nombreEmpleado = data.user.user_metadata?.nombre_empleado || '';
+    currentRole = rolUsuario;
+    if(nombreEmpleado) window.currentEmpleadoNombre = nombreEmpleado;
     setupApp();
     await loadAll();
   } catch(e) {
@@ -1235,6 +1263,17 @@ function setupApp(){
   });
 
   document.getElementById('loginScreen').style.display='none';
+  
+  // Si es empleado, ocultar todo excepto turnos
+  if(currentRole === 'empleado'){
+    const modMap2 = ['nav-ventas','nav-stock','nav-equipos','nav-gastos','nav-analisis','nav-precios','nav-inversores','nav-clientes','nav-auditoria'];
+    modMap2.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    // Auto-filtrar turnos por nombre del empleado
+    if(window.currentEmpleadoNombre){
+      turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
+    }
+    go('turnos');
+  }
   // Auto backup diario
   const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
   const lastBackup = localStorage.getItem(hoyKey);
@@ -1273,6 +1312,62 @@ function doSuperLogout(){
 }
 
 // ═══ SUPERADMIN — CREAR TENANT ═══
+function toggleRolFields(rol){
+  const empFields = document.getElementById('saEmpleadoFields');
+  const nameField = document.getElementById('saName').closest('div')?.parentElement;
+  empFields.style.display = rol==='empleado' ? 'block' : 'none';
+  // Load tenants list for empleado
+  if(rol==='empleado') loadTenantsForSelect();
+}
+
+async function loadTenantsForSelect(){
+  const { data } = await sb.from('tenants').select('id,nombre').eq('activo',true);
+  const sel = document.getElementById('saTenantExistente');
+  if(sel && data) sel.innerHTML = data.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+}
+
+async function crearUsuario(){
+  const rol = document.getElementById('saRol').value;
+  
+  if(rol === 'empleado'){
+    // Crear usuario empleado para negocio existente
+    const tenantId = document.getElementById('saTenantExistente').value;
+    const email = document.getElementById('saEmail').value.trim().toLowerCase();
+    const pass = document.getElementById('saPass').value.trim();
+    const nombreEmp = document.getElementById('saNombreEmpleado').value.trim();
+    
+    if(!email||!pass||!tenantId||!nombreEmp){
+      showSaMsg('Completá todos los campos', 'err'); return;
+    }
+    
+    showSaMsg('Creando empleado...', 'ok');
+    try {
+      const { data: usr, error: ue } = await sb.auth.admin.createUser({
+        email, password: pass,
+        user_metadata: { tenant_id: tenantId, rol: 'empleado', nombre_empleado: nombreEmp },
+        email_confirm: true
+      });
+      if(ue){
+        const { error: ue2 } = await sb.auth.signUp({
+          email, password: pass,
+          options: { data: { tenant_id: tenantId, rol: 'empleado', nombre_empleado: nombreEmp } }
+        });
+        if(ue2) throw ue2;
+      }
+      showSaMsg(`✓ Empleado "${nombreEmp}" creado. Email: ${email}`, 'ok');
+      document.getElementById('saEmail').value='';
+      document.getElementById('saPass').value='';
+      document.getElementById('saNombreEmpleado').value='';
+    } catch(e){
+      showSaMsg('Error: ' + (e.message||JSON.stringify(e)), 'err');
+    }
+    return;
+  }
+  
+  // Si es admin, crear tenant nuevo (comportamiento original)
+  return crearTenant();
+}
+
 async function crearTenant(){
   const nombre  = document.getElementById('saName').value.trim();
   const rubro   = document.getElementById('saRubro').value.trim();
@@ -3179,7 +3274,12 @@ function rTurnos(){
   const fecha = fechaEl.value;
   const cfg = getTurnosCfg();
   let turnos = getTurnos().filter(t=>t.fecha===fecha && t.estado!=='cancelado');
-  if(turnosFiltroEmpleado!=='todos') turnos=turnos.filter(t=>t.empleadoId==turnosFiltroEmpleado);
+  if(turnosFiltroEmpleado.startsWith('auto_')){
+    const nombre = turnosFiltroEmpleado.replace('auto_','');
+    turnos = turnos.filter(t=>t.empleadoNombre===nombre);
+  } else if(turnosFiltroEmpleado!=='todos'){
+    turnos=turnos.filter(t=>t.empleadoId==turnosFiltroEmpleado);
+  }
   turnos.sort((a,b)=>a.hora.localeCompare(b.hora));
 
   // Update empleado tabs
