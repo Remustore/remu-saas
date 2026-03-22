@@ -691,14 +691,16 @@ textarea{resize:vertical;min-height:70px;}
 
       <!-- Selector de fecha y vista -->
       <div class="card" style="margin-bottom:14px">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="btn bsm" onclick="cambiarFechaTurnos(-1)">◀</button>
           <input type="date" id="turnosFecha" onchange="rTurnos()" style="padding:7px 12px;font-size:.85rem;flex:1;max-width:180px">
           <button class="btn bsm" onclick="cambiarFechaTurnos(1)">▶</button>
           <button class="btn bgh bsm" onclick="irHoyTurnos()">Hoy</button>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="tab active" id="vistaListaBtn" onclick="setVistaTurnos('lista')">Lista</button>
-            <button class="tab" id="vistaHorarioBtn" onclick="setVistaTurnos('horario')">Horario</button>
+          <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+            <button class="tab active" id="vistaListaBtn" onclick="setVistaTurnos('lista')">📋 Lista</button>
+            <button class="tab" id="vistaHorarioBtn" onclick="setVistaTurnos('horario')">🕐 Horario</button>
+            <button class="tab" id="vistaSemanaBt" onclick="setVistaTurnos('semana')">📅 Semana</button>
+            <button class="tab" id="vistaCalendarioBtn" onclick="setVistaTurnos('calendario')">🗓 Mes</button>
           </div>
         </div>
       </div>
@@ -711,8 +713,10 @@ textarea{resize:vertical;min-height:70px;}
       <!-- Resumen del día -->
       <div id="turnosDayStats" style="margin-bottom:14px"></div>
 
-      <!-- Lista de turnos -->
+      <!-- Contenedor principal -->
       <div id="turnosLista"></div>
+      <div id="turnosSemana" style="display:none"></div>
+      <div id="turnosCalendario" style="display:none"></div>
     </div>
 
     <!-- CONFIGURACION TURNOS -->
@@ -1004,6 +1008,13 @@ textarea{resize:vertical;min-height:70px;}
     · Finaliza: <strong id="turnoFinLabel" style="color:var(--tx)">—</strong>
   </div>
   <div id="turnoConflicto" style="display:none;background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--bad)"></div>
+  <div class="fr"><div><label>Estado</label><select id="turnoEstado">
+    <option value="confirmado">✅ Confirmado</option>
+    <option value="llego">🟢 Llegó</option>
+    <option value="en_proceso">🔄 En proceso</option>
+    <option value="terminado">✓ Terminado</option>
+    <option value="no_vino">❌ No vino</option>
+  </select></div><div><label>Precio cobrado ($)</label><input type="number" id="turnoPrecio" placeholder="0"></div></div>
   <div class="fr full"><div><label>Notas</label><input id="turnoNotas" placeholder="Observaciones..."></div></div>
 </div>
 <div class="mf"><button class="btn" onclick="closeM('mTurno')">Cancelar</button><button class="btn bg" onclick="saveTurno()">Guardar turno</button></div>
@@ -2942,6 +2953,11 @@ function setVistaTurnos(v){
   turnosVista = v;
   document.getElementById('vistaListaBtn').classList.toggle('active', v==='lista');
   document.getElementById('vistaHorarioBtn').classList.toggle('active', v==='horario');
+  document.getElementById('vistaSemanaBt')?.classList.toggle('active', v==='semana');
+  document.getElementById('vistaCalendarioBtn')?.classList.toggle('active', v==='calendario');
+  document.getElementById('turnosLista').style.display = (v==='lista'||v==='horario') ? '' : 'none';
+  document.getElementById('turnosSemana').style.display = v==='semana' ? '' : 'none';
+  document.getElementById('turnosCalendario').style.display = v==='calendario' ? '' : 'none';
   rTurnos();
 }
 
@@ -3057,6 +3073,8 @@ async function saveTurno(){
   const empleado = cfg.empleados.find(e=>e.id==empleadoId);
 
   const turnos = getTurnos();
+  const estado = document.getElementById('turnoEstado')?.value || 'confirmado';
+  const precioCobrado = parseFloat(document.getElementById('turnoPrecio')?.value || srv?.precio || 0);
   const obj = {
     id: id || Date.now().toString(),
     cliente: cli, tel, fecha, hora,
@@ -3064,9 +3082,8 @@ async function saveTurno(){
     servicioId, servicioNombre: srv?.nombre||'',
     sector: srv?.sector||'',
     duracion: srv?.duracion||60,
-    precio: srv?.precio||0,
-    notas,
-    estado: 'confirmado',
+    precio: precioCobrado,
+    notas, estado,
     creadoEn: new Date().toISOString()
   };
 
@@ -3078,6 +3095,29 @@ async function saveTurno(){
   }
 
   saveTurnosLocal(turnos);
+
+  // Si terminado, ofrecer registrar venta
+  if(estado === 'terminado' && precioCobrado > 0 && !id){
+    if(confirm(`¿Registrar venta de ${fmt(precioCobrado)} por ${srv?.nombre||'servicio'}?`)){
+      const venta = {
+        id: Date.now(),
+        tipo: 'servicio',
+        nombre: srv?.nombre || 'Servicio salón',
+        cantidad: 1,
+        precio: precioCobrado,
+        total: precioCobrado,
+        costo: 0,
+        metodo: 'Efectivo',
+        fecha: fecha,
+        comPct: 0,
+        comision: 0
+      };
+      S.ventas.unshift(venta);
+      await dbUpsert('ventas', venta);
+      showToast('Venta registrada automáticamente ✓');
+    }
+  }
+
   closeM('mTurno');
   rTurnos();
   showToast(id ? 'Turno actualizado ✓' : 'Turno agendado ✓');
@@ -3107,6 +3147,8 @@ function editarTurno(id){
   document.getElementById('turnoFecha').value = t.fecha;
   document.getElementById('turnoHora').value = t.hora;
   document.getElementById('turnoNotas').value = t.notas||'';
+  if(document.getElementById('turnoEstado')) document.getElementById('turnoEstado').value = t.estado||'confirmado';
+  if(document.getElementById('turnoPrecio')) document.getElementById('turnoPrecio').value = t.precio||0;
   document.getElementById('mTurnoTitle').textContent = 'Editar turno';
   document.getElementById('turnoConflicto').style.display='none';
   updateDuracionTurno();
@@ -3165,29 +3207,152 @@ function rTurnos(){
 
   const sectorColors = {'Peluquería':'bbl','Manicuria':'bgr','Maquillaje':'byw','Estética':'brd'};
 
+  const estadoBadge = {confirmado:'<span class="bx bbl">✅ Confirmado</span>',llego:'<span class="bx bgr">🟢 Llegó</span>',en_proceso:'<span class="bx byw">🔄 En proceso</span>',terminado:'<span class="bx bgx">✓ Terminado</span>',no_vino:'<span class="bx brd">❌ No vino</span>'};
+
   listaEl.innerHTML = turnos.map(t=>{
     const [h,m] = t.hora.split(':').map(Number);
     const fin = new Date(2000,0,1,h,m+t.duracion);
     const finStr = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
-    const color = sectorColors[t.sector]||'bg2';
-    return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${t.sector==='Peluquería'?'var(--inf)':t.sector==='Manicuria'?'var(--ok)':t.sector==='Maquillaje'?'var(--wrn)':'var(--bad)'}">
+    const borderColor = t.sector==='Peluquería'?'var(--inf)':t.sector==='Manicuria'?'var(--ok)':t.sector==='Maquillaje'?'var(--wrn)':'var(--bad)';
+    return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${borderColor}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
-        <div>
-          <div style="font-weight:600;font-size:.95rem">${t.cliente}</div>
+        <div style="flex:1">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:.95rem">${t.cliente}</span>
+            ${estadoBadge[t.estado]||''}
+            ${t.precio>0?`<span style="font-size:.78rem;color:var(--gld);font-weight:600">${fmt(t.precio)}</span>`:''}
+          </div>
           <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
             🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ✂ ${t.servicioNombre} &nbsp;·&nbsp; 👤 ${t.empleadoNombre}
           </div>
           ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${t.notas}</div>`:''}
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          <span class="bx ${color}">${t.sector}</span>
           ${t.tel?`<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')">📲 WA</button>`:''}
+          <button class="btn bg2 bsm" onclick="verHistorialCliente('${t.cliente.replace(/'/g,"\'")}')">📋</button>
           <button class="btn be bsm" onclick="editarTurno('${t.id}')">✎</button>
           <button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>
         </div>
       </div>
     </div>`;
   }).join('');
+
+  // Render other views too
+  if(turnosVista==='semana') rTurnosSemana();
+  if(turnosVista==='calendario') rTurnosCalendario();
+}
+
+function rTurnosSemana(){
+  const el = document.getElementById('turnosSemana');
+  if(!el) return;
+  const fecha = document.getElementById('turnosFecha').value || tod();
+  const d = new Date(fecha + 'T00:00:00');
+  const diaSem = d.getDay();
+  const lunes = new Date(d); lunes.setDate(d.getDate() - (diaSem===0?6:diaSem-1));
+  
+  const dias = [];
+  for(let i=0;i<7;i++){
+    const dd = new Date(lunes); dd.setDate(lunes.getDate()+i);
+    dias.push(dd.toISOString().slice(0,10));
+  }
+
+  const nombres = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const cfg = getTurnosCfg();
+  const estadoColors = {confirmado:'var(--inf)',llego:'var(--ok)',en_proceso:'var(--wrn)',terminado:'var(--mut)',no_vino:'var(--bad)'};
+
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+    ${dias.map((d,i)=>{
+      const esHoy = d===tod();
+      return `<div style="text-align:center;padding:6px 4px;font-size:.72rem;font-weight:${esHoy?700:400};color:${esHoy?'var(--gld)':'var(--tx2)'}">
+        ${nombres[i]}<br><span style="font-size:.8rem;color:${esHoy?'var(--gld)':'var(--tx)'}">${d.slice(8)}</span>
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">
+    ${dias.map(d=>{
+      const turnos = getTurnos().filter(t=>t.fecha===d&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
+      const esHoy = d===tod();
+      return `<div style="background:var(--car);border-radius:8px;padding:6px;min-height:80px;border:1px solid ${esHoy?'var(--gld)':'var(--bor)'};cursor:pointer" onclick="document.getElementById('turnosFecha').value='${d}';setVistaTurnos('lista')">
+        ${turnos.map(t=>`<div style="background:${estadoColors[t.estado]||'var(--inf)'};opacity:.85;border-radius:4px;padding:3px 5px;margin-bottom:3px;font-size:.65rem;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${t.hora} ${t.cliente}</div>`).join('')}
+        ${!turnos.length?`<div style="color:var(--mut);font-size:.65rem;text-align:center;margin-top:8px">—</div>`:''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function rTurnosCalendario(){
+  const el = document.getElementById('turnosCalendario');
+  if(!el) return;
+  const fecha = document.getElementById('turnosFecha').value || tod();
+  const [y,m] = fecha.split('-').map(Number);
+  const primerDia = new Date(y,m-1,1);
+  const ultimoDia = new Date(y,m,0);
+  const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  let startDay = primerDia.getDay(); if(startDay===0) startDay=7;
+  const dias = [];
+  for(let i=1;i<startDay;i++) dias.push(null);
+  for(let i=1;i<=ultimoDia.getDate();i++) dias.push(i);
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <button class="btn bsm" onclick="cambiarMesCalendario(-1)">◀</button>
+      <strong>${meses[m-1]} ${y}</strong>
+      <button class="btn bsm" onclick="cambiarMesCalendario(1)">▶</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+      ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:.7rem;color:var(--mut);padding:4px">${d}</div>`).join('')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+      ${dias.map(d=>{
+        if(!d) return '<div></div>';
+        const fechaDia = y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+        const turnos = getTurnos().filter(t=>t.fecha===fechaDia&&t.estado!=='cancelado');
+        const esHoy = fechaDia===tod();
+        const esSel = fechaDia===fecha;
+        return `<div style="background:${esSel?'var(--gld2)':esHoy?'var(--car2)':'var(--car)'};border:1px solid ${esSel?'var(--gld)':esHoy?'var(--bor2)':'var(--bor)'};border-radius:6px;padding:4px;min-height:48px;cursor:pointer;text-align:center" onclick="document.getElementById('turnosFecha').value='${fechaDia}';setVistaTurnos('lista')">
+          <div style="font-size:.8rem;font-weight:${esHoy||esSel?700:400};color:${esSel?'var(--gld)':esHoy?'var(--tx)':'var(--tx2)'}">${d}</div>
+          ${turnos.length?`<div style="background:var(--gld);color:#080808;border-radius:10px;font-size:.6rem;font-weight:700;padding:1px 5px;margin-top:2px">${turnos.length}</div>`:''}
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+function cambiarMesCalendario(dir){
+  const input = document.getElementById('turnosFecha');
+  const [y,m] = (input.value||tod()).split('-').map(Number);
+  const nueva = new Date(y, m-1+dir, 1);
+  input.value = nueva.getFullYear()+'-'+String(nueva.getMonth()+1).padStart(2,'0')+'-01';
+  rTurnosCalendario();
+}
+
+function verHistorialCliente(nombre){
+  const turnos = getTurnos().filter(t=>t.cliente===nombre).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  const estados={confirmado:'✅',llego:'🟢',en_proceso:'🔄',terminado:'✓',no_vino:'❌',cancelado:'✕'};
+  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:460px;max-height:80vh;overflow-y:auto">
+    <div style="padding:16px;border-bottom:1px solid var(--bor)">
+      <div style="font-family:var(--fh);font-size:1rem;font-weight:700">📅 Historial — ${nombre}</div>
+      <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${turnos.length} visitas registradas</div>
+    </div>
+    <div style="padding:16px">
+      ${turnos.map(t=>`<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem">
+          <span style="font-weight:600">${t.servicioNombre}</span>
+          <span>${estados[t.estado]||''} ${t.estado}</span>
+        </div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">${fD(t.fecha)} ${t.hora} · ${t.empleadoNombre}${t.precio?` · ${fmt(t.precio)}`:''}</div>
+      </div>`).join('')}
+      ${!turnos.length?'<div style="color:var(--mut);font-size:.82rem">Sin historial</div>':''}
+    </div>
+    <div style="padding:14px;border-top:1px solid var(--bor);text-align:right">
+      <button class="btn" onclick="this.closest('[style*=fixed]').remove()">Cerrar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 
 function rTurnosConfig(){
