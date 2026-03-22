@@ -577,7 +577,7 @@ textarea{resize:vertical;min-height:70px;}
             <button class="btn bg" onclick="openM('mStock',null)">+ Agregar producto</button>
           </div>
         </div>
-        <div class="tw"><table><thead><tr><th>Producto</th><th>Cat.</th><th>Stock</th><th>Precio</th><th>Costo</th><th>Ganancia $</th><th>Margen %</th><th>Markup %</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio venta</th><th>Margen</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
       </div>
     </div>
 
@@ -1388,10 +1388,8 @@ function rStock(){
     return `<tr><td><strong>${s.nombre}</strong>${s.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${s.notas}</span>`:''}</td>
     <td><span class="bx bg2">${s.categoria}</span></td>
     <td><strong>${s.cantidad}</strong> <span style="color:var(--mut);font-size:.69rem">mín ${s.minimo}</span></td>
-    <td>${fmt(s.precio)}</td><td>${fmt(s.costo)}</td>
-    <td>${s.precio&&s.costo?`<span style="color:var(--ok);font-weight:600">${fmt(s.precio-s.costo)}</span>`:'—'}</td>
-    <td>${mg!==null?`<span style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'};font-weight:600">${mg}%</span>`:'—'}</td>
-    <td>${s.precio&&s.costo?`<span style="color:var(--gld);font-weight:600">${Math.round((s.precio-s.costo)/s.costo*100)}%</span>`:'—'}</td>
+    <td>${fmt(s.precio)}</td>
+    <td>${mg!==null?`<span style="color:${mg>50?'var(--ok)':mg>30?'var(--wrn)':'var(--bad)'};font-weight:600">${mg}%</span>`:'—'}</td>
     <td>${s.cantidad<=s.minimo?`<span class="bx brd">Bajo</span>`:`<span class="bx bgr">OK</span>`}</td>
     <td style="display:flex;gap:4px"><button class="btn be bsm" onclick="openM('mStock',${s.id})">✎</button><button class="btn bd bsm" onclick="delStock(${s.id})">✕</button></td></tr>`;
   }).join('');
