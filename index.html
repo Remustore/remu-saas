@@ -477,6 +477,8 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('clientes')" id="nav-clientes"><span class="nico">👥</span>Clientes</div>
   <div class="ni" onclick="go('auditoria')" id="nav-auditoria"><span class="nico">📋</span>Control Stock</div>
   <div class="ni" onclick="go('turnos')" id="nav-turnos"><span class="nico">📆</span>Turnos</div>
+  <div class="ni" onclick="go('fichasClientes')" id="nav-fichas"><span class="nico">📋</span>Fichas</div>
+  <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline"><span class="nico">🔗</span>Turnos online</div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
   <div class="ni" onclick="go('analisis')" id="nav-analisis"><span class="nico">◈</span>Análisis</div>
@@ -803,6 +805,47 @@ textarea{resize:vertical;min-height:70px;}
             <label class="mod-check"><input type="checkbox" class="diasSalon" value="0" onchange="saveTurnosConfig()"> Dom</label>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- FICHAS CLIENTES STANDALONE -->
+    <div class="sec" id="sec-fichasClientes">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">Fichas de clientes</div>
+          <div class="ps" style="margin-bottom:0">Historial, color, alergias y preferencias</div>
+        </div>
+        <button class="btn bg bsm" onclick="editarFichaCliente('')">+ Nueva ficha</button>
+      </div>
+      <div class="card">
+        <div class="ch">
+          <div class="srch"><span>⌕</span><input id="fichaQ2" placeholder="Buscar cliente..." oninput="rFichasClientesMain()"></div>
+        </div>
+        <div id="fichasClientesMain"></div>
+      </div>
+    </div>
+
+    <!-- TURNOS ONLINE -->
+    <div class="sec" id="sec-turnosOnline">
+      <div class="pt">Turnos online</div>
+      <div class="ps">Link público para que los clientes saquen turno</div>
+      <div class="card" style="margin-bottom:14px">
+        <h3 style="margin-bottom:12px">🔗 Tu link de turnos</h3>
+        <div style="background:var(--bg);border-radius:8px;padding:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div id="turnosOnlineLink" style="flex:1;font-size:.82rem;color:var(--gld);word-break:break-all"></div>
+          <button class="btn bgh bsm" onclick="copiarLinkTurnos()">📋 Copiar</button>
+          <button class="btn bg bsm" onclick="compartirLinkWA()">📲 Compartir WA</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:12px">⚙ Configurar página online</h3>
+        <label>Mensaje de bienvenida</label>
+        <input id="onlineMensaje" placeholder="Ej: Reservá tu turno en Pelo Studio" style="margin-bottom:10px">
+        <label>Instagram (opcional)</label>
+        <input id="onlineInsta" placeholder="@tu_salon" style="margin-bottom:10px">
+        <label>Dirección</label>
+        <input id="onlineDireccion" placeholder="Ej: Av. San Martín 1234, Marcos Juárez">
+        <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
     </div>
 
@@ -1622,7 +1665,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', turnos:'Turnos', turnosConfig:'Configuración Turnos', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1631,7 +1674,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, turnos:rTurnos, turnosConfig:rTurnosConfig, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -3778,6 +3821,191 @@ function checkFichaAlerta(nombre){
   }
 }
 
+// ═══ FICHAS STANDALONE ═══
+function rFichasClientesMain(){
+  const el = document.getElementById('fichasClientesMain');
+  if(!el) return;
+  const q = (document.getElementById('fichaQ2')?.value||'').toLowerCase();
+  const fichas = Object.values(getFichas());
+  const turnos = getTurnos();
+  const nombresConTurnos = [...new Set(turnos.map(t=>t.cliente))];
+  const todos = [...new Set([...fichas.map(f=>f.nombre), ...nombresConTurnos])].filter(n=>!q||n.toLowerCase().includes(q)).sort();
+
+  if(!todos.length){
+    el.innerHTML=`<div class="emp"><div class="ei">📋</div><div>Sin fichas aún</div><div style="font-size:.75rem;color:var(--mut)">Las fichas se crean al agendar el primer turno de un cliente</div></div>`;
+    return;
+  }
+
+  el.innerHTML = todos.map(nombre=>{
+    const ficha = getFichaCliente(nombre);
+    const visits = turnos.filter(t=>t.cliente===nombre);
+    const ultima = visits.sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    const totalGastado = visits.filter(t=>t.estado==='terminado').reduce((a,t)=>a+t.precio,0);
+    return `<div style="padding:14px;border-bottom:1px solid var(--bor)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.9rem">${nombre}</div>
+          <div style="font-size:.75rem;color:var(--tx2);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
+            ${ficha.color?`<span>🎨 ${ficha.color}</span>`:''}
+            ${ficha.largo?`<span>✂ ${ficha.largo}</span>`:''}
+            <span>📅 ${visits.length} visitas</span>
+            ${totalGastado>0?`<span style="color:var(--gld)">💰 ${fmt(totalGastado)} total</span>`:''}
+            ${ultima?`<span>Última: ${fD(ultima.fecha)}</span>`:''}
+          </div>
+          ${ficha.alergias?`<div style="font-size:.72rem;color:var(--bad);margin-top:3px;font-weight:600">⚠ ALERGIA: ${ficha.alergias}</div>`:''}
+          ${ficha.notas?`<div style="font-size:.72rem;color:var(--mut);margin-top:2px">📝 ${ficha.notas.slice(0,60)}${ficha.notas.length>60?'...':''}</div>`:''}
+        </div>
+        <button class="btn be bsm" onclick="editarFichaCliente('${nombre.replace(/'/g,"\'")}')">✎ Editar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══ TURNOS ONLINE ═══
+const ONLINE_CFG_KEY = 'turnosOnlineCfg';
+
+function getOnlineCfg(){
+  const raw = localStorage.getItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : {mensaje:'', insta:'', direccion:''};
+}
+
+function rTurnosOnline(){
+  const cfg = getOnlineCfg();
+  const tenantId = currentTenant?.id||'';
+  const link = window.location.origin + window.location.pathname + '?turno=' + tenantId;
+  
+  const el = document.getElementById('turnosOnlineLink');
+  if(el) el.textContent = link;
+  
+  if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
+  if(document.getElementById('onlineInsta')) document.getElementById('onlineInsta').value = cfg.insta||'';
+  if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
+}
+
+function saveOnlineConfig(){
+  const cfg = {
+    mensaje: document.getElementById('onlineMensaje')?.value||'',
+    insta: document.getElementById('onlineInsta')?.value||'',
+    direccion: document.getElementById('onlineDireccion')?.value||''
+  };
+  localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  showToast('Configuración guardada ✓');
+}
+
+function copiarLinkTurnos(){
+  const link = document.getElementById('turnosOnlineLink')?.textContent;
+  if(link) navigator.clipboard.writeText(link).then(()=>showToast('Link copiado ✓'));
+}
+
+function compartirLinkWA(){
+  const link = document.getElementById('turnosOnlineLink')?.textContent;
+  const negocio = currentTenant?.nombre||'el salón';
+  const msg = `¡Ahora podés sacar tu turno online en *${negocio}*! 💇‍♀️
+
+Hacé click acá: ${link}`;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+
+// ═══ CHECK TURNO ONLINE AL CARGAR ═══
+function checkTurnoOnlineParam(){
+  const params = new URLSearchParams(window.location.search);
+  const tenantId = params.get('turno');
+  if(!tenantId) return;
+  
+  // Load tenant and show booking form
+  sb.from('tenants').select('*').eq('id', tenantId).single().then(({data:tenant})=>{
+    if(!tenant) return;
+    mostrarFormularioTurnoOnline(tenant);
+  });
+}
+
+function mostrarFormularioTurnoOnline(tenant){
+  const cfg = JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}');
+  const turnosCfgRaw = localStorage.getItem('turnosCfg_' + tenant.id);
+  const turnosCfg = turnosCfgRaw ? JSON.parse(turnosCfgRaw) : {servicios:[], empleados:[]};
+  
+  document.body.innerHTML = `
+    <div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif">
+      <div style="background:#141414;border:1px solid #242424;border-radius:16px;width:100%;max-width:420px;padding:24px">
+        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;text-align:center;margin-bottom:4px">${tenant.nombre}</div>
+        <div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:20px">${cfg.mensaje||'Reservá tu turno online'}</div>
+        ${cfg.direccion?`<div style="text-align:center;font-size:.75rem;color:#585044;margin-bottom:16px">📍 ${cfg.direccion}</div>`:''}
+        
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Tu nombre</label>
+        <input id="onNombre" placeholder="Nombre completo" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+        
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">WhatsApp</label>
+        <input id="onTel" placeholder="11 2345 6789" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+        
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Servicio</label>
+        <select id="onServicio" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+          ${turnosCfg.servicios.map(s=>`<option value="${s.id}">${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('')||'<option>Sin servicios configurados</option>'}
+        </select>
+        
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Profesional</label>
+        <select id="onEmpleado" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+          <option value="">Sin preferencia</option>
+          ${turnosCfg.empleados.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')}
+        </select>
+        
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Fecha</label>
+        <input type="date" id="onFecha" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+        
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Hora preferida</label>
+        <input type="time" id="onHora" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:16px">
+        
+        <button onclick="enviarSolicitudTurno('${tenant.id}')" style="width:100%;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit';font-size:.9rem;font-weight:700;cursor:pointer">
+          Solicitar turno
+        </button>
+        <div id="onMsg" style="margin-top:12px;text-align:center;font-size:.8rem;display:none"></div>
+        ${cfg.insta?`<div style="text-align:center;margin-top:16px;font-size:.78rem;color:#585044">📸 ${cfg.insta}</div>`:''}
+      </div>
+    </div>
+  `;
+}
+
+function enviarSolicitudTurno(tenantId){
+  const nombre = document.getElementById('onNombre')?.value.trim();
+  const tel = document.getElementById('onTel')?.value.trim();
+  const servicioId = document.getElementById('onServicio')?.value;
+  const empleadoId = document.getElementById('onEmpleado')?.value;
+  const fecha = document.getElementById('onFecha')?.value;
+  const hora = document.getElementById('onHora')?.value;
+  const msg = document.getElementById('onMsg');
+
+  if(!nombre||!tel||!fecha||!hora){
+    if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Completá todos los campos';}
+    return;
+  }
+
+  // Save turno request to Supabase
+  sb.from('turnos_solicitudes').insert({
+    tenant_id: tenantId,
+    nombre, tel, servicio_id: servicioId,
+    empleado_id: empleadoId||null,
+    fecha, hora,
+    estado: 'pendiente',
+    created_at: new Date().toISOString()
+  }).then(({error})=>{
+    if(msg){
+      msg.style.display='block';
+      if(error){
+        msg.style.color='#c9524c';
+        msg.textContent='Error al enviar. Intentá de nuevo.';
+      } else {
+        msg.style.color='#4caf7d';
+        msg.textContent='✓ Solicitud enviada. Te confirmaremos por WhatsApp.';
+        setTimeout(()=>{
+          document.getElementById('onNombre').value='';
+          document.getElementById('onTel').value='';
+          document.getElementById('onFecha').value='';
+          document.getElementById('onHora').value='';
+        },1000);
+      }
+    }
+  });
+}
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -4077,7 +4305,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,turnos:rTurnos,turnosConfig:rTurnosConfig,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
