@@ -3781,7 +3781,42 @@ function editarFichaCliente(nombre){
       <label style="font-size:.67rem;color:var(--bad);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">⚠ Alergias / contraindicaciones</label>
       <input id="fichaAlergias" value="${ficha.alergias||''}" placeholder="Ej: alergia a la oxidante, sensible al calor..." style="width:100%;background:var(--bg);border:1px solid rgba(201,82,76,.3);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
       <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">📝 Notas del estilista</label>
-      <textarea id="fichaNota" placeholder="Preferencias, observaciones, productos usados..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;min-height:80px;resize:vertical">${ficha.notas||''}</textarea>
+      <textarea id="fichaNota" placeholder="Preferencias, observaciones, productos usados..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;min-height:80px;resize:vertical;margin-bottom:14px">${ficha.notas||''}</textarea>
+      
+      <div style="border-top:1px solid var(--bor);padding-top:14px;margin-top:4px">
+        <div style="font-size:.72rem;font-weight:600;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">💅 Manicuria</div>
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Tipo de uñas</label>
+        <select id="fichaTipoUnas" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+          <option value="" ${!ficha.tipoUnas?'selected':''}>Sin especificar</option>
+          <option value="Natural" ${ficha.tipoUnas==='Natural'?'selected':''}>Natural</option>
+          <option value="Acrílico" ${ficha.tipoUnas==='Acrílico'?'selected':''}>Acrílico</option>
+          <option value="Gel" ${ficha.tipoUnas==='Gel'?'selected':''}>Gel</option>
+          <option value="Semipermanente" ${ficha.tipoUnas==='Semipermanente'?'selected':''}>Semipermanente</option>
+          <option value="Kapping" ${ficha.tipoUnas==='Kapping'?'selected':''}>Kapping</option>
+        </select>
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Tipo de trabajo</label>
+        <select id="fichaTipoTrabajo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+          <option value="" ${!ficha.tipoTrabajo?'selected':''}>Sin especificar</option>
+          <option value="Liso" ${ficha.tipoTrabajo==='Liso'?'selected':''}>Liso</option>
+          <option value="Con diseño" ${ficha.tipoTrabajo==='Con diseño'?'selected':''}>Con diseño</option>
+          <option value="Franceado" ${ficha.tipoTrabajo==='Franceado'?'selected':''}>Franceado</option>
+          <option value="Degradé" ${ficha.tipoTrabajo==='Degradé'?'selected':''}>Degradé</option>
+          <option value="Glitter" ${ficha.tipoTrabajo==='Glitter'?'selected':''}>Glitter</option>
+          <option value="Nail art" ${ficha.tipoTrabajo==='Nail art'?'selected':''}>Nail art</option>
+        </select>
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Largo de uñas preferido</label>
+        <select id="fichaLargoUnas" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+          <option value="" ${!ficha.largoUnas?'selected':''}>Sin especificar</option>
+          <option value="Corto" ${ficha.largoUnas==='Corto'?'selected':''}>Corto</option>
+          <option value="Medio" ${ficha.largoUnas==='Medio'?'selected':''}>Medio</option>
+          <option value="Largo" ${ficha.largoUnas==='Largo'?'selected':''}>Largo</option>
+          <option value="Extra largo" ${ficha.largoUnas==='Extra largo'?'selected':''}>Extra largo</option>
+        </select>
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Color favorito / referencia</label>
+        <input id="fichaColorUnas" value="${ficha.colorUnas||''}" placeholder="Ej: nude, rojo, colores pastel, cambio cada vez..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Notas de diseño / referencias</label>
+        <textarea id="fichaNotaUnas" placeholder="Referencias de diseño, fotos guardadas, preferencias especiales..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;min-height:60px;resize:vertical">${ficha.notaUnas||''}</textarea>
+      </div>
       
       <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px">
         <div style="font-size:.72rem;font-weight:600;color:var(--tx2);margin-bottom:8px">HISTORIAL DE VISITAS</div>
@@ -3796,7 +3831,7 @@ function editarFichaCliente(nombre){
     <div style="padding:14px;border-top:1px solid var(--bor);display:flex;gap:10px;justify-content:flex-end">
       <button class="btn" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
       <button class="btn bg" onclick="
-        const f={nombre:'${nombre.replace(/'/g,"\'")}',color:document.getElementById('fichaColor').value,largo:document.getElementById('fichaLargo').value,alergias:document.getElementById('fichaAlergias').value,notas:document.getElementById('fichaNota').value,ultimaVisita:'${tod()}'};
+        const f={nombre:'${nombre.replace(/'/g,"\'")}',color:document.getElementById('fichaColor').value,largo:document.getElementById('fichaLargo').value,alergias:document.getElementById('fichaAlergias').value,notas:document.getElementById('fichaNota').value,tipoUnas:document.getElementById('fichaTipoUnas')?.value||'',tipoTrabajo:document.getElementById('fichaTipoTrabajo')?.value||'',largoUnas:document.getElementById('fichaLargoUnas')?.value||'',colorUnas:document.getElementById('fichaColorUnas')?.value||'',notaUnas:document.getElementById('fichaNotaUnas')?.value||'',ultimaVisita:'${tod()}'};
         guardarFichaCliente(f);
         this.closest('[style*=fixed]').remove();
         rFichasClientes();
@@ -3848,6 +3883,7 @@ function rFichasClientesMain(){
           <div style="font-size:.75rem;color:var(--tx2);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
             ${ficha.color?`<span>🎨 ${ficha.color}</span>`:''}
             ${ficha.largo?`<span>✂ ${ficha.largo}</span>`:''}
+            ${ficha.tipoUnas?`<span>💅 ${ficha.tipoUnas} ${ficha.tipoTrabajo?'· '+ficha.tipoTrabajo:''}</span>`:''}
             <span>📅 ${visits.length} visitas</span>
             ${totalGastado>0?`<span style="color:var(--gld)">💰 ${fmt(totalGastado)} total</span>`:''}
             ${ultima?`<span>Última: ${fD(ultima.fecha)}</span>`:''}
