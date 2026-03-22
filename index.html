@@ -743,11 +743,22 @@ textarea{resize:vertical;min-height:70px;}
         </div>
       </div>
       <div class="card">
+        <div style="margin-bottom:12px">
+          <div class="tabs" id="prTabs" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px">
+            <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+            <button class="tab" onclick="setPrFilt('pantalla',this)">📱 Pantallas</button>
+            <button class="tab" onclick="setPrFilt('tapa',this)">🔲 Tapas</button>
+            <button class="tab" onclick="setPrFilt('bateria',this)">🔋 Baterías</button>
+            <button class="tab" onclick="setPrFilt('conector',this)">🔌 Conectores</button>
+            <button class="tab" onclick="setPrFilt('camara',this)">📸 Cámaras</button>
+            <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otros</button>
+          </div>
+        </div>
         <div class="ch">
           <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rPrecios()" id="prQ"></div>
           <button class="btn bg" onclick="openM('mPrecio',null)">+ Agregar servicio</button>
         </div>
-        <div class="tw"><table><thead><tr><th>Servicio</th><th>Modelo/Tipo</th><th>Precio</th><th>Disponibilidad</th><th>Notas</th><th></th></tr></thead><tbody id="tbPr"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Servicio</th><th>Modelo</th><th>Precio</th><th>Estado</th><th>Notas</th><th></th></tr></thead><tbody id="tbPr"></tbody></table></div>
       </div>
     </div>
 
@@ -1844,12 +1855,33 @@ async function delPrecio(id){
   S.precios=S.precios.filter(p=>p.id!==id);await dbDelete('precios',id);pushUndo('Eliminar precio','precios',snap);rPrecios();
 }
 
+let prFilt = '';
+function setPrFilt(f, btn){
+  prFilt = f;
+  document.querySelectorAll('#prTabs .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  rPrecios();
+}
+
 function rPrecios(){
   const q=(document.getElementById('prQ')||{value:''}).value.toLowerCase();
-  const items=S.precios.filter(p=>!q||p.nombre.toLowerCase().includes(q)||(p.modelo||'').toLowerCase().includes(q));
-  const tb=document.getElementById('tbPr');const dc={disponible:'bgr',consultar:'byw','no disponible':'brd'};
-  if(!items.length){tb.innerHTML=`<tr><td colspan="6">${emp('🔧','Agregá servicios')}</td></tr>`;return;}
-  tb.innerHTML=items.map(p=>`<tr><td><strong>${p.nombre}</strong></td><td style="font-size:.78rem;color:var(--tx2)">${p.modelo||'—'}</td><td><strong style="color:var(--gld)">${fmt(p.precio)}</strong></td><td><span class="bx ${dc[p.disponibilidad]||'bgx'}">${p.disponibilidad}</span></td><td style="font-size:.75rem;color:var(--mut)">${p.notas||'—'}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mPrecio',${p.id})">✎</button><button class="btn bd bsm" onclick="delPrecio(${p.id})">✕</button></td></tr>`).join('');
+  let items = S.precios.filter(p=>{
+    const n = p.nombre.toLowerCase();
+    const matchQ = !q || n.includes(q) || (p.modelo||'').toLowerCase().includes(q);
+    const matchF = !prFilt || n.includes(prFilt);
+    return matchQ && matchF;
+  });
+  const tb=document.getElementById('tbPr');
+  const dc={disponible:'bgr',consultar:'byw','no disponible':'brd'};
+  if(!items.length){tb.innerHTML=`<tr><td colspan="6">${emp('🔧','Sin servicios en esta categoría')}</td></tr>`;return;}
+  tb.innerHTML=items.map(p=>`<tr>
+    <td><strong>${p.nombre}</strong></td>
+    <td style="font-size:.78rem;color:var(--tx2)">${p.modelo||'—'}</td>
+    <td><strong style="color:var(--gld);font-size:.95rem">${fmt(p.precio)}</strong></td>
+    <td><span class="bx ${dc[p.disponibilidad]||'bgx'}">${p.disponibilidad}</span></td>
+    <td style="font-size:.75rem;color:var(--mut)">${p.notas||'—'}</td>
+    <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mPrecio',${p.id})">✎</button><button class="btn bd bsm" onclick="delPrecio(${p.id})">✕</button></td>
+  </tr>`).join('');
 }
 
 // ═══ META ═══
