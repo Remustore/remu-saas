@@ -707,6 +707,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tabs" id="atabs" style="margin-bottom:16px">
         <button class="tab active" onclick="setAT('general',0)">📊 General</button>
         <button class="tab" onclick="setAT('reparaciones',1)" id="tabRep">🔧 Servicios</button>
+        <button class="tab" onclick="setAT('comparativa',2)">📅 Comparativa</button>
       </div>
       <div id="aGeneral">
         <div class="g2" style="margin-bottom:14px">
@@ -724,6 +725,24 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div class="card"><div class="ch"><h3>📋 Detalle completo</h3></div>
         <div class="tw"><table><thead><tr><th>Fecha</th><th>Cliente</th><th>Trabajo</th><th>Cobrado</th><th>Repuesto</th><th>Flete</th><th>Ganancia</th><th>Margen</th></tr></thead><tbody id="tbRepAn"></tbody></table></div></div>
+      </div>
+
+      <!-- COMPARATIVA -->
+      <div id="aComparativa" style="display:none">
+        <div class="card" style="margin-bottom:14px">
+          <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+            <div>
+              <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Período 1</label>
+              <input type="month" id="cmpMes1" style="padding:7px 10px;font-size:.82rem" onchange="rComparativa()">
+            </div>
+            <div style="color:var(--tx2);font-size:1.2rem;padding-bottom:6px">vs</div>
+            <div>
+              <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Período 2</label>
+              <input type="month" id="cmpMes2" style="padding:7px 10px;font-size:.82rem" onchange="rComparativa()">
+            </div>
+          </div>
+        </div>
+        <div id="cmpResultado"></div>
       </div>
     </div>
 
@@ -1932,7 +1951,10 @@ function setAT(t,i){
   document.querySelectorAll('#atabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j));
   document.getElementById('aGeneral').style.display=t==='general'?'':'none';
   document.getElementById('aRep').style.display=t==='reparaciones'?'':'none';
-  if(t==='reparaciones')rAnalisisRep(); else rAnalisis();
+  document.getElementById('aComparativa').style.display=t==='comparativa'?'':'none';
+  if(t==='reparaciones') rAnalisisRep();
+  else if(t==='comparativa') rComparativa();
+  else rAnalisis();
 }
 
 function rAnalisisRep(){
@@ -2547,6 +2569,97 @@ function rStockMov(){
       </div>
     </div>
   `).join('');
+}
+
+function rComparativa(){
+  const el = document.getElementById('cmpResultado');
+  if(!el) return;
+
+  // Set default months if empty
+  const now = new Date();
+  const m1Input = document.getElementById('cmpMes1');
+  const m2Input = document.getElementById('cmpMes2');
+  if(!m1Input.value){
+    const prev = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    m1Input.value = prev.toISOString().slice(0,7);
+  }
+  if(!m2Input.value){
+    m2Input.value = now.toISOString().slice(0,7);
+  }
+
+  const m1 = m1Input.value;
+  const m2 = m2Input.value;
+  if(!m1 || !m2){ el.innerHTML = '<div style="color:var(--mut);padding:16px">Seleccioná los dos períodos</div>'; return; }
+
+  function calcMes(m){
+    const v = S.ventas.filter(x=>x.fecha&&x.fecha.startsWith(m));
+    const g = S.gastos.filter(x=>x.fecha&&x.fecha.startsWith(m));
+    const r = S.reparaciones.filter(x=>x.estado==='entregado'&&x.fecha&&x.fecha.startsWith(m));
+    const tV = v.reduce((a,x)=>a+x.total,0);
+    const tC = v.reduce((a,x)=>a+(x.costo||0),0);
+    const tG = g.reduce((a,x)=>a+x.monto,0);
+    const tR = r.reduce((a,x)=>a+(x.presupuesto||0),0);
+    const neto = tV+tR-tC-tG;
+    const mg = (tV+tR)>0 ? Math.round(neto/(tV+tR)*100) : 0;
+    return { tV, tC, tG, tR, neto, mg, nVentas:v.length, nRep:r.length };
+  }
+
+  const d1 = calcMes(m1);
+  const d2 = calcMes(m2);
+
+  function fmtMes(m){ const [y,mo]=m.split('-'); const nombres=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return nombres[parseInt(mo)-1]+' '+y; }
+  function diff(a,b){ const d=b-a; const pct=a>0?Math.round((b-a)/a*100):0; const col=d>=0?'var(--ok)':'var(--bad)'; return `<span style="color:${col};font-size:.75rem">${d>=0?'+':''}${pct}%</span>`; }
+
+  const rows = [
+    ['💰 Ventas productos', d1.tV, d2.tV],
+    ['🔧 Ingresos taller', d1.tR, d2.tR],
+    ['📦 Costo mercadería', d1.tC, d2.tC],
+    ['💸 Gastos operativos', d1.tG, d2.tG],
+    ['📊 Resultado neto', d1.neto, d2.neto],
+  ];
+
+  el.innerHTML = `
+    <div class="card" style="margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr>
+            <th style="text-align:left;padding:8px;font-size:.7rem;color:var(--mut);text-transform:uppercase">Concepto</th>
+            <th style="text-align:right;padding:8px;font-size:.7rem;color:var(--mut);text-transform:uppercase">${fmtMes(m1)}</th>
+            <th style="text-align:right;padding:8px;font-size:.7rem;color:var(--mut);text-transform:uppercase">${fmtMes(m2)}</th>
+            <th style="text-align:right;padding:8px;font-size:.7rem;color:var(--mut);text-transform:uppercase">Variación</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((r,i)=>`<tr style="border-top:1px solid var(--bor)${i===4?';font-weight:700':''}">
+            <td style="padding:10px 8px;font-size:.82rem">${r[0]}</td>
+            <td style="padding:10px 8px;text-align:right;font-size:.82rem">${fmt(r[1])}</td>
+            <td style="padding:10px 8px;text-align:right;font-size:.82rem;color:var(--gld)">${fmt(r[2])}</td>
+            <td style="padding:10px 8px;text-align:right">${diff(r[1],r[2])}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="g2">
+      <div class="stat">
+        <div class="sl">Operaciones ${fmtMes(m1)}</div>
+        <div class="sv">${d1.nVentas + d1.nRep}</div>
+        <div class="ss">${d1.nVentas} ventas · ${d1.nRep} trabajos</div>
+      </div>
+      <div class="stat">
+        <div class="sl">Operaciones ${fmtMes(m2)}</div>
+        <div class="sv" style="color:var(--gld)">${d2.nVentas + d2.nRep}</div>
+        <div class="ss">${d2.nVentas} ventas · ${d2.nRep} trabajos</div>
+      </div>
+      <div class="stat">
+        <div class="sl">Margen neto ${fmtMes(m1)}</div>
+        <div class="sv" style="color:${d1.mg>=0?'var(--ok)':'var(--bad)'}">${d1.mg}%</div>
+      </div>
+      <div class="stat">
+        <div class="sl">Margen neto ${fmtMes(m2)}</div>
+        <div class="sv" style="color:${d2.mg>=0?'var(--ok)':'var(--bad)'}">${d2.mg}%</div>
+      </div>
+    </div>
+  `;
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
