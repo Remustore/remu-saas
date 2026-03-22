@@ -4396,8 +4396,8 @@ function toggleTheme(){
   document.body.classList.toggle('light-mode');
   const btn = document.getElementById('themeToggle');
   const isLight = document.body.classList.contains('light-mode');
-  btn.textContent = isLight ? '🌙' : '☀️';
-  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  if(btn) btn.textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem('theme_' + (currentTenant?.id||''), isLight ? 'light' : 'dark');
 }
 
 function cierreDiario(){
@@ -4486,12 +4486,18 @@ function applyBranding(){
   } else {
     document.documentElement.style.setProperty('--fh', "'Playfair Display', serif");
   }
-  // Modo por defecto
-  if(mods.modo === 'light' && !localStorage.getItem('theme')){
+  // Modo por defecto — siempre aplicar el del tenant
+  const savedTheme = localStorage.getItem('theme_' + (currentTenant?.id||''));
+  if(savedTheme){
+    if(savedTheme === 'light') document.body.classList.add('light-mode');
+    else document.body.classList.remove('light-mode');
+  } else if(mods.modo === 'light'){
     document.body.classList.add('light-mode');
-    const btn = document.getElementById('themeToggle');
-    if(btn) btn.textContent = '🌙';
+  } else {
+    document.body.classList.remove('light-mode');
   }
+  const btn = document.getElementById('themeToggle');
+  if(btn) btn.textContent = document.body.classList.contains('light-mode') ? '🌙' : '☀️';
   // Logo o emoji en login y sidebar
   const emoji = mods.emoji || '';
   const logo = mods.logo || '';
