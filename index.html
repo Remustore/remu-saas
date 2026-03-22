@@ -1588,21 +1588,123 @@ async function loadTenants(){
   const el = document.getElementById('tenantsList');
   if(error || !data){ el.innerHTML='<div style="color:var(--bad);font-size:.8rem">Error al cargar</div>'; return; }
   if(!data.length){ el.innerHTML='<div style="color:var(--mut);font-size:.8rem">Sin clientes aún</div>'; return; }
-  el.innerHTML = data.map(t => `
+  el.innerHTML = data.map(t => {
+    const color = t.modulos?.color || '#c9a84c';
+    const emoji = t.modulos?.emoji || '';
+    return `
     <div class="tenant-row">
-      <div>
-        <div class="tenant-name">${t.nombre}</div>
-        <div class="tenant-email">${t.rubro || ''}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="tenant-badge ${t.activo?'t-active':'t-inactive'}">${t.activo?'Activo':'Inactivo'}</span>
-        <div class="tenant-actions">
-          <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:4px 10px;font-size:.72rem" onclick="toggleTenant('${t.id}',${t.activo})">
-            ${t.activo?'Desactivar':'Activar'}
-          </button>
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">${emoji||t.nombre.slice(0,1).toUpperCase()}</div>
+        <div>
+          <div class="tenant-name">${t.nombre}</div>
+          <div class="tenant-email">${t.rubro || ''}</div>
         </div>
       </div>
-    </div>`).join('');
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span class="tenant-badge ${t.activo?'t-active':'t-inactive'}">${t.activo?'Activo':'Inactivo'}</span>
+        <button class="sa-btn outline" style="margin:0;padding:4px 10px;font-size:.72rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
+        <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:4px 10px;font-size:.72rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function editarTenant(id){
+  const { data: t } = await sb.from('tenants').select('*').eq('id', id).single();
+  if(!t) return;
+  
+  const mods = t.modulos || {};
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
+  
+  overlay.innerHTML = `
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:16px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-family:var(--fh);font-size:1rem;font-weight:700">✎ Editar — ${t.nombre}</div>
+        <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:18px 20px">
+        
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre del negocio</label>
+        <input id="etNombre" value="${t.nombre}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+        
+        <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Rubro</label>
+        <input id="etRubro" value="${t.rubro||''}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:14px">
+
+        <div style="border-top:1px solid var(--bor);padding-top:14px;margin-bottom:4px">
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">🎨 Personalización visual</div>
+          
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Color principal</label>
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+            <input type="color" id="etColor" value="${mods.color||'#c9a84c'}" style="width:48px;height:38px;padding:2px;border-radius:6px;cursor:pointer;border:1px solid var(--bor2);background:none">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <div onclick="document.getElementById('etColor').value='#c9a84c'" style="width:24px;height:24px;border-radius:50%;background:#c9a84c;cursor:pointer" title="Dorado"></div>
+              <div onclick="document.getElementById('etColor').value='#e85d8a'" style="width:24px;height:24px;border-radius:50%;background:#e85d8a;cursor:pointer" title="Rosa"></div>
+              <div onclick="document.getElementById('etColor').value='#4caf7d'" style="width:24px;height:24px;border-radius:50%;background:#4caf7d;cursor:pointer" title="Verde"></div>
+              <div onclick="document.getElementById('etColor').value='#4c8ec9'" style="width:24px;height:24px;border-radius:50%;background:#4c8ec9;cursor:pointer" title="Azul"></div>
+              <div onclick="document.getElementById('etColor').value='#c97a4c'" style="width:24px;height:24px;border-radius:50%;background:#c97a4c;cursor:pointer" title="Naranja"></div>
+              <div onclick="document.getElementById('etColor').value='#9b4cc9'" style="width:24px;height:24px;border-radius:50%;background:#9b4cc9;cursor:pointer" title="Violeta"></div>
+              <div onclick="document.getElementById('etColor').value='#c94c4c'" style="width:24px;height:24px;border-radius:50%;background:#c94c4c;cursor:pointer" title="Rojo"></div>
+              <div onclick="document.getElementById('etColor').value='#4cc9b8'" style="width:24px;height:24px;border-radius:50%;background:#4cc9b8;cursor:pointer" title="Turquesa"></div>
+            </div>
+          </div>
+
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Emoji / ícono</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            ${['💇','✂','💅','📱','🏠','👗','🌸','⭐','🛍','💄','🌿','🍃'].map(e=>`<div onclick="document.getElementById('etEmoji').value='${e}'" style="font-size:1.4rem;cursor:pointer;padding:4px;border-radius:6px;border:1px solid var(--bor)">${e}</div>`).join('')}
+            <input id="etEmoji" value="${mods.emoji||''}" style="width:60px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:6px 8px;border-radius:7px;font-size:1rem;outline:none;text-align:center" placeholder="✨">
+          </div>
+
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Fuente</label>
+          <select id="etFuente" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+            <option value="playfair" ${(mods.fuente||'playfair')==='playfair'?'selected':''}>Elegante (Playfair) — salones, moda</option>
+            <option value="outfit" ${mods.fuente==='outfit'?'selected':''}>Moderno (Outfit) — tecnologia, comercios</option>
+            <option value="mono" ${mods.fuente==='mono'?'selected':''}>Tecnico (Monospace)</option>
+          </select>
+
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Modo por defecto</label>
+          <select id="etModo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+            <option value="dark" ${(mods.modo||'dark')==='dark'?'selected':''}>Oscuro</option>
+            <option value="light" ${mods.modo==='light'?'selected':''}>Claro</option>
+          </select>
+
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Logo (URL de imagen)</label>
+          <input id="etLogo" value="${mods.logo||''}" placeholder="https://... pega el link de tu logo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:4px">
+          <div style="font-size:.72rem;color:var(--mut)">Subí tu logo a Google Drive (compartir > cualquiera con el link) o Imgur y pegá la URL acá</div>
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;gap:10px;justify-content:flex-end">
+        <button class="sa-btn outline" style="margin:0" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+        <button class="sa-btn" style="margin:0" onclick="guardarEdicionTenant('${id}')">Guardar cambios</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+async function guardarEdicionTenant(id){
+  const nombre = document.getElementById('etNombre').value.trim();
+  const rubro = document.getElementById('etRubro').value.trim();
+  const color = document.getElementById('etColor').value;
+  const emoji = document.getElementById('etEmoji').value.trim();
+  const fuente = document.getElementById('etFuente').value;
+  const modo = document.getElementById('etModo').value;
+  const logo = document.getElementById('etLogo').value.trim();
+  
+  if(!nombre){ alert('El nombre es obligatorio'); return; }
+  
+  // Get current modulos and update
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id', id).single();
+  const mods = { ...(t?.modulos||{}), color, emoji, fuente, modo };
+  if(logo) mods.logo = logo;
+  
+  const { error } = await sb.from('tenants').update({ nombre, rubro, modulos: mods }).eq('id', id);
+  if(error){ alert('Error al guardar: ' + error.message); return; }
+  
+  document.querySelector('[style*=fixed]')?.remove();
+  loadTenants();
+  showSaMsg('Cliente actualizado correctamente', 'ok');
 }
 
 async function toggleTenant(id, activo){
@@ -4384,13 +4486,26 @@ function applyBranding(){
     const btn = document.getElementById('themeToggle');
     if(btn) btn.textContent = '🌙';
   }
-  // Emoji en login y sidebar
+  // Logo o emoji en login y sidebar
   const emoji = mods.emoji || '';
+  const logo = mods.logo || '';
+  const nombre = currentTenant?.nombre || 'SISTEMA';
   const loginLogo = document.getElementById('loginLogo');
   const loadLogo = document.getElementById('loadLogo');
-  const nombre = currentTenant?.nombre || 'SISTEMA';
-  if(loginLogo) loginLogo.textContent = emoji ? emoji + ' ' + nombre : nombre;
-  if(loadLogo) loadLogo.textContent = emoji ? emoji + ' ' + nombre : nombre;
+  const sbLogo = document.getElementById('sbLogo');
+  
+  if(logo){
+    // Show logo image
+    const logoHtml = `<img src="${logo}" style="max-height:60px;max-width:180px;object-fit:contain;border-radius:8px" onerror="this.style.display='none'">`;
+    if(loginLogo) loginLogo.innerHTML = logoHtml + '<br>' + nombre;
+    if(loadLogo) loadLogo.innerHTML = logoHtml;
+    if(sbLogo) sbLogo.innerHTML = `<img src="${logo}" style="max-height:36px;max-width:100%;object-fit:contain;border-radius:4px" onerror="this.textContent='${nombre.toUpperCase()}'">`;
+  } else {
+    const texto = emoji ? emoji + ' ' + nombre : nombre;
+    if(loginLogo) loginLogo.textContent = texto;
+    if(loadLogo) loadLogo.textContent = texto;
+    if(sbLogo) sbLogo.textContent = nombre.toUpperCase();
+  }
 }
 
 function previewColor(color){
