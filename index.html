@@ -2762,7 +2762,7 @@ function initTheme(){
 function updateGreeting(){
   const h = new Date().getHours();
   const name = currentTenant?.nombre || '';
-  let saludo = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  let saludo = h >= 6 && h < 12 ? 'Buenos días' : h >= 12 && h < 19 ? 'Buenas tardes' : h >= 19 && h < 24 ? 'Buenas noches' : 'Buenas noches';
   const el = document.getElementById('dashGreeting');
   if(el) el.textContent = saludo + (name ? ', ' + name : '');
 }
