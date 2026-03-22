@@ -1257,6 +1257,7 @@ async function doLogin(){
     document.getElementById('loginScreen').style.display='none';
   // Populate dynamic stock categories
   setupCategoriasStock();
+  setupPreciosTabs();
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
@@ -1399,6 +1400,7 @@ function setupApp(){
   document.getElementById('loginScreen').style.display='none';
   // Populate dynamic stock categories
   setupCategoriasStock();
+  setupPreciosTabs();
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
@@ -2290,6 +2292,34 @@ function setPrFilt(f, btn){
   document.querySelectorAll('#prTabs .tab').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   rPrecios();
+}
+
+function setupPreciosTabs(){
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
+  const tabsEl = document.getElementById('prTabs');
+  if(!tabsEl) return;
+  if(esSalon){
+    tabsEl.innerHTML = `
+      <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+      <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
+      <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
+      <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
+      <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
+      <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
+      <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>
+    `;
+  } else {
+    tabsEl.innerHTML = `
+      <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+      <button class="tab" onclick="setPrFilt('pantalla',this)">📱 Pantallas</button>
+      <button class="tab" onclick="setPrFilt('tapa',this)">🔲 Tapas</button>
+      <button class="tab" onclick="setPrFilt('bateria',this)">🔋 Baterías</button>
+      <button class="tab" onclick="setPrFilt('conector',this)">🔌 Conectores</button>
+      <button class="tab" onclick="setPrFilt('camara',this)">📸 Cámaras</button>
+      <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otros</button>
+    `;
+  }
 }
 
 function rPrecios(){
