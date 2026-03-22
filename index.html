@@ -638,6 +638,19 @@ textarea{resize:vertical;min-height:70px;}
       </div>
     </div>
 
+    <!-- HISTORIAL STOCK -->
+    <div class="card" id="stockMovCard" style="margin-top:14px">
+      <div class="ch">
+        <h3>📊 Historial de movimientos</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="stockMovFiltro" onchange="rStockMov()" style="padding:5px 10px;font-size:.75rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+            <option value="">Todos los productos</option>
+          </select>
+        </div>
+      </div>
+      <div id="stockMovList"></div>
+    </div>
+
     <!-- AUDITORIA -->
     <div class="sec" id="sec-auditoria">
       <div class="pt">Control diario de stock</div>
@@ -1356,7 +1369,11 @@ async function saveStock(){
   const obj = { nombre:n, categoria:document.getElementById('sCat').value, cantidad:parseInt(document.getElementById('sCant').value)||0, minimo:parseInt(document.getElementById('sMin').value)||3, precio:parseFloat(document.getElementById('sPre').value)||0, costo:parseFloat(document.getElementById('sCos').value)||0, notas:document.getElementById('sNot').value };
   if(id){
     const i = S.stock.findIndex(s=>s.id===parseInt(id));
-    if(i>-1){ S.stock[i]={...S.stock[i],...obj}; await dbUpsert('stock',S.stock[i]); pushUndo('Editar stock','stock',snap); }
+    if(i>-1){
+      const diffCant = obj.cantidad - (S.stock[i].cantidad||0);
+      S.stock[i]={...S.stock[i],...obj}; await dbUpsert('stock',S.stock[i]); pushUndo('Editar stock','stock',snap);
+      if(diffCant!==0) registrarMovStock(S.stock[i].id, S.stock[i].nombre, diffCant, 'ajuste', 'Ajuste manual');
+    }
   }else{
     const item={id:Date.now(),...obj,vendidos:0};
     S.stock.push(item); await dbUpsert('stock',item); pushUndo('Agregar producto','stock',snap);
@@ -1522,6 +1539,7 @@ async function saveVenta(){
       const pid=parseInt(document.getElementById('vProd').value); const p=S.stock.find(s=>s.id===pid);
       if(!p) return alert('Seleccioná un producto'); if(p.cantidad<cant) return alert('Stock insuficiente');
       p.cantidad-=cant; p.vendidos=(p.vendidos||0)+cant; nombre=p.nombre; costoU=p.costo||0; await dbUpsert('stock',p);
+      registrarMovStock(p.id, p.nombre, -cant, 'venta', 'Venta registrada');
     }else if(tipo==='equipo'){
       const eid=parseInt(document.getElementById('vEq').value); const eq=S.equipos.find(e=>e.id===eid);
       if(!eq) return alert('Seleccioná un equipo'); eq.estado='vendido'; nombre=eq.modelo+' '+eq.memoria; costoU=eq.costo||0; await dbUpsert('equipos',eq);
@@ -1546,6 +1564,7 @@ async function delVenta(id){
       prod.cantidad += (venta.cantidad||1);
       prod.vendidos = Math.max(0,(prod.vendidos||0)-(venta.cantidad||1));
       await dbUpsert('stock', prod);
+      registrarMovStock(prod.id, prod.nombre, +(venta.cantidad||1), 'devolucion', 'Venta cancelada');
     }
   }
   // Reintegrar equipo si era venta de equipo
@@ -2323,7 +2342,79 @@ function exportarPDF(){
   showToast('PDF listo para imprimir ✓');
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); }
+// ═══ HISTORIAL DE MOVIMIENTOS DE STOCK ═══
+const MOV_KEY = 'stockMovimientos';
+
+function getStockMov(){
+  const raw = localStorage.getItem(MOV_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function registrarMovStock(productoId, nombre, cantidad, tipo, motivo){
+  const movs = getStockMov();
+  movs.unshift({
+    id: Date.now(),
+    productoId,
+    nombre,
+    cantidad,
+    tipo, // 'venta', 'devolucion', 'ajuste', 'auditoria'
+    motivo,
+    fecha: tod(),
+    hora: new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'})
+  });
+  // Guardar solo los últimos 500 movimientos
+  if(movs.length > 500) movs.splice(500);
+  localStorage.setItem(MOV_KEY + '_' + (currentTenant?.id||''), JSON.stringify(movs));
+  rStockMov();
+}
+
+function rStockMov(){
+  const filtro = document.getElementById('stockMovFiltro');
+  const list = document.getElementById('stockMovList');
+  if(!list) return;
+  
+  // Actualizar filtro con productos
+  if(filtro){
+    const current = filtro.value;
+    filtro.innerHTML = '<option value="">Todos los productos</option>' +
+      S.stock.map(s=>`<option value="${s.id}" ${s.id==current?'selected':''}>${s.nombre}</option>`).join('');
+  }
+  
+  let movs = getStockMov();
+  const filtroVal = filtro?.value;
+  if(filtroVal) movs = movs.filter(m=>m.productoId==filtroVal);
+  
+  if(!movs.length){
+    list.innerHTML = '<div style="color:var(--mut);font-size:.8rem;padding:16px 0;text-align:center">Sin movimientos registrados aún</div>';
+    return;
+  }
+  
+  const colores = {
+    venta: 'var(--bad)',
+    devolucion: 'var(--ok)',
+    ajuste: 'var(--wrn)',
+    auditoria: 'var(--inf)'
+  };
+  const iconos = { venta:'📤', devolucion:'📥', ajuste:'✏️', auditoria:'🔍' };
+  
+  list.innerHTML = movs.slice(0,50).map(m=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:1rem">${iconos[m.tipo]||'📦'}</span>
+        <div>
+          <div style="font-size:.82rem;font-weight:500">${m.nombre}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">${m.motivo} · ${fD(m.fecha)} ${m.hora}</div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-weight:700;color:${colores[m.tipo]||'var(--tx)'};font-size:.9rem">${m.cantidad>0?'+':''}${m.cantidad} uds</div>
+        <div style="font-size:.68rem;color:var(--tx2)">${m.tipo}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
   const mapa = {};
