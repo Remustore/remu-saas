@@ -1275,8 +1275,24 @@ function toggleSB(){
 function openM(id, editId){
   const el = document.getElementById(id);
   if(!el) return;
+  // Reset form fields for new entries
+  if(editId === null || editId === undefined){
+    el.querySelectorAll('input:not([type=checkbox]):not([type=color])').forEach(i=>{ if(i.id!=='vFec') i.value=''; });
+    el.querySelectorAll('select').forEach(s=>s.selectedIndex=0);
+    el.querySelectorAll('textarea').forEach(t=>t.value='');
+  }
   el.classList.add('open');
-  if(editId !== undefined) fillModal(id, editId);
+  if(editId) fillModalEdit(id, editId);
+}
+
+function fillModalEdit(modal, id){
+  if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
+  if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';calcGanTaller();}
+  if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
+  if(modal==='mGasto'){const g=S.gastos.find(x=>x.id===id);if(!g)return;document.getElementById('gId').value=id;document.getElementById('gCon').value=g.concepto;document.getElementById('gTip').value=g.tipo;document.getElementById('gMon').value=g.monto;document.getElementById('gFec').value=g.fecha;document.getElementById('gNot').value=g.notas||'';}
+  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id);if(!p)return;document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDis').value=p.disponibilidad||'disponible';document.getElementById('prNot').value=p.notas||'';}
+  if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';}
 }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.mb').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
