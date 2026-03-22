@@ -3270,8 +3270,7 @@ function eliminarServicioTurno(id){
 function agregarEmpleado(){
   const nombre = prompt('Nombre del empleado:');
   if(!nombre) return;
-  const sectores = prompt('Sectores que atiende (separados por coma):
-Ej: Peluquería, Manicuria') || '';
+  const sectores = prompt('Sectores que atiende (ej: Peluquería, Manicuria)') || '';
   const cfg = getTurnosCfg();
   cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean)});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
