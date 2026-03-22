@@ -816,7 +816,11 @@ textarea{resize:vertical;min-height:70px;}
 <div id="cliSugg" style="position:absolute;background:var(--car2);border:1px solid var(--bor2);border-radius:8px;z-index:400;max-height:150px;overflow-y:auto;width:100%;display:none;"></div>
 </div><div><label>Teléfono / WA</label><input id="tTel" placeholder="11 2345 6789"></div></div>
 <div class="fr"><div><label>Equipo / Trabajo</label><input id="tEq" placeholder="Ej: iPhone 13, corte de pelo..."></div><div><label>IMEI (opcional)</label><input id="tIme" placeholder="Solo para celulares"></div></div>
-<div class="fr full"><div><label>Falla / Descripción</label><input id="tFal" placeholder="¿Qué necesita?"></div></div>
+<div class="fr full"><div><label>Falla / Descripción</label><input id="tFal" placeholder="¿Qué necesita?" oninput="sugerirGuia(this.value)"></div></div>
+<div id="guiaRep" style="display:none;background:var(--bg);border:1px solid var(--gld);border-radius:8px;padding:12px;margin-top:8px;font-size:.8rem">
+  <div style="font-weight:600;color:var(--gld);margin-bottom:8px" id="guiaTitulo"></div>
+  <ol style="margin:0;padding-left:18px" id="guiaPasos"></ol>
+</div>
 <div class="fr"><div><label>Presupuesto cobrado al cliente ($)</label><input type="number" id="tPre" placeholder="0" oninput="calcGanTaller()"></div><div><label>Estado</label><select id="tEst"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
 <div id="tGanBox">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -829,6 +833,34 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 <div class="fr"><div><label>Costo del repuesto ($)</label><input type="number" id="tCosRep" placeholder="0" oninput="calcGanTaller()"></div><div><label>Flete / Comisionista ($)</label><input type="number" id="tFlete" placeholder="0" oninput="calcGanTaller()"></div></div>
+<div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">
+  <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;font-weight:600">🔍 Estado del equipo al ingreso</div>
+  <div class="fr">
+    <div>
+      <label>¿Tiene golpes?</label>
+      <select id="tGolpes"><option value="">No</option><option value="leve">Golpe leve</option><option value="grave">Golpe grave</option></select>
+    </div>
+    <div>
+      <label>¿Tiene humedad?</label>
+      <select id="tHumedad"><option value="">No</option><option value="si">Sí</option></select>
+    </div>
+  </div>
+  <div class="fr">
+    <div>
+      <label>Estado pantalla</label>
+      <select id="tEstPantalla"><option value="funciona">Funciona</option><option value="rota">Rota/Rajada</option><option value="manchas">Con manchas</option><option value="no_funciona">No funciona</option></select>
+    </div>
+    <div>
+      <label>Estado físico</label>
+      <select id="tEstFisico"><option value="excelente">Excelente</option><option value="bueno">Bueno</option><option value="regular">Regular</option><option value="malo">Malo</option></select>
+    </div>
+  </div>
+  <div style="margin-top:8px">
+    <label>Accesorios que trae</label>
+    <input id="tAccesorios" placeholder="Ej: cargador, funda, sin accesorios...">
+  </div>
+</div>
+<div class="fr full"><div><label>Diagnóstico / Qué se reparó</label><textarea id="tDiagnostico" placeholder="Describí qué se hizo, qué repuestos se usaron..."></textarea></div></div>
 <div class="fr full"><div><label>Notas internas</label><textarea id="tNot" placeholder="Notas internas..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mTaller')">Cancelar</button><button class="btn bg" onclick="saveTaller()">Guardar</button></div></div></div>
 
@@ -1319,7 +1351,14 @@ function openM(id, editId){
 function fillModalEdit(modal, id){
   if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';calcGanTaller();}
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+    if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
+    if(document.getElementById('tGolpes'))document.getElementById('tGolpes').value=t.golpes||'';
+    if(document.getElementById('tHumedad'))document.getElementById('tHumedad').value=t.humedad||'';
+    if(document.getElementById('tEstPantalla'))document.getElementById('tEstPantalla').value=t.estPantalla||'funciona';
+    if(document.getElementById('tEstFisico'))document.getElementById('tEstFisico').value=t.estFisico||'excelente';
+    if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
+    calcGanTaller();}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
   if(modal==='mGasto'){const g=S.gastos.find(x=>x.id===id);if(!g)return;document.getElementById('gId').value=id;document.getElementById('gCon').value=g.concepto;document.getElementById('gTip').value=g.tipo;document.getElementById('gMon').value=g.monto;document.getElementById('gFec').value=g.fecha;document.getElementById('gNot').value=g.notas||'';}
   if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id);if(!p)return;document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDis').value=p.disponibilidad||'disponible';document.getElementById('prNot').value=p.notas||'';}
@@ -1594,6 +1633,32 @@ function rVentas(){
 // ═══ TALLER ═══
 const ESTS = [{k:'recibido',l:'Recibido',c:'bbl'},{k:'proceso',l:'En proceso',c:'byw'},{k:'listo',l:'✓ Listo',c:'bgr'},{k:'entregado',l:'Entregado',c:'bgx'}];
 
+const GUIAS_REP = {
+  bateria: { k:['bateria','batería','no carga','carga lenta','no enciende'], t:'🔋 Cambio de batería', p:['Quitar tornillos pentalobe','Calentar bordes 30 seg para abrir','Desconectar batería ANTES que todo','Quitar adhesivo con paciencia','Colocar nueva batería y conectar','Testear carga y porcentaje','Cerrar y verificar sellos'] },
+  pantalla: { k:['pantalla','display','vidrio','touch','rota','rajada','no se ve'], t:'📱 Cambio de pantalla', p:['Quitar tornillos pentalobe','Calentar bordes para separar','Desconectar batería primero','Desconectar flex de pantalla','Transferir cámara y sensor FaceID','Conectar nueva pantalla y testear touch','Armar y verificar Face ID'] },
+  conector: { k:['conector','puerto','lightning','tipo c','no carga','pin','usb'], t:'🔌 Cambio de conector', p:['Desarmar equipo','Quitar placa con cuidado','Dessoldar conector viejo','Soldar nuevo conector','Testear con diferentes cables','Armar y verificar'] },
+  camara: { k:['camara','cámara','foto','lente','borrosa','no enfoca'], t:'📸 Cambio de cámara', p:['Abrir equipo','Desconectar batería','Quitar módulo de cámara','Conectar nueva cámara','Testear foto y video antes de cerrar','Armar y verificar'] },
+  microfono: { k:['microfono','micrófono','no se escucha','audio','no escucha'], t:'🎤 Reparación de micrófono', p:['Abrir equipo','Limpiar conector','Verificar hardware vs software','Reemplazar módulo si necesario','Testear llamada y grabación'] },
+};
+
+function sugerirGuia(val){
+  const v = val.toLowerCase();
+  const box = document.getElementById('guiaRep');
+  const tit = document.getElementById('guiaTitulo');
+  const pasos = document.getElementById('guiaPasos');
+  if(!box) return;
+  
+  for(const [, g] of Object.entries(GUIAS_REP)){
+    if(g.k.some(k=>v.includes(k))){
+      tit.textContent = g.t;
+      pasos.innerHTML = g.p.map(p=>`<li style="margin-bottom:4px">${p}</li>`).join('');
+      box.style.display = 'block';
+      return;
+    }
+  }
+  box.style.display = 'none';
+}
+
 function autocompleteCli(val){
   const box = document.getElementById('cliSugg');
   if(!val || val.length < 2){ box.style.display='none'; return; }
@@ -1634,7 +1699,22 @@ async function saveTaller(){
   const flete=parseFloat(document.getElementById('tFlete').value)||0;
   const pre=parseFloat(document.getElementById('tPre').value)||0;
   const ganancia=pre-costoRep-flete; const margen=pre>0?Math.round(ganancia/pre*100):0;
-  const obj={cliente:cli,tel:document.getElementById('tTel').value,equipo:document.getElementById('tEq').value,imei:document.getElementById('tIme').value,falla:document.getElementById('tFal').value,presupuesto:pre,costoRep,flete,ganancia,margen,estado:document.getElementById('tEst').value,notas:document.getElementById('tNot').value};
+  const obj={
+    cliente:cli,
+    tel:document.getElementById('tTel').value,
+    equipo:document.getElementById('tEq').value,
+    imei:document.getElementById('tIme').value,
+    falla:document.getElementById('tFal').value,
+    presupuesto:pre,costoRep,flete,ganancia,margen,
+    estado:document.getElementById('tEst').value,
+    notas:document.getElementById('tNot').value,
+    diagnostico:document.getElementById('tDiagnostico')?.value||'',
+    golpes:document.getElementById('tGolpes')?.value||'',
+    humedad:document.getElementById('tHumedad')?.value||'',
+    estPantalla:document.getElementById('tEstPantalla')?.value||'',
+    estFisico:document.getElementById('tEstFisico')?.value||'excelente',
+    accesorios:document.getElementById('tAccesorios')?.value||''
+  };
   if(id){
     const i=S.reparaciones.findIndex(r=>r.id===parseInt(id));
     if(i>-1){S.reparaciones[i]={...S.reparaciones[i],...obj};await dbUpsert('reparaciones',S.reparaciones[i]);pushUndo('Editar trabajo','reparaciones',snap);}
@@ -1670,7 +1750,9 @@ async function confAv(){
 
 function showWA(r){
   const bizName = currentTenant?.nombre || 'el negocio';
-  const msg=`Hola ${r.cliente} 👋\n\nTe avisamos desde *${bizName}* que tu trabajo (*${r.equipo||'trabajo'}*) ya está *listo para retirar* ✅\n\n${r.presupuesto?`💰 Total: ${fmt(r.presupuesto)}\n\n`:''}Podés pasar a buscarlo cuando quieras.\n\n¡Gracias por elegirnos! 🙌`;
+  const diag = r.diagnostico ? `\n\n🔧 *Qué se hizo:* ${r.diagnostico}` : '';
+  const garantia = r.costoRep > 0 ? '\n\n✅ *Garantía:* 30 días por la reparación' : '';
+  const msg=`Hola ${r.cliente} 👋\n\nTe avisamos desde *${bizName}* que tu equipo (*${r.equipo||'trabajo'}*) ya está *listo para retirar* ✅${diag}\n\n${r.presupuesto?`💰 *Total: ${fmt(r.presupuesto)}*\n`:''}${garantia}\n\nPodés pasar a buscarlo cuando quieras.\n\n¡Gracias por elegirnos! 🙌`;
   document.getElementById('waMB').textContent=msg;
   const tel=(r.tel||'').replace(/\D/g,'');
   document.getElementById('waLink').onclick=()=>window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`,'_blank');
@@ -1959,7 +2041,14 @@ function fillEdit(modal,id){
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';return;}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';['eId','eTipo','eMod','eMem','eCol','eIme','eBat','eFis','ePre','eCos','eNot'].forEach(k=>{const el=document.getElementById(k);if(el)el.value=({eId:e.id,eTipo:e.tipo,eMod:e.modelo,eMem:e.memoria,eCol:e.color,eIme:e.imei,eBat:e.bateria,eFis:e.estadoFisico,ePre:e.precio,eCos:e.costo,eNot:e.notas})[k]||'';});return;}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';calcGanTaller();}
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+    if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
+    if(document.getElementById('tGolpes'))document.getElementById('tGolpes').value=t.golpes||'';
+    if(document.getElementById('tHumedad'))document.getElementById('tHumedad').value=t.humedad||'';
+    if(document.getElementById('tEstPantalla'))document.getElementById('tEstPantalla').value=t.estPantalla||'funciona';
+    if(document.getElementById('tEstFisico'))document.getElementById('tEstFisico').value=t.estFisico||'excelente';
+    if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
+    calcGanTaller();}
 }
 
 // ═══ CAJAS ═══
