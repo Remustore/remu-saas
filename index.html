@@ -518,6 +518,18 @@ textarea{resize:vertical;min-height:70px;}
     <div class="sec active" id="sec-dashboard">
       <div class="pt" id="dashGreeting">Buenos días</div>
       <div class="ps" id="dashSub">Resumen del negocio</div>
+      <!-- BARRA DE ENERGÍA -->
+      <div class="card" style="margin-bottom:14px" id="energyCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div id="energyMsg" style="font-family:var(--fh);font-size:1rem;font-weight:700">Cargando...</div>
+          <div id="energyPct" style="font-size:.82rem;color:var(--tx2)"></div>
+        </div>
+        <div style="background:var(--bg);border-radius:20px;height:18px;overflow:hidden;position:relative">
+          <div id="energyBar" style="height:100%;border-radius:20px;transition:width .8s ease,background .5s ease;width:0%"></div>
+        </div>
+        <div id="energySub" style="font-size:.75rem;color:var(--tx2);margin-top:8px"></div>
+      </div>
+
       <div class="card" style="margin-bottom:14px">
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
           <div style="text-align:center;padding:16px 8px">
@@ -750,6 +762,26 @@ textarea{resize:vertical;min-height:70px;}
       <div class="card" style="margin-bottom:14px">
         <div class="ch"><h3>👤 Empleados</h3><button class="btn bg bsm" onclick="agregarEmpleado()">+ Agregar</button></div>
         <div id="empleadosList"></div>
+        <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:.75rem;color:var(--tx2)">
+          💡 Las comisiones se calculan automáticamente al marcar un turno como <strong>Terminado</strong>
+        </div>
+      </div>
+
+      <!-- CAJA POR EMPLEADA -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>💰 Caja por empleada — hoy</h3>
+          <input type="date" id="cajEmpFecha" onchange="rCajaEmpleadas()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+        </div>
+        <div id="cajaEmpleadasGrid"></div>
+      </div>
+
+      <!-- FICHAS DE CLIENTES -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch">
+          <h3>📋 Fichas de clientes</h3>
+          <div class="srch"><span>⌕</span><input id="fichaQ" placeholder="Buscar cliente..." oninput="rFichasClientes()"></div>
+        </div>
+        <div id="fichasClientesList"></div>
       </div>
 
       <!-- Horarios -->
@@ -1966,10 +1998,14 @@ function autocompleteCli(val){
 function selCli(nombre){
   document.getElementById('tCli').value = nombre;
   document.getElementById('cliSugg').style.display='none';
-  // Auto-fill phone if exists
   const prev = S.reparaciones.find(r=>r.cliente===nombre);
   if(prev && prev.tel) document.getElementById('tTel').value = prev.tel;
 }
+
+// Show ficha alerta in turno form
+document.addEventListener('change', function(e){
+  if(e.target.id==='turnoCli') checkFichaAlerta(e.target.value);
+});
 
 function calcGanTaller(){
   const pre=parseFloat(document.getElementById('tPre').value)||0;
@@ -2162,7 +2198,7 @@ async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').
 
 // ═══ DASHBOARD ═══
 function rDash(){
-  updateGreeting(); updateBigNumbers(); rObjetivos(); rCajas();
+  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas();
   const m=mes();
   const vm=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
@@ -3478,12 +3514,14 @@ function rTurnosConfig(){
   // Empleados
   const empEl = document.getElementById('empleadosList');
   empEl.innerHTML = cfg.empleados.map(e=>`
-    <div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
+    <div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
       <div>
         <strong style="font-size:.88rem">👤 ${e.nombre}</strong>
         ${e.sectores?.length?`<span style="color:var(--tx2);font-size:.75rem;margin-left:8px">${e.sectores.join(', ')}</span>`:''}
+        ${e.comision>0?`<span style="color:var(--gld);font-size:.75rem;margin-left:8px">💰 ${e.comision}% comisión</span>`:''}
       </div>
       <div style="display:flex;gap:6px">
+        <button class="btn bgh bsm" onclick="verCajaEmpleada('${e.id}')">📊 Caja</button>
         <button class="btn be bsm" onclick="editarEmpleado('${e.id}')">✎</button>
         <button class="btn bd bsm" onclick="eliminarEmpleado('${e.id}')">✕</button>
       </div>
@@ -3494,6 +3532,12 @@ function rTurnosConfig(){
   if(document.getElementById('horApertura')) document.getElementById('horApertura').value = cfg.apertura||'09:00';
   if(document.getElementById('horCierre')) document.getElementById('horCierre').value = cfg.cierre||'20:00';
   document.querySelectorAll('.diasSalon').forEach(c=>{ c.checked = cfg.dias.includes(parseInt(c.value)); });
+  
+  // Set today's date in caja
+  const cajEl = document.getElementById('cajEmpFecha');
+  if(cajEl && !cajEl.value) cajEl.value = tod();
+  rCajaEmpleadas();
+  rFichasClientes();
 }
 
 function agregarServicioTurno(){
@@ -3536,8 +3580,9 @@ function agregarEmpleado(){
   const nombre = prompt('Nombre del empleado:');
   if(!nombre) return;
   const sectores = prompt('Sectores que atiende (ej: Peluquería, Manicuria)') || '';
+  const comision = parseFloat(prompt('% de comisión sobre cada servicio (0 si no aplica):') || '0');
   const cfg = getTurnosCfg();
-  cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean)});
+  cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean), comision});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   rTurnosConfig();
   showToast('Empleado agregado ✓');
@@ -3550,7 +3595,8 @@ function editarEmpleado(id){
   const nombre = prompt('Nombre:', e.nombre);
   if(!nombre) return;
   const sectores = prompt('Sectores:', e.sectores?.join(', ')||'') || '';
-  e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean);
+  const comision = parseFloat(prompt('% de comisión:', e.comision||0) || e.comision||0);
+  e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean); e.comision=comision;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   rTurnosConfig();
   showToast('Empleado actualizado ✓');
@@ -3562,6 +3608,174 @@ function eliminarEmpleado(id){
   cfg.empleados = cfg.empleados.filter(e=>e.id!==id);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   rTurnosConfig();
+}
+
+// ═══ CAJA POR EMPLEADA ═══
+function rCajaEmpleadas(){
+  const el = document.getElementById('cajaEmpleadasGrid');
+  if(!el) return;
+  const fechaEl = document.getElementById('cajEmpFecha');
+  if(!fechaEl.value) fechaEl.value = tod();
+  const fecha = fechaEl.value;
+  const cfg = getTurnosCfg();
+  const turnos = getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado'&&t.precio>0);
+
+  if(!cfg.empleados.length){
+    el.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:12px">Agregá empleadas primero</div>';
+    return;
+  }
+
+  el.innerHTML = cfg.empleados.map(e=>{
+    const tEmp = turnos.filter(t=>t.empleadoId==e.id);
+    const total = tEmp.reduce((a,t)=>a+t.precio,0);
+    const comision = Math.round(total*(e.comision||0)/100);
+    return `<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:600;font-size:.88rem">👤 ${e.nombre}</div>
+          <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${tEmp.length} servicios terminados</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;color:var(--ok)">${fmt(total)}</div>
+          ${e.comision>0?`<div style="font-size:.75rem;color:var(--gld)">Comisión ${e.comision}%: ${fmt(comision)}</div>`:''}
+        </div>
+      </div>
+      ${tEmp.length?`<div style="margin-top:8px;border-top:1px solid var(--bor);padding-top:8px">
+        ${tEmp.map(t=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--tx2);padding:2px 0">
+          <span>${t.hora} — ${t.cliente} (${t.servicioNombre})</span>
+          <span style="color:var(--tx)">${fmt(t.precio)}</span>
+        </div>`).join('')}
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function verCajaEmpleada(id){
+  const cajEl = document.getElementById('cajEmpFecha');
+  if(cajEl) cajEl.value = tod();
+  rCajaEmpleadas();
+  document.getElementById('cajaEmpleadasGrid')?.scrollIntoView({behavior:'smooth'});
+}
+
+// ═══ FICHAS DE CLIENTES ═══
+const FICHAS_KEY = 'fichasClientes';
+
+function getFichas(){
+  const raw = localStorage.getItem(FICHAS_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : {};
+}
+
+function saveFichas(fichas){
+  localStorage.setItem(FICHAS_KEY + '_' + (currentTenant?.id||''), JSON.stringify(fichas));
+}
+
+function getFichaCliente(nombre){
+  const fichas = getFichas();
+  return fichas[nombre.toLowerCase()] || {nombre, color:'', largo:'', alergias:'', notas:'', ultimaVisita:''};
+}
+
+function guardarFichaCliente(ficha){
+  const fichas = getFichas();
+  fichas[ficha.nombre.toLowerCase()] = ficha;
+  saveFichas(fichas);
+}
+
+function rFichasClientes(){
+  const el = document.getElementById('fichasClientesList');
+  if(!el) return;
+  const q = (document.getElementById('fichaQ')?.value||'').toLowerCase();
+  const fichas = Object.values(getFichas()).filter(f=>!q||f.nombre.toLowerCase().includes(q));
+  
+  // También incluir clientes de turnos sin ficha
+  const turnos = getTurnos();
+  const nombresConTurnos = [...new Set(turnos.map(t=>t.cliente))];
+  
+  if(!fichas.length && !nombresConTurnos.length){
+    el.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:12px">Las fichas se crean automáticamente cuando abrís el perfil de un cliente</div>';
+    return;
+  }
+
+  const todos = [...new Set([...fichas.map(f=>f.nombre), ...nombresConTurnos])].filter(n=>!q||n.toLowerCase().includes(q));
+  
+  el.innerHTML = todos.map(nombre=>{
+    const ficha = getFichaCliente(nombre);
+    const visitasTotales = turnos.filter(t=>t.cliente===nombre).length;
+    return `<div style="padding:12px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:600;font-size:.88rem">${nombre}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">
+          ${ficha.color?`🎨 ${ficha.color} ·`:''}
+          ${ficha.largo?`✂ ${ficha.largo} ·`:''}
+          ${visitasTotales} visitas
+        </div>
+        ${ficha.alergias?`<div style="font-size:.72rem;color:var(--bad);margin-top:2px">⚠ ${ficha.alergias}</div>`:''}
+      </div>
+      <button class="btn be bsm" onclick="editarFichaCliente('${nombre.replace(/'/g,"\'")}')">📋 Ver ficha</button>
+    </div>`;
+  }).join('');
+}
+
+function editarFichaCliente(nombre){
+  const ficha = getFichaCliente(nombre);
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:460px;max-height:85vh;overflow-y:auto">
+    <div style="padding:16px;border-bottom:1px solid var(--bor)">
+      <div style="font-family:var(--fh);font-size:1rem;font-weight:700">📋 Ficha — ${nombre}</div>
+    </div>
+    <div style="padding:16px">
+      <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">🎨 Color actual / tratamiento</label>
+      <input id="fichaColor" value="${ficha.color||''}" placeholder="Ej: Castaño oscuro 4.0, rubio 8.1..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+      <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">✂ Largo del pelo</label>
+      <select id="fichaLargo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+        <option value="" ${!ficha.largo?'selected':''}>Sin especificar</option>
+        <option value="Corto" ${ficha.largo==='Corto'?'selected':''}>Corto</option>
+        <option value="Medio" ${ficha.largo==='Medio'?'selected':''}>Medio</option>
+        <option value="Largo" ${ficha.largo==='Largo'?'selected':''}>Largo</option>
+        <option value="Muy largo" ${ficha.largo==='Muy largo'?'selected':''}>Muy largo</option>
+      </select>
+      <label style="font-size:.67rem;color:var(--bad);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">⚠ Alergias / contraindicaciones</label>
+      <input id="fichaAlergias" value="${ficha.alergias||''}" placeholder="Ej: alergia a la oxidante, sensible al calor..." style="width:100%;background:var(--bg);border:1px solid rgba(201,82,76,.3);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+      <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">📝 Notas del estilista</label>
+      <textarea id="fichaNota" placeholder="Preferencias, observaciones, productos usados..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;min-height:80px;resize:vertical">${ficha.notas||''}</textarea>
+      
+      <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.72rem;font-weight:600;color:var(--tx2);margin-bottom:8px">HISTORIAL DE VISITAS</div>
+        ${getTurnos().filter(t=>t.cliente===nombre).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8).map(t=>`
+          <div style="font-size:.75rem;padding:5px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between">
+            <span>${fD(t.fecha)} — ${t.servicioNombre}</span>
+            <span style="color:var(--gld)">${t.precio>0?fmt(t.precio):''}</span>
+          </div>
+        `).join('') || '<div style="color:var(--mut);font-size:.75rem">Sin visitas</div>'}
+      </div>
+    </div>
+    <div style="padding:14px;border-top:1px solid var(--bor);display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="btn bg" onclick="
+        const f={nombre:'${nombre.replace(/'/g,"\'")}',color:document.getElementById('fichaColor').value,largo:document.getElementById('fichaLargo').value,alergias:document.getElementById('fichaAlergias').value,notas:document.getElementById('fichaNota').value,ultimaVisita:'${tod()}'};
+        guardarFichaCliente(f);
+        this.closest('[style*=fixed]').remove();
+        rFichasClientes();
+        showToast('Ficha guardada ✓');
+      ">Guardar ficha</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+// Mostrar alerta de ficha al abrir turno si tiene alergias
+function checkFichaAlerta(nombre){
+  if(!nombre) return;
+  const ficha = getFichaCliente(nombre);
+  if(ficha.alergias){
+    const box = document.getElementById('turnoConflicto');
+    if(box){ 
+      box.style.display='block';
+      box.style.borderColor='var(--bad)';
+      box.textContent='⚠ ALERTA: ' + nombre + ' tiene: ' + ficha.alergias;
+    }
+  }
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
@@ -3781,6 +3995,56 @@ function updateGreeting(){
   let saludo = h >= 6 && h < 12 ? 'Buenos días' : h >= 12 && h < 19 ? 'Buenas tardes' : h >= 19 && h < 24 ? 'Buenas noches' : 'Buenas noches';
   const el = document.getElementById('dashGreeting');
   if(el) el.textContent = saludo + (name ? ', ' + name : '');
+}
+
+function updateEnergyBar(){
+  const hoy = tod();
+  const ventasHoy = S.ventas.filter(v=>v.fecha===hoy);
+  const totalHoy = ventasHoy.reduce((a,v)=>a+v.total,0);
+  const repsHoy = S.reparaciones.filter(r=>r.fecha===hoy&&r.estado!=='cancelado').length;
+  const obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1};
+  const metaDia = (obj.repCant||7)*(obj.repPre||40000) + (obj.accCant||10)*(obj.accPre||10000);
+
+  const bar = document.getElementById('energyBar');
+  const msg = document.getElementById('energyMsg');
+  const pct = document.getElementById('energyPct');
+  const sub = document.getElementById('energySub');
+  if(!bar||!msg) return;
+
+  let porcentaje = metaDia > 0 ? Math.min(100, Math.round(totalHoy/metaDia*100)) : 0;
+
+  // Color y mensaje según rendimiento
+  let color, texto, subtexto;
+  if(porcentaje >= 80){
+    color = 'linear-gradient(90deg,#2d9e5f,#4caf7d)';
+    const frases = ['🔥 Día de 10, seguí así!','💪 Imparable, vas a tope!','⚡ Máquina, no parás!','🏆 Día épico, a full!'];
+    texto = frases[Math.floor(Math.random()*frases.length)];
+    subtexto = `Meta del día casi cumplida · ${fmt(totalHoy)} de ${fmt(metaDia)}`;
+  } else if(porcentaje >= 50){
+    color = 'linear-gradient(90deg,#b07a1a,#c9a84c)';
+    const frases = ['💛 Buen ritmo, no aflojés','📈 Mitad del camino, dale más','🎯 Vas bien, enfocate en la meta'];
+    texto = frases[Math.floor(Math.random()*frases.length)];
+    subtexto = `${fmt(metaDia - totalHoy)} para llegar a la meta · ${porcentaje}% completado`;
+  } else if(porcentaje >= 20){
+    color = 'linear-gradient(90deg,#b05a1a,#c97a4c)';
+    const frases = ['📊 Día tranquilo, a despertar','🚀 Hora de arrancar fuerte','💡 Todavía hay tiempo, acelerá'];
+    texto = frases[Math.floor(Math.random()*frases.length)];
+    subtexto = `Necesitás ${fmt(metaDia - totalHoy)} más para la meta de hoy`;
+  } else {
+    color = totalHoy === 0 
+      ? 'linear-gradient(90deg,#555,#777)'
+      : 'linear-gradient(90deg,#8b2a2a,#c9524c)';
+    texto = totalHoy === 0 ? '☀️ Arrancá el día con todo!' : '🔴 Día difícil, no bajés los brazos';
+    subtexto = totalHoy === 0 
+      ? `Meta del día: ${fmt(metaDia)}`
+      : `${fmt(metaDia - totalHoy)} para llegar a la meta`;
+  }
+
+  bar.style.background = color;
+  bar.style.width = Math.max(porcentaje, porcentaje>0?3:0) + '%';
+  msg.textContent = texto;
+  pct.textContent = porcentaje + '%';
+  sub.textContent = subtexto;
 }
 
 function updateBigNumbers(){
