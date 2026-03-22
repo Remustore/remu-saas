@@ -3449,7 +3449,12 @@ async function saveTurno(){
   // Verificar conflicto antes de guardar
   const conflictoEl = document.getElementById('turnoConflicto');
   if(conflictoEl.style.display !== 'none') {
-    if(!confirm('Hay un conflicto de horario. ¿Querés guardarlo igual?')) return;
+    // Delfi puede superponer turnos sin confirmacion (tinturas largas con cortes intermedios)
+    const esDelfi = window.currentEmpleadoNombre === 'Delfi';
+    if(!esDelfi){
+      if(!confirm('Hay un conflicto de horario. ¿Querés guardarlo igual?')) return;
+    }
+    // Para Delfi simplemente avisa pero continua
   }
 
   const cfg = getTurnosCfg();
