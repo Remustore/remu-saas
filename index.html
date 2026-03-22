@@ -777,7 +777,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mb" id="mVenta"><div class="md"><div class="mh"><div class="mt2" id="mVentaTitle">Registrar Venta</div><button class="xbtn" onclick="closeM('mVenta')">✕</button></div>
 <div class="mc"><input type="hidden" id="vId">
 <div class="fr full"><div><label>Tipo</label><select id="vTipo" onchange="uVUI()"><option value="producto">Producto / Accesorio</option><option value="equipo">Equipo</option><option value="servicio">Servicio técnico</option></select></div></div>
-<div id="vPR"><label>Categoría</label><select id="vCatFilt" onchange="filtrarProdVenta()"><option value="">Todas</option><option value="Fundas siliconadas">Fundas siliconadas</option><option value="Fundas con diseño">Fundas con diseño</option><option value="Cables">Cables</option><option value="Cargadores">Cargadores</option><option value="Templados">Templados</option><option value="Parlantes">Parlantes</option><option value="Auriculares">Auriculares</option><option value="Baterías portátiles">Baterías portátiles</option><option value="Soportes y accesorios">Soportes y accesorios</option><option value="Stanley y termos">Stanley y termos</option><option value="Gorras">Gorras</option><option value="Otros">Otros</option></select><label>Producto</label><select id="vProd"></select></div>
+<div id="vPR"><label>Categoría</label><select id="vCatFilt" onchange="filtrarProdVenta()"><option value="">Todas</option><option value="Fundas siliconadas">Fundas siliconadas</option><option value="Fundas con diseño">Fundas con diseño</option><option value="Cables">Cables</option><option value="Cargadores">Cargadores</option><option value="Templados">Templados</option><option value="Parlantes">Parlantes</option><option value="Auriculares">Auriculares</option><option value="Baterías portátiles">Baterías portátiles</option><option value="Soportes y accesorios">Soportes y accesorios</option><option value="Stanley y termos">Stanley y termos</option><option value="Gorras">Gorras</option><option value="Otros">Otros</option></select><label>Producto</label><select id="vProd" onchange="autoFillPrecio()"></select></div>
 <div id="vER" style="display:none"><label>Equipo</label><select id="vEq"></select>
 <div class="fr"><div><label>% Comisión sobre precio venta</label><input type="number" id="vCom" placeholder="0" oninput="calcComision()"></div><div><label>Comisión calculada ($)</label><input type="number" id="vComCalc" readonly style="background:var(--car2)"></div></div></div>
 <div id="vSR" style="display:none"><label>Descripción</label><input id="vSDesc" placeholder="Ej: Cambio de pantalla"></div>
@@ -1457,7 +1457,9 @@ function rEquipos(){
 // ═══ VENTAS ═══
 function popVSels(){
   const catF = document.getElementById('vCatFilt')?.value||'';
-  document.getElementById('vProd').innerHTML = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF)).map(s=>`<option value="${s.id}">${s.nombre} (×${s.cantidad}) — ${fmt(s.precio)}</option>`).join('')||'<option>Sin stock</option>';
+  const prodOpts = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF));
+  document.getElementById('vProd').innerHTML = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('')||'<option value="">Sin stock</option>';
+  autoFillPrecio();
   document.getElementById('vEq').innerHTML = S.equipos.filter(e=>e.estado==='disponible').map(e=>`<option value="${e.id}">${e.modelo} ${e.memoria}${e.tipo==='usado'?' (Usado)':''} — ${fmt(e.precio)}</option>`).join('')||'<option>Sin equipos</option>';
 }
 
@@ -1468,9 +1470,22 @@ function uVUI(){
   document.getElementById('vSR').style.display = t==='servicio'?'':'none';
 }
 
+function autoFillPrecio(){
+  const sel = document.getElementById('vProd');
+  const opt = sel.options[sel.selectedIndex];
+  if(!opt || !opt.value) return;
+  const precio = opt.getAttribute('data-precio');
+  if(precio && parseFloat(precio) > 0){
+    document.getElementById('vPre').value = precio;
+    calcComision();
+  }
+}
+
 function filtrarProdVenta(){
   const catF = document.getElementById('vCatFilt')?.value||'';
-  document.getElementById('vProd').innerHTML = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF)).map(s=>`<option value="${s.id}">${s.nombre} (×${s.cantidad}) — ${fmt(s.precio)}</option>`).join('')||'<option>Sin stock</option>';
+  const prodOpts = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF));
+  document.getElementById('vProd').innerHTML = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('')||'<option value="">Sin stock</option>';
+  autoFillPrecio();
 }
 
 function calcComision(){
