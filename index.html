@@ -1250,27 +1250,7 @@ async function doLogin(){
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
-    // Ocultar TODOS los nav items
-    document.querySelectorAll('.ni').forEach(el=>el.style.display='none');
-    document.querySelectorAll('.ns').forEach(el=>el.style.display='none');
-    
-    // Mostrar solo turnos y fichas
-    const mostrar = ['nav-turnos','nav-fichas'];
-    mostrar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='flex'; });
-    
-    // Ocultar botones de dashboard, backup, etc
-    const btnOcultar = ['themeToggle'];
-    btnOcultar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
-    
-    // Simplificar topbar
-    const tbUser = document.getElementById('tbUser');
-    if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser.email);
-    
-    // Auto-filtrar turnos por nombre del empleado
-    if(window.currentEmpleadoNombre){
-      turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
-    }
-    go('turnos');
+    aplicarModoEmpleado();
   }
   // Auto backup diario
   const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
@@ -1393,27 +1373,7 @@ function setupApp(){
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
-    // Ocultar TODOS los nav items
-    document.querySelectorAll('.ni').forEach(el=>el.style.display='none');
-    document.querySelectorAll('.ns').forEach(el=>el.style.display='none');
-    
-    // Mostrar solo turnos y fichas
-    const mostrar = ['nav-turnos','nav-fichas'];
-    mostrar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='flex'; });
-    
-    // Ocultar botones de dashboard, backup, etc
-    const btnOcultar = ['themeToggle'];
-    btnOcultar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
-    
-    // Simplificar topbar
-    const tbUser = document.getElementById('tbUser');
-    if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser.email);
-    
-    // Auto-filtrar turnos por nombre del empleado
-    if(window.currentEmpleadoNombre){
-      turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
-    }
-    go('turnos');
+    aplicarModoEmpleado();
   }
   // Auto backup diario
   const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
@@ -1780,6 +1740,15 @@ async function dbGetConfig(key){
 
 // ═══ LOAD ALL ═══
 async function loadAll(){
+  // Clear previous tenant's localStorage cache to avoid cross-contamination
+  const prevTenant = localStorage.getItem('activeTenant');
+  const thisTenant = currentTenant?.id || '';
+  if(prevTenant && prevTenant !== thisTenant){
+    // Different tenant - clear audit cache
+    localStorage.removeItem('auditoria_' + prevTenant + '_hoy');
+    console.log('Cleared cache for previous tenant');
+  }
+  localStorage.setItem('activeTenant', thisTenant);
   document.getElementById('loadingScreen').style.display='flex';
   try{
     const [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja] = await Promise.all([
@@ -1795,6 +1764,8 @@ async function loadAll(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     renderAll();
+    // Re-apply empleado restrictions after data loads
+    if(currentRole === 'empleado') aplicarModoEmpleado();
   }catch(e){ console.error('Load error', e); }
   document.getElementById('loadingScreen').style.display='none';
 }
@@ -4279,6 +4250,36 @@ function setupCategoriasStock(){
   if(vcf){ var o2="<option value=\"\">Todas</option>"; cats.forEach(function(c){o2+="<option value=\""+c+"\">"+c+"</option>";}); vcf.innerHTML=o2; }
 }
 
+function aplicarModoEmpleado(){
+  // Ocultar TODOS los nav items
+  document.querySelectorAll('.ni').forEach(el=>el.style.display='none');
+  document.querySelectorAll('.ns').forEach(el=>el.style.display='none');
+  
+  // Mostrar solo turnos y fichas
+  ['nav-turnos','nav-fichas'].forEach(id=>{ 
+    const el=document.getElementById(id); 
+    if(el){ el.style.display='flex'; el.style.removeProperty('display'); el.style.display='flex'; }
+  });
+  
+  // Ocultar todas las secciones de contenido excepto turnos y fichas
+  document.querySelectorAll('.sec').forEach(el=>{
+    const id = el.id;
+    if(id !== 'sec-turnos' && id !== 'sec-turnosConfig' && id !== 'sec-fichasClientes'){
+      el.style.display='none';
+    }
+  });
+  
+  // Simplificar topbar
+  const tbUser = document.getElementById('tbUser');
+  if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser?.email || '');
+  
+  // Auto-filtrar turnos
+  if(window.currentEmpleadoNombre){
+    turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
+  }
+  go('turnos');
+}
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -4657,7 +4658,10 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     const { data: td } = await sb.from('tenants').select('*').eq('id', session.user.user_metadata?.tenant_id).single();
     if(td && td.activo){
       currentTenant = td;
-      currentRole = 'admin';
+      const rolSesion = session.user.user_metadata?.rol || 'admin';
+      const nombreEmpSesion = session.user.user_metadata?.nombre_empleado || '';
+      currentRole = rolSesion;
+      if(nombreEmpSesion) window.currentEmpleadoNombre = nombreEmpSesion;
       setupApp();
       await loadAll();
     } else {
