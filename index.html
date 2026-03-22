@@ -462,6 +462,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('taller')" id="nav-taller"><span class="nico">◉</span>Taller/Servicios</div>
   <div class="ni" onclick="go('clientes')" id="nav-clientes"><span class="nico">👥</span>Clientes</div>
   <div class="ni" onclick="go('auditoria')" id="nav-auditoria"><span class="nico">📋</span>Control Stock</div>
+  <div class="ni" onclick="go('turnos')" id="nav-turnos"><span class="nico">📆</span>Turnos</div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
   <div class="ni" onclick="go('analisis')" id="nav-analisis"><span class="nico">◈</span>Análisis</div>
@@ -557,7 +558,11 @@ textarea{resize:vertical;min-height:70px;}
       </div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card"><div class="ch"><h3>🏆 Más vendidos</h3></div><div id="topS"></div></div>
-        <div class="card"><div class="ch"><h3>⚠️ Alertas</h3></div><div id="alerts"></div></div>
+        <div class="card" id="resumenSemCard" style="display:none;margin-bottom:14px;border-left:3px solid var(--gld)">
+        <div class="ch"><h3>📅 Resumen de la semana pasada</h3><button class="btn bsm" onclick="document.getElementById('resumenSemCard').style.display='none'">✕</button></div>
+        <div id="resumenSemContent"></div>
+      </div>
+      <div class="card"><div class="ch"><h3>⚠️ Alertas</h3></div><div id="alerts"></div></div>
       </div>
       <div class="card"><div class="ch"><h3>Consejos para tu negocio</h3></div><div id="cons"></div></div>
       <div id="dStats" class="g4" style="margin-top:14px"></div>
@@ -668,6 +673,86 @@ textarea{resize:vertical;min-height:70px;}
       <div class="card" style="margin-top:14px">
         <h3 style="margin-bottom:12px">📜 Historial de verificaciones</h3>
         <div id="audHistorial"></div>
+      </div>
+    </div>
+
+    <!-- TURNOS -->
+    <div class="sec" id="sec-turnos">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:2px">
+        <div>
+          <div class="pt">Turnos</div>
+          <div class="ps" style="margin-bottom:0">Agenda del salón</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bgh bsm" onclick="go('turnosConfig')">⚙ Configurar</button>
+          <button class="btn bg bsm" onclick="openNuevoTurno()">+ Nuevo turno</button>
+        </div>
+      </div>
+
+      <!-- Selector de fecha y vista -->
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <button class="btn bsm" onclick="cambiarFechaTurnos(-1)">◀</button>
+          <input type="date" id="turnosFecha" onchange="rTurnos()" style="padding:7px 12px;font-size:.85rem;flex:1;max-width:180px">
+          <button class="btn bsm" onclick="cambiarFechaTurnos(1)">▶</button>
+          <button class="btn bgh bsm" onclick="irHoyTurnos()">Hoy</button>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="tab active" id="vistaListaBtn" onclick="setVistaTurnos('lista')">Lista</button>
+            <button class="tab" id="vistaHorarioBtn" onclick="setVistaTurnos('horario')">Horario</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filtro por empleado -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px" id="empleadoTabs">
+        <button class="tab active" onclick="setEmpleadoFiltro('todos',this)">Todos</button>
+      </div>
+
+      <!-- Resumen del día -->
+      <div id="turnosDayStats" style="margin-bottom:14px"></div>
+
+      <!-- Lista de turnos -->
+      <div id="turnosLista"></div>
+    </div>
+
+    <!-- CONFIGURACION TURNOS -->
+    <div class="sec" id="sec-turnosConfig">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div class="pt">Configuración de turnos</div>
+        <button class="btn bsm" onclick="go('turnos')">← Volver</button>
+      </div>
+
+      <!-- Sectores y servicios -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>✂ Sectores y servicios</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>
+        <div id="serviciosTurnosList"></div>
+      </div>
+
+      <!-- Empleados -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>👤 Empleados</h3><button class="btn bg bsm" onclick="agregarEmpleado()">+ Agregar</button></div>
+        <div id="empleadosList"></div>
+      </div>
+
+      <!-- Horarios -->
+      <div class="card">
+        <div class="ch"><h3>🕐 Horario del salón</h3></div>
+        <div class="fr">
+          <div><label>Apertura</label><input type="time" id="horApertura" value="09:00" onchange="saveTurnosConfig()"></div>
+          <div><label>Cierre</label><input type="time" id="horCierre" value="20:00" onchange="saveTurnosConfig()"></div>
+        </div>
+        <div style="margin-top:10px">
+          <label>Días de atención</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="1" checked onchange="saveTurnosConfig()"> Lun</label>
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="2" checked onchange="saveTurnosConfig()"> Mar</label>
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="3" checked onchange="saveTurnosConfig()"> Mié</label>
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="4" checked onchange="saveTurnosConfig()"> Jue</label>
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="5" checked onchange="saveTurnosConfig()"> Vie</label>
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="6" checked onchange="saveTurnosConfig()"> Sáb</label>
+            <label class="mod-check"><input type="checkbox" class="diasSalon" value="0" onchange="saveTurnosConfig()"> Dom</label>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -907,6 +992,23 @@ textarea{resize:vertical;min-height:70px;}
 <div class="fr full"><div><label>Notas internas</label><textarea id="tNot" placeholder="Notas internas..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mTaller')">Cancelar</button><button class="btn bg" onclick="saveTaller()">Guardar</button></div></div></div>
 
+<!-- Nuevo Turno -->
+<div class="mb" id="mTurno"><div class="md"><div class="mh"><div class="mt2" id="mTurnoTitle">Nuevo turno</div><button class="xbtn" onclick="closeM('mTurno')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="turnoId">
+  <div class="fr"><div><label>Cliente</label><input id="turnoCli" placeholder="Nombre del cliente"></div><div><label>Teléfono / WA</label><input id="turnoTel" placeholder="11 2345 6789"></div></div>
+  <div class="fr"><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div><div><label>Empleado</label><select id="turnoEmpleado"></select></div></div>
+  <div class="fr"><div><label>Fecha</label><input type="date" id="turnoFecha"></div><div><label>Hora</label><input type="time" id="turnoHora" step="1800"></div></div>
+  <div id="turnoDurBox" style="background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--tx2)">
+    Duración estimada: <strong id="turnoDurLabel" style="color:var(--gld)">—</strong>
+    · Finaliza: <strong id="turnoFinLabel" style="color:var(--tx)">—</strong>
+  </div>
+  <div id="turnoConflicto" style="display:none;background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--bad)"></div>
+  <div class="fr full"><div><label>Notas</label><input id="turnoNotas" placeholder="Observaciones..."></div></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mTurno')">Cancelar</button><button class="btn bg" onclick="saveTurno()">Guardar turno</button></div>
+</div></div>
+
 <!-- Avance taller -->
 <div class="mb" id="mAv"><div class="md"><div class="mh"><div class="mt2">Actualizar trabajo</div><button class="xbtn" onclick="closeM('mAv')">✕</button></div>
 <div class="mc">
@@ -1034,6 +1136,18 @@ async function doLogin(){
   if(email === SUPER_EMAIL.toLowerCase() && pass === SUPER_PASS){
     currentRole = 'superadmin';
     document.getElementById('loginScreen').style.display='none';
+  // Auto backup diario
+  const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
+  const lastBackup = localStorage.getItem(hoyKey);
+  if(lastBackup !== tod()){
+    setTimeout(()=>{
+      autoBackup();
+      localStorage.setItem(hoyKey, tod());
+    }, 3000);
+  }
+  // Resumen semanal los lunes
+  const diaSemana = new Date().getDay();
+  if(diaSemana === 1) setTimeout(mostrarResumenSemanal, 1500);
     document.getElementById('superadminScreen').style.display='flex';
     loadTenants();
     loadSaStats();
@@ -1110,6 +1224,18 @@ function setupApp(){
   });
 
   document.getElementById('loginScreen').style.display='none';
+  // Auto backup diario
+  const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
+  const lastBackup = localStorage.getItem(hoyKey);
+  if(lastBackup !== tod()){
+    setTimeout(()=>{
+      autoBackup();
+      localStorage.setItem(hoyKey, tod());
+    }, 3000);
+  }
+  // Resumen semanal los lunes
+  const diaSemana = new Date().getDay();
+  if(diaSemana === 1) setTimeout(mostrarResumenSemanal, 1500);
   document.getElementById('sb').style.display='flex';
   document.getElementById('mn').style.display='flex';
   go('dashboard');
@@ -1358,7 +1484,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', turnos:'Turnos', turnosConfig:'Configuración Turnos', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1367,7 +1493,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, turnos:rTurnos, turnosConfig:rTurnosConfig, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -1567,7 +1693,8 @@ function rEquipos(){
 function popVSels(){
   const catF = document.getElementById('vCatFilt')?.value||'';
   const prodOpts = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF));
-  document.getElementById('vProd').innerHTML = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('')||'<option value="">Sin stock</option>';
+  const optsHtml = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('');
+  document.getElementById('vProd').innerHTML = (optsHtml||'') + '<option value="__nuevo__">➕ Agregar producto nuevo...</option>';
   autoFillPrecio();
   document.getElementById('vEq').innerHTML = S.equipos.filter(e=>e.estado==='disponible').map(e=>`<option value="${e.id}">${e.modelo} ${e.memoria}${e.tipo==='usado'?' (Usado)':''} — ${fmt(e.precio)}</option>`).join('')||'<option>Sin equipos</option>';
 }
@@ -1583,6 +1710,25 @@ function autoFillPrecio(){
   const sel = document.getElementById('vProd');
   const opt = sel.options[sel.selectedIndex];
   if(!opt || !opt.value) return;
+  if(opt.value === '__nuevo__'){
+    const nombre = prompt('Nombre del producto nuevo:');
+    if(!nombre) { sel.selectedIndex=0; return; }
+    const precio = parseFloat(prompt('Precio de venta ($):') || '0');
+    const costo = parseFloat(prompt('Costo ($):') || '0');
+    const cat = document.getElementById('vCatFilt').value || 'Otros';
+    const nuevoId = Date.now();
+    const nuevo = {id:nuevoId, nombre, categoria:cat, cantidad:0, minimo:3, precio, costo, vendidos:0, notas:''};
+    S.stock.push(nuevo);
+    dbUpsert('stock', nuevo);
+    filtrarProdVenta();
+    // Select the newly created product
+    setTimeout(()=>{
+      const newOpt = document.querySelector(`#vProd option[value="${nuevoId}"]`);
+      if(newOpt){ newOpt.selected=true; autoFillPrecio(); }
+    }, 100);
+    showToast('Producto creado ✓');
+    return;
+  }
   const precio = opt.getAttribute('data-precio');
   if(precio && parseFloat(precio) > 0){
     document.getElementById('vPre').value = precio;
@@ -1593,7 +1739,8 @@ function autoFillPrecio(){
 function filtrarProdVenta(){
   const catF = document.getElementById('vCatFilt')?.value||'';
   const prodOpts = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF));
-  document.getElementById('vProd').innerHTML = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('')||'<option value="">Sin stock</option>';
+  const optsHtml = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('');
+  document.getElementById('vProd').innerHTML = (optsHtml||'') + '<option value="__nuevo__">➕ Agregar producto nuevo...</option>';
   autoFillPrecio();
 }
 
@@ -2662,6 +2809,497 @@ function rComparativa(){
   `;
 }
 
+function autoBackup(){
+  try {
+    const fecha = tod().replace(/-/g,'');
+    const datos = {
+      version: '1.0',
+      fecha: tod(),
+      negocio: currentTenant?.nombre || 'backup',
+      datos: {
+        stock: S.stock,
+        ventas: S.ventas,
+        gastos: S.gastos,
+        reparaciones: S.reparaciones,
+        equipos: S.equipos,
+        precios: S.precios,
+        inversores: S.inversores,
+        movimientos_inv: S.movimientos_inv
+      }
+    };
+    // Guardar en localStorage como backup de emergencia
+    localStorage.setItem('autoBackup_' + (currentTenant?.id||''), JSON.stringify(datos));
+    console.log('Backup automático guardado:', fecha);
+  } catch(e){ console.error('Error en backup automático:', e); }
+}
+
+function mostrarResumenSemanal(){
+  const hoy = new Date();
+  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - 7);
+  const domingo = new Date(hoy); domingo.setDate(hoy.getDate() - 1);
+  const desde = lunes.toISOString().slice(0,10);
+  const hasta = domingo.toISOString().slice(0,10);
+
+  const ventas = S.ventas.filter(v=>v.fecha>=desde&&v.fecha<=hasta);
+  const gastos = S.gastos.filter(g=>g.fecha>=desde&&g.fecha<=hasta);
+  const reps = S.reparaciones.filter(r=>r.estado==='entregado'&&r.fecha>=desde&&r.fecha<=hasta);
+
+  const tV = ventas.reduce((a,v)=>a+v.total,0);
+  const tG = gastos.reduce((a,g)=>a+g.monto,0);
+  const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const neto = tV+tR-tG;
+
+  if(tV===0 && tR===0) return; // Sin datos, no mostrar
+
+  const card = document.getElementById('resumenSemCard');
+  const content = document.getElementById('resumenSemContent');
+  if(!card || !content) return;
+
+  content.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:8px">
+      <div style="text-align:center;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Ventas</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:var(--ok)">${fmt(tV)}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${ventas.length} operaciones</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Taller</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:var(--gld)">${fmt(tR)}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${reps.length} trabajos</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Gastos</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:var(--bad)">- ${fmt(tG)}</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Resultado neto</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:${neto>=0?'var(--gld)':'var(--bad)'}">${fmt(neto)}</div>
+      </div>
+    </div>
+  `;
+  card.style.display = 'block';
+}
+
+// ═══ MÓDULO DE TURNOS ═══
+const TURNOS_KEY = 'turnos';
+const TURNOS_CFG_KEY = 'turnosCfg';
+let turnosFiltroEmpleado = 'todos';
+let turnosVista = 'lista';
+
+// Servicios predeterminados
+const SERVICIOS_DEFAULT = [
+  {id:1, nombre:'Corte de pelo', sector:'Peluquería', duracion:45, precio:0},
+  {id:2, nombre:'Tintura', sector:'Peluquería', duracion:120, precio:0},
+  {id:3, nombre:'Corte + tintura', sector:'Peluquería', duracion:150, precio:0},
+  {id:4, nombre:'Manicuria', sector:'Manicuria', duracion:60, precio:0},
+  {id:5, nombre:'Maquillaje', sector:'Maquillaje', duracion:60, precio:0},
+  {id:6, nombre:'Lifting de pestañas', sector:'Estética', duracion:90, precio:0},
+];
+
+function getTurnosCfg(){
+  const raw = localStorage.getItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : {
+    servicios: SERVICIOS_DEFAULT,
+    empleados: [],
+    apertura: '09:00',
+    cierre: '20:00',
+    dias: [1,2,3,4,5,6]
+  };
+}
+
+function saveTurnosConfig(){
+  const cfg = getTurnosCfg();
+  cfg.apertura = document.getElementById('horApertura')?.value || '09:00';
+  cfg.cierre = document.getElementById('horCierre')?.value || '20:00';
+  cfg.dias = [...document.querySelectorAll('.diasSalon:checked')].map(c=>parseInt(c.value));
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  showToast('Configuración guardada ✓');
+}
+
+function getTurnos(){
+  const raw = localStorage.getItem(TURNOS_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveTurnosLocal(turnos){
+  localStorage.setItem(TURNOS_KEY + '_' + (currentTenant?.id||''), JSON.stringify(turnos));
+}
+
+function irHoyTurnos(){
+  document.getElementById('turnosFecha').value = tod();
+  rTurnos();
+}
+
+function cambiarFechaTurnos(dias){
+  const input = document.getElementById('turnosFecha');
+  const d = new Date(input.value + 'T00:00:00');
+  d.setDate(d.getDate() + dias);
+  input.value = d.toISOString().slice(0,10);
+  rTurnos();
+}
+
+function setVistaTurnos(v){
+  turnosVista = v;
+  document.getElementById('vistaListaBtn').classList.toggle('active', v==='lista');
+  document.getElementById('vistaHorarioBtn').classList.toggle('active', v==='horario');
+  rTurnos();
+}
+
+function setEmpleadoFiltro(id, btn){
+  turnosFiltroEmpleado = id;
+  document.querySelectorAll('#empleadoTabs .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  rTurnos();
+}
+
+function openNuevoTurno(){
+  const cfg = getTurnosCfg();
+  // Fill empleados select
+  const empSel = document.getElementById('turnoEmpleado');
+  empSel.innerHTML = cfg.empleados.length
+    ? cfg.empleados.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')
+    : '<option value="">Sin empleados — configurar primero</option>';
+  // Fill servicios select
+  const srvSel = document.getElementById('turnoServicio');
+  srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}">${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('');
+  // Set date
+  const fechaEl = document.getElementById('turnoFecha');
+  if(!fechaEl.value) fechaEl.value = document.getElementById('turnosFecha')?.value || tod();
+  document.getElementById('turnoId').value = '';
+  document.getElementById('turnoCli').value = '';
+  document.getElementById('turnoTel').value = '';
+  document.getElementById('turnoHora').value = '';
+  document.getElementById('turnoNotas').value = '';
+  document.getElementById('turnoConflicto').style.display = 'none';
+  document.getElementById('mTurnoTitle').textContent = 'Nuevo turno';
+  updateDuracionTurno();
+  openM('mTurno', null);
+}
+
+function updateDuracionTurno(){
+  const srv = document.getElementById('turnoServicio');
+  const opt = srv.options[srv.selectedIndex];
+  const dur = parseInt(opt?.getAttribute('data-dur')||'0');
+  const hora = document.getElementById('turnoHora').value;
+  document.getElementById('turnoDurLabel').textContent = dur ? dur + ' min' : '—';
+  if(hora && dur){
+    const [h,m] = hora.split(':').map(Number);
+    const fin = new Date(2000,0,1,h,m+dur);
+    document.getElementById('turnoFinLabel').textContent = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
+  } else {
+    document.getElementById('turnoFinLabel').textContent = '—';
+  }
+  verificarConflicto();
+}
+
+function verificarConflicto(){
+  const fecha = document.getElementById('turnoFecha').value;
+  const hora = document.getElementById('turnoHora').value;
+  const empleado = document.getElementById('turnoEmpleado').value;
+  const turnoIdActual = document.getElementById('turnoId').value;
+  const srv = document.getElementById('turnoServicio');
+  const dur = parseInt(srv.options[srv.selectedIndex]?.getAttribute('data-dur')||'0');
+  const box = document.getElementById('turnoConflicto');
+
+  if(!fecha||!hora||!empleado||!dur){ box.style.display='none'; return; }
+
+  const [h,m] = hora.split(':').map(Number);
+  const inicio = h*60+m;
+  const fin = inicio+dur;
+
+  const turnos = getTurnos().filter(t=>
+    t.fecha===fecha &&
+    t.empleadoId==empleado &&
+    t.id != turnoIdActual
+  );
+
+  const cfg = getTurnosCfg();
+  const conflicto = turnos.find(t=>{
+    const srvT = cfg.servicios.find(s=>s.id==t.servicioId);
+    const durT = srvT?.duracion||60;
+    const [th,tm] = t.hora.split(':').map(Number);
+    const tInicio = th*60+tm;
+    const tFin = tInicio+durT;
+    return inicio<tFin && fin>tInicio;
+  });
+
+  if(conflicto){
+    const srvC = cfg.servicios.find(s=>s.id==conflicto.servicioId);
+    box.style.display='block';
+    box.textContent = `⚠ Conflicto con turno de ${conflicto.cliente} a las ${conflicto.hora} (${srvC?.nombre||'servicio'})`;
+  } else {
+    box.style.display='none';
+  }
+}
+
+async function saveTurno(){
+  const id = document.getElementById('turnoId').value;
+  const cli = document.getElementById('turnoCli').value.trim();
+  const tel = document.getElementById('turnoTel').value.trim();
+  const fecha = document.getElementById('turnoFecha').value;
+  const hora = document.getElementById('turnoHora').value;
+  const empleadoId = document.getElementById('turnoEmpleado').value;
+  const servicioId = parseInt(document.getElementById('turnoServicio').value);
+  const notas = document.getElementById('turnoNotas').value;
+
+  if(!cli) return alert('Ingresá el nombre del cliente');
+  if(!fecha||!hora) return alert('Ingresá fecha y hora');
+  if(!empleadoId) return alert('Seleccioná un empleado');
+
+  // Verificar conflicto antes de guardar
+  const conflictoEl = document.getElementById('turnoConflicto');
+  if(conflictoEl.style.display !== 'none') {
+    if(!confirm('Hay un conflicto de horario. ¿Querés guardarlo igual?')) return;
+  }
+
+  const cfg = getTurnosCfg();
+  const srv = cfg.servicios.find(s=>s.id===servicioId);
+  const empleado = cfg.empleados.find(e=>e.id==empleadoId);
+
+  const turnos = getTurnos();
+  const obj = {
+    id: id || Date.now().toString(),
+    cliente: cli, tel, fecha, hora,
+    empleadoId, empleadoNombre: empleado?.nombre||'',
+    servicioId, servicioNombre: srv?.nombre||'',
+    sector: srv?.sector||'',
+    duracion: srv?.duracion||60,
+    precio: srv?.precio||0,
+    notas,
+    estado: 'confirmado',
+    creadoEn: new Date().toISOString()
+  };
+
+  if(id){
+    const idx = turnos.findIndex(t=>t.id===id);
+    if(idx>-1) turnos[idx]=obj;
+  } else {
+    turnos.push(obj);
+  }
+
+  saveTurnosLocal(turnos);
+  closeM('mTurno');
+  rTurnos();
+  showToast(id ? 'Turno actualizado ✓' : 'Turno agendado ✓');
+}
+
+function cancelarTurno(id){
+  if(!confirm('¿Cancelar este turno?')) return;
+  const turnos = getTurnos();
+  const t = turnos.find(x=>x.id===id);
+  if(t) t.estado='cancelado';
+  saveTurnosLocal(turnos);
+  rTurnos();
+  showToast('Turno cancelado');
+}
+
+function editarTurno(id){
+  const cfg = getTurnosCfg();
+  const t = getTurnos().find(x=>x.id===id);
+  if(!t) return;
+  const empSel = document.getElementById('turnoEmpleado');
+  empSel.innerHTML = cfg.empleados.map(e=>`<option value="${e.id}" ${e.id==t.empleadoId?'selected':''}>${e.nombre}</option>`).join('');
+  const srvSel = document.getElementById('turnoServicio');
+  srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" ${s.id===t.servicioId?'selected':''}>${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('');
+  document.getElementById('turnoId').value = t.id;
+  document.getElementById('turnoCli').value = t.cliente;
+  document.getElementById('turnoTel').value = t.tel||'';
+  document.getElementById('turnoFecha').value = t.fecha;
+  document.getElementById('turnoHora').value = t.hora;
+  document.getElementById('turnoNotas').value = t.notas||'';
+  document.getElementById('mTurnoTitle').textContent = 'Editar turno';
+  document.getElementById('turnoConflicto').style.display='none';
+  updateDuracionTurno();
+  openM('mTurno', null);
+}
+
+function enviarRecordatorioWA(id){
+  const t = getTurnos().find(x=>x.id===id);
+  if(!t||!t.tel) return alert('Este cliente no tiene teléfono registrado');
+  const negocio = currentTenant?.nombre||'el salón';
+  const msg = `Hola ${t.cliente} 👋
+
+Te recordamos tu turno en *${negocio}*:
+
+📅 *Fecha:* ${fD(t.fecha)}
+🕐 *Hora:* ${t.hora}
+✂ *Servicio:* ${t.servicioNombre}
+👤 *Con:* ${t.empleadoNombre}
+
+¡Te esperamos! Si no podés asistir avisanos con anticipación. 🙏`;
+  const tel = t.tel.replace(/\D/g,'');
+  window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+}
+
+function rTurnos(){
+  const fechaEl = document.getElementById('turnosFecha');
+  if(!fechaEl.value) fechaEl.value = tod();
+  const fecha = fechaEl.value;
+  const cfg = getTurnosCfg();
+  let turnos = getTurnos().filter(t=>t.fecha===fecha && t.estado!=='cancelado');
+  if(turnosFiltroEmpleado!=='todos') turnos=turnos.filter(t=>t.empleadoId==turnosFiltroEmpleado);
+  turnos.sort((a,b)=>a.hora.localeCompare(b.hora));
+
+  // Update empleado tabs
+  const tabsEl = document.getElementById('empleadoTabs');
+  tabsEl.innerHTML = `<button class="tab ${turnosFiltroEmpleado==='todos'?'active':''}" onclick="setEmpleadoFiltro('todos',this)">Todos</button>` +
+    cfg.empleados.map(e=>`<button class="tab ${turnosFiltroEmpleado==e.id?'active':''}" onclick="setEmpleadoFiltro('${e.id}',this)">${e.nombre}</button>`).join('');
+
+  // Day stats
+  const statsEl = document.getElementById('turnosDayStats');
+  const totalDia = getTurnos().filter(t=>t.fecha===fecha&&t.estado!=='cancelado');
+  statsEl.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div class="stat" style="flex:1;min-width:100px"><div class="sl">Turnos hoy</div><div class="sv">${totalDia.length}</div></div>
+    ${cfg.empleados.map(e=>{
+      const n=totalDia.filter(t=>t.empleadoId==e.id).length;
+      return `<div class="stat" style="flex:1;min-width:100px"><div class="sl">${e.nombre}</div><div class="sv">${n}</div></div>`;
+    }).join('')}
+  </div>`;
+
+  // Lista de turnos
+  const listaEl = document.getElementById('turnosLista');
+  if(!turnos.length){
+    listaEl.innerHTML = `<div class="card">${emp('📅','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurno()">+ Agendar turno</button></div></div>`;
+    return;
+  }
+
+  const sectorColors = {'Peluquería':'bbl','Manicuria':'bgr','Maquillaje':'byw','Estética':'brd'};
+
+  listaEl.innerHTML = turnos.map(t=>{
+    const [h,m] = t.hora.split(':').map(Number);
+    const fin = new Date(2000,0,1,h,m+t.duracion);
+    const finStr = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
+    const color = sectorColors[t.sector]||'bg2';
+    return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${t.sector==='Peluquería'?'var(--inf)':t.sector==='Manicuria'?'var(--ok)':t.sector==='Maquillaje'?'var(--wrn)':'var(--bad)'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:600;font-size:.95rem">${t.cliente}</div>
+          <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
+            🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ✂ ${t.servicioNombre} &nbsp;·&nbsp; 👤 ${t.empleadoNombre}
+          </div>
+          ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${t.notas}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="bx ${color}">${t.sector}</span>
+          ${t.tel?`<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')">📲 WA</button>`:''}
+          <button class="btn be bsm" onclick="editarTurno('${t.id}')">✎</button>
+          <button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function rTurnosConfig(){
+  const cfg = getTurnosCfg();
+
+  // Servicios
+  const srvEl = document.getElementById('serviciosTurnosList');
+  srvEl.innerHTML = cfg.servicios.map(s=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div>
+        <span class="bx bg2" style="margin-right:6px">${s.sector}</span>
+        <strong style="font-size:.85rem">${s.nombre}</strong>
+        <span style="color:var(--tx2);font-size:.78rem;margin-left:8px">${s.duracion} min</span>
+        ${s.precio>0?`<span style="color:var(--gld);font-size:.78rem;margin-left:4px">· ${fmt(s.precio)}</span>`:''}
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn be bsm" onclick="editarServicioTurno(${s.id})">✎</button>
+        <button class="btn bd bsm" onclick="eliminarServicioTurno(${s.id})">✕</button>
+      </div>
+    </div>
+  `).join('') || '<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Sin servicios</div>';
+
+  // Empleados
+  const empEl = document.getElementById('empleadosList');
+  empEl.innerHTML = cfg.empleados.map(e=>`
+    <div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <strong style="font-size:.88rem">👤 ${e.nombre}</strong>
+        ${e.sectores?.length?`<span style="color:var(--tx2);font-size:.75rem;margin-left:8px">${e.sectores.join(', ')}</span>`:''}
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn be bsm" onclick="editarEmpleado('${e.id}')">✎</button>
+        <button class="btn bd bsm" onclick="eliminarEmpleado('${e.id}')">✕</button>
+      </div>
+    </div>
+  `).join('') || '<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Sin empleados</div>';
+
+  // Horarios
+  if(document.getElementById('horApertura')) document.getElementById('horApertura').value = cfg.apertura||'09:00';
+  if(document.getElementById('horCierre')) document.getElementById('horCierre').value = cfg.cierre||'20:00';
+  document.querySelectorAll('.diasSalon').forEach(c=>{ c.checked = cfg.dias.includes(parseInt(c.value)); });
+}
+
+function agregarServicioTurno(){
+  const nombre = prompt('Nombre del servicio:');
+  if(!nombre) return;
+  const sector = prompt('Sector (Peluquería / Manicuria / Maquillaje / Estética):') || 'Peluquería';
+  const duracion = parseInt(prompt('Duración en minutos:') || '60');
+  const precio = parseFloat(prompt('Precio ($) — podés dejarlo en 0:') || '0');
+  const cfg = getTurnosCfg();
+  cfg.servicios.push({id:Date.now(), nombre, sector, duracion, precio});
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+  showToast('Servicio agregado ✓');
+}
+
+function editarServicioTurno(id){
+  const cfg = getTurnosCfg();
+  const s = cfg.servicios.find(x=>x.id===id);
+  if(!s) return;
+  const nombre = prompt('Nombre:', s.nombre);
+  if(!nombre) return;
+  const sector = prompt('Sector:', s.sector) || s.sector;
+  const duracion = parseInt(prompt('Duración (min):', s.duracion) || s.duracion);
+  const precio = parseFloat(prompt('Precio ($):', s.precio) || s.precio);
+  s.nombre=nombre; s.sector=sector; s.duracion=duracion; s.precio=precio;
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+  showToast('Servicio actualizado ✓');
+}
+
+function eliminarServicioTurno(id){
+  if(!confirm('¿Eliminar este servicio?')) return;
+  const cfg = getTurnosCfg();
+  cfg.servicios = cfg.servicios.filter(s=>s.id!==id);
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+}
+
+function agregarEmpleado(){
+  const nombre = prompt('Nombre del empleado:');
+  if(!nombre) return;
+  const sectores = prompt('Sectores que atiende (separados por coma):
+Ej: Peluquería, Manicuria') || '';
+  const cfg = getTurnosCfg();
+  cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean)});
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+  showToast('Empleado agregado ✓');
+}
+
+function editarEmpleado(id){
+  const cfg = getTurnosCfg();
+  const e = cfg.empleados.find(x=>x.id===id);
+  if(!e) return;
+  const nombre = prompt('Nombre:', e.nombre);
+  if(!nombre) return;
+  const sectores = prompt('Sectores:', e.sectores?.join(', ')||'') || '';
+  e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean);
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+  showToast('Empleado actualizado ✓');
+}
+
+function eliminarEmpleado(id){
+  if(!confirm('¿Eliminar este empleado?')) return;
+  const cfg = getTurnosCfg();
+  cfg.empleados = cfg.empleados.filter(e=>e.id!==id);
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+}
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -2911,7 +3549,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,turnos:rTurnos,turnosConfig:rTurnosConfig,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
