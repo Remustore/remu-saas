@@ -1865,10 +1865,11 @@ function setPrFilt(f, btn){
 
 function rPrecios(){
   const q=(document.getElementById('prQ')||{value:''}).value.toLowerCase();
+  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   let items = S.precios.filter(p=>{
-    const n = p.nombre.toLowerCase();
-    const matchQ = !q || n.includes(q) || (p.modelo||'').toLowerCase().includes(q);
-    const matchF = !prFilt || n.includes(prFilt);
+    const n = norm(p.nombre);
+    const matchQ = !q || n.includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
+    const matchF = !prFilt || n.includes(norm(prFilt));
     return matchQ && matchF;
   });
   const tb=document.getElementById('tbPr');
