@@ -1271,8 +1271,29 @@ async function doLogin(){
   
   // Si es empleado, ocultar todo excepto turnos
   if(currentRole === 'empleado'){
-    const modMap2 = ['nav-ventas','nav-stock','nav-equipos','nav-gastos','nav-analisis','nav-precios','nav-inversores','nav-clientes','nav-auditoria'];
-    modMap2.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    // Ocultar todos los items del sidebar excepto turnos y fichas
+    const ocultar = [
+      'nav-dashboard','nav-ventas','nav-stock','nav-equipos',
+      'nav-gastos','nav-analisis','nav-precios','nav-inversores',
+      'nav-clientes','nav-auditoria','nav-turnosOnline'
+    ];
+    ocultar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    
+    // Ocultar secciones del sidebar (títulos de grupo)
+    document.querySelectorAll('.ns').forEach(el=>el.style.display='none');
+    
+    // Ocultar secciones de contenido
+    const secsOcultar = [
+      'sec-dashboard','sec-ventas','sec-stock','sec-equipos',
+      'sec-gastos','sec-analisis','sec-precios','sec-inversores',
+      'sec-clientes','sec-auditoria','sec-turnosOnline'
+    ];
+    secsOcultar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none !important'; });
+    
+    // Simplificar topbar para empleado
+    const tbUser = document.getElementById('tbUser');
+    if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser.email);
+    
     // Auto-filtrar turnos por nombre del empleado
     if(window.currentEmpleadoNombre){
       turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
@@ -1372,8 +1393,29 @@ function setupApp(){
   
   // Si es empleado, ocultar todo excepto turnos
   if(currentRole === 'empleado'){
-    const modMap2 = ['nav-ventas','nav-stock','nav-equipos','nav-gastos','nav-analisis','nav-precios','nav-inversores','nav-clientes','nav-auditoria'];
-    modMap2.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    // Ocultar todos los items del sidebar excepto turnos y fichas
+    const ocultar = [
+      'nav-dashboard','nav-ventas','nav-stock','nav-equipos',
+      'nav-gastos','nav-analisis','nav-precios','nav-inversores',
+      'nav-clientes','nav-auditoria','nav-turnosOnline'
+    ];
+    ocultar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    
+    // Ocultar secciones del sidebar (títulos de grupo)
+    document.querySelectorAll('.ns').forEach(el=>el.style.display='none');
+    
+    // Ocultar secciones de contenido
+    const secsOcultar = [
+      'sec-dashboard','sec-ventas','sec-stock','sec-equipos',
+      'sec-gastos','sec-analisis','sec-precios','sec-inversores',
+      'sec-clientes','sec-auditoria','sec-turnosOnline'
+    ];
+    secsOcultar.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none !important'; });
+    
+    // Simplificar topbar para empleado
+    const tbUser = document.getElementById('tbUser');
+    if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser.email);
+    
     // Auto-filtrar turnos por nombre del empleado
     if(window.currentEmpleadoNombre){
       turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
