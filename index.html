@@ -1359,28 +1359,6 @@ function setupApp(){
   document.getElementById('sbUserEmail').textContent = currentUser.email || '';
   document.getElementById('dashSub').textContent = 'Visión general — ' + n;
   
-  // Aplicar visibilidad de módulos según configuración del tenant
-  const modsConfig = currentTenant?.modulos || {};
-  const navModMap = {
-    'nav-ventas': modsConfig.ventas !== false,
-    'nav-stock': modsConfig.stock !== false,
-    'nav-equipos': modsConfig.equipos !== false,
-    'nav-taller': modsConfig.taller !== false,
-    'nav-clientes': modsConfig.ventas !== false,
-    'nav-auditoria': modsConfig.stock !== false,
-    'nav-gastos': modsConfig.gastos !== false,
-    'nav-analisis': modsConfig.analisis !== false,
-    'nav-precios': modsConfig.precios !== false,
-    'nav-inversores': modsConfig.inversores !== false,
-    'nav-turnos': true,
-    'nav-fichas': true,
-    'nav-turnosOnline': true,
-  };
-  Object.entries(navModMap).forEach(([id, show])=>{
-    const el = document.getElementById(id);
-    if(el) el.style.display = show ? '' : 'none';
-  });
-
   // Adaptar labels del dashboard según el rubro
   const rubro = (currentTenant.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon') || rubro.includes('salón') || rubro.includes('belleza') || rubro.includes('peluq') || rubro.includes('manicur');
@@ -1416,7 +1394,7 @@ function setupApp(){
     precios:['nav-precios','sec-precios','ns-precios'],
     inversores:['nav-inversores','sec-inversores','ns-inversores'],
   };
-  Object.entries(navModMap).forEach(([key, ids]) => {
+  Object.entries(modMap).forEach(([key, ids]) => {
     const enabled = mods[key] !== false; // default true si no está en el objeto
     ids.forEach(id => {
       const el = document.getElementById(id);
