@@ -1359,6 +1359,28 @@ function setupApp(){
   document.getElementById('sbUserEmail').textContent = currentUser.email || '';
   document.getElementById('dashSub').textContent = 'Visión general — ' + n;
   
+  // Aplicar visibilidad de módulos según configuración del tenant
+  const modsConfig = currentTenant?.modulos || {};
+  const navModMap = {
+    'nav-ventas': modsConfig.ventas !== false,
+    'nav-stock': modsConfig.stock !== false,
+    'nav-equipos': modsConfig.equipos !== false,
+    'nav-taller': modsConfig.taller !== false,
+    'nav-clientes': modsConfig.ventas !== false,
+    'nav-auditoria': modsConfig.stock !== false,
+    'nav-gastos': modsConfig.gastos !== false,
+    'nav-analisis': modsConfig.analisis !== false,
+    'nav-precios': modsConfig.precios !== false,
+    'nav-inversores': modsConfig.inversores !== false,
+    'nav-turnos': true,
+    'nav-fichas': true,
+    'nav-turnosOnline': true,
+  };
+  Object.entries(navModMap).forEach(([id, show])=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = show ? '' : 'none';
+  });
+
   // Adaptar labels del dashboard según el rubro
   const rubro = (currentTenant.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon') || rubro.includes('salón') || rubro.includes('belleza') || rubro.includes('peluq') || rubro.includes('manicur');
@@ -1394,7 +1416,7 @@ function setupApp(){
     precios:['nav-precios','sec-precios','ns-precios'],
     inversores:['nav-inversores','sec-inversores','ns-inversores'],
   };
-  Object.entries(modMap).forEach(([key, ids]) => {
+  Object.entries(navModMap).forEach(([key, ids]) => {
     const enabled = mods[key] !== false; // default true si no está en el objeto
     ids.forEach(id => {
       const el = document.getElementById(id);
@@ -1776,13 +1798,20 @@ async function dbGetConfig(key){
 
 // ═══ LOAD ALL ═══
 async function loadAll(){
-  // Clear previous tenant's localStorage cache to avoid cross-contamination
+  // Clear ALL cached data when switching tenants
   const prevTenant = localStorage.getItem('activeTenant');
   const thisTenant = currentTenant?.id || '';
   if(prevTenant && prevTenant !== thisTenant){
-    // Different tenant - clear audit cache
-    localStorage.removeItem('auditoria_' + prevTenant + '_hoy');
-    console.log('Cleared cache for previous tenant');
+    // Different tenant - clear ALL tenant-specific caches
+    const keysToRemove = [];
+    for(let i=0; i<localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && (k.includes(prevTenant) || k.startsWith('auditoria_') || k.startsWith('turnos_') || k.startsWith('turnosCfg_') || k.startsWith('fichasClientes_'))){
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    console.log('Cleared', keysToRemove.length, 'cache keys for tenant switch');
   }
   localStorage.setItem('activeTenant', thisTenant);
   document.getElementById('loadingScreen').style.display='flex';
@@ -2771,7 +2800,12 @@ function rAuditoria(){
   let aud = getAuditoria();
   
   // Si no hay ronda para hoy, generarla automáticamente
-  if(aud.fecha !== tod() || !aud.items.length){
+  // También regenerar si los items no coinciden con el stock actual del tenant
+  const stockIds = S.stock.map(s=>s.id);
+  const audIds = aud.items.map(i=>i.productoId);
+  const hayMezcla = audIds.some(id => !stockIds.includes(id));
+  
+  if(aud.fecha !== tod() || !aud.items.length || hayMezcla){
     aud = generarRonda();
   }
 
