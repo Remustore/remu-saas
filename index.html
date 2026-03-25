@@ -1153,6 +1153,16 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mf"><button class="btn" onclick="closeM('mTurno')">Cancelar</button><button class="btn bg" onclick="saveTurno()">Guardar turno</button></div>
 </div></div>
 
+<!-- Modal Nuevo Producto Rápido -->
+<div class="mb" id="mNuevoProd"><div class="md"><div class="mh"><div class="mt2">➕ Nuevo producto</div><button class="xbtn" onclick="closeM('mNuevoProd')">✕</button></div>
+<div class="mc">
+  <div class="fr"><div><label>Nombre</label><input id="npNombre" placeholder="Ej: Templado iPhone 15"></div><div><label>Categoría</label><select id="npCat"></select></div></div>
+  <div class="fr"><div><label>Precio de venta ($)</label><input type="number" id="npPrecio" placeholder="0"></div><div><label>Costo ($)</label><input type="number" id="npCosto" placeholder="0"></div></div>
+  <div class="fr full"><div><label>Stock inicial</label><input type="number" id="npStock" placeholder="0" value="0"></div></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mNuevoProd')">Cancelar</button><button class="btn bg" onclick="guardarNuevoProd()">Crear y seleccionar</button></div>
+</div></div>
+
 <!-- Avance taller -->
 <div class="mb" id="mAv"><div class="md"><div class="mh"><div class="mt2">Actualizar trabajo</div><button class="xbtn" onclick="closeM('mAv')">✕</button></div>
 <div class="mc">
@@ -2077,27 +2087,21 @@ function autoFillPrecio(){
   const opt = sel.options[sel.selectedIndex];
   if(!opt || !opt.value) return;
   if(opt.value === '__nuevo__'){
-    const nombre = prompt('Nombre del producto nuevo:');
-    if(!nombre) { sel.selectedIndex=0; return; }
-    const precio = parseFloat(prompt('Precio de venta ($):') || '0');
-    const costo = parseFloat(prompt('Costo ($):') || '0');
-    const cat = document.getElementById('vCatFilt').value || 'Otros';
-    const nuevoId = Date.now();
-    const nuevo = {id:nuevoId, nombre, categoria:cat, cantidad:0, minimo:3, precio, costo, vendidos:0, notas:''};
-    S.stock.push(nuevo);
-    dbUpsert('stock', nuevo);
-    filtrarProdVenta();
-    // Select the newly created product WITHOUT calling autoFillPrecio again
-    setTimeout(()=>{
-      const newOpt = document.querySelector(`#vProd option[value="${nuevoId}"]`);
-      if(newOpt){
-        newOpt.selected=true;
-        // Fill price manually without recursion
-        if(precio > 0) document.getElementById('vPre').value = precio;
-        calcComision();
-      }
-    }, 150);
-    showToast('Producto creado ✓');
+    // Reset select to avoid staying on __nuevo__
+    sel.selectedIndex = 0;
+    // Populate category select in modal
+    const cats = getCategorias();
+    const npCat = document.getElementById('npCat');
+    if(npCat) npCat.innerHTML = cats.map(c=>'<option value="'+c+'">'+c+'</option>').join('');
+    // Pre-select current category filter
+    const filtCat = document.getElementById('vCatFilt')?.value;
+    if(filtCat && npCat) npCat.value = filtCat;
+    // Clear fields
+    document.getElementById('npNombre').value = '';
+    document.getElementById('npPrecio').value = '';
+    document.getElementById('npCosto').value = '';
+    document.getElementById('npStock').value = '0';
+    openM('mNuevoProd', null);
     return;
   }
   const precio = opt.getAttribute('data-precio');
@@ -4331,6 +4335,34 @@ function aplicarModoEmpleado(){
     turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
   }
   go('turnos');
+}
+
+async function guardarNuevoProd(){
+  const nombre = document.getElementById('npNombre').value.trim();
+  const precio = parseFloat(document.getElementById('npPrecio').value) || 0;
+  const costo  = parseFloat(document.getElementById('npCosto').value) || 0;
+  const cat    = document.getElementById('npCat').value || 'Otros';
+  const stock  = parseInt(document.getElementById('npStock').value) || 0;
+
+  if(!nombre){ showToast('Ingresá el nombre del producto'); return; }
+
+  const nuevoId = Date.now();
+  const nuevo = {id:nuevoId, nombre, categoria:cat, cantidad:stock, minimo:3, precio, costo, vendidos:0, notas:''};
+  S.stock.push(nuevo);
+  await dbUpsert('stock', nuevo);
+  closeM('mNuevoProd');
+  filtrarProdVenta();
+
+  // Select the new product in the venta form
+  setTimeout(()=>{
+    const newOpt = document.querySelector(`#vProd option[value="${nuevoId}"]`);
+    if(newOpt){
+      newOpt.selected = true;
+      if(precio > 0) document.getElementById('vPre').value = precio;
+      calcComision();
+    }
+  }, 150);
+  showToast('Producto "' + nombre + '" creado ✓');
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
