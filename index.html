@@ -545,6 +545,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('clientes')" id="nav-clientes"><span class="nico">👥</span>Clientes</div>
   <div class="ni" onclick="go('auditoria')" id="nav-auditoria"><span class="nico">📋</span>Control Stock</div>
   <div class="ni" onclick="go('turnos')" id="nav-turnos"><span class="nico">📆</span>Turnos</div>
+  <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec"><span class="nico">🔧</span>Turnos técnicos</div>
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas"><span class="nico">📋</span>Fichas</div>
   <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline"><span class="nico">🔗</span>Turnos online</div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
@@ -759,6 +760,27 @@ textarea{resize:vertical;min-height:70px;}
       </div>
     </div>
 
+    <!-- AGENDA TECNICA REMU -->
+    <div class="sec" id="sec-agendaTecnico">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">Agenda técnica</div>
+          <div class="ps" style="margin-bottom:0">Turnos programados para servicio técnico</div>
+        </div>
+        <button class="btn bg bsm" onclick="openNuevoTurnoTecnico()">+ Nuevo turno</button>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn bsm" onclick="cambiarFechaAgenda(-1)">◀</button>
+          <input type="date" id="agendaFecha" onchange="rAgendaTecnico()" style="padding:7px 12px;font-size:.85rem;flex:1;max-width:180px">
+          <button class="btn bsm" onclick="cambiarFechaAgenda(1)">▶</button>
+          <button class="btn bgh bsm" onclick="irHoyAgenda()">Hoy</button>
+        </div>
+      </div>
+      <div id="agendaTecnicoStats" style="margin-bottom:14px"></div>
+      <div id="agendaTecnicoLista"></div>
+    </div>
+
     <!-- TURNOS -->
     <div class="sec" id="sec-turnos">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:2px">
@@ -902,6 +924,29 @@ textarea{resize:vertical;min-height:70px;}
         <input id="onlineDireccion" placeholder="Ej: Av. San Martín 1234, Marcos Juárez">
         <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
+    </div>
+
+    <!-- TURNOS TÉCNICOS -->
+    <div class="sec" id="sec-turnosTec">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">Turnos técnicos</div>
+          <div class="ps" style="margin-bottom:0">Agenda de reparaciones programadas</div>
+        </div>
+        <button class="btn bg bsm" onclick="openNuevoTurnoTec()">+ Nuevo turno</button>
+      </div>
+
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn bsm" onclick="cambiarFechaTurnosTec(-1)">◀</button>
+          <input type="date" id="turnosTecFecha" onchange="rTurnosTec()" style="padding:7px 12px;font-size:.85rem;flex:1;max-width:180px">
+          <button class="btn bsm" onclick="cambiarFechaTurnosTec(1)">▶</button>
+          <button class="btn bgh bsm" onclick="irHoyTurnosTec()">Hoy</button>
+        </div>
+      </div>
+
+      <div id="turnosTecStats" style="margin-bottom:14px"></div>
+      <div id="turnosTecLista"></div>
     </div>
 
     <!-- GASTOS -->
@@ -1080,6 +1125,8 @@ textarea{resize:vertical;min-height:70px;}
 <div id="cliSugg" style="position:absolute;background:var(--car2);border:1px solid var(--bor2);border-radius:8px;z-index:400;max-height:150px;overflow-y:auto;width:100%;display:none;"></div>
 </div><div><label>Teléfono / WA</label><input id="tTel" placeholder="11 2345 6789"></div></div>
 <div class="fr"><div><label>Equipo / Trabajo</label><input id="tEq" placeholder="Ej: iPhone 13, corte de pelo..."></div><div><label>IMEI (opcional)</label><input id="tIme" placeholder="Solo para celulares"></div></div>
+<div class="fr"><div><label>🔐 Contraseña / Patrón</label><input id="tPass" placeholder="Ej: 1234, patrón Z, sin clave..." autocomplete="off" autocorrect="off" spellcheck="false" type="password" oninput="document.getElementById('tPassAlert').style.display=this.value?'block':'none'"></div><div><label>Tipo de bloqueo</label><select id="tTipoPass"><option value="">Sin bloqueo</option><option value="pin">PIN numérico</option><option value="patron">Patrón</option><option value="huella">Huella / Face ID</option><option value="contrasena">Contraseña alfanumérica</option></select></div></div>
+<div id="tPassAlert" style="display:none;background:rgba(201,148,76,.1);border:1px solid var(--wrn);border-radius:7px;padding:8px 12px;font-size:.75rem;color:var(--wrn);margin-top:4px">🔒 Dato confidencial — visible solo para el técnico. No se comparte con el cliente.</div>
 <div class="fr full"><div><label>Falla / Descripción</label><input id="tFal" placeholder="¿Qué necesita?" oninput="sugerirGuia(this.value)"></div></div>
 <div id="guiaRep" style="display:none;background:var(--bg);border:1px solid var(--gld);border-radius:8px;padding:12px;margin-top:8px;font-size:.8rem">
   <div style="font-weight:600;color:var(--gld);margin-bottom:8px" id="guiaTitulo"></div>
@@ -1128,6 +1175,46 @@ textarea{resize:vertical;min-height:70px;}
 <div class="fr full"><div><label>Diagnóstico / Qué se reparó</label><textarea id="tDiagnostico" placeholder="Describí qué se hizo, qué repuestos se usaron..."></textarea></div></div>
 <div class="fr full"><div><label>Notas internas</label><textarea id="tNot" placeholder="Notas internas..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mTaller')">Cancelar</button><button class="btn bg" onclick="saveTaller()">Guardar</button></div></div></div>
+
+<!-- Modal Nuevo Turno Técnico -->
+<div class="mb" id="mTurnoTec"><div class="md"><div class="mh"><div class="mt2" id="mTurnoTecTitle">Nuevo turno técnico</div><button class="xbtn" onclick="closeM('mTurnoTec')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="turnoTecId">
+  <div class="fr"><div><label>Cliente</label><input id="ttecCli" placeholder="Nombre del cliente"></div><div><label>Teléfono / WA</label><input id="ttecTel" placeholder="11 2345 6789"></div></div>
+  <div class="fr"><div><label>Equipo</label><input id="ttecEq" placeholder="Ej: iPhone 13, Samsung S22..."></div><div><label>Servicio</label><select id="ttecServ">
+    <option value="Cambio de pantalla">Cambio de pantalla</option>
+    <option value="Cambio de batería">Cambio de batería</option>
+    <option value="Cambio de tapa trasera">Cambio de tapa trasera</option>
+    <option value="Conector de carga">Conector de carga</option>
+    <option value="Cámara">Cámara</option>
+    <option value="Software / Formateo">Software / Formateo</option>
+    <option value="Diagnóstico">Diagnóstico</option>
+    <option value="Otro">Otro</option>
+  </select></div></div>
+  <div class="fr"><div><label>Fecha</label><input type="date" id="ttecFecha"></div><div><label>Hora</label><input type="time" id="ttecHora" step="1800"></div></div>
+  <div class="fr full"><div><label>Notas</label><input id="ttecNotas" placeholder="Observaciones..."></div></div>
+  <div id="ttecConflicto" style="display:none;background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--bad)"></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mTurnoTec')">Cancelar</button><button class="btn bg" onclick="saveTurnoTec()">Agendar turno</button></div>
+</div></div>
+<div class="mb" id="mTurnoTecnico"><div class="md"><div class="mh"><div class="mt2">Nuevo turno técnico</div><button class="xbtn" onclick="closeM('mTurnoTecnico')">✕</button></div>
+<div class="mc">
+  <div class="fr"><div><label>Cliente</label><input id="ttCli" placeholder="Nombre del cliente"></div><div><label>Teléfono / WA</label><input id="ttTel" placeholder="11 2345 6789"></div></div>
+  <div class="fr"><div><label>Equipo</label><input id="ttEq" placeholder="iPhone 13, Samsung S23..."></div><div><label>Servicio</label><select id="ttServicio">
+    <option value="Cambio de pantalla">Cambio de pantalla</option>
+    <option value="Cambio de batería">Cambio de batería</option>
+    <option value="Cambio de tapa trasera">Cambio de tapa trasera</option>
+    <option value="Conector de carga">Conector de carga</option>
+    <option value="Cámara">Cámara</option>
+    <option value="Software / Reset">Software / Reset</option>
+    <option value="Diagnóstico">Diagnóstico</option>
+    <option value="Otro">Otro</option>
+  </select></div></div>
+  <div class="fr"><div><label>Fecha</label><input type="date" id="ttFecha"></div><div><label>Hora</label><input type="time" id="ttHora" step="1800"></div></div>
+  <div class="fr full"><div><label>Notas</label><input id="ttNotas" placeholder="Observaciones..."></div></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mTurnoTecnico')">Cancelar</button><button class="btn bg" onclick="guardarTurnoTecnico()">Guardar</button></div>
+</div></div>
 
 <!-- Nuevo Turno -->
 <div class="mb" id="mTurno"><div class="md"><div class="mh"><div class="mt2" id="mTurnoTitle">Nuevo turno</div><button class="xbtn" onclick="closeM('mTurno')">✕</button></div>
@@ -1293,6 +1380,11 @@ async function doLogin(){
   // Populate dynamic stock categories
   setupCategoriasStock();
   setupPreciosTabs();
+  // Mostrar turnos técnicos solo en Remu (no salon)
+  const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur');
+  const navTec = document.getElementById('nav-turnosTec');
+  if(navTec) navTec.style.display = esSalonCheck ? 'none' : '';
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
@@ -1398,7 +1490,7 @@ function setupApp(){
     ventas: ['nav-ventas','sec-ventas'],
     stock:  ['nav-stock','sec-stock','nav-auditoria','sec-auditoria'],
     equipos:['nav-equipos','sec-equipos'],
-    taller: ['nav-taller','sec-taller','nav-clientes','sec-clientes'],
+    taller: ['nav-taller','sec-taller','nav-clientes','sec-clientes','nav-agendaTecnico','sec-agendaTecnico'],
     gastos: ['nav-gastos','sec-gastos'],
     analisis:['nav-analisis','sec-analisis'],
     precios:['nav-precios','sec-precios','ns-precios'],
@@ -1416,6 +1508,11 @@ function setupApp(){
   // Populate dynamic stock categories
   setupCategoriasStock();
   setupPreciosTabs();
+  // Mostrar turnos técnicos solo en Remu (no salon)
+  const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur');
+  const navTec = document.getElementById('nav-turnosTec');
+  if(navTec) navTec.style.display = esSalonCheck ? 'none' : '';
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
@@ -1860,7 +1957,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -1869,7 +1966,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -1896,8 +1993,11 @@ function openM(id, editId){
 function fillModalEdit(modal, id){
   if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
+    if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
+    if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
+    if(t.pass) document.getElementById('tPassAlert').style.display='block';
     if(document.getElementById('tGolpes'))document.getElementById('tGolpes').value=t.golpes||'';
     if(document.getElementById('tHumedad'))document.getElementById('tHumedad').value=t.humedad||'';
     if(document.getElementById('tEstPantalla'))document.getElementById('tEstPantalla').value=t.estPantalla||'funciona';
@@ -2271,8 +2371,12 @@ async function saveTaller(){
   const obj={
     cliente:cli,
     tel:document.getElementById('tTel').value,
+    pass:document.getElementById('tPass')?.value||'',
+    tipoPass:document.getElementById('tTipoPass')?.value||'',
     equipo:document.getElementById('tEq').value,
     imei:document.getElementById('tIme').value,
+    password:document.getElementById('tPass')?.value||'',
+    tipoPass:document.getElementById('tTipoPass')?.value||'',
     falla:document.getElementById('tFal').value,
     presupuesto:pre,costoRep,flete,ganancia,margen,
     estado:document.getElementById('tEst').value,
@@ -2674,8 +2778,11 @@ function fillEdit(modal,id){
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';return;}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';['eId','eTipo','eMod','eMem','eCol','eIme','eBat','eFis','ePre','eCos','eNot'].forEach(k=>{const el=document.getElementById(k);if(el)el.value=({eId:e.id,eTipo:e.tipo,eMod:e.modelo,eMem:e.memoria,eCol:e.color,eIme:e.imei,eBat:e.bateria,eFis:e.estadoFisico,ePre:e.precio,eCos:e.costo,eNot:e.notas})[k]||'';});return;}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
+    if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
+    if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
+    if(t.pass) document.getElementById('tPassAlert').style.display='block';
     if(document.getElementById('tGolpes'))document.getElementById('tGolpes').value=t.golpes||'';
     if(document.getElementById('tHumedad'))document.getElementById('tHumedad').value=t.humedad||'';
     if(document.getElementById('tEstPantalla'))document.getElementById('tEstPantalla').value=t.estPantalla||'funciona';
@@ -3321,8 +3428,12 @@ const SERVICIOS_DEFAULT = [
 
 function getTurnosCfg(){
   const raw = localStorage.getItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''));
-  return raw ? JSON.parse(raw) : {
-    servicios: SERVICIOS_DEFAULT,
+  if(raw) return JSON.parse(raw);
+  // Solo usar servicios default para salones
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esSalon = rubro.includes('salon')||rubro.includes('salón')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur')||rubro.includes('estética')||rubro.includes('estetica');
+  return {
+    servicios: esSalon ? SERVICIOS_DEFAULT : [],
     empleados: [],
     apertura: '09:00',
     cierre: '20:00',
@@ -3389,7 +3500,11 @@ function openNuevoTurno(){
     : '<option value="">Sin empleados — configurar primero</option>';
   // Fill servicios select
   const srvSel = document.getElementById('turnoServicio');
-  srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}">${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('');
+  if(!cfg.servicios.length){
+    srvSel.innerHTML = '<option value="">Sin servicios — configurá primero en ⚙</option>';
+  } else {
+    srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}">${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('');
+  }
   // Set date
   const fechaEl = document.getElementById('turnoFecha');
   if(!fechaEl.value) fechaEl.value = document.getElementById('turnosFecha')?.value || tod();
@@ -4365,6 +4480,328 @@ async function guardarNuevoProd(){
   showToast('Producto "' + nombre + '" creado ✓');
 }
 
+// ═══ AGENDA TÉCNICA REMU ═══
+const AGENDA_TEC_KEY = 'agendaTecnico';
+
+function getAgendaTecnico(){
+  const raw = localStorage.getItem(AGENDA_TEC_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveAgendaTecnico(items){
+  localStorage.setItem(AGENDA_TEC_KEY + '_' + (currentTenant?.id||''), JSON.stringify(items));
+}
+
+function irHoyAgenda(){
+  document.getElementById('agendaFecha').value = tod();
+  rAgendaTecnico();
+}
+
+function cambiarFechaAgenda(dias){
+  const input = document.getElementById('agendaFecha');
+  const d = new Date((input.value||tod()) + 'T00:00:00');
+  d.setDate(d.getDate() + dias);
+  input.value = d.toISOString().slice(0,10);
+  rAgendaTecnico();
+}
+
+function openNuevoTurnoTecnico(){
+  const fechaEl = document.getElementById('ttFecha');
+  if(!fechaEl.value) fechaEl.value = document.getElementById('agendaFecha')?.value || tod();
+  document.getElementById('ttCli').value = '';
+  document.getElementById('ttTel').value = '';
+  document.getElementById('ttEq').value = '';
+  document.getElementById('ttHora').value = '';
+  document.getElementById('ttNotas').value = '';
+  openM('mTurnoTecnico', null);
+}
+
+function guardarTurnoTecnico(){
+  const cli = document.getElementById('ttCli').value.trim();
+  const tel = document.getElementById('ttTel').value.trim();
+  const eq  = document.getElementById('ttEq').value.trim();
+  const srv = document.getElementById('ttServicio').value;
+  const fecha = document.getElementById('ttFecha').value;
+  const hora  = document.getElementById('ttHora').value;
+  const notas = document.getElementById('ttNotas').value;
+
+  if(!cli || !fecha || !hora) return alert('Completá cliente, fecha y hora');
+
+  const items = getAgendaTecnico();
+  items.push({
+    id: Date.now().toString(),
+    cliente: cli, tel, equipo: eq,
+    servicio: srv, fecha, hora, notas,
+    estado: 'pendiente',
+    creadoEn: new Date().toISOString()
+  });
+  saveAgendaTecnico(items);
+  closeM('mTurnoTecnico');
+  rAgendaTecnico();
+  showToast('Turno agendado ✓');
+}
+
+function cancelarTurnoTecnico(id){
+  if(!confirm('¿Cancelar este turno?')) return;
+  const items = getAgendaTecnico().filter(t=>t.id!==id);
+  saveAgendaTecnico(items);
+  rAgendaTecnico();
+  showToast('Turno cancelado');
+}
+
+function enviarWATurnoTecnico(id){
+  const t = getAgendaTecnico().find(x=>x.id===id);
+  if(!t||!t.tel) return alert('Sin teléfono registrado');
+  const msg = `Hola ${t.cliente}! 👋
+
+Te recordamos tu turno en *Remu Store*:
+
+📅 *Fecha:* ${fD(t.fecha)}
+🕐 *Hora:* ${t.hora}
+📱 *Equipo:* ${t.equipo||'—'}
+🔧 *Servicio:* ${t.servicio}
+
+¡Te esperamos!`;
+  window.open('https://wa.me/549'+t.tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function rAgendaTecnico(){
+  const fechaEl = document.getElementById('agendaFecha');
+  if(!fechaEl) return;
+  if(!fechaEl.value) fechaEl.value = tod();
+  const fecha = fechaEl.value;
+
+  const items = getAgendaTecnico().filter(t=>t.fecha===fecha).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const statsEl = document.getElementById('agendaTecnicoStats');
+  const listaEl = document.getElementById('agendaTecnicoLista');
+  if(!listaEl) return;
+
+  const total = getAgendaTecnico().filter(t=>t.fecha===fecha).length;
+  if(statsEl) statsEl.innerHTML = `<div class="stat" style="margin-bottom:0"><div class="sl">Turnos agendados</div><div class="sv">${total}</div></div>`;
+
+  if(!items.length){
+    listaEl.innerHTML = `<div class="card">${emp('📅','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurnoTecnico()">+ Agendar turno</button></div></div>`;
+    return;
+  }
+
+  const estadoColors = {pendiente:'var(--wrn)',confirmado:'var(--inf)',completado:'var(--ok)',cancelado:'var(--mut)'};
+  listaEl.innerHTML = items.map(t=>`
+    <div class="card" style="margin-bottom:10px;border-left:3px solid ${estadoColors[t.estado]||'var(--gld)'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.95rem">${t.cliente}</div>
+          <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
+            🕐 ${t.hora} &nbsp;·&nbsp; 📱 ${t.equipo||'—'} &nbsp;·&nbsp; 🔧 ${t.servicio}
+          </div>
+          ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${t.notas}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <span class="bx ${t.estado==='completado'?'bgr':t.estado==='cancelado'?'bgx':'byw'}">${t.estado}</span>
+          ${t.tel?`<button class="btn bs bsm" onclick="enviarWATurnoTecnico('${t.id}')">📲 WA</button>`:''}
+          <button class="btn be bsm" onclick="convertirATaller('${t.id}')">→ Taller</button>
+          <button class="btn bd bsm" onclick="cancelarTurnoTecnico('${t.id}')">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function convertirATaller(id){
+  const t = getAgendaTecnico().find(x=>x.id===id);
+  if(!t) return;
+  // Pre-fill taller form with turno data
+  openM('mTaller', null);
+  setTimeout(()=>{
+    document.getElementById('tCli').value = t.cliente || '';
+    document.getElementById('tTel').value = t.tel || '';
+    document.getElementById('tEq').value = t.equipo || '';
+    document.getElementById('tFal').value = t.servicio || '';
+    if(t.notas) document.getElementById('tNot').value = t.notas;
+    showToast('Datos del turno cargados en Taller');
+  }, 200);
+}
+
+// ═══ TURNOS TÉCNICOS (REMU) ═══
+const TURNOS_TEC_KEY = 'turnosTec';
+
+function getTurnosTec(){
+  const raw = localStorage.getItem(TURNOS_TEC_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveTurnosTecLocal(t){
+  localStorage.setItem(TURNOS_TEC_KEY + '_' + (currentTenant?.id||''), JSON.stringify(t));
+}
+
+function irHoyTurnosTec(){
+  document.getElementById('turnosTecFecha').value = tod();
+  rTurnosTec();
+}
+
+function cambiarFechaTurnosTec(d){
+  const el = document.getElementById('turnosTecFecha');
+  const dt = new Date((el.value||tod()) + 'T00:00:00');
+  dt.setDate(dt.getDate() + d);
+  el.value = dt.toISOString().slice(0,10);
+  rTurnosTec();
+}
+
+function openNuevoTurnoTec(){
+  document.getElementById('turnoTecId').value = '';
+  document.getElementById('ttecCli').value = '';
+  document.getElementById('ttecTel').value = '';
+  document.getElementById('ttecEq').value = '';
+  document.getElementById('ttecNotas').value = '';
+  document.getElementById('ttecHora').value = '';
+  document.getElementById('ttecConflicto').style.display = 'none';
+  const fechaEl = document.getElementById('ttecFecha');
+  if(!fechaEl.value) fechaEl.value = document.getElementById('turnosTecFecha')?.value || tod();
+  document.getElementById('mTurnoTecTitle').textContent = 'Nuevo turno técnico';
+  openM('mTurnoTec', null);
+}
+
+async function saveTurnoTec(){
+  const id = document.getElementById('turnoTecId').value;
+  const cli = document.getElementById('ttecCli').value.trim();
+  const tel = document.getElementById('ttecTel').value.trim();
+  const equipo = document.getElementById('ttecEq').value.trim();
+  const servicio = document.getElementById('ttecServ').value;
+  const fecha = document.getElementById('ttecFecha').value;
+  const hora = document.getElementById('ttecHora').value;
+  const notas = document.getElementById('ttecNotas').value;
+
+  if(!cli) return alert('Ingresá el nombre del cliente');
+  if(!fecha || !hora) return alert('Ingresá fecha y hora');
+
+  // Verificar superposición
+  const turnos = getTurnosTec();
+  const conflicto = turnos.find(t => t.fecha===fecha && t.hora===hora && t.id!==(id||''));
+  const box = document.getElementById('ttecConflicto');
+  if(conflicto){
+    box.style.display='block';
+    box.textContent = '⚠ Ya hay un turno a las ' + hora + ' — ' + conflicto.cliente + ' (' + conflicto.servicio + ')';
+    return;
+  }
+  box.style.display='none';
+
+  const obj = {
+    id: id || Date.now().toString(),
+    cliente: cli, tel, equipo, servicio, fecha, hora, notas,
+    estado: 'confirmado',
+    creadoEn: new Date().toISOString()
+  };
+
+  if(id){
+    const idx = turnos.findIndex(t=>t.id===id);
+    if(idx>-1) turnos[idx]=obj;
+  } else {
+    turnos.push(obj);
+  }
+
+  saveTurnosTecLocal(turnos);
+  closeM('mTurnoTec');
+  rTurnosTec();
+  showToast(id ? 'Turno actualizado ✓' : 'Turno agendado ✓');
+}
+
+function cancelarTurnoTec(id){
+  if(!confirm('¿Cancelar este turno?')) return;
+  const t = getTurnosTec().filter(x=>x.id!==id);
+  saveTurnosTecLocal(t);
+  rTurnosTec();
+  showToast('Turno cancelado');
+}
+
+function editarTurnoTec(id){
+  const t = getTurnosTec().find(x=>x.id===id);
+  if(!t) return;
+  document.getElementById('turnoTecId').value = t.id;
+  document.getElementById('ttecCli').value = t.cliente;
+  document.getElementById('ttecTel').value = t.tel||'';
+  document.getElementById('ttecEq').value = t.equipo||'';
+  document.getElementById('ttecServ').value = t.servicio||'Diagnóstico';
+  document.getElementById('ttecFecha').value = t.fecha;
+  document.getElementById('ttecHora').value = t.hora;
+  document.getElementById('ttecNotas').value = t.notas||'';
+  document.getElementById('ttecConflicto').style.display='none';
+  document.getElementById('mTurnoTecTitle').textContent = 'Editar turno técnico';
+  openM('mTurnoTec', null);
+}
+
+function enviarWATurnoTec(id){
+  const t = getTurnosTec().find(x=>x.id===id);
+  if(!t||!t.tel) return alert('Este cliente no tiene teléfono');
+  const neg = currentTenant?.nombre||'el servicio técnico';
+  const msg = `Hola ${t.cliente} 👋
+
+Te recordamos tu turno en *${neg}*:
+
+📅 *Fecha:* ${fD(t.fecha)}
+🕐 *Hora:* ${t.hora}
+🔧 *Servicio:* ${t.servicio}
+📱 *Equipo:* ${t.equipo||'a confirmar'}
+
+¡Te esperamos!`;
+  window.open('https://wa.me/549'+t.tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function convertirATrabajo(id){
+  const t = getTurnosTec().find(x=>x.id===id);
+  if(!t) return;
+  if(!confirm('¿Convertir este turno en un trabajo de taller?')) return;
+  // Pre-fill taller form
+  openM('mTaller', null);
+  setTimeout(()=>{
+    document.getElementById('tCli').value = t.cliente;
+    document.getElementById('tTel').value = t.tel||'';
+    document.getElementById('tEq').value = t.equipo||'';
+    document.getElementById('tFal').value = t.servicio||'';
+  }, 200);
+  showToast('Completá el trabajo en el formulario ✓');
+}
+
+function rTurnosTec(){
+  const fechaEl = document.getElementById('turnosTecFecha');
+  if(!fechaEl) return;
+  if(!fechaEl.value) fechaEl.value = tod();
+  const fecha = fechaEl.value;
+  const turnos = getTurnosTec().filter(t=>t.fecha===fecha&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
+
+  // Stats
+  const statsEl = document.getElementById('turnosTecStats');
+  const totalDia = getTurnosTec().filter(t=>t.fecha===fecha&&t.estado!=='cancelado');
+  if(statsEl) statsEl.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div class="stat" style="flex:1;min-width:120px"><div class="sl">Turnos hoy</div><div class="sv">${totalDia.length}</div></div>
+    <div class="stat" style="flex:1;min-width:120px"><div class="sl">Próximo</div><div class="sv" style="font-size:1rem">${totalDia[0]?.hora||'—'}</div><div class="ss">${totalDia[0]?.cliente||''}</div></div>
+  </div>`;
+
+  const listaEl = document.getElementById('turnosTecLista');
+  if(!listaEl) return;
+
+  if(!turnos.length){
+    listaEl.innerHTML = `<div class="card">${emp('🔧','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurnoTec()">+ Agendar turno</button></div></div>`;
+    return;
+  }
+
+  listaEl.innerHTML = turnos.map(t=>`
+    <div class="card" style="margin-bottom:10px;border-left:3px solid var(--gld)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:.95rem">${t.cliente}</div>
+          <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
+            🕐 ${t.hora} &nbsp;·&nbsp; 🔧 ${t.servicio} &nbsp;·&nbsp; 📱 ${t.equipo||'sin especificar'}
+          </div>
+          ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${t.notas}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          ${t.tel?`<button class="btn bs bsm" onclick="enviarWATurnoTec('${t.id}')">📲 WA</button>`:''}
+          <button class="btn bgh bsm" onclick="convertirATrabajo('${t.id}')">→ Taller</button>
+          <button class="btn be bsm" onclick="editarTurnoTec('${t.id}')">✎</button>
+          <button class="btn bd bsm" onclick="cancelarTurnoTec('${t.id}')">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -4769,7 +5206,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
