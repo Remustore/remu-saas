@@ -1674,6 +1674,9 @@ async function crearTenant(){
       if(ue2) throw ue2;
     }
 
+    // Precargar servicios según rubro
+    await precargarServiciosTenant(tenant.id, rubro, nombre);
+    
     showSaMsg(`✓ Cliente "${nombre}" creado. Email: ${email}`, 'ok');
     document.getElementById('saName').value='';
     document.getElementById('saRubro').value='';
@@ -1685,6 +1688,83 @@ async function crearTenant(){
     console.error(e);
     showSaMsg('Error: ' + (e.message || JSON.stringify(e)), 'err');
   }
+}
+
+const SERVICIOS_POR_RUBRO = {
+  barberia: [
+    {nombre:'Corte de pelo', sector:'Barbería', duracion:30, precio:0},
+    {nombre:'Corte con degradé', sector:'Barbería', duracion:45, precio:0},
+    {nombre:'Corte navaja', sector:'Barbería', duracion:40, precio:0},
+    {nombre:'Arreglo de barba', sector:'Barbería', duracion:20, precio:0},
+    {nombre:'Afeitado completo', sector:'Barbería', duracion:30, precio:0},
+    {nombre:'Corte + barba', sector:'Barbería', duracion:50, precio:0},
+    {nombre:'Cejas', sector:'Barbería', duracion:10, precio:0},
+    {nombre:'Coloración cabello', sector:'Barbería', duracion:60, precio:0},
+    {nombre:'Coloración barba', sector:'Barbería', duracion:30, precio:0},
+  ],
+  salon: [
+    {nombre:'Corte de pelo', sector:'Peluquería', duracion:45, precio:0},
+    {nombre:'Tintura completa', sector:'Peluquería', duracion:120, precio:0},
+    {nombre:'Mechas/Babylights', sector:'Peluquería', duracion:150, precio:0},
+    {nombre:'Brushing', sector:'Peluquería', duracion:45, precio:0},
+    {nombre:'Keratina', sector:'Peluquería', duracion:120, precio:0},
+    {nombre:'Manicuria', sector:'Manicuria', duracion:60, precio:0},
+    {nombre:'Pedicuria', sector:'Manicuria', duracion:60, precio:0},
+    {nombre:'Maquillaje', sector:'Maquillaje', duracion:60, precio:0},
+    {nombre:'Lifting de pestañas', sector:'Estética', duracion:90, precio:0},
+  ],
+  telefonia: [
+    {nombre:'Cambio de pantalla', sector:'Servicio técnico', duracion:60, precio:0},
+    {nombre:'Cambio de batería', sector:'Servicio técnico', duracion:30, precio:0},
+    {nombre:'Cambio de tapa trasera', sector:'Servicio técnico', duracion:30, precio:0},
+    {nombre:'Conector de carga', sector:'Servicio técnico', duracion:45, precio:0},
+    {nombre:'Cámara', sector:'Servicio técnico', duracion:45, precio:0},
+    {nombre:'Software / Formateo', sector:'Servicio técnico', duracion:60, precio:0},
+    {nombre:'Diagnóstico', sector:'Servicio técnico', duracion:20, precio:0},
+  ],
+};
+
+async function precargarServiciosTenant(tenantId, rubro, nombre){
+  const r = (rubro||'').toLowerCase();
+  let tipo = null;
+  if(r.includes('barberia')||r.includes('barbería')) tipo = 'barberia';
+  else if(r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')) tipo = 'salon';
+  else if(r.includes('telefonia')||r.includes('telefonía')||r.includes('tecnico')||r.includes('técnico')) tipo = 'telefonia';
+  
+  if(!tipo) return; // Rubro desconocido, no precargar
+
+  const servicios = SERVICIOS_POR_RUBRO[tipo];
+  const base = Date.now();
+  
+  // Guardar en Supabase como precios (lista de servicios)
+  const preciosInserts = servicios.map((s,i) => ({
+    id: base + i,
+    data: {id: base+i, nombre: s.nombre, modelo: s.sector, precio: s.precio, disponibilidad:'disponible', notas:''},
+    tenant_id: tenantId
+  }));
+  
+  for(const p of preciosInserts){
+    await sb.from('precios').insert(p);
+  }
+
+  // Guardar config de turnos en localStorage (se aplica cuando el usuario entra)
+  // Guardar en Supabase config table para que persista
+  const turnosCfg = {
+    servicios: servicios.map((s,i) => ({id: base+1000+i, nombre: s.nombre, sector: s.sector, duracion: s.duracion, precio: s.precio})),
+    empleados: [{id: Date.now().toString(), nombre: nombre.split(' ')[0] || 'Propietario', sectores: [servicios[0]?.sector||'General'], comision: 0}],
+    apertura: '09:00',
+    cierre: '20:00',
+    dias: [1,2,3,4,5,6]
+  };
+  
+  // Store in a special config row
+  await sb.from('precios').insert({
+    id: base + 9999,
+    data: {id: base+9999, __turnosCfg: turnosCfg, __tipo: 'turnosCfg'},
+    tenant_id: tenantId
+  });
+
+  console.log('Servicios precargados para', nombre, '-', tipo);
 }
 
 function showSaMsg(txt, tipo){
@@ -1918,6 +1998,14 @@ async function loadAll(){
     ]);
     S.stock=stock; S.equipos=equipos; S.ventas=ventas;
     S.gastos=gastos.length ? gastos : getGastosFijos();
+    // Restore turnosCfg from Supabase if not in localStorage
+    const cfgKey = 'turnosCfg_' + (currentTenant?.id||'');
+    if(!localStorage.getItem(cfgKey) && precios){
+      const cfgRow = precios.find(p=>p.__turnosCfg);
+      if(cfgRow) localStorage.setItem(cfgKey, JSON.stringify(cfgRow.__turnosCfg));
+      // Filter out config rows from precios
+      precios = precios.filter(p=>!p.__turnosCfg);
+    }
     S.reparaciones=reparaciones; S.precios=precios; S.meta=meta||0;
     S.inversores=inversores; S.movimientos_inv=movimientos_inv;
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
