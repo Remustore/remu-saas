@@ -2087,11 +2087,16 @@ function autoFillPrecio(){
     S.stock.push(nuevo);
     dbUpsert('stock', nuevo);
     filtrarProdVenta();
-    // Select the newly created product
+    // Select the newly created product WITHOUT calling autoFillPrecio again
     setTimeout(()=>{
       const newOpt = document.querySelector(`#vProd option[value="${nuevoId}"]`);
-      if(newOpt){ newOpt.selected=true; autoFillPrecio(); }
-    }, 100);
+      if(newOpt){
+        newOpt.selected=true;
+        // Fill price manually without recursion
+        if(precio > 0) document.getElementById('vPre').value = precio;
+        calcComision();
+      }
+    }, 150);
     showToast('Producto creado ✓');
     return;
   }
