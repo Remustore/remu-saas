@@ -711,7 +711,16 @@ textarea{resize:vertical;min-height:70px;}
     <!-- TALLER -->
     <div class="sec" id="sec-taller">
       <div class="pt" id="tallerTitle">Taller / Servicios</div><div class="ps" id="tallerSub">Seguimiento de trabajos</div>
-      <div class="ch"><div></div><button class="btn bg" onclick="openM('mTaller',null)">+ Nuevo trabajo</button></div>
+      <div class="ch">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <div class="srch" style="max-width:220px"><span>⌕</span><input id="tallerIMEI" placeholder="Buscar IMEI o cliente..." oninput="buscarTaller(this.value)"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bgh bsm" onclick="verEstadisticasTaller()">📊 Estadísticas</button>
+          <button class="btn bg" onclick="openM('mTaller',null)">+ Nuevo trabajo</button>
+        </div>
+      </div>
+      <div id="tallerBusqueda" style="display:none;margin-bottom:14px"></div>
       <div class="kan" id="kan"></div>
     </div>
 
@@ -2434,21 +2443,130 @@ function showWA(r){
 
 function cpWA(){ navigator.clipboard.writeText(document.getElementById('waMB').textContent).then(()=>alert('¡Copiado!')); }
 
+function buscarTaller(q){
+  const box = document.getElementById('tallerBusqueda');
+  if(!q || q.length < 2){ box.style.display='none'; return; }
+  const q2 = q.toLowerCase();
+  const results = S.reparaciones.filter(r=>
+    r.cliente?.toLowerCase().includes(q2) ||
+    r.imei?.toLowerCase().includes(q2) ||
+    r.equipo?.toLowerCase().includes(q2) ||
+    r.tel?.includes(q2)
+  );
+  box.style.display = 'block';
+  if(!results.length){
+    box.innerHTML = '<div class="card" style="padding:12px;font-size:.82rem;color:var(--mut)">Sin resultados para "' + q + '"</div>';
+    return;
+  }
+  const estados = {recibido:'bbl',proceso:'byw',listo:'bgr',entregado:'bgx'};
+  box.innerHTML = '<div class="card" style="padding:12px">' +
+    '<div style="font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">' + results.length + ' resultado(s)</div>' +
+    results.map(r=>`<div style="padding:8px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;font-size:.85rem">${r.cliente} — ${r.equipo||'—'}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${r.falla||''} · ${fD(r.fecha)} ${r.imei?'· IMEI: '+r.imei:''}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="bx ${estados[r.estado]||'bgx'}">${r.estado}</span>
+        <button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>
+        ${r.tel?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+function verEstadisticasTaller(){
+  const reps = S.reparaciones.filter(r=>r.estado==='entregado' && r.fecha);
+  if(!reps.length){ showToast('Sin datos suficientes aún'); return; }
+
+  // Tiempo promedio por tipo de trabajo
+  const tiempos = {};
+  reps.forEach(r=>{
+    if(!r.falla || !r.fecha) return;
+    const key = r.falla.slice(0,30);
+    if(!tiempos[key]) tiempos[key] = {total:0, count:0};
+    // Approximate: use created date vs delivered (we use fecha as received)
+    tiempos[key].total += 2; // placeholder since we don't track delivery date separately
+    tiempos[key].count++;
+  });
+
+  // Stats reales
+  const totalReps = reps.length;
+  const totalFact = reps.reduce((a,r)=>a+r.presupuesto,0);
+  const totalGan = reps.reduce((a,r)=>a+(r.ganancia||0),0);
+  const margenProm = totalFact > 0 ? Math.round(totalGan/totalFact*100) : 0;
+
+  // Trabajos por tipo
+  const porTipo = {};
+  S.reparaciones.forEach(r=>{
+    const tipo = r.falla?.split(' ').slice(0,3).join(' ') || 'Sin descripción';
+    porTipo[tipo] = (porTipo[tipo]||0)+1;
+  });
+  const topTipos = Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // Tiempo en taller por trabajo activo
+  const activos = S.reparaciones.filter(r=>r.estado!=='entregado'&&r.fecha);
+  const tiemposProm = activos.map(r=>({
+    cliente: r.cliente,
+    equipo: r.equipo,
+    dias: Math.floor((new Date()-new Date(r.fecha+'T00:00:00'))/86400000)
+  })).sort((a,b)=>b.dias-a.dias);
+
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:500px;max-height:85vh;overflow-y:auto">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
+      <div style="font-family:var(--fh);font-size:1rem;font-weight:700">📊 Estadísticas del taller</div>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:16px 20px">
+      <div class="g2" style="margin-bottom:16px">
+        <div class="stat"><div class="sl">Trabajos entregados</div><div class="sv">${totalReps}</div></div>
+        <div class="stat"><div class="sl">Facturado total</div><div class="sv" style="font-size:1.1rem;color:var(--gld)">${fmt(totalFact)}</div></div>
+        <div class="stat"><div class="sl">Ganancia total</div><div class="sv" style="font-size:1.1rem;color:var(--ok)">${fmt(totalGan)}</div></div>
+        <div class="stat"><div class="sl">Margen promedio</div><div class="sv" style="color:${margenProm>=40?'var(--ok)':margenProm>=25?'var(--wrn)':'var(--bad)'}">${margenProm}%</div></div>
+      </div>
+
+      <div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">🔝 Trabajos más frecuentes</div>
+      ${topTipos.map(([tipo,cant])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor);font-size:.82rem">
+        <span>${tipo}</span><span style="color:var(--gld);font-weight:600">${cant}</span>
+      </div>`).join('')}
+
+      ${tiemposProm.length?`<div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-top:14px;margin-bottom:8px">⏱ Trabajos activos — días en taller</div>
+      ${tiemposProm.slice(0,5).map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor);font-size:.82rem">
+        <span>${t.cliente} — ${t.equipo||'—'}</span>
+        <span style="color:${t.dias>5?'var(--bad)':t.dias>2?'var(--wrn)':'var(--ok)'};font-weight:600">${t.dias}d</span>
+      </div>`).join('')}`:''}
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
 function rTaller(){
   document.getElementById('kan').innerHTML=ESTS.map(est=>{
     const reps=S.reparaciones.filter(r=>r.estado===est.k);
     return`<div class="kc"><div class="kct">${est.l} <span style="color:var(--mut)">(${reps.length})</span></div>
-    ${reps.length?reps.map(r=>`<div class="kk"><div class="kn">${r.cliente}</div><div class="kd">${r.equipo||'—'}</div>
-    ${r.falla?`<div class="kd" style="margin-top:2px;font-style:italic">"${r.falla.slice(0,45)}..."</div>`:''}
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;flex-wrap:wrap;gap:3px">
-      <span style="font-size:.68rem;color:var(--mut)">${fD(r.fecha)}</span>
-      ${r.presupuesto?`<span style="font-size:.74rem;color:var(--gld);font-weight:600">${fmt(r.presupuesto)}</span>`:''}
-    </div>
-    ${r.ganancia!=null&&r.presupuesto?`<div style="font-size:.7rem;margin-top:3px;padding:3px 6px;border-radius:4px;background:${r.margen>=50?'rgba(74,222,128,.12)':r.margen>=30?'rgba(250,204,21,.12)':'rgba(248,113,113,.12)'};color:${r.margen>=50?'var(--ok)':r.margen>=30?'var(--wrn)':'var(--bad)'};font-weight:600">
-      Gan: ${fmt(r.ganancia)} · ${r.margen}% ${r.margen>=50?'✓':r.margen>=30?'⚠':'✕'}
-    </div>`:''}
-    <div class="ka"><button class="btn bgh bsm" onclick="openAv(${r.id})">Avanzar</button><button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>${r.tel?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}<button class="btn bd bsm" onclick="delRep(${r.id})">✕</button></div>
-    </div>`).join(''):`<div style="color:var(--mut);font-size:.74rem;padding:7px 0">Sin órdenes</div>`}</div>`;
+    ${reps.length?reps.map(r=>{
+      const diasEnTaller = r.fecha ? Math.floor((new Date()-new Date(r.fecha+'T00:00:00'))/86400000) : 0;
+      const diasColor = diasEnTaller>5?'var(--bad)':diasEnTaller>2?'var(--wrn)':'var(--mut)';
+      return`<div class="kk"><div class="kn">${r.cliente}</div>
+      <div class="kd">${r.equipo||'—'}${r.imei?` <span style="font-size:.65rem;color:var(--mut)">· ${r.imei.slice(-6)}</span>`:''}</div>
+      ${r.falla?`<div class="kd" style="margin-top:2px;font-style:italic">"${r.falla.slice(0,40)}"</div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;flex-wrap:wrap;gap:3px">
+        <span style="font-size:.68rem;color:${diasColor}">${fD(r.fecha)}${diasEnTaller>0?` · ${diasEnTaller}d`:''}</span>
+        ${r.presupuesto?`<span style="font-size:.74rem;color:var(--gld);font-weight:600">${fmt(r.presupuesto)}</span>`:''}
+      </div>
+      ${r.ganancia!=null&&r.presupuesto?`<div style="font-size:.7rem;margin-top:3px;padding:3px 6px;border-radius:4px;background:${r.margen>=50?'rgba(74,222,128,.12)':r.margen>=30?'rgba(250,204,21,.12)':'rgba(248,113,113,.12)'};color:${r.margen>=50?'var(--ok)':r.margen>=30?'var(--wrn)':'var(--bad)'};font-weight:600">
+        Gan: ${fmt(r.ganancia)} · ${r.margen}% ${r.margen>=50?'✓':r.margen>=30?'⚠':'✕'}
+      </div>`:''}
+      <div class="ka">
+        <button class="btn bgh bsm" onclick="openAv(${r.id})">Avanzar</button>
+        <button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>
+        ${r.tel?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}
+        <button class="btn bd bsm" onclick="delRep(${r.id})">✕</button>
+      </div>
+      </div>`;
+    }).join(''):`<div style="color:var(--mut);font-size:.74rem;padding:7px 0">Sin órdenes</div>`}</div>`;
   }).join('');
 }
 
