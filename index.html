@@ -3925,12 +3925,11 @@ async function saveTurno(){
   // Verificar conflicto antes de guardar
   const conflictoEl = document.getElementById('turnoConflicto');
   if(conflictoEl.style.display !== 'none') {
-    // Delfi puede superponer turnos sin confirmacion (tinturas largas con cortes intermedios)
+    // Delfi puede superponer turnos (tinturas largas con cortes intermedios)
     const esDelfi = window.currentEmpleadoNombre === 'Delfi';
     if(!esDelfi){
       if(!confirm('Hay un conflicto de horario. ¿Querés guardarlo igual?')) return;
     }
-    // Para Delfi simplemente avisa pero continua
   }
 
   const cfg = getTurnosCfg();
@@ -3989,13 +3988,11 @@ async function saveTurno(){
 }
 
 function cancelarTurno(id){
-  if(!confirm('¿Cancelar este turno?')) return;
-  const turnos = getTurnos();
-  const t = turnos.find(x=>x.id===id);
-  if(t) t.estado='cancelado';
+  if(!confirm('¿Eliminar este turno?')) return;
+  const turnos = getTurnos().filter(x=>x.id!==id);
   saveTurnosLocal(turnos);
   rTurnos();
-  showToast('Turno cancelado');
+  showToast('Turno eliminado ✓');
 }
 
 function editarTurno(id){
