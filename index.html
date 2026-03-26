@@ -4812,10 +4812,13 @@ function mostrarFormularioTurnoOnline(tenant){
         </select>
         
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Fecha</label>
-        <input type="date" id="onFecha" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+        <input type="date" id="onFecha" onchange="cargarHorasDisponibles('${tenant.id}', turnosCfg)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
         
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Hora preferida</label>
-        <input type="time" id="onHora" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:16px">
+        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Horarios disponibles</label>
+        <div id="onSlotsGrid" style="margin-bottom:16px">
+          <div style="color:#585044;font-size:.8rem;text-align:center;padding:12px">Seleccioná una fecha para ver los horarios disponibles</div>
+        </div>
+        <input type="hidden" id="onHora">
         
         <button onclick="enviarSolicitudTurno('${tenant.id}')" style="width:100%;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit';font-size:.9rem;font-weight:700;cursor:pointer">
           Solicitar turno
@@ -4825,6 +4828,92 @@ function mostrarFormularioTurnoOnline(tenant){
       </div>
     </div>
   `;
+}
+
+async function cargarHorasDisponibles(tenantId, turnosCfg){
+  const fecha = document.getElementById('onFecha')?.value;
+  const grid = document.getElementById('onSlotsGrid');
+  if(!grid || !fecha) return;
+
+  grid.innerHTML = '<div style="color:#a89880;font-size:.8rem;text-align:center;padding:12px">Cargando horarios...</div>';
+
+  // Get cfg
+  const cfg = turnosCfg || {servicios:[], empleados:[]};
+  const apertura = cfg.apertura || '09:00';
+  const cierre = cfg.cierre || '20:00';
+
+  // Get occupied slots from Supabase solicitudes
+  const { data: solicitudes } = await sb.from('turnos_solicitudes')
+    .select('hora')
+    .eq('tenant_id', tenantId)
+    .eq('fecha', fecha)
+    .eq('estado', 'confirmado');
+
+  const ocupados = new Set((solicitudes||[]).map(s=>s.hora));
+
+  // Get turnos fijos bloqueados
+  const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
+  if(fijosRaw){
+    const fijos = JSON.parse(fijosRaw);
+    const diaSemana = new Date(fecha+'T00:00:00').getDay();
+    fijos.filter(f=>f.activo && f.dia===diaSemana).forEach(f=>ocupados.add(f.hora));
+  }
+
+  // Get duration of selected service
+  const srvSel = document.getElementById('onServicio');
+  const srvId = srvSel ? parseInt(srvSel.value) : 0;
+  const srv = cfg.servicios.find(s=>s.id===srvId) || cfg.servicios[0];
+  const duracion = srv?.duracion || 30;
+
+  // Generate slots every 30 min between apertura and cierre
+  const slots = [];
+  const [ah, am] = apertura.split(':').map(Number);
+  const [ch, cm] = cierre.split(':').map(Number);
+  let cur = ah*60+am;
+  const fin = ch*60+cm - duracion;
+
+  while(cur <= fin){
+    const h = String(Math.floor(cur/60)).padStart(2,'0');
+    const m = String(cur%60).padStart(2,'0');
+    const hora = h+':'+m;
+    slots.push({hora, ocupado: ocupados.has(hora)});
+    cur += 30;
+  }
+
+  const disponibles = slots.filter(s=>!s.ocupado);
+
+  if(!disponibles.length){
+    grid.innerHTML = '<div style="color:#c9524c;font-size:.8rem;text-align:center;padding:12px">Sin horarios disponibles para este día</div>';
+    return;
+  }
+
+  grid.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
+    slots.map(s=>{
+      if(s.ocupado) return `<div style="padding:8px 14px;border-radius:8px;background:#1a1a1a;color:#3a3a3a;font-size:.85rem;border:1px solid #222;text-decoration:line-through">${s.hora}</div>`;
+      return `<div onclick="seleccionarSlot('${s.hora}',this)" style="padding:8px 14px;border-radius:8px;background:#080808;color:#a89880;font-size:.85rem;border:1px solid #2e2e2e;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='#b8976a'" onmouseout="this.style.borderColor=this.dataset.sel?'#b8976a':'#2e2e2e'">${s.hora}</div>`;
+    }).join('') + '</div>' +
+    '<div style="font-size:.7rem;color:#585044;margin-top:8px">Tachados = ocupados · Tocá para elegir tu horario</div>';
+
+  // Reset hora hidden input
+  document.getElementById('onHora').value = '';
+}
+
+function seleccionarSlot(hora, el){
+  // Reset all slots
+  document.querySelectorAll('#onSlotsGrid div[onclick]').forEach(d=>{
+    d.style.background = '#080808';
+    d.style.color = '#a89880';
+    d.style.borderColor = '#2e2e2e';
+    d.style.fontWeight = 'normal';
+    d.dataset.sel = '';
+  });
+  // Highlight selected
+  el.style.background = '#b8976a';
+  el.style.color = '#080808';
+  el.style.fontWeight = '700';
+  el.dataset.sel = '1';
+  // Set hidden input
+  document.getElementById('onHora').value = hora;
 }
 
 async function enviarSolicitudTurno(tenantId){
