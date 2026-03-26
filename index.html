@@ -2752,7 +2752,7 @@ function setPrFilt(f, btn){
 
 function setupPreciosTabs(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
+  const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur')||rubro.includes('barberia')||rubro.includes('barbería');
   const tabsEl = document.getElementById('prTabs');
   
   // Dynamic notice
