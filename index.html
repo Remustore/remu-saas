@@ -3026,7 +3026,11 @@ function getCajas(){
 
 function rCajas(){
   const c=getCajas();
-  const items=[{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
+  const rubro2 = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonCaja = rubro2.includes('salon')||rubro2.includes('belleza')||rubro2.includes('barberia')||rubro2.includes('barbería');
+  const items = esSalonCaja
+    ? [{k:'servicio',l:'✂ Servicios',obj:0},{k:'accesorios',l:'🛍 Productos',obj:0},{k:'general',l:'💼 General',obj:0}]
+    : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
   document.getElementById('cajasGrid').innerHTML=items.map(i=>`<div class="stat"><div class="sl">${i.l}</div><div class="sv" style="color:${c[i.k]>=0?'var(--ok)':'var(--bad)'}">${fmt(c[i.k])}</div>${i.obj>0?`<div style="margin-top:6px"><div class="pb"><div class="pf" style="width:${Math.min(100,Math.round(c[i.k]/i.obj*100))}%"></div></div><div style="font-size:.68rem;color:var(--mut);margin-top:3px">Meta día: ${fmt(i.obj)}</div></div>`:''}</div>`).join('');
 }
 
@@ -3037,22 +3041,43 @@ async function saveMovCaja(){
 
 // ═══ OBJETIVOS ═══
 function rObjetivos(){
-  const obj=S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
-  const hoy=tod();
-  const repsHoy=S.reparaciones.filter(r=>r.fecha===hoy&&r.estado!=='recibido').length;
-  const accHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='producto').reduce((a,v)=>a+v.cantidad,0);
-  const eqHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='equipo').length;
-  const ingRepHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
-  const ingAccHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='producto').reduce((a,v)=>a+v.total,0);
-  const ingEqHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='equipo').reduce((a,v)=>a+(v.comision||0),0);
-  const metaRepMonto=(obj.repCant||7)*(obj.repPre||40000);
-  const metaAccMonto=(obj.accCant||10)*(obj.accPre||10000);
+  const obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
+  const hoy = tod();
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq');
+  const esBarberia = rubro.includes('barberia')||rubro.includes('barbería');
+  const esDeco = rubro.includes('deco')||rubro.includes('perfum');
+
   function bloque(emoji,titulo,actual,meta,monto,metaMonto){
     const pct=meta>0?Math.min(100,Math.round(actual/meta*100)):0;
     const color=pct>=100?'var(--ok)':pct>=60?'var(--wrn)':'var(--bad)';
     return`<div class="stat"><div class="sl">${emoji} ${titulo}</div><div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px"><div style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:${color}">${actual}</div><div style="font-size:.78rem;color:var(--mut)">/ ${meta} hoy</div></div><div class="pb"><div class="pf" style="width:${pct}%;background:${pct>=100?'linear-gradient(90deg,var(--ok),#6fd4a0)':pct>=60?'linear-gradient(90deg,var(--wrn),#e8c96a)':'linear-gradient(90deg,var(--bad),#e07070)'}"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:.7rem"><span style="color:var(--mut)">${pct}% logrado</span><span style="color:var(--gld);font-weight:600">${fmt(monto)}</span></div>${metaMonto>0?`<div style="font-size:.68rem;color:var(--mut);margin-top:2px">Meta: ${fmt(metaMonto)}</div>`:''}</div>`;
   }
-  document.getElementById('objHoy').innerHTML=bloque('🔧','Trabajos',repsHoy,obj.repCant||7,ingRepHoy,metaRepMonto)+bloque('📦','Accesorios',accHoy,obj.accCant||10,ingAccHoy,metaAccMonto)+bloque('📱','Equipos',eqHoy,obj.eqCant||1,ingEqHoy,0);
+
+  if(esSalon || esBarberia){
+    // Turnos del día como objetivo principal
+    const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado!=='cancelado').length : 0;
+    const turnosTerminados = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').length : 0;
+    const facturadoTurnos = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
+    const ventasHoy = S.ventas.filter(v=>v.fecha===hoy).reduce((a,v)=>a+v.total,0);
+    const metaTurnos = obj.repCant||10;
+    const metaMontoTurnos = (obj.repCant||10)*(obj.repPre||5000);
+    document.getElementById('objHoy').innerHTML =
+      bloque('📅','Turnos agendados',turnosHoy,metaTurnos,0,0) +
+      bloque('✓','Turnos terminados',turnosTerminados,metaTurnos,facturadoTurnos,metaMontoTurnos) +
+      bloque('💰','Facturado hoy',Math.round(ventasHoy+facturadoTurnos),1,ventasHoy+facturadoTurnos,(obj.accCant||1)*(obj.accPre||10000));
+  } else {
+    // Remu Store — original
+    const repsHoy=S.reparaciones.filter(r=>r.fecha===hoy&&r.estado!=='recibido').length;
+    const accHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='producto').reduce((a,v)=>a+v.cantidad,0);
+    const eqHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='equipo').length;
+    const ingRepHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
+    const ingAccHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='producto').reduce((a,v)=>a+v.total,0);
+    const ingEqHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='equipo').reduce((a,v)=>a+(v.comision||0),0);
+    const metaRepMonto=(obj.repCant||7)*(obj.repPre||40000);
+    const metaAccMonto=(obj.accCant||10)*(obj.accPre||10000);
+    document.getElementById('objHoy').innerHTML=bloque('🔧','Trabajos',repsHoy,obj.repCant||7,ingRepHoy,metaRepMonto)+bloque('📦','Accesorios',accHoy,obj.accCant||10,ingAccHoy,metaAccMonto)+bloque('📱','Equipos',eqHoy,obj.eqCant||1,ingEqHoy,0);
+  }
 }
 
 async function saveObjetivos(){
