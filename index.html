@@ -4889,13 +4889,31 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
 
   grid.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
     slots.map(s=>{
-      if(s.ocupado) return `<div style="padding:8px 14px;border-radius:8px;background:#1a1a1a;color:#3a3a3a;font-size:.85rem;border:1px solid #222;text-decoration:line-through">${s.hora}</div>`;
+      if(s.ocupado) return `<div 
+        onclick="mostrarMotivoOcupado(this)" 
+        title="Turno ocupado"
+        style="padding:8px 14px;border-radius:8px;background:#1a1a1a;color:#3a3a3a;font-size:.85rem;border:1px solid #222;text-decoration:line-through;cursor:pointer;position:relative">
+        ${s.hora}
+        <span style="position:absolute;top:-6px;right:-6px;background:#c9524c;color:#fff;border-radius:50%;width:14px;height:14px;font-size:.55rem;display:flex;align-items:center;justify-content:center;font-weight:700">✕</span>
+      </div>`;
       return `<div onclick="seleccionarSlot('${s.hora}',this)" style="padding:8px 14px;border-radius:8px;background:#080808;color:#a89880;font-size:.85rem;border:1px solid #2e2e2e;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='#b8976a'" onmouseout="this.style.borderColor=this.dataset.sel?'#b8976a':'#2e2e2e'">${s.hora}</div>`;
     }).join('') + '</div>' +
-    '<div style="font-size:.7rem;color:#585044;margin-top:8px">Tachados = ocupados · Tocá para elegir tu horario</div>';
+    '<div style="font-size:.7rem;color:#585044;margin-top:10px">✓ Verde = disponible &nbsp;·&nbsp; ✕ Rojo = ocupado (tocá para ver el motivo)</div>' +
+    '<div id="motivoOcupado" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:8px;font-size:.8rem;color:#e07070"></div>';
 
   // Reset hora hidden input
   document.getElementById('onHora').value = '';
+}
+
+function mostrarMotivoOcupado(el){
+  const box = document.getElementById('motivoOcupado');
+  if(!box) return;
+  box.style.display = 'block';
+  box.innerHTML = '⏳ Este horario ya fue reservado por otro cliente. Por favor elegí otro horario disponible.';
+  // Scroll to message
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  // Auto hide after 4 seconds
+  setTimeout(()=>{ box.style.display='none'; }, 4000);
 }
 
 function seleccionarSlot(hora, el){
