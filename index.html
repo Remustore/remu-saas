@@ -1400,7 +1400,7 @@ async function doLogin(){
   setupPreciosTabs();
   // Mostrar turnos técnicos solo en Remu (no salon)
   const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur');
+  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
   const navTec = document.getElementById('nav-turnosTec');
   if(navTec) navTec.style.display = esSalonCheck ? 'none' : '';
   
@@ -1471,12 +1471,22 @@ function setupApp(){
   const r = currentTenant.rubro || 'Sistema de Gestión';
   document.getElementById('sbLogo').textContent = n.toUpperCase();
   document.getElementById('sbSub').textContent = r;
+  // Adaptar botones de acceso rápido según rubro
+  const rubroQ = (currentTenant?.rubro||'').toLowerCase();
+  const esNoTaller = rubroQ.includes('barberia')||rubroQ.includes('barbería')||rubroQ.includes('salon')||rubroQ.includes('belleza');
+  const quickBtns = document.getElementById('dashQuickBtns');
+  if(quickBtns && esNoTaller){
+    quickBtns.innerHTML = `
+      <button class="btn" style="padding:14px;font-size:.88rem;justify-content:center;background:rgba(76,175,125,.1);color:var(--ok);border:1px solid rgba(76,175,125,.25);grid-column:1/-1" onclick="go('turnos')">
+        📅 Ver turnos de hoy</button>`;
+  }
+
   // Adaptar subtítulo de stock
-  const stockSubEl = document.getElementById('stockSub');
-  if(stockSubEl){
-    const rubroS = (currentTenant.rubro||'').toLowerCase();
-    if(rubroS.includes('salon')||rubroS.includes('belleza')) stockSubEl.textContent = 'Productos y artículos del salón';
-    else if(rubroS.includes('deco')||rubroS.includes('perfum')) stockSubEl.textContent = 'Deco, perfumes y accesorios';
+  const stockSubEl2 = document.getElementById('stockSub');
+  if(stockSubEl2){
+    const rubroS2 = (currentTenant.rubro||'').toLowerCase();
+    if(rubroS2.includes('salon')||rubroS2.includes('belleza')) stockSubEl2.textContent = 'Productos y artículos del salón';
+    else if(rubroS2.includes('deco')||rubroS2.includes('perfum')) stockSubEl2.textContent = 'Deco, perfumes y accesorios';
   }
   document.getElementById('tbUser').textContent = '👑 ' + (currentUser.email || '');
   document.getElementById('sbBizName').textContent = n;
@@ -1484,24 +1494,29 @@ function setupApp(){
   document.getElementById('dashSub').textContent = 'Visión general — ' + n;
   
   // Adaptar labels del dashboard según el rubro
-  const rubro = (currentTenant.rubro||'').toLowerCase();
-  const esSalon = rubro.includes('salon') || rubro.includes('salón') || rubro.includes('belleza') || rubro.includes('peluq') || rubro.includes('manicur');
-  const esDeco = rubro.includes('deco') || rubro.includes('perfum') || rubro.includes('hogar');
+  const rubroLbl = (currentTenant.rubro||'').toLowerCase();
+  const esSalonLbl = rubroLbl.includes('salon') || rubroLbl.includes('salón') || rubroLbl.includes('belleza') || rubroLbl.includes('peluq') || rubroLbl.includes('manicur') || rubroLbl.includes('barberia') || rubroLbl.includes('barbería');
+  const esDeco = rubroLbl.includes('deco') || rubroLbl.includes('perfum') || rubroLbl.includes('hogar');
   
   const lbl2 = document.getElementById('labelTrabajosListos');
   const lbl3 = document.getElementById('labelStockBajo');
   const lbl1 = document.getElementById('labelVentaHoy');
   
-  if(esSalon){
+  if(esSalonLbl){
     if(lbl2) lbl2.innerHTML = '📅 Turnos hoy';
     if(lbl3) lbl3.innerHTML = '✓ Turnos terminados';
     if(lbl1) lbl1.innerHTML = '💰 Facturado hoy';
   } else if(esDeco){
     if(lbl2) lbl2.innerHTML = '📦 Productos bajo mínimo';
     if(lbl3) lbl3.innerHTML = '🛍 Ventas de hoy';
-  }
-  document.getElementById('pageTitle').textContent = n;
-  document.title = n;
+  }  // Adaptar subtítulo de stock
+
+  document.getElementById('tbUser').textContent = '👑 ' + (currentUser.email || '');
+  document.getElementById('sbBizName').textContent = n;
+  document.getElementById('sbUserEmail').textContent = currentUser.email || '';
+  document.getElementById('dashSub').textContent = 'Visión general — ' + n;
+  
+
 
   // Aplicar branding del negocio
   applyBranding();
@@ -1532,7 +1547,7 @@ function setupApp(){
   setupPreciosTabs();
   // Mostrar turnos técnicos solo en Remu (no salon)
   const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur');
+  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
   const navTec = document.getElementById('nav-turnosTec');
   if(navTec) navTec.style.display = esSalonCheck ? 'none' : '';
   
@@ -2807,7 +2822,12 @@ function rDash(){
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
   const tG=S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m)).reduce((a,g)=>a+g.monto,0);
   const gan=tV-tG,repA=S.reparaciones.filter(r=>r.estado!=='entregado').length,eqD=S.equipos.filter(e=>e.estado==='disponible').length;
-  document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">Ventas del mes</div><div class="sv" style="color:var(--ok)">${fmt(tV)}</div><div class="ss">${vm.length} operaciones</div></div><div class="stat"><div class="sl">Gastos del mes</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${gan>=0?'var(--gld)':'var(--bad)'}">${fmt(gan)}</div></div><div class="stat"><div class="sl">Trabajos activos</div><div class="sv" style="color:var(--wrn)">${repA}</div><div class="ss">${eqD} equipos disponibles</div></div>`;
+  const rubD=(currentTenant?.rubro||'').toLowerCase();
+  const esBarberiaD=rubD.includes('barberia')||rubD.includes('barbería')||rubD.includes('salon')||rubD.includes('belleza');
+  const stat4 = esBarberiaD
+    ? `<div class="stat"><div class="sl">Turnos este mes</div><div class="sv" style="color:var(--wrn)">${getTurnos?getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes())).length:0}</div></div>`
+    : `<div class="stat"><div class="sl">Trabajos activos</div><div class="sv" style="color:var(--wrn)">${repA}</div><div class="ss">${eqD} equipos disponibles</div></div>`;
+  document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">Ventas del mes</div><div class="sv" style="color:var(--ok)">${fmt(tV)}</div><div class="ss">${vm.length} operaciones</div></div><div class="stat"><div class="sl">Gastos del mes</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${gan>=0?'var(--gld)':'var(--bad)'}"> ${fmt(gan)}</div></div>${stat4}`;
   const meta=S.meta||0,pct=meta>0?Math.min(100,Math.round(tV/meta*100)):0;
   document.getElementById('metaArc').style.strokeDashoffset=157-(157*pct/100);
   document.getElementById('mPct').textContent=pct+'%';document.getElementById('mVal').textContent=fmt(meta);document.getElementById('mVen').textContent=fmt(tV);
@@ -5595,11 +5615,10 @@ function updateBigNumbers(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon')||rubro.includes('salón')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
   
-  if(esSalon){
-    // Para salón: turnos hoy / turnos terminados hoy
+  const esBarberiaBig = rubro.includes('barberia')||rubro.includes('barbería');
+  if(esSalon || esBarberiaBig){
     const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado!=='cancelado').length : 0;
     const turnosTerminados = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').length : 0;
-    // Facturado por turnos terminados
     const facturadoTurnos = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
     const totalFact = totalHoy + facturadoTurnos;
     if(bvh) bvh.textContent = fmt(totalFact);
