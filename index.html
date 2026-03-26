@@ -4722,13 +4722,18 @@ Tu turno en *${neg}* fue *confirmado* ✅
 
 async function rechazarSolicitud(id, nombre, tel){
   if(!confirm('¿Rechazar la solicitud de ' + nombre + '?')) return;
-  await sb.from('turnos_solicitudes').update({estado:'cancelado'}).eq('id', id);
-  showToast('Solicitud rechazada');
-  cargarSolicitudes();
+  // Delete from Supabase completely
+  const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id);
+  if(error){ showToast('Error al rechazar'); return; }
+  showToast('Solicitud rechazada ✓');
+  await cargarSolicitudes();
+  // Open WA after updating UI
   if(tel){
     const neg = currentTenant?.nombre||'el negocio';
     const msg = `Hola ${nombre}, lamentablemente no podemos confirmar tu turno en *${neg}* para ese horario. Contactanos para coordinar otro. 🙏`;
-    window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
+    setTimeout(()=>{
+      window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
+    }, 500);
   }
 }
 
