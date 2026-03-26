@@ -4812,7 +4812,7 @@ function mostrarFormularioTurnoOnline(tenant){
         </select>
         
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Fecha</label>
-        <input type="date" id="onFecha" onchange="cargarHorasDisponibles('${tenant.id}', turnosCfg)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+        <input type="date" id="onFecha" onchange="cargarHorasDisponibles(window.__onlineTenantId, window.__onlineTurnosCfg)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
         
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Horarios disponibles</label>
         <div id="onSlotsGrid" style="margin-bottom:16px">
@@ -4828,6 +4828,9 @@ function mostrarFormularioTurnoOnline(tenant){
       </div>
     </div>
   `;
+  // Store globals for use in onchange handlers
+  window.__onlineTenantId = tenant.id;
+  window.__onlineTurnosCfg = turnosCfg;
 }
 
 async function cargarHorasDisponibles(tenantId, turnosCfg){
