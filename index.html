@@ -4550,21 +4550,45 @@ async function cargarSolicitudes(){
 }
 
 async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
-  // Create actual turno from solicitud
   const cfg = getTurnosCfg();
   const srv = cfg.servicios.find(s=>s.nombre===servicio) || cfg.servicios[0];
   const emp = cfg.empleados[0];
-  
+  const duracion = srv?.duracion || 30;
+
+  // Verificar conflicto de horario
+  const turnos = getTurnos();
+  const [h,m] = (hora||'00:00').split(':').map(Number);
+  const inicioNuevo = h*60+m;
+  const finNuevo = inicioNuevo + duracion;
+
+  const conflicto = turnos.find(t=>{
+    if(t.fecha !== fecha || t.estado === 'cancelado') return false;
+    const srvT = cfg.servicios.find(s=>s.id==t.servicioId);
+    const durT = srvT?.duracion || 30;
+    const [th,tm] = (t.hora||'00:00').split(':').map(Number);
+    const tInicio = th*60+tm;
+    const tFin = tInicio + durT;
+    return inicioNuevo < tFin && finNuevo > tInicio;
+  });
+
+  if(conflicto){
+    const msg = `⚠ Conflicto de horario
+
+Ya hay un turno a las ${conflicto.hora} con ${conflicto.cliente} (${conflicto.servicioNombre}).
+
+¿Querés confirmar igual o rechazar esta solicitud?`;
+    if(!confirm(msg)) return;
+  }
+
   const turno = {
     id: Date.now().toString(),
     cliente: nombre, tel, fecha, hora,
     empleadoId: emp?.id||'', empleadoNombre: emp?.nombre||'',
     servicioId: srv?.id||0, servicioNombre: srv?.nombre||servicio,
-    sector: srv?.sector||'', duracion: srv?.duracion||30,
+    sector: srv?.sector||'', duracion,
     precio: 0, notas: 'Turno solicitado online', estado: 'confirmado',
     creadoEn: new Date().toISOString()
   };
-  const turnos = getTurnos();
   turnos.push(turno);
   saveTurnosLocal(turnos);
 
@@ -4696,7 +4720,7 @@ function mostrarFormularioTurnoOnline(tenant){
   `;
 }
 
-function enviarSolicitudTurno(tenantId){
+async function enviarSolicitudTurno(tenantId){
   const nombre = document.getElementById('onNombre')?.value.trim();
   const tel = document.getElementById('onTel')?.value.trim();
   const servicioId = document.getElementById('onServicio')?.value;
@@ -4707,6 +4731,18 @@ function enviarSolicitudTurno(tenantId){
 
   if(!nombre||!tel||!fecha||!hora){
     if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Completá todos los campos';}
+    return;
+  }
+
+  // Verificar disponibilidad antes de enviar
+  const { data: existentes } = await sb.from('turnos_solicitudes')
+    .select('hora, servicio_id, estado')
+    .eq('tenant_id', tenantId)
+    .eq('fecha', fecha)
+    .eq('estado', 'confirmado');
+  
+  if(existentes && existentes.some(t => t.hora === hora)){
+    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya está ocupado. Por favor elegí otro.';}
     return;
   }
 
