@@ -3939,6 +3939,8 @@ async function saveTurno(){
   const turnos = getTurnos();
   const estado = document.getElementById('turnoEstado')?.value || 'confirmado';
   const precioCobrado = parseFloat(document.getElementById('turnoPrecio')?.value || srv?.precio || 0);
+  // Preserve original data when editing
+  const turnoOriginal = id ? turnos.find(t=>t.id===id) : null;
   const obj = {
     id: id || Date.now().toString(),
     cliente: cli, tel, fecha, hora,
@@ -3948,12 +3950,20 @@ async function saveTurno(){
     duracion: srv?.duracion||60,
     precio: precioCobrado,
     notas, estado,
-    creadoEn: new Date().toISOString()
+    esFijo: turnoOriginal?.esFijo || false,
+    fijoId: turnoOriginal?.fijoId || null,
+    creadoEn: turnoOriginal?.creadoEn || new Date().toISOString()
   };
 
   if(id){
     const idx = turnos.findIndex(t=>t.id===id);
-    if(idx>-1) turnos[idx]=obj;
+    if(idx>-1){
+      turnos[idx] = obj;
+    } else {
+      // id provided but not found - don't create duplicate, show error
+      showToast('Error: turno no encontrado');
+      return;
+    }
   } else {
     turnos.push(obj);
   }
