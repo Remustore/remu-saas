@@ -5616,6 +5616,31 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 
 // Verificar sesión existente
 (async()=>{
+  // Si hay param ?turno= mostrar página de reserva sin login
+  const urlParams = new URLSearchParams(window.location.search);
+  const turnoParam = urlParams.get('turno');
+  if(turnoParam){
+    // Hide loading screen
+    document.getElementById('loadingScreen').style.display='none';
+    // Load tenant and show booking form directly
+    const { data: tenant } = await sb.from('tenants').select('*').eq('id', turnoParam).single();
+    if(tenant){
+      // Load turnosCfg from Supabase precios table
+      const { data: preciosData } = await sb.from('precios')
+        .select('data')
+        .eq('tenant_id', turnoParam);
+      
+      if(preciosData){
+        const cfgRow = preciosData.find(p=>p.data?.__turnosCfg);
+        if(cfgRow) localStorage.setItem('turnosCfg_' + turnoParam, JSON.stringify(cfgRow.data.__turnosCfg));
+      }
+      mostrarFormularioTurnoOnline(tenant);
+    } else {
+      document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;color:#fff;font-family:sans-serif">Link inválido o negocio no encontrado.</div>';
+    }
+    return;
+  }
+
   const { data: { session } } = await sb.auth.getSession();
   if(session){
     currentUser = session.user;
