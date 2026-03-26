@@ -153,8 +153,8 @@ h3{font-family:var(--fh);font-size:.93rem;font-weight:700;}
 .bs{background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.25);}.bs:hover{background:rgba(76,175,125,.25);}
 .be{background:rgba(76,142,201,.12);color:var(--inf);border:1px solid rgba(76,142,201,.2);}.be:hover{background:rgba(76,142,201,.22);}
 .bd{background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.2);}.bd:hover{background:rgba(201,82,76,.2);}
-.bgh{background:var(--gld2);color:var(--gld);border:1px solid rgba(201,168,76,.25);}.bgh:hover{background:rgba(201,168,76,.22);}
-.bsm{padding:5px 10px;font-size:.73rem;}
+.bgh{background:var(--gld2);color:var(--gld);border:1px solid rgba(201,168,76,.4);font-weight:600;}.bgh:hover{background:rgba(201,168,76,.3);box-shadow:0 2px 8px rgba(201,168,76,.2);}
+.bsm{padding:6px 12px;font-size:.75rem;font-weight:600;}
 .bx{font-size:.67rem;padding:2px 8px;border-radius:20px;font-weight:600;letter-spacing:.3px;}
 .bg2{background:var(--car2);color:var(--tx2);border:1px solid var(--bor);}
 .bgr{background:rgba(76,175,125,.12);color:var(--ok);border:1px solid rgba(76,175,125,.2);}
@@ -627,7 +627,7 @@ textarea{resize:vertical;min-height:70px;}
           </button>
         </div>
       </div>
-      <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bgh bsm" onclick="openM('mObjetivos',null)">⚙ Configurar</button></div><div class="g3" id="objHoy"></div></div>
+      <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
       <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card">
@@ -798,7 +798,7 @@ textarea{resize:vertical;min-height:70px;}
           <div class="ps" style="margin-bottom:0">Agenda del salón</div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn bgh bsm" onclick="go('turnosConfig')">⚙ Configurar</button>
+          <button class="btn bg" style="padding:7px 14px;font-size:.8rem" onclick="go('turnosConfig')">⚙ Configurar turnos</button>
           <button class="btn bg bsm" onclick="openNuevoTurno()">+ Nuevo turno</button>
         </div>
       </div>
