@@ -547,6 +547,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('turnos')" id="nav-turnos"><span class="nico">📆</span>Turnos</div>
   <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec"><span class="nico">🔧</span>Turnos técnicos</div>
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas"><span class="nico">📋</span>Fichas</div>
+  <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos"><span class="nico">🔒</span>Turnos fijos</div>
   <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline"><span class="nico">🔗</span>Turnos online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
@@ -983,6 +984,23 @@ textarea{resize:vertical;min-height:70px;}
       <div id="turnosTecLista"></div>
     </div>
 
+    <!-- TURNOS FIJOS -->
+    <div class="sec" id="sec-turnosFijos">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">Turnos fijos</div>
+          <div class="ps" style="margin-bottom:0">Clientes con horario reservado semanalmente</div>
+        </div>
+        <button class="btn bg bsm" onclick="openNuevoTurnoFijo()">+ Agregar turno fijo</button>
+      </div>
+      <div class="card" style="margin-bottom:14px;border-left:3px solid var(--gld)">
+        <div style="font-size:.78rem;color:var(--tx2);line-height:1.6">
+          🔒 Los turnos fijos <strong style="color:var(--tx)">bloquean ese horario cada semana</strong>. Ningún otro cliente puede reservar online ese día y hora. Se generan automáticamente en la agenda.
+        </div>
+      </div>
+      <div id="turnosFijosList"></div>
+    </div>
+
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
       <div class="pt">Gastos</div><div class="ps">Fijos y variables del local</div>
@@ -1272,6 +1290,36 @@ textarea{resize:vertical;min-height:70px;}
   <div class="fr full"><div><label>Notas</label><input id="turnoNotas" placeholder="Observaciones..."></div></div>
 </div>
 <div class="mf"><button class="btn" onclick="closeM('mTurno')">Cancelar</button><button class="btn bg" onclick="saveTurno()">Guardar turno</button></div>
+</div></div>
+
+<!-- Modal Turno Fijo -->
+<div class="mb" id="mTurnoFijo"><div class="md"><div class="mh"><div class="mt2" id="mTurnoFijoTitle">Nuevo turno fijo</div><button class="xbtn" onclick="closeM('mTurnoFijo')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="turnoFijoId">
+  <div class="fr"><div><label>Cliente</label><input id="tfCli" placeholder="Nombre del cliente"></div><div><label>Teléfono / WA</label><input id="tfTel" placeholder="11 2345 6789"></div></div>
+  <div class="fr"><div><label>Día de la semana</label><select id="tfDia">
+    <option value="1">Lunes</option>
+    <option value="2">Martes</option>
+    <option value="3">Miércoles</option>
+    <option value="4">Jueves</option>
+    <option value="5">Viernes</option>
+    <option value="6">Sábado</option>
+    <option value="0">Domingo</option>
+  </select></div><div><label>Hora</label><input type="time" id="tfHora" step="1800"></div></div>
+  <div class="fr"><div><label>Servicio</label><select id="tfServicio"></select></div><div><label>Duración estimada</label><select id="tfDuracion">
+    <option value="20">20 min</option>
+    <option value="30" selected>30 min</option>
+    <option value="45">45 min</option>
+    <option value="60">1 hora</option>
+    <option value="90">1:30 hs</option>
+    <option value="120">2 horas</option>
+  </select></div></div>
+  <div class="fr full"><div><label>Notas</label><input id="tfNotas" placeholder="Observaciones..."></div></div>
+  <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:10px;margin-top:8px;font-size:.78rem;color:var(--tx2)">
+    🔒 Este horario quedará <strong style="color:var(--gld)">bloqueado todas las semanas</strong> y no podrá ser tomado por otros clientes online.
+  </div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mTurnoFijo')">Cancelar</button><button class="btn bg" onclick="guardarTurnoFijo()">Guardar turno fijo</button></div>
 </div></div>
 
 <!-- Modal Nuevo Producto Rápido -->
@@ -2102,7 +2150,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -2111,7 +2159,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -4796,7 +4844,7 @@ async function enviarSolicitudTurno(tenantId){
     return;
   }
 
-  // Verificar disponibilidad antes de enviar
+  // Verificar disponibilidad — incluye turnos fijos bloqueados
   const { data: existentes } = await sb.from('turnos_solicitudes')
     .select('hora, servicio_id, estado')
     .eq('tenant_id', tenantId)
@@ -4806,6 +4854,19 @@ async function enviarSolicitudTurno(tenantId){
   if(existentes && existentes.some(t => t.hora === hora)){
     if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya está ocupado. Por favor elegí otro.';}
     return;
+  }
+  
+  // Verificar turnos fijos del tenant
+  const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
+  if(fijosRaw){
+    const fijos = JSON.parse(fijosRaw);
+    const fechaObj = new Date(fecha + 'T00:00:00');
+    const diaSemana = fechaObj.getDay();
+    const fijoConflicto = fijos.find(f=>f.activo && f.dia===diaSemana && f.hora===hora);
+    if(fijoConflicto){
+      if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario está reservado. Por favor elegí otro.';}
+      return;
+    }
   }
 
   // Save turno request to Supabase
@@ -5399,6 +5460,209 @@ function rGraficoDias(){
     <div style="font-size:.7rem;color:var(--mut);margin-top:8px">Últimos 30 días · <strong style="color:var(--tx)">${nombres[orden.find(d=>porDia[d]===Math.max(...porDia))]||'—'}</strong> es el día más activo</div>`;
 }
 
+// ═══ TURNOS FIJOS ═══
+const FIJOS_KEY = 'turnosFijos';
+const DIAS_NOMBRES = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+
+function getTurnosFijos(){
+  const raw = localStorage.getItem(FIJOS_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveTurnosFijosLocal(fijos){
+  localStorage.setItem(FIJOS_KEY + '_' + (currentTenant?.id||''), JSON.stringify(fijos));
+}
+
+function openNuevoTurnoFijo(){
+  const cfg = getTurnosCfg();
+  const srvSel = document.getElementById('tfServicio');
+  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}">${s.nombre}</option>`).join('') || '<option>Sin servicios</option>';
+  document.getElementById('turnoFijoId').value = '';
+  document.getElementById('tfCli').value = '';
+  document.getElementById('tfTel').value = '';
+  document.getElementById('tfHora').value = '';
+  document.getElementById('tfNotas').value = '';
+  document.getElementById('mTurnoFijoTitle').textContent = 'Nuevo turno fijo';
+  openM('mTurnoFijo', null);
+}
+
+function guardarTurnoFijo(){
+  const id = document.getElementById('turnoFijoId').value;
+  const cli = document.getElementById('tfCli').value.trim();
+  const tel = document.getElementById('tfTel').value.trim();
+  const dia = parseInt(document.getElementById('tfDia').value);
+  const hora = document.getElementById('tfHora').value;
+  const servicio = document.getElementById('tfServicio').value;
+  const duracion = parseInt(document.getElementById('tfDuracion').value);
+  const notas = document.getElementById('tfNotas').value;
+
+  if(!cli) return alert('Ingresá el nombre del cliente');
+  if(!hora) return alert('Ingresá la hora');
+
+  // Verificar que no haya otro fijo en el mismo día/hora
+  const fijos = getTurnosFijos();
+  const conflicto = fijos.find(f => f.dia===dia && f.hora===hora && f.id!==(id||''));
+  if(conflicto){
+    return alert(`⚠ Ya hay un turno fijo de ${conflicto.cliente} los ${DIAS_NOMBRES[dia]} a las ${hora}`);
+  }
+
+  const obj = {
+    id: id || Date.now().toString(),
+    cliente: cli, tel, dia, hora, servicio, duracion, notas,
+    activo: true,
+    creadoEn: new Date().toISOString()
+  };
+
+  if(id){
+    const idx = fijos.findIndex(f=>f.id===id);
+    if(idx>-1) fijos[idx]=obj;
+  } else {
+    fijos.push(obj);
+  }
+
+  saveTurnosFijosLocal(fijos);
+  
+  // Generar turnos para las próximas 4 semanas
+  generarTurnosDesdeFijos([obj]);
+  
+  closeM('mTurnoFijo');
+  rTurnosFijos();
+  showToast('Turno fijo guardado ✓ — generado para las próximas 4 semanas');
+}
+
+function generarTurnosDesdeFijos(fijos){
+  const turnosExistentes = getTurnos();
+  const cfg = getTurnosCfg();
+  const nuevos = [];
+
+  fijos.forEach(fijo=>{
+    if(!fijo.activo) return;
+    // Generate for next 4 weeks
+    for(let semana=0; semana<4; semana++){
+      const hoy = new Date();
+      const diasHastaProximo = (fijo.dia - hoy.getDay() + 7) % 7 + (semana * 7);
+      const fecha = new Date(hoy);
+      fecha.setDate(hoy.getDate() + diasHastaProximo);
+      const fechaStr = fecha.toISOString().slice(0,10);
+
+      // Check if turno already exists for this date/hora
+      const yaExiste = turnosExistentes.find(t=>
+        t.fecha===fechaStr && t.hora===fijo.hora && t.cliente===fijo.cliente
+      );
+      if(yaExiste) continue;
+
+      const srv = cfg.servicios.find(s=>s.nombre===fijo.servicio) || cfg.servicios[0];
+      const emp = cfg.empleados[0];
+
+      nuevos.push({
+        id: 'fijo_' + fijo.id + '_' + fechaStr,
+        cliente: fijo.cliente,
+        tel: fijo.tel,
+        fecha: fechaStr,
+        hora: fijo.hora,
+        empleadoId: emp?.id||'',
+        empleadoNombre: emp?.nombre||'',
+        servicioId: srv?.id||0,
+        servicioNombre: fijo.servicio,
+        sector: srv?.sector||'',
+        duracion: fijo.duracion,
+        precio: srv?.precio||0,
+        notas: '🔒 Turno fijo — ' + (fijo.notas||''),
+        estado: 'confirmado',
+        esFijo: true,
+        fijoId: fijo.id,
+        creadoEn: new Date().toISOString()
+      });
+    }
+  });
+
+  if(nuevos.length){
+    const todos = [...turnosExistentes, ...nuevos];
+    saveTurnosLocal(todos);
+  }
+  return nuevos.length;
+}
+
+function eliminarTurnoFijo(id){
+  if(!confirm('¿Eliminar este turno fijo? Se eliminarán también los turnos futuros generados.')) return;
+  const fijos = getTurnosFijos().filter(f=>f.id!==id);
+  saveTurnosFijosLocal(fijos);
+  
+  // Remove future generated turnos
+  const turnos = getTurnos().filter(t=>!(t.esFijo && t.fijoId===id && t.fecha >= tod()));
+  saveTurnosLocal(turnos);
+  
+  rTurnosFijos();
+  showToast('Turno fijo eliminado ✓');
+}
+
+function editarTurnoFijo(id){
+  const fijo = getTurnosFijos().find(f=>f.id===id);
+  if(!fijo) return;
+  const cfg = getTurnosCfg();
+  const srvSel = document.getElementById('tfServicio');
+  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}" ${s.nombre===fijo.servicio?'selected':''}>${s.nombre}</option>`).join('');
+  document.getElementById('turnoFijoId').value = fijo.id;
+  document.getElementById('tfCli').value = fijo.cliente;
+  document.getElementById('tfTel').value = fijo.tel||'';
+  document.getElementById('tfDia').value = fijo.dia;
+  document.getElementById('tfHora').value = fijo.hora;
+  document.getElementById('tfDuracion').value = fijo.duracion||30;
+  document.getElementById('tfNotas').value = fijo.notas||'';
+  document.getElementById('mTurnoFijoTitle').textContent = 'Editar turno fijo';
+  openM('mTurnoFijo', null);
+}
+
+function toggleTurnoFijo(id){
+  const fijos = getTurnosFijos();
+  const f = fijos.find(x=>x.id===id);
+  if(!f) return;
+  f.activo = !f.activo;
+  saveTurnosFijosLocal(fijos);
+  if(f.activo) generarTurnosDesdeFijos([f]);
+  rTurnosFijos();
+  showToast(f.activo ? 'Turno fijo activado ✓' : 'Turno fijo pausado');
+}
+
+function rTurnosFijos(){
+  const el = document.getElementById('turnosFijosList');
+  if(!el) return;
+  const fijos = getTurnosFijos();
+
+  if(!fijos.length){
+    el.innerHTML = `<div class="card">${emp('🔒','Sin turnos fijos aún')}<div style="text-align:center;margin-top:8px;font-size:.82rem;color:var(--mut)">Agregá clientes con horario fijo semanal</div></div>`;
+    return;
+  }
+
+  el.innerHTML = fijos.map(f=>`
+    <div class="card" style="margin-bottom:10px;border-left:3px solid ${f.activo?'var(--gld)':'var(--mut)'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-weight:600;font-size:.95rem">${f.cliente}</span>
+            <span class="bx ${f.activo?'byw':'bgx'}">${f.activo?'🔒 Activo':'Pausado'}</span>
+          </div>
+          <div style="font-size:.78rem;color:var(--tx2);margin-top:4px">
+            📅 Todos los <strong>${DIAS_NOMBRES[f.dia]}</strong> a las <strong>${f.hora}</strong>
+          </div>
+          <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">
+            ✂ ${f.servicio} · ${f.duracion} min
+          </div>
+          ${f.notas?`<div style="font-size:.72rem;color:var(--mut);margin-top:2px">📝 ${f.notas}</div>`:''}
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn bgh bsm" onclick="toggleTurnoFijo('${f.id}')">${f.activo?'⏸ Pausar':'▶ Activar'}</button>
+          <button class="btn be bsm" onclick="editarTurnoFijo('${f.id}')">✎</button>
+          <button class="btn bd bsm" onclick="eliminarTurnoFijo('${f.id}')">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Regenerate upcoming turnos from active fijos on each render
+  const activosFijos = fijos.filter(f=>f.activo);
+  if(activosFijos.length) generarTurnosDesdeFijos(activosFijos);
+}
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -5802,7 +6066,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
