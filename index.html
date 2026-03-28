@@ -1568,6 +1568,26 @@ async function doLogin(){
     const el = document.getElementById(id);
     if(el) el.style.display = esFinanzas ? '' : 'none';
   });
+  
+  // Para finanzas personales, ocultar módulos de negocio
+  if(esFinanzas){
+    const ocultarFinanzas = [
+      'nav-ventas','nav-stock','nav-equipos','nav-taller','nav-clientes',
+      'nav-auditoria','nav-precios','nav-turnos','nav-turnosTec',
+      'nav-turnosFijos','nav-listaEspera','nav-turnosOnline'
+    ];
+    ocultarFinanzas.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    
+    // Ocultar secciones del dashboard que no aplican
+    const dashQuick = document.getElementById('dashQuickBtns');
+    if(dashQuick) dashQuick.style.display='none';
+    
+    const energyCard = document.getElementById('energyCard');
+    if(energyCard) energyCard.style.display='none';
+    
+    const objCard = document.getElementById('objetivosCompraCard');
+    if(objCard) objCard.style.display='none';
+  }
   // Mostrar turnos técnicos solo en Remu (no salon)
   const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
   const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
@@ -1722,6 +1742,26 @@ function setupApp(){
     const el = document.getElementById(id);
     if(el) el.style.display = esFinanzas ? '' : 'none';
   });
+  
+  // Para finanzas personales, ocultar módulos de negocio
+  if(esFinanzas){
+    const ocultarFinanzas = [
+      'nav-ventas','nav-stock','nav-equipos','nav-taller','nav-clientes',
+      'nav-auditoria','nav-precios','nav-turnos','nav-turnosTec',
+      'nav-turnosFijos','nav-listaEspera','nav-turnosOnline'
+    ];
+    ocultarFinanzas.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    
+    // Ocultar secciones del dashboard que no aplican
+    const dashQuick = document.getElementById('dashQuickBtns');
+    if(dashQuick) dashQuick.style.display='none';
+    
+    const energyCard = document.getElementById('energyCard');
+    if(energyCard) energyCard.style.display='none';
+    
+    const objCard = document.getElementById('objetivosCompraCard');
+    if(objCard) objCard.style.display='none';
+  }
   // Mostrar turnos técnicos solo en Remu (no salon)
   const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
   const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
@@ -3283,6 +3323,12 @@ function rCajas(){
 
 async function saveMovCaja(){
   const obj={id:Date.now(),caja:document.getElementById('mcCaja').value,tipo:document.getElementById('mcTipo').value,monto:parseFloat(document.getElementById('mcMonto').value)||0,fecha:document.getElementById('mcFec').value||tod(),concepto:document.getElementById('mcConc').value};
+  const rubroC = (currentTenant?.rubro||'').toLowerCase();
+  if(rubroC.includes('personal')||rubroC.includes('pareja')){
+    const cajasGrid = document.getElementById('cajasGrid');
+    if(cajasGrid) cajasGrid.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:8px">Usá el módulo de Gastos para registrar tus gastos</div>';
+    return;
+  }
   if(!S.movCaja)S.movCaja=[];S.movCaja.push(obj);await dbSetConfig('movCaja',S.movCaja);closeM('mMovCaja');rCajas();rDash();
 }
 
