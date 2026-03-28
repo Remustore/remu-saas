@@ -548,6 +548,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec"><span class="nico">🔧</span>Turnos técnicos</div>
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas"><span class="nico">📋</span>Fichas</div>
   <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos"><span class="nico">🔒</span>Turnos fijos</div>
+  <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera"><span class="nico">⏳</span>Lista de espera</div>
   <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline"><span class="nico">🔗</span>Turnos online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
@@ -1016,6 +1017,23 @@ textarea{resize:vertical;min-height:70px;}
         </div>
       </div>
       <div id="turnosFijosList"></div>
+    </div>
+
+    <!-- LISTA DE ESPERA -->
+    <div class="sec" id="sec-listaEspera">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">Lista de espera</div>
+          <div class="ps" style="margin-bottom:0">Clientes esperando un turno disponible</div>
+        </div>
+        <button class="btn bg bsm" onclick="agregarListaEspera()">+ Agregar</button>
+      </div>
+      <div class="card" style="margin-bottom:14px;border-left:3px solid var(--wrn)">
+        <div style="font-size:.78rem;color:var(--tx2)">
+          ⏳ Cuando se libera un turno, avisás por WhatsApp al primero de la lista con un click.
+        </div>
+      </div>
+      <div id="listaEsperaList"></div>
     </div>
 
     <!-- GASTOS -->
@@ -2177,7 +2195,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -2186,7 +2204,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -2800,6 +2818,7 @@ function rTaller(){
         <button class="btn bgh bsm" onclick="openAv(${r.id})">Avanzar</button>
         <button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>
         ${r.tel?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}
+        ${r.estado==='recibido'?`<button class="btn bgh bsm" onclick="generarPresupuestoPDF(${r.id})">📋</button>`:''}
         <button class="btn bd bsm" onclick="delRep(${r.id})">✕</button>
       </div>
       </div>`;
@@ -6269,6 +6288,160 @@ ${esTelefonia?`<h3>Distribución sugerida (50/30/20)</h3>
   setTimeout(()=>ventana.print(), 500);
 }
 
+// ═══ LISTA DE ESPERA ═══
+const ESPERA_KEY = 'listaEspera';
+
+function getListaEspera(){
+  const raw = localStorage.getItem(ESPERA_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveListaEspera(lista){
+  localStorage.setItem(ESPERA_KEY + '_' + (currentTenant?.id||''), JSON.stringify(lista));
+}
+
+function agregarListaEspera(){
+  const nombre = prompt('Nombre del cliente:');
+  if(!nombre) return;
+  const tel = prompt('Teléfono WhatsApp:') || '';
+  const servicio = prompt('Servicio que necesita:') || '';
+  const lista = getListaEspera();
+  lista.push({
+    id: Date.now().toString(),
+    nombre, tel, servicio,
+    fecha: tod(),
+    avisado: false
+  });
+  saveListaEspera(lista);
+  rListaEspera();
+  showToast('Agregado a lista de espera ✓');
+}
+
+function avisarEspera(id){
+  const lista = getListaEspera();
+  const c = lista.find(x=>x.id===id);
+  if(!c || !c.tel) return alert('Este cliente no tiene teléfono');
+  const neg = currentTenant?.nombre||'el negocio';
+  const msg = `Hola ${c.nombre} 👋
+
+Te avisamos desde *${neg}* que se liberó un turno disponible para *${c.servicio||'tu servicio'}*.
+
+¿Te interesa? Respondé este mensaje para coordinarlo. 😊`;
+  c.avisado = true;
+  saveListaEspera(lista);
+  rListaEspera();
+  window.open('https://wa.me/549'+c.tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function eliminarEspera(id){
+  saveListaEspera(getListaEspera().filter(x=>x.id!==id));
+  rListaEspera();
+  showToast('Eliminado de la lista ✓');
+}
+
+function rListaEspera(){
+  const el = document.getElementById('listaEsperaList');
+  if(!el) return;
+  const lista = getListaEspera();
+  if(!lista.length){
+    el.innerHTML = `<div class="card">${emp('⏳','Sin clientes en espera')}</div>`;
+    return;
+  }
+  el.innerHTML = lista.map((c,i)=>`
+    <div class="card" style="margin-bottom:10px;border-left:3px solid ${c.avisado?'var(--ok)':'var(--wrn)'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:.75rem;color:var(--mut);font-weight:600">#${i+1}</span>
+            <span style="font-weight:600">${c.nombre}</span>
+            ${c.avisado?'<span class="bx bgr">✓ Avisado</span>':'<span class="bx byw">Esperando</span>'}
+          </div>
+          <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">
+            ${c.servicio?`✂ ${c.servicio} · `:''}📅 Desde ${fD(c.fecha)}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          ${c.tel&&!c.avisado?`<button class="btn bg bsm" onclick="avisarEspera('${c.id}')">📲 Avisar</button>`:''}
+          ${c.tel&&c.avisado?`<button class="btn bs bsm" onclick="avisarEspera('${c.id}')">📲 Re-avisar</button>`:''}
+          <button class="btn bd bsm" onclick="eliminarEspera('${c.id}')">✕</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ═══ PRESUPUESTO PDF ═══
+function generarPresupuestoPDF(id){
+  const r = S.reparaciones.find(x=>x.id===id);
+  if(!r) return;
+  const neg = currentTenant?.nombre||'Mi Negocio';
+  const fecha = new Date().toLocaleDateString('es-AR');
+  const nro = 'P-' + String(id).slice(-4);
+  
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body{font-family:Arial,sans-serif;color:#1a1a1a;max-width:600px;margin:0 auto;padding:30px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a1a1a;padding-bottom:16px}
+  .biz-name{font-size:1.6rem;font-weight:800;letter-spacing:2px}
+  .nro{font-size:.8rem;color:#888;margin-top:4px}
+  .titulo{font-size:1.1rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:2px;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;margin:14px 0}
+  td{padding:8px 12px;border:1px solid #ddd;font-size:.85rem}
+  td:first-child{background:#f5f5f5;font-weight:600;width:35%}
+  .total-row td{background:#1a1a1a;color:#fff;font-size:1rem;font-weight:700}
+  .footer{margin-top:24px;font-size:.75rem;color:#888;border-top:1px solid #ddd;padding-top:14px}
+  .aviso{background:#f5f5f5;border-left:3px solid #1a1a1a;padding:10px 14px;margin-top:16px;font-size:.8rem}
+  @media print{body{padding:10px}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <div class="biz-name">${neg}</div>
+    <div class="nro">Presupuesto N° ${nro} · ${fecha}</div>
+  </div>
+</div>
+
+<div class="titulo">Presupuesto de reparación</div>
+
+<table>
+  <tr><td>Cliente</td><td>${r.cliente}</td></tr>
+  <tr><td>Teléfono</td><td>${r.tel||'—'}</td></tr>
+  <tr><td>Equipo</td><td>${r.equipo||'—'}</td></tr>
+  <tr><td>IMEI</td><td>${r.imei||'—'}</td></tr>
+  <tr><td>Falla reportada</td><td>${r.falla||'—'}</td></tr>
+  <tr><td>Fecha ingreso</td><td>${fD(r.fecha)}</td></tr>
+</table>
+
+<table>
+  <tr><td>Servicio / Reparación</td><td>${r.falla||'A determinar'}</td></tr>
+  <tr><td>Costo del repuesto</td><td>${fmt(r.costoRep||0)}</td></tr>
+  <tr><td>Mano de obra</td><td>${fmt((r.presupuesto||0) - (r.costoRep||0))}</td></tr>
+  <tr class="total-row"><td>TOTAL PRESUPUESTADO</td><td>${fmt(r.presupuesto||0)}</td></tr>
+</table>
+
+${r.sena>0?`<p style="font-size:.85rem">✓ Seña recibida: <strong>${fmt(r.sena)}</strong> · Saldo: <strong>${fmt((r.presupuesto||0)-r.sena)}</strong></p>`:''}
+
+<div class="aviso">
+  <strong>Tiempo estimado:</strong> 2 a 3 días hábiles.<br>
+  Este presupuesto tiene validez de 7 días. El equipo será reparado previa aprobación del cliente.
+  ${r.garantiaDias>0?`<br><strong>Garantía:</strong> ${r.garantiaDias} días por la reparación realizada.`:''}
+</div>
+
+<div class="footer">
+  ${neg} · Presupuesto generado el ${fecha}<br>
+  La reparación comienza una vez aprobado este presupuesto.
+</div>
+</body></html>`;
+
+  const ventana = window.open('','_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+  setTimeout(()=>ventana.print(), 500);
+}
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -6672,7 +6845,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
