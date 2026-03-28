@@ -549,6 +549,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas"><span class="nico">📋</span>Fichas</div>
   <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos"><span class="nico">🔒</span>Turnos fijos</div>
   <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera"><span class="nico">⏳</span>Lista de espera</div>
+  <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra"><span class="nico">🎯</span>Objetivos de compra</div>
   <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline"><span class="nico">🔗</span>Turnos online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
   <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
   <div class="ns">Análisis</div>
@@ -629,7 +630,11 @@ textarea{resize:vertical;min-height:70px;}
           </button>
         </div>
       </div>
-      <div class="card"><div class="ch"><h3>🎯 Objetivos de la semana</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
+      <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
+      <div class="card" id="objetivosCompraCard">
+        <div class="ch"><h3>🛒 Objetivos de compra</h3><button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Agregar</button></div>
+        <div id="objetivosCompraList"></div>
+      </div>
       <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card">
@@ -1036,6 +1041,18 @@ textarea{resize:vertical;min-height:70px;}
       <div id="listaEsperaList"></div>
     </div>
 
+    <!-- OBJETIVOS DE COMPRA -->
+    <div class="sec" id="sec-objetivosCompra">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">Objetivos de compra</div>
+          <div class="ps" style="margin-bottom:0">Ahorrá un % de tus ganancias para lo que necesitás</div>
+        </div>
+        <button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Nuevo objetivo</button>
+      </div>
+      <div id="objetivosCompraList"></div>
+    </div>
+
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
       <div class="pt">Gastos</div><div class="ps">Fijos y variables del local</div>
@@ -1399,7 +1416,17 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mb" id="mGasto"><div class="md"><div class="mh"><div class="mt2">Registrar Gasto</div><button class="xbtn" onclick="closeM('mGasto')">✕</button></div>
 <div class="mc"><input type="hidden" id="gId">
 <div class="fr full"><div><label>Concepto</label><input id="gCon" placeholder="Ej: Alquiler, luz..."></div></div>
-<div class="fr"><div><label>Tipo</label><select id="gTip"><option value="fijo">Fijo mensual</option><option value="variable">Variable</option><option value="proveedor">Compra proveedor</option></select></div><div><label>Monto ($)</label><input type="number" id="gMon" placeholder="0"></div></div>
+<div class="fr"><div><label>Tipo</label><select id="gTip">
+  <option value="fijo">🏠 Alquiler</option>
+  <option value="servicios">💡 Servicios (luz, internet, etc.)</option>
+  <option value="personal">👤 Personal / Sueldos</option>
+  <option value="herramientas">🔧 Herramientas</option>
+  <option value="stock">📦 Stock / Mercadería</option>
+  <option value="marketing">📢 Marketing</option>
+  <option value="mejoras">🏗 Mejoras del local</option>
+  <option value="inversion">💰 Inversión propia</option>
+  <option value="variable">📋 Otros gastos</option>
+</select></div><div><label>Monto ($)</label><input type="number" id="gMon" placeholder="0"></div></div>
 <div class="fr"><div><label>Fecha</label><input type="date" id="gFec"></div></div>
 <div class="fr full"><div><label>Notas</label><textarea id="gNot" placeholder="Opcional..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mGasto')">Cancelar</button><button class="btn bg" onclick="saveGasto()">Guardar</button></div></div></div>
@@ -2195,7 +2222,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -2204,7 +2231,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -2956,6 +2983,7 @@ function rDash(){
   updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas();
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
+  setTimeout(rObjetivosCompra, 200);
   setTimeout(rDivision, 150);
   const m=mes();
   const vm=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
@@ -6442,6 +6470,109 @@ ${r.sena>0?`<p style="font-size:.85rem">✓ Seña recibida: <strong>${fmt(r.sena
   setTimeout(()=>ventana.print(), 500);
 }
 
+// ═══ OBJETIVOS DE COMPRA ═══
+const OBJ_COMPRA_KEY = 'objetivosCompra';
+
+function getObjetivosCompra(){
+  const raw = localStorage.getItem(OBJ_COMPRA_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveObjetivosCompra(obj){
+  localStorage.setItem(OBJ_COMPRA_KEY + '_' + (currentTenant?.id||''), JSON.stringify(obj));
+}
+
+function agregarObjetivoCompra(){
+  const nombre = prompt('¿Qué querés comprar? (Ej: Silla nueva, herramienta, vitrina)');
+  if(!nombre) return;
+  const meta = parseFloat(prompt('¿Cuánto cuesta? ($)') || '0');
+  if(!meta) return;
+  const pct = parseFloat(prompt('¿Qué % de cada ingreso apartar? (Ej: 5 para el 5%)') || '5');
+  
+  const objs = getObjetivosCompra();
+  objs.push({
+    id: Date.now().toString(),
+    nombre, meta, pct,
+    ahorrado: 0,
+    fecha: tod()
+  });
+  saveObjetivosCompra(objs);
+  rObjetivosCompra();
+  showToast('Objetivo de compra creado ✓');
+}
+
+function aportarObjetivoCompra(id, monto){
+  const objs = getObjetivosCompra();
+  const obj = objs.find(o=>o.id===id);
+  if(!obj) return;
+  const aporte = parseFloat(prompt(`Aportar a "${obj.nombre}"
+Ahorro actual: ${fmt(obj.ahorrado)}
+
+Monto a aportar ($):`) || '0');
+  if(!aporte) return;
+  obj.ahorrado = Math.min(obj.meta, (obj.ahorrado||0) + aporte);
+  saveObjetivosCompra(objs);
+  rObjetivosCompra();
+  showToast(`Aporte registrado ✓ · ${fmt(obj.ahorrado)} de ${fmt(obj.meta)}`);
+}
+
+function eliminarObjetivoCompra(id){
+  if(!confirm('¿Eliminar este objetivo?')) return;
+  saveObjetivosCompra(getObjetivosCompra().filter(o=>o.id!==id));
+  rObjetivosCompra();
+}
+
+function autoAportarDesdeIngreso(monto){
+  // Called when registering a sale or repair
+  const objs = getObjetivosCompra();
+  if(!objs.length) return;
+  objs.forEach(obj=>{
+    const aporte = Math.round(monto * (obj.pct||5) / 100);
+    obj.ahorrado = Math.min(obj.meta, (obj.ahorrado||0) + aporte);
+  });
+  saveObjetivosCompra(objs);
+  rObjetivosCompra();
+}
+
+function rObjetivosCompra(){
+  const el = document.getElementById('objetivosCompraList');
+  if(!el) return;
+  const objs = getObjetivosCompra();
+  
+  if(!objs.length){
+    el.innerHTML = '<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Agregá un objetivo para guardar parte de tus ganancias hacia una compra importante</div>';
+    return;
+  }
+  
+  el.innerHTML = objs.map(obj=>{
+    const ahorrado = obj.ahorrado || 0;
+    const pct = Math.min(100, Math.round(ahorrado/obj.meta*100));
+    const falta = Math.max(0, obj.meta - ahorrado);
+    const completo = pct >= 100;
+    return `<div style="padding:12px 0;border-bottom:1px solid var(--bor)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-weight:600;font-size:.88rem">${obj.nombre} ${completo?'✅':''}</div>
+          <div style="font-size:.72rem;color:var(--mut);margin-top:2px">${obj.pct}% de cada ingreso · Meta: ${fmt(obj.meta)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--fh);font-size:1rem;font-weight:700;color:${completo?'var(--ok)':'var(--gld)'}">${fmt(ahorrado)}</div>
+          ${!completo?`<div style="font-size:.7rem;color:var(--mut)">Falta ${fmt(falta)}</div>`:''}
+        </div>
+      </div>
+      <div style="background:var(--bg);border-radius:6px;height:10px;overflow:hidden;margin-bottom:8px">
+        <div style="width:${pct}%;height:100%;background:${completo?'var(--ok)':'linear-gradient(90deg,var(--gld),var(--gll))'};border-radius:6px;transition:width .6s"></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${!completo?`<button class="btn bg bsm" onclick="aportarObjetivoCompra('${obj.id}')">+ Aportar</button>`:'<span class="bx bgr" style="padding:5px 10px">🎉 ¡Listo para comprar!</span>'}
+        <button class="btn bd bsm" onclick="eliminarObjetivoCompra('${obj.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══ OBJETIVOS DE COMPRA ═══
+
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
@@ -6845,7 +6976,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
   }catch(e){}
 }
