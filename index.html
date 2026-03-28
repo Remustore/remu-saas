@@ -665,6 +665,23 @@ textarea{resize:vertical;min-height:70px;}
       <div class="card"><div class="ch"><h3>Consejos para tu negocio</h3></div><div id="cons"></div></div>
       <div id="dStats" class="g4" style="margin-top:14px"></div>
       
+      <!-- DIVISION DE INGRESOS -->
+      <div class="card" id="divisionCard" style="margin-top:14px;display:none">
+        <div class="ch"><h3>💰 División de ingresos del mes</h3><button class="btn bgh bsm" onclick="verConfigDivision()">⚙ Configurar %</button></div>
+        <div id="divisionGrid"></div>
+      </div>
+
+      <!-- PANEL DINERO 50/30/20 -->
+      <div id="panelDinero" style="display:none;margin-top:14px">
+        <div class="card" style="border-left:3px solid var(--gld)">
+          <div class="ch">
+            <h3>💰 Distribución del dinero</h3>
+            <span style="font-size:.72rem;color:var(--mut)">Este mes</span>
+          </div>
+          <div id="panelDineroContent"></div>
+        </div>
+      </div>
+
       <!-- GRAFICOS -->
       <div class="g2" style="margin-top:14px">
         <div class="card">
@@ -1184,7 +1201,8 @@ textarea{resize:vertical;min-height:70px;}
   <div style="font-weight:600;color:var(--gld);margin-bottom:8px" id="guiaTitulo"></div>
   <ol style="margin:0;padding-left:18px" id="guiaPasos"></ol>
 </div>
-<div class="fr"><div><label>Presupuesto cobrado al cliente ($)</label><input type="number" id="tPre" placeholder="0" oninput="calcGanTaller()"></div><div><label>Estado</label><select id="tEst"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
+<div class="fr"><div><label>💵 Seña recibida ($)</label><input type="number" id="tSena" placeholder="0" oninput="calcGanTaller()"></div><div><label>Presupuesto cobrado ($)</label><input type="number" id="tPre" placeholder="0" oninput="calcGanTaller()"></div></div>
+<div class="fr"><div><label>Estado</label><select id="tEst"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
 <div id="tGanBox">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
     <span style="font-size:.72rem;color:var(--tx2)">Ganancia neta</span>
@@ -2186,7 +2204,8 @@ function openM(id, editId){
 function fillModalEdit(modal, id){
   if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';
+    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
     if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
     if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
@@ -2538,19 +2557,37 @@ document.addEventListener('change', function(e){
 });
 
 function calcGanTaller(){
-  const pre=parseFloat(document.getElementById('tPre').value)||0;
-  const rep=parseFloat(document.getElementById('tCosRep').value)||0;
-  const flete=parseFloat(document.getElementById('tFlete').value)||0;
-  const box=document.getElementById('tGanBox');
-  if(pre<=0){box.style.display='none';return;}
-  box.style.display='block';
-  const gan=pre-rep-flete; const pct=pre>0?Math.round(gan/pre*100):0;
-  document.getElementById('tGanVal').textContent=fmt(gan);
-  document.getElementById('tGanPct').textContent=pct+'%';
-  const alert=document.getElementById('tGanAlert');
-  if(pct>=50){box.style.borderColor='var(--ok)';document.getElementById('tGanVal').style.color='var(--ok)';alert.textContent='✓ Buena ganancia';alert.style.background='rgba(74,222,128,.15)';alert.style.color='var(--ok)';}
-  else if(pct>=30){box.style.borderColor='var(--wrn)';document.getElementById('tGanVal').style.color='var(--wrn)';alert.textContent='⚠ Margen ajustado';alert.style.background='rgba(250,204,21,.15)';alert.style.color='var(--wrn)';}
-  else{box.style.borderColor='var(--bad)';document.getElementById('tGanVal').style.color='var(--bad)';alert.textContent='✕ Ganancia baja';alert.style.background='rgba(248,113,113,.15)';alert.style.color='var(--bad)';}
+  const pre = parseFloat(document.getElementById('tPre')?.value||0);
+  const cosRep = parseFloat(document.getElementById('tCosRep')?.value||0);
+  const flete = parseFloat(document.getElementById('tFlete')?.value||0);
+  const sena = parseFloat(document.getElementById('tSena')?.value||0);
+  const gan = pre - cosRep - flete;
+  const pct = pre > 0 ? Math.round(gan/pre*100) : 0;
+  const saldo = pre - sena;
+  
+  const ganVal = document.getElementById('tGanVal');
+  const ganPct = document.getElementById('tGanPct');
+  const ganBox = document.getElementById('tGanBox');
+  const ganAlert = document.getElementById('tGanAlert');
+  const saldoBox = document.getElementById('tSaldoBox');
+  
+  if(saldoBox) saldoBox.textContent = saldo > 0 ? 'Falta: ' + fmt(saldo) : saldo === 0 ? '✓ Pagado' : 'Exceso: ' + fmt(Math.abs(saldo));
+  if(saldoBox) saldoBox.style.color = saldo <= 0 ? 'var(--ok)' : 'var(--wrn)';
+  
+  if(pre > 0){
+    if(ganBox) ganBox.style.display='block';
+    if(ganVal) ganVal.textContent = fmt(gan);
+    if(ganVal) ganVal.style.color = gan>=0?'var(--ok)':'var(--bad)';
+    if(ganPct) ganPct.textContent = pct+'%';
+    if(ganPct) ganPct.style.color = pct>=50?'var(--ok)':pct>=30?'var(--wrn)':'var(--bad)';
+    if(ganAlert){
+      ganAlert.textContent = pct>=50?'✓ Buen margen':pct>=30?'⚠ Margen regular':'✕ Margen bajo';
+      ganAlert.style.background = pct>=50?'rgba(76,175,125,.15)':pct>=30?'rgba(201,148,76,.15)':'rgba(201,82,76,.15)';
+      ganAlert.style.color = pct>=50?'var(--ok)':pct>=30?'var(--wrn)':'var(--bad)';
+    }
+  } else {
+    if(ganBox) ganBox.style.display='none';
+  }
 }
 
 async function saveTaller(){
@@ -2568,6 +2605,8 @@ async function saveTaller(){
     tipoPass:document.getElementById('tTipoPass')?.value||'',
     equipo:document.getElementById('tEq').value,
     imei:document.getElementById('tIme').value,
+    sena:parseFloat(document.getElementById('tSena')?.value||0),
+    sena:parseFloat(document.getElementById('tSena')?.value)||0,
     password:document.getElementById('tPass')?.value||'',
     tipoPass:document.getElementById('tTipoPass')?.value||'',
     falla:document.getElementById('tFal').value,
@@ -2776,6 +2815,7 @@ async function delGasto(id){
 }
 
 function rGastos(){
+  rGastosCoverage();
   const m=mes();const gm=S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
   const tM=gm.reduce((a,g)=>a+g.monto,0);const tF=S.gastos.filter(g=>g.tipo==='fijo').reduce((a,g)=>a+g.monto,0);
   const tV=gm.filter(g=>g.tipo==='variable').reduce((a,g)=>a+g.monto,0);
@@ -2882,6 +2922,8 @@ async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').
 function rDash(){
   updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas();
   setTimeout(rGraficos, 100);
+  setTimeout(rPanelDinero, 150);
+  setTimeout(rDivision, 150);
   const m=mes();
   const vm=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
@@ -3026,7 +3068,7 @@ let invActivo = null;
 function rInversores(){
   const grid=document.getElementById('invCards');
   if(!S.inversores||!S.inversores.length){grid.innerHTML=`<div style="grid-column:1/-1">${emp('💼','No hay inversores registrados.')}</div>`;return;}
-  grid.innerHTML=S.inversores.map(inv=>{const movs=(S.movimientos_inv||[]).filter(m=>m.invId===inv.id);const capitalActual=calcCapital(inv,movs);const ganMes=calcGanMes(inv,movs);const comMes=Math.round(ganMes*(inv.pct||10)/100);return`<div class="stat" style="cursor:pointer;border-color:${invActivo===inv.id?'var(--gld)':'var(--bor)'}" onclick="abrirDetalle(${inv.id})"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><div style="font-family:var(--fh);font-size:1rem;font-weight:700;color:var(--gld)">${inv.nombre}</div><div style="font-size:.68rem;color:var(--mut);margin-top:2px">Desde ${fD(inv.fecha)}</div></div><span class="bx ${inv.modalidad==='reinvertir'?'bbl':'bgr'}">${inv.modalidad==='reinvertir'?'↩ Reinvierte':'💸 Cobra'}</span></div><div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px">Capital actual</div><div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--tx)">${fmt(capitalActual)}</div><div style="margin-top:8px;display:flex;justify-content:space-between;font-size:.75rem"><span style="color:var(--tx2)">Comisión este mes</span><span style="color:var(--ok);font-weight:600">${fmt(comMes)}</span></div><div style="margin-top:10px"><button class="btn bg bsm" style="width:100%" onclick="event.stopPropagation();abrirDetalle(${inv.id})">Ver detalle →</button></div></div>`;}).join('');
+  grid.innerHTML=S.inversores.map(inv=>{const movs=(S.movimientos_inv||[]).filter(m=>m.invId===inv.id);const capitalActual=calcCapital(inv,movs);const ganMes=calcGanMes(inv,movs);const comMes=Math.round(ganMes*(inv.pct||10)/100);return`<div class="stat" style="cursor:pointer;border-color:${invActivo===inv.id?'var(--gld)':'var(--bor)'}" onclick="abrirDetalle(${inv.id})"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px"><div><div style="font-family:var(--fh);font-size:1rem;font-weight:700;color:var(--gld)">${inv.nombre}</div><div style="font-size:.68rem;color:var(--mut);margin-top:2px">Desde ${fD(inv.fecha)}</div></div><span class="bx ${inv.modalidad==='reinvertir'?'bbl':'bgr'}">${inv.modalidad==='reinvertir'?'↩ Reinvierte':'💸 Cobra'}</span></div><div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px">Capital actual</div><div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--tx)">${fmt(capitalActual)}</div><div style="margin-top:8px;display:flex;justify-content:space-between;font-size:.75rem"><span style="color:var(--tx2)">Comisión este mes</span><span style="color:var(--ok);font-weight:600">${fmt(comMes)}</span></div><div style="margin-top:10px"><button class="btn bg bsm" style="width:100%" onclick="event.stopPropagation();abrirDetalle(${inv.id})">Ver detalle →</button><button class="btn bd bsm" style="width:100%;margin-top:6px" onclick="event.stopPropagation();delInversor(${inv.id})">🗑 Eliminar</button></div></div>`;}).join('');
 }
 function calcCapital(inv,movs){let cap=inv.capital||0;movs.forEach(m=>{if(m.tipo==='ampliacion')cap+=m.monto||0;if(m.tipo==='retiro_capital')cap-=m.monto||0;if(m.tipo==='reinversion')cap+=m.monto||0;});return cap;}
 function calcGanMes(inv,movs){const m=mes();let ingresos=0,costos=0;movs.filter(mv=>mv.fecha&&mv.fecha.startsWith(m)).forEach(mv=>{if(mv.tipo==='ingreso_venta'||mv.tipo==='ingreso_servicio')ingresos+=mv.monto||0;if(mv.tipo==='gasto')costos+=mv.monto||0;ingresos-=mv.costo||0;});return Math.max(0,ingresos-costos);}
@@ -3086,7 +3128,8 @@ function fillEdit(modal,id){
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';return;}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';['eId','eTipo','eMod','eMem','eCol','eIme','eBat','eFis','ePre','eCos','eNot'].forEach(k=>{const el=document.getElementById(k);if(el)el.value=({eId:e.id,eTipo:e.tipo,eMod:e.modelo,eMem:e.memoria,eCol:e.color,eIme:e.imei,eBat:e.bateria,eFis:e.estadoFisico,ePre:e.precio,eCos:e.costo,eNot:e.notas})[k]||'';});return;}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';
+    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
     if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
     if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
@@ -5783,6 +5826,245 @@ function rTurnosFijos(){
   // Regenerate upcoming turnos from active fijos on each render
   const activosFijos = fijos.filter(f=>f.activo);
   if(activosFijos.length) generarTurnosDesdeFijos(activosFijos);
+}
+
+// ═══ SISTEMA FINANCIERO 50/30/20 ═══
+const DIVISION_KEY = 'divisionConfig';
+
+function getDivisionConfig(){
+  const raw = localStorage.getItem(DIVISION_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : {gastos:50, reinversion:30, ganancia:20};
+}
+
+function saveDivisionConfig(cfg){
+  localStorage.setItem(DIVISION_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+}
+
+function verConfigDivision(){
+  const cfg = getDivisionConfig();
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:400px">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--bor)">
+      <div style="font-family:var(--fh);font-size:1rem;font-weight:700">⚙ División de ingresos</div>
+      <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">Los porcentajes deben sumar 100%</div>
+    </div>
+    <div style="padding:16px 20px">
+      <label>🧾 % para Gastos fijos</label>
+      <input type="number" id="divGastos" value="${cfg.gastos}" min="0" max="100" style="margin-bottom:10px">
+      <label>📦 % para Reinversión (stock/herramientas)</label>
+      <input type="number" id="divReinversion" value="${cfg.reinversion}" min="0" max="100" style="margin-bottom:10px">
+      <label>👤 % Ganancia personal</label>
+      <input type="number" id="divGanancia" value="${cfg.ganancia}" min="0" max="100">
+      <div id="divTotal" style="margin-top:10px;font-size:.82rem;font-weight:600"></div>
+    </div>
+    <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="btn bg" onclick="guardarDivision()">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  // Live total
+  ['divGastos','divReinversion','divGanancia'].forEach(id=>{
+    document.getElementById(id)?.addEventListener('input', ()=>{
+      const t = (parseFloat(document.getElementById('divGastos')?.value)||0) +
+                (parseFloat(document.getElementById('divReinversion')?.value)||0) +
+                (parseFloat(document.getElementById('divGanancia')?.value)||0);
+      const el = document.getElementById('divTotal');
+      if(el) el.innerHTML = `Total: <span style="color:${t===100?'var(--ok)':'var(--bad)'};font-weight:700">${t}%</span> ${t===100?'✓':'(debe ser 100%)'}`;
+    });
+  });
+}
+
+function guardarDivision(){
+  const g = parseFloat(document.getElementById('divGastos')?.value)||0;
+  const r = parseFloat(document.getElementById('divReinversion')?.value)||0;
+  const p = parseFloat(document.getElementById('divGanancia')?.value)||0;
+  if(Math.abs(g+r+p-100)>0.1) return alert('Los porcentajes deben sumar 100%');
+  saveDivisionConfig({gastos:g, reinversion:r, ganancia:p});
+  document.querySelector('[style*=fixed]')?.remove();
+  rDivision();
+  showToast('División guardada ✓');
+}
+
+function rDivision(){
+  const card = document.getElementById('divisionCard');
+  if(!card) return;
+  
+  // Only show for Remu (not salon/barberia)
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esRemu = rubro.includes('telefon')||rubro.includes('tecnico')||rubro.includes('técnico')||rubro.includes('remu')||(!rubro.includes('salon')&&!rubro.includes('barberia')&&!rubro.includes('belleza'));
+  
+  if(!esRemu){ card.style.display='none'; return; }
+  card.style.display='block';
+
+  const cfg = getDivisionConfig();
+  const m = mes();
+  const ventasMes = S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m)).reduce((a,v)=>a+v.total,0);
+  const repsMes = S.reparaciones.filter(r=>r.fecha&&r.fecha.startsWith(m)&&r.estado==='entregado').reduce((a,r)=>a+(r.presupuesto||0),0);
+  const totalMes = ventasMes + repsMes;
+
+  const paraGastos = Math.round(totalMes * cfg.gastos/100);
+  const paraReinversion = Math.round(totalMes * cfg.reinversion/100);
+  const paraGanancia = Math.round(totalMes * cfg.ganancia/100);
+
+  // Total gastos del mes
+  const gastosMes = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m)).reduce((a,g)=>a+g.monto,0);
+  const faltaGastos = Math.max(0, gastosMes - paraGastos);
+  const sobra = Math.max(0, paraGastos - gastosMes);
+
+  const grid = document.getElementById('divisionGrid');
+  if(!grid) return;
+
+  grid.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+      <div style="text-align:center;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--bad)">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">🧾 Gastos (${cfg.gastos}%)</div>
+        <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;color:var(--bad);margin:4px 0">${fmt(paraGastos)}</div>
+        <div style="font-size:.68rem;color:var(--mut)">Gastado: ${fmt(gastosMes)}</div>
+      </div>
+      <div style="text-align:center;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--inf)">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">📦 Reinversión (${cfg.reinversion}%)</div>
+        <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;color:var(--inf);margin:4px 0">${fmt(paraReinversion)}</div>
+        <div style="font-size:.68rem;color:var(--mut)">Para stock/herramientas</div>
+      </div>
+      <div style="text-align:center;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--ok)">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">👤 Ganancia (${cfg.ganancia}%)</div>
+        <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;color:var(--ok);margin:4px 0">${fmt(paraGanancia)}</div>
+        <div style="font-size:.68rem;color:var(--mut)">Podés retirar</div>
+      </div>
+    </div>
+    <div style="padding:10px 12px;border-radius:8px;background:${faltaGastos>0?'rgba(201,82,76,.1)':'rgba(76,175,125,.1)'};border:1px solid ${faltaGastos>0?'var(--bad)':'var(--ok)'}">
+      <div style="font-size:.82rem;font-weight:600;color:${faltaGastos>0?'var(--bad)':'var(--ok)'}">
+        ${faltaGastos>0 
+          ? `⚠️ Te faltan ${fmt(faltaGastos)} para cubrir los gastos del mes`
+          : `✅ Gastos cubiertos — te sobran ${fmt(sobra)}`}
+      </div>
+      <div style="font-size:.72rem;color:var(--tx2);margin-top:4px">Total ingresos del mes: ${fmt(totalMes)}</div>
+    </div>`;
+}
+
+function rGastosCoverage(){
+  const el = document.getElementById('gastosCoverage');
+  if(!el) return;
+  
+  const m = mes();
+  const gastosMes = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m)).reduce((a,g)=>a+g.monto,0);
+  const ventasMes = S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m)).reduce((a,v)=>a+v.total,0);
+  const repsMes = S.reparaciones.filter(r=>r.fecha&&r.fecha.startsWith(m)&&r.estado==='entregado').reduce((a,r)=>a+(r.presupuesto||0),0);
+  const cfg = getDivisionConfig();
+  const totalMes = ventasMes + repsMes;
+  const paraGastos = Math.round(totalMes * cfg.gastos/100);
+  const pct = gastosMes>0 ? Math.min(100,Math.round(paraGastos/gastosMes*100)) : 0;
+  const falta = Math.max(0, gastosMes - paraGastos);
+
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:6px">
+      <span style="color:var(--tx2)">Cubierto con ingresos (${cfg.gastos}%)</span>
+      <span style="font-weight:600;color:${pct>=100?'var(--ok)':'var(--wrn)'}">${fmt(paraGastos)} / ${fmt(gastosMes)}</span>
+    </div>
+    <div style="background:var(--bg);border-radius:6px;height:12px;overflow:hidden;margin-bottom:8px">
+      <div style="width:${pct}%;height:100%;background:${pct>=100?'var(--ok)':'var(--wrn)'};border-radius:6px;transition:width .6s"></div>
+    </div>
+    <div style="font-size:.78rem;font-weight:600;color:${falta>0?'var(--bad)':'var(--ok)'}">
+      ${falta>0 ? `⚠️ Faltan ${fmt(falta)} para cubrir los gastos del mes` : `✅ Gastos del mes cubiertos`}
+    </div>`;
+}
+
+async function delInversor(id){
+  if(!confirm('¿Eliminar esta inversión?')) return;
+  const snap = JSON.parse(JSON.stringify(S.inversores));
+  S.inversores = S.inversores.filter(i=>i.id!==id);
+  await dbDelete('inversores', id);
+  pushUndo('Eliminar inversión','inversores',snap);
+  rInversores();
+  showToast('Inversión eliminada ✓');
+}
+
+function rPanelDinero(){
+  const panel = document.getElementById('panelDinero');
+  if(!panel) return;
+  
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esTelefonia = rubro.includes('telefon')||rubro.includes('tecnico')||rubro.includes('técnico')||rubro.includes('remu');
+  
+  if(!esTelefonia){ panel.style.display='none'; return; }
+  panel.style.display='block';
+  
+  const m = mes();
+  const ventas = S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
+  const reps = S.reparaciones.filter(r=>r.estado==='entregado'&&r.fecha&&r.fecha.startsWith(m));
+  const gastos = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
+  
+  const totalVentas = ventas.reduce((a,v)=>a+v.total,0);
+  const totalReps = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const totalIngresos = totalVentas + totalReps;
+  
+  const totalGastos = gastos.reduce((a,g)=>a+g.monto,0);
+  
+  // 50/30/20 split
+  const paraGastos = Math.round(totalIngresos * 0.50);
+  const paraReinversion = Math.round(totalIngresos * 0.30);
+  const gananciaPersonal = Math.round(totalIngresos * 0.20);
+  
+  // Gastos fijos del mes (configurados)
+  const gastosFijosTotal = (S.gastosFijos||[]).reduce((a,g)=>a+g.monto,0);
+  const faltaParaGastos = Math.max(0, gastosFijosTotal - paraGastos);
+  const gastosCubiertos = Math.min(paraGastos, gastosFijosTotal);
+  const pctGastos = gastosFijosTotal > 0 ? Math.min(100, Math.round(gastosCubiertos/gastosFijosTotal*100)) : 100;
+  
+  const el = document.getElementById('panelDineroContent');
+  if(!el) return;
+  
+  el.innerHTML = `
+    <div class="g2" style="margin-bottom:14px">
+      <div style="text-align:center;padding:12px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px">Total ingresos mes</div>
+        <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--gld)">${fmt(totalIngresos)}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${ventas.length} ventas · ${reps.length} reparaciones</div>
+      </div>
+      <div style="text-align:center;padding:12px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px">Gastos reales mes</div>
+        <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--bad)">${fmt(totalGastos)}</div>
+      </div>
+    </div>
+    
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px">
+        <span>🧾 Gastos fijos <span style="color:var(--mut)">(50%)</span></span>
+        <span style="color:${pctGastos>=100?'var(--ok)':'var(--wrn)'};font-weight:600">${fmt(paraGastos)} ${faltaParaGastos>0?'· faltan '+fmt(faltaParaGastos):' ✓'}</span>
+      </div>
+      <div style="background:var(--bg);border-radius:4px;height:10px;overflow:hidden">
+        <div style="width:${pctGastos}%;height:100%;background:${pctGastos>=100?'var(--ok)':'var(--wrn)'};border-radius:4px;transition:width .6s"></div>
+      </div>
+      ${faltaParaGastos>0?`<div style="font-size:.7rem;color:var(--bad);margin-top:3px">⚠ Te faltan ${fmt(faltaParaGastos)} para cubrir los gastos fijos</div>`:'<div style="font-size:.7rem;color:var(--ok);margin-top:3px">✓ Gastos cubiertos</div>'}
+    </div>
+    
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px">
+        <span>📦 Reinversión stock/herramientas <span style="color:var(--mut)">(30%)</span></span>
+        <span style="color:var(--inf);font-weight:600">${fmt(paraReinversion)}</span>
+      </div>
+      <div style="background:var(--bg);border-radius:4px;height:10px;overflow:hidden">
+        <div style="width:30%;height:100%;background:var(--inf);border-radius:4px"></div>
+      </div>
+    </div>
+    
+    <div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:4px">
+        <span>👤 Ganancia personal <span style="color:var(--mut)">(20%)</span></span>
+        <span style="color:var(--ok);font-weight:600">${fmt(gananciaPersonal)}</span>
+      </div>
+      <div style="background:var(--bg);border-radius:4px;height:10px;overflow:hidden">
+        <div style="width:20%;height:100%;background:var(--ok);border-radius:4px"></div>
+      </div>
+    </div>
+    
+    <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:.78rem;color:var(--tx2);border-top:1px solid var(--bor)">
+      💡 <strong style="color:var(--tx)">Regla del negocio:</strong> Cada peso que entra se divide automáticamente. Primero cubrís gastos, después reinvertís, y lo que queda es tuyo.
+    </div>
+  `;
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
