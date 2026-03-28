@@ -628,7 +628,7 @@ textarea{resize:vertical;min-height:70px;}
           </button>
         </div>
       </div>
-      <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
+      <div class="card"><div class="ch"><h3>🎯 Objetivos de la semana</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
       <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card">
@@ -1035,7 +1035,8 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn bgh bsm" onclick="exportarExcel()">📊 Excel</button>
-          <button class="btn bgh bsm" onclick="exportarPDF()">📄 PDF</button>
+          <button class="btn bgh bsm" onclick="exportarPDF()">📄 PDF datos</button>
+          <button class="btn bg bsm" onclick="generarResumenMesPDF()">📋 Resumen del mes</button>
         </div>
       </div>
       <div class="card" style="margin-bottom:14px">
@@ -1202,7 +1203,7 @@ textarea{resize:vertical;min-height:70px;}
   <ol style="margin:0;padding-left:18px" id="guiaPasos"></ol>
 </div>
 <div class="fr"><div><label>💵 Seña recibida ($)</label><input type="number" id="tSena" placeholder="0" oninput="calcGanTaller()"></div><div><label>Presupuesto cobrado ($)</label><input type="number" id="tPre" placeholder="0" oninput="calcGanTaller()"></div></div>
-<div class="fr"><div><label>Estado</label><select id="tEst"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
+<div class="fr"><div><label>Estado</label><select id="tEst" onchange="updateGarantiaVence()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
 <div id="tGanBox">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
     <span style="font-size:.72rem;color:var(--tx2)">Ganancia neta</span>
@@ -1243,6 +1244,14 @@ textarea{resize:vertical;min-height:70px;}
   </div>
 </div>
 <div class="fr full"><div><label>Diagnóstico / Qué se reparó</label><textarea id="tDiagnostico" placeholder="Describí qué se hizo, qué repuestos se usaron..."></textarea></div></div>
+<div class="fr"><div><label>🛡 Garantía (días)</label><select id="tGarantia" onchange="updateGarantiaVence()">
+  <option value="0">Sin garantía</option>
+  <option value="30" selected>30 días</option>
+  <option value="60">60 días</option>
+  <option value="90">90 días</option>
+  <option value="180">6 meses</option>
+  <option value="365">1 año</option>
+</select></div><div><label>Vence el</label><div id="tGarantiaVence" style="padding:9px 12px;background:var(--bg);border:1px solid var(--bor2);border-radius:7px;font-size:.82rem;color:var(--tx2)">—</div></div></div>
 <div class="fr full"><div><label>Notas internas</label><textarea id="tNot" placeholder="Notas internas..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mTaller')">Cancelar</button><button class="btn bg" onclick="saveTaller()">Guardar</button></div></div></div>
 
@@ -2205,7 +2214,11 @@ function fillModalEdit(modal, id){
   if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
   if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';
-    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
+    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
+    updateGarantiaVence();if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
+    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
+    updateGarantiaVence();document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
     if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
     if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
@@ -2613,6 +2626,7 @@ async function saveTaller(){
     presupuesto:pre,costoRep,flete,ganancia,margen,
     estado:document.getElementById('tEst').value,
     notas:document.getElementById('tNot').value,
+    garantiaDias:parseInt(document.getElementById('tGarantia')?.value||30),
     diagnostico:document.getElementById('tDiagnostico')?.value||'',
     golpes:document.getElementById('tGolpes')?.value||'',
     humedad:document.getElementById('tHumedad')?.value||'',
@@ -2949,6 +2963,18 @@ function rDash(){
   const totalBajo=S.stock.filter(s=>s.cantidad<=s.minimo).length;
   if(totalBajo>5)als.push({t:'w',m:`...y ${totalBajo-5} productos más con stock bajo`});
   S.reparaciones.filter(r=>r.estado==='listo').forEach(r=>als.push({t:'o',m:`<strong>${r.cliente}</strong> — trabajo listo para entregar`}));
+  // Garantías por vencer
+  const hoyG = tod();
+  S.reparaciones.filter(r=>{
+    if(!r.garantiaDias||r.estado!=='entregado'||!r.fechaEntrega) return false;
+    const vence = new Date(r.fechaEntrega); vence.setDate(vence.getDate()+r.garantiaDias);
+    const diasRestantes = Math.floor((vence-new Date())/86400000);
+    return diasRestantes >= 0 && diasRestantes <= 7;
+  }).forEach(r=>{
+    const vence = new Date(r.fechaEntrega); vence.setDate(vence.getDate()+r.garantiaDias);
+    const dias = Math.floor((vence-new Date())/86400000);
+    als.push({t:'w',m:`🛡 Garantía de <strong>${r.cliente}</strong> (${r.equipo}) vence en ${dias} día${dias!==1?'s':''}`});
+  });
   if(gan<0)als.push({t:'b',m:`Los gastos superan las ventas en <strong>${fmt(Math.abs(gan))}</strong>`});
   if(meta>0&&pct>=100)als.push({t:'o',m:`¡Meta de ${fmt(meta)} alcanzada! 🎉`});
   document.getElementById('alerts').innerHTML=als.length?als.map(a=>`<div class="al ${a.t==='w'?'aw':a.t==='o'?'ao':'ab'}"><span>${a.t==='w'?'⚠':a.t==='o'?'✓':'✕'}</span><span>${a.m}</span></div>`).join(''):`<div class="al ai"><span>✓</span><span>Sin alertas. Todo en orden.</span></div>`;
@@ -3129,7 +3155,11 @@ function fillEdit(modal,id){
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';['eId','eTipo','eMod','eMem','eCol','eIme','eBat','eFis','ePre','eCos','eNot'].forEach(k=>{const el=document.getElementById(k);if(el)el.value=({eId:e.id,eTipo:e.tipo,eMod:e.modelo,eMem:e.memoria,eCol:e.color,eIme:e.imei,eBat:e.bateria,eFis:e.estadoFisico,ePre:e.precio,eCos:e.costo,eNot:e.notas})[k]||'';});return;}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
   if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';
-    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
+    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
+    updateGarantiaVence();if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
+    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
+    updateGarantiaVence();document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
     if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
     if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
@@ -3170,11 +3200,19 @@ async function saveMovCaja(){
 // ═══ OBJETIVOS ═══
 function rObjetivos(){
   const obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
-  const hoy = tod();
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq');
   const esBarberia = rubro.includes('barberia')||rubro.includes('barbería');
   const esDeco = rubro.includes('deco')||rubro.includes('perfum');
+  
+  // Semana actual (lunes a domingo)
+  const hoy = new Date();
+  const diaSem = hoy.getDay();
+  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - (diaSem===0?6:diaSem-1));
+  const domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
+  const desdeStr = lunes.toISOString().slice(0,10);
+  const hastaStr = domingo.toISOString().slice(0,10);
+  const periodoLabel = fD(desdeStr) + ' → ' + fD(hastaStr);
 
   function bloque(emoji,titulo,actual,meta,monto,metaMonto){
     const pct=meta>0?Math.min(100,Math.round(actual/meta*100)):0;
@@ -3184,27 +3222,28 @@ function rObjetivos(){
 
   if(esSalon || esBarberia){
     // Turnos del día como objetivo principal
-    const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado!=='cancelado').length : 0;
-    const turnosTerminados = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').length : 0;
-    const facturadoTurnos = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
-    const ventasHoy = S.ventas.filter(v=>v.fecha===hoy).reduce((a,v)=>a+v.total,0);
-    const metaTurnos = obj.repCant||10;
-    const metaMontoTurnos = (obj.repCant||10)*(obj.repPre||5000);
+    const turnosSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado!=='cancelado').length : 0;
+    const turnosTermSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado==='terminado').length : 0;
+    const facturadoSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
+    const ventasSem = S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr).reduce((a,v)=>a+v.total,0);
+    const metaTurnos = obj.repCant||20;
+    const metaMontoTurnos = (obj.repCant||20)*(obj.repPre||5000);
     document.getElementById('objHoy').innerHTML =
-      bloque('📅','Turnos agendados',turnosHoy,metaTurnos,0,0) +
-      bloque('✓','Turnos terminados',turnosTerminados,metaTurnos,facturadoTurnos,metaMontoTurnos) +
-      bloque('💰','Facturado hoy',Math.round(ventasHoy+facturadoTurnos),1,ventasHoy+facturadoTurnos,(obj.accCant||1)*(obj.accPre||10000));
+      `<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 Semana: ${periodoLabel}</div>` +
+      bloque('📅','Turnos agendados',turnosSem,metaTurnos,0,0) +
+      bloque('✓','Turnos terminados',turnosTermSem,metaTurnos,facturadoSem,metaMontoTurnos) +
+      bloque('💰','Facturado semana',Math.round(ventasSem+facturadoSem),1,ventasSem+facturadoSem,(obj.accCant||1)*(obj.accPre||10000));
   } else {
     // Remu Store — original
-    const repsHoy=S.reparaciones.filter(r=>r.fecha===hoy&&r.estado!=='recibido').length;
-    const accHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='producto').reduce((a,v)=>a+v.cantidad,0);
-    const eqHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='equipo').length;
-    const ingRepHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
-    const ingAccHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='producto').reduce((a,v)=>a+v.total,0);
-    const ingEqHoy=S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='equipo').reduce((a,v)=>a+(v.comision||0),0);
+    const repsSem=S.reparaciones.filter(r=>r.fecha>=desdeStr&&r.fecha<=hastaStr&&r.estado!=='recibido').length;
+    const accSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='producto').reduce((a,v)=>a+v.cantidad,0);
+    const eqSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='equipo').length;
+    const ingRepSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
+    const ingAccSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='producto').reduce((a,v)=>a+v.total,0);
+    const ingEqSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='equipo').reduce((a,v)=>a+(v.comision||0),0);
     const metaRepMonto=(obj.repCant||7)*(obj.repPre||40000);
     const metaAccMonto=(obj.accCant||10)*(obj.accPre||10000);
-    document.getElementById('objHoy').innerHTML=bloque('🔧','Trabajos',repsHoy,obj.repCant||7,ingRepHoy,metaRepMonto)+bloque('📦','Accesorios',accHoy,obj.accCant||10,ingAccHoy,metaAccMonto)+bloque('📱','Equipos',eqHoy,obj.eqCant||1,ingEqHoy,0);
+    document.getElementById('objHoy').innerHTML=`<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 Semana: ${periodoLabel}</div>`+bloque('🔧','Trabajos',repsSem,obj.repCant||7,ingRepSem,metaRepMonto)+bloque('📦','Accesorios',accSem,obj.accCant||10,ingAccSem,metaAccMonto)+bloque('📱','Equipos',eqSem,obj.eqCant||1,ingEqSem,0);
   }
 }
 
@@ -6065,6 +6104,169 @@ function rPanelDinero(){
       💡 <strong style="color:var(--tx)">Regla del negocio:</strong> Cada peso que entra se divide automáticamente. Primero cubrís gastos, después reinvertís, y lo que queda es tuyo.
     </div>
   `;
+}
+
+// ═══ GARANTÍAS ═══
+function updateGarantiaVence(){
+  const dias = parseInt(document.getElementById('tGarantia')?.value||0);
+  const estado = document.getElementById('tEst')?.value;
+  const el = document.getElementById('tGarantiaVence');
+  if(!el) return;
+  if(dias === 0 || estado !== 'entregado'){ el.textContent = '—'; return; }
+  const vence = new Date();
+  vence.setDate(vence.getDate() + dias);
+  el.textContent = fD(vence.toISOString().slice(0,10));
+  el.style.color = 'var(--ok)';
+}
+
+function rGarantias(){
+  // Show in taller kanban - highlight equipment with active warranties
+  const hoy = tod();
+  const conGarantia = S.reparaciones.filter(r=>{
+    if(!r.garantiaDias || r.garantiaDias === 0) return false;
+    if(r.estado !== 'entregado' || !r.fechaEntrega) return false;
+    const vence = new Date(r.fechaEntrega);
+    vence.setDate(vence.getDate() + r.garantiaDias);
+    return vence.toISOString().slice(0,10) >= hoy;
+  });
+  return conGarantia;
+}
+
+// ═══ COMISIONES AUTOMÁTICAS SALÓN ═══
+function rComisionesMes(){
+  const cfg = getTurnosCfg();
+  const m = mes();
+  const turnos = getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(m)&&t.estado==='terminado') : [];
+  
+  return cfg.empleados.map(emp=>{
+    const tEmp = turnos.filter(t=>t.empleadoId==emp.id);
+    const total = tEmp.reduce((a,t)=>a+(t.precio||0),0);
+    const comision = Math.round(total*(emp.comision||0)/100);
+    return { empleado: emp.nombre, servicios: tEmp.length, total, comision, pct: emp.comision||0 };
+  });
+}
+
+// ═══ ESTADÍSTICAS CLIENTES FRECUENTES ═══
+function getClientesFrecuentes(){
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
+  
+  const stats = {};
+  
+  if(esTurnos && getTurnos){
+    getTurnos().filter(t=>t.estado==='terminado').forEach(t=>{
+      if(!stats[t.cliente]) stats[t.cliente] = {nombre:t.cliente, tel:t.tel||'', visitas:0, gasto:0, ultimaVisita:'', servicios:{}};
+      stats[t.cliente].visitas++;
+      stats[t.cliente].gasto += (t.precio||0);
+      if(t.fecha > stats[t.cliente].ultimaVisita) stats[t.cliente].ultimaVisita = t.fecha;
+      stats[t.cliente].servicios[t.servicioNombre] = (stats[t.cliente].servicios[t.servicioNombre]||0)+1;
+    });
+  }
+  
+  S.reparaciones.forEach(r=>{
+    if(!stats[r.cliente]) stats[r.cliente] = {nombre:r.cliente, tel:r.tel||'', visitas:0, gasto:0, ultimaVisita:'', servicios:{}};
+    stats[r.cliente].visitas++;
+    stats[r.cliente].gasto += (r.presupuesto||0);
+    if(r.fecha > stats[r.cliente].ultimaVisita) stats[r.cliente].ultimaVisita = r.fecha;
+  });
+  
+  return Object.values(stats).sort((a,b)=>b.visitas-a.visitas).slice(0,10);
+}
+
+// ═══ RESUMEN MENSUAL PDF ═══
+function generarResumenMesPDF(){
+  const m = mes();
+  const mNombre = new Date(m+'-01').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  const ventas = S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
+  const gastos = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
+  const reps = S.reparaciones.filter(r=>r.fecha&&r.fecha.startsWith(m));
+  const turnos = getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(m)&&t.estado==='terminado') : [];
+  
+  const tV = ventas.reduce((a,v)=>a+v.total,0);
+  const tG = gastos.reduce((a,g)=>a+g.monto,0);
+  const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const tT = turnos.reduce((a,t)=>a+(t.precio||0),0);
+  const totalIngresos = tV + tR + tT;
+  const ganancia = totalIngresos - tG;
+  
+  const comisiones = rComisionesMes();
+  const clientesFrecuentes = getClientesFrecuentes().slice(0,5);
+  
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esTelefonia = rubro.includes('telefon')||rubro.includes('tecnico');
+  const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
+  
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body{font-family:Arial,sans-serif;color:#1a1a1a;max-width:700px;margin:0 auto;padding:30px;background:#fff}
+  h1{font-size:1.8rem;color:#1a1a1a;border-bottom:3px solid #1a1a1a;padding-bottom:10px;margin-bottom:4px}
+  h2{font-size:1rem;color:#555;font-weight:400;margin-bottom:24px}
+  h3{font-size:1rem;color:#1a1a1a;border-bottom:1px solid #ddd;padding-bottom:6px;margin-top:24px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+  .stat{background:#f5f5f5;border-radius:8px;padding:14px;text-align:center}
+  .stat-label{font-size:.65rem;color:#888;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px}
+  .stat-val{font-size:1.4rem;font-weight:700}
+  .ok{color:#2d9e5f}.bad{color:#c9524c}.gld{color:#b8976a}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{text-align:left;padding:7px 10px;font-size:.72rem;color:#888;text-transform:uppercase;border-bottom:1px solid #ddd}
+  td{padding:8px 10px;font-size:.82rem;border-bottom:1px solid #f0f0f0}
+  .footer{margin-top:30px;padding-top:14px;border-top:1px solid #ddd;font-size:.75rem;color:#888;text-align:center}
+  @media print{body{padding:10px}}
+</style>
+</head>
+<body>
+<h1>${currentTenant?.nombre||'Mi Negocio'}</h1>
+<h2>Resumen mensual — ${mNombre}</h2>
+
+<div class="grid">
+  <div class="stat"><div class="stat-label">Total ingresos</div><div class="stat-val gld">${fmt(totalIngresos)}</div></div>
+  <div class="stat"><div class="stat-label">Total gastos</div><div class="stat-val bad">${fmt(tG)}</div></div>
+  <div class="stat"><div class="stat-label">Ganancia neta</div><div class="stat-val ${ganancia>=0?'ok':'bad'}">${fmt(ganancia)}</div></div>
+  <div class="stat"><div class="stat-label">Margen</div><div class="stat-val ${ganancia>=0?'ok':'bad'}">${totalIngresos>0?Math.round(ganancia/totalIngresos*100):0}%</div></div>
+</div>
+
+${tV>0?`<h3>Ventas de productos</h3>
+<p>${ventas.length} operaciones · Total: <strong>${fmt(tV)}</strong></p>`:''}
+
+${tR>0?`<h3>Reparaciones</h3>
+<p>${reps.length} trabajos · Total: <strong>${fmt(tR)}</strong></p>`:''}
+
+${tT>0?`<h3>Servicios / Turnos</h3>
+<p>${turnos.length} servicios · Total: <strong>${fmt(tT)}</strong></p>`:''}
+
+${gastos.length?`<h3>Gastos del mes</h3>
+<table><thead><tr><th>Concepto</th><th>Monto</th></tr></thead><tbody>
+${gastos.map(g=>`<tr><td>${g.concepto}</td><td><strong>${fmt(g.monto)}</strong></td></tr>`).join('')}
+<tr><td><strong>TOTAL</strong></td><td><strong style="color:#c9524c">${fmt(tG)}</strong></td></tr>
+</tbody></table>`:''}
+
+${comisiones.filter(c=>c.pct>0).length?`<h3>Comisiones empleadas</h3>
+<table><thead><tr><th>Empleada</th><th>Servicios</th><th>Facturado</th><th>Comisión (${comisiones[0]?.pct||0}%)</th></tr></thead><tbody>
+${comisiones.filter(c=>c.pct>0).map(c=>`<tr><td>${c.empleado}</td><td>${c.servicios}</td><td>${fmt(c.total)}</td><td><strong style="color:#2d9e5f">${fmt(c.comision)}</strong></td></tr>`).join('')}
+</tbody></table>`:''}
+
+${clientesFrecuentes.length?`<h3>Clientes más frecuentes</h3>
+<table><thead><tr><th>Cliente</th><th>Visitas</th><th>Total gastado</th></tr></thead><tbody>
+${clientesFrecuentes.map(c=>`<tr><td>${c.nombre}</td><td>${c.visitas}</td><td>${fmt(c.gasto)}</td></tr>`).join('')}
+</tbody></table>`:''}
+
+${esTelefonia?`<h3>Distribución sugerida (50/30/20)</h3>
+<table><thead><tr><th>Destino</th><th>%</th><th>Monto</th></tr></thead><tbody>
+<tr><td>🧾 Gastos fijos</td><td>50%</td><td>${fmt(Math.round(totalIngresos*0.5))}</td></tr>
+<tr><td>📦 Reinversión</td><td>30%</td><td>${fmt(Math.round(totalIngresos*0.3))}</td></tr>
+<tr><td>👤 Ganancia personal</td><td>20%</td><td><strong style="color:#2d9e5f">${fmt(Math.round(totalIngresos*0.2))}</strong></td></tr>
+</tbody></table>`:''}
+
+<div class="footer">Generado el ${new Date().toLocaleDateString('es-AR')} · ${currentTenant?.nombre}</div>
+</body></html>`;
+
+  const ventana = window.open('','_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+  setTimeout(()=>ventana.print(), 500);
 }
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
