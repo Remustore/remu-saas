@@ -558,6 +558,8 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('precios')" id="nav-precios"><span class="nico">◎</span>Lista de precios</div>
   <div class="ns" id="ns-inversores">Finanzas</div>
   <div class="ni" onclick="go('inversores')" id="nav-inversores"><span class="nico">◈</span>Inversores</div>
+  <div class="ni" onclick="go('cuotas')" id="nav-cuotas"><span class="nico">💳</span>Cuotas</div>
+  <div class="ni" onclick="go('metasPareja')" id="nav-metasPareja"><span class="nico">🎯</span>Metas</div>
   <div class="sbf" id="sbFooter">
     <div style="font-weight:600;margin-bottom:4px" id="sbBizName"></div>
     <div id="sbUserEmail" style="margin-bottom:10px"></div>
@@ -1053,6 +1055,31 @@ textarea{resize:vertical;min-height:70px;}
       <div id="objetivosCompraList"></div>
     </div>
 
+    <!-- CUOTAS -->
+    <div class="sec" id="sec-cuotas">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">💳 Cuotas</div>
+          <div class="ps" style="margin-bottom:0">Control de pagos en cuotas</div>
+        </div>
+        <button class="btn bg bsm" onclick="agregarCuota()">+ Nueva cuota</button>
+      </div>
+      <div id="cuotasActivasList" style="margin-bottom:20px"></div>
+      <div id="cuotasTerminadasList"></div>
+    </div>
+
+    <!-- METAS PAREJA -->
+    <div class="sec" id="sec-metasPareja">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">🎯 Metas compartidas</div>
+          <div class="ps" style="margin-bottom:0">Objetivos que van a cumplir juntos</div>
+        </div>
+        <button class="btn bg bsm" onclick="agregarMetaPareja()">+ Nueva meta</button>
+      </div>
+      <div id="metasParejaList"></div>
+    </div>
+
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
       <div class="pt">Gastos</div><div class="ps">Fijos y variables del local</div>
@@ -1534,6 +1561,13 @@ async function doLogin(){
   // Populate dynamic stock categories
   setupCategoriasStock();
   setupPreciosTabs();
+  // Mostrar cuotas y metas solo para finanzas personales
+  const rubroFin = (currentTenant?.rubro||'').toLowerCase();
+  const esFinanzas = rubroFin.includes('personal') || rubroFin.includes('pareja') || rubroFin.includes('hogar');
+  ['nav-cuotas','nav-metasPareja'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = esFinanzas ? '' : 'none';
+  });
   // Mostrar turnos técnicos solo en Remu (no salon)
   const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
   const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
@@ -1681,6 +1715,13 @@ function setupApp(){
   // Populate dynamic stock categories
   setupCategoriasStock();
   setupPreciosTabs();
+  // Mostrar cuotas y metas solo para finanzas personales
+  const rubroFin = (currentTenant?.rubro||'').toLowerCase();
+  const esFinanzas = rubroFin.includes('personal') || rubroFin.includes('pareja') || rubroFin.includes('hogar');
+  ['nav-cuotas','nav-metasPareja'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = esFinanzas ? '' : 'none';
+  });
   // Mostrar turnos técnicos solo en Remu (no salon)
   const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
   const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
@@ -2222,7 +2263,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores' };
+const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores', cuotas:'Cuotas', metasPareja:'Metas' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -2984,6 +3025,7 @@ function rDash(){
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
   setTimeout(rObjetivosCompra, 200);
+  setTimeout(rDashPareja, 250);
   setTimeout(rDivision, 150);
   const m=mes();
   const vm=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
@@ -6572,6 +6614,336 @@ function rObjetivosCompra(){
 }
 
 // ═══ OBJETIVOS DE COMPRA ═══
+
+// ═══ CUOTAS ═══
+const CUOTAS_KEY = 'cuotas';
+
+function getCuotas(){
+  const raw = localStorage.getItem(CUOTAS_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveCuotas(c){
+  localStorage.setItem(CUOTAS_KEY + '_' + (currentTenant?.id||''), JSON.stringify(c));
+}
+
+function agregarCuota(){
+  const nombre = prompt('¿Para qué es la cuota? (Ej: Viaje a Córdoba, Smart TV, Heladera)');
+  if(!nombre) return;
+  const total = parseFloat(prompt('Monto total ($):') || '0');
+  const cantCuotas = parseInt(prompt('¿En cuántas cuotas? (Ej: 6, 12, 18):') || '0');
+  if(!total || !cantCuotas) return;
+  const quienPaga = prompt('¿Quién paga? (Ej: Fiore con VISA, Nacho con débito):') || '';
+  const diaVto = parseInt(prompt('¿Qué día del mes vence? (Ej: 10):') || '1');
+  const emoji = prompt('Elegí un emoji para esta cuota (Ej: ✈ 📺 🏠 🎮):') || '💳';
+
+  const cuotaActual = 1;
+  const cuotas = getCuotas();
+  cuotas.push({
+    id: Date.now().toString(),
+    nombre, total, cantCuotas, quienPaga, diaVto, emoji,
+    cuotaActual,
+    montoCuota: Math.round(total / cantCuotas),
+    fechaInicio: tod(),
+    pagadas: [],
+    activa: true
+  });
+  saveCuotas(cuotas);
+  rCuotas();
+  showToast(emoji + ' Cuota agregada ✓');
+}
+
+function pagarCuota(id){
+  const cuotas = getCuotas();
+  const c = cuotas.find(x=>x.id===id);
+  if(!c) return;
+  
+  if(c.cuotaActual >= c.cantCuotas){
+    if(confirm('🎉 ¡Esta es la ÚLTIMA cuota! ¿Marcarla como pagada?')){
+      c.pagadas.push({cuota: c.cuotaActual, fecha: tod()});
+      c.activa = false;
+      saveCuotas(cuotas);
+      rCuotas();
+      // Celebración
+      setTimeout(()=>{
+        showToast('🎉 ¡Felicitaciones! Terminaron de pagar ' + c.nombre + '!');
+      }, 300);
+    }
+    return;
+  }
+  
+  const esPenultima = c.cuotaActual === c.cantCuotas - 1;
+  const msg = esPenultima 
+    ? `📢 ¡Solo queda UNA cuota después de esta!
+¿Marcar cuota ${c.cuotaActual}/${c.cantCuotas} como pagada?`
+    : `¿Marcar cuota ${c.cuotaActual}/${c.cantCuotas} como pagada?`;
+    
+  if(!confirm(msg)) return;
+  c.pagadas.push({cuota: c.cuotaActual, fecha: tod()});
+  c.cuotaActual++;
+  saveCuotas(cuotas);
+  rCuotas();
+  
+  if(esPenultima) showToast('💪 ¡Solo falta 1 cuota más!');
+  else showToast('✓ Cuota ' + (c.cuotaActual-1) + '/' + c.cantCuotas + ' pagada ✓');
+}
+
+function eliminarCuota(id){
+  if(!confirm('¿Eliminar esta cuota?')) return;
+  saveCuotas(getCuotas().filter(c=>c.id!==id));
+  rCuotas();
+}
+
+function rCuotas(){
+  const activas = document.getElementById('cuotasActivasList');
+  const terminadas = document.getElementById('cuotasTerminadasList');
+  if(!activas) return;
+
+  const cuotas = getCuotas();
+  const actList = cuotas.filter(c=>c.activa);
+  const termList = cuotas.filter(c=>!c.activa);
+
+  if(!actList.length){
+    activas.innerHTML = `<div class="card">${emp('💳','Sin cuotas activas')}<div style="text-align:center;margin-top:8px;font-size:.82rem;color:var(--mut)">Agregá una cuota para llevar el control</div></div>`;
+  } else {
+    activas.innerHTML = actList.map(c=>{
+      const pct = Math.round((c.cuotaActual-1)/c.cantCuotas*100);
+      const esUltima = c.cuotaActual === c.cantCuotas;
+      const esPenultima = c.cuotaActual === c.cantCuotas - 1;
+      const pagadas = c.cuotaActual - 1;
+      const restantes = c.cantCuotas - pagadas;
+      const montoRestante = c.montoCuota * restantes;
+      
+      return `<div class="card" style="margin-bottom:12px;border-left:3px solid ${esUltima?'var(--bad)':esPenultima?'var(--wrn)':'var(--gld)'}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-size:1.3rem">${c.emoji} <strong style="font-size:.95rem">${c.nombre}</strong></div>
+            <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">
+              💰 ${fmt(c.montoCuota)}/mes · 👤 ${c.quienPaga||'—'} · 📅 Vto día ${c.diaVto}
+            </div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:${esUltima?'var(--bad)':esPenultima?'var(--wrn)':'var(--gld)'}">${c.cuotaActual}/${c.cantCuotas}</div>
+            <div style="font-size:.7rem;color:var(--mut)">Quedan ${fmt(montoRestante)}</div>
+          </div>
+        </div>
+        
+        ${esUltima?'<div style="background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:8px 12px;font-size:.8rem;color:var(--bad);margin-bottom:10px;text-align:center;font-weight:600">🔔 ¡ÚLTIMA CUOTA! Pagala y quedan libres</div>':''}
+        ${esPenultima?'<div style="background:rgba(201,148,76,.1);border:1px solid var(--wrn);border-radius:8px;padding:8px 12px;font-size:.8rem;color:var(--wrn);margin-bottom:10px;text-align:center">⚡ ¡Solo falta 1 cuota más después de esta!</div>':''}
+        
+        <div style="background:var(--bg);border-radius:6px;height:12px;overflow:hidden;margin-bottom:6px">
+          <div style="width:${pct}%;height:100%;background:${esUltima?'var(--bad)':esPenultima?'var(--wrn)':'linear-gradient(90deg,var(--gld),var(--gll))'};border-radius:6px;transition:width .6s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.7rem;color:var(--mut);margin-bottom:10px">
+          <span>${pagadas} pagadas</span><span>${pct}% completado</span><span>${restantes} restantes</span>
+        </div>
+        
+        <div style="display:flex;gap:6px">
+          <button class="btn bg" style="flex:1" onclick="pagarCuota('${c.id}')">✓ Pagar cuota ${c.cuotaActual}/${c.cantCuotas}</button>
+          <button class="btn bd bsm" onclick="eliminarCuota('${c.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  if(termList.length && terminadas){
+    terminadas.innerHTML = `<div style="font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">✅ Cuotas terminadas</div>` +
+      termList.map(c=>`<div class="card" style="margin-bottom:8px;opacity:.7">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span>${c.emoji} ${c.nombre}</span>
+          <span class="bx bgr">✓ Terminada · ${fmt(c.total)}</span>
+        </div>
+      </div>`).join('');
+  }
+}
+
+// ═══ METAS PAREJA ═══
+const METAS_KEY = 'metasPareja';
+
+function getMetasPareja(){
+  const raw = localStorage.getItem(METAS_KEY + '_' + (currentTenant?.id||''));
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveMetasPareja(m){
+  localStorage.setItem(METAS_KEY + '_' + (currentTenant?.id||''), JSON.stringify(m));
+}
+
+function agregarMetaPareja(){
+  const nombre = prompt('¿Cuál es la meta? (Ej: Viaje a Brasil, Auto nuevo, Casa propia)');
+  if(!nombre) return;
+  const monto = parseFloat(prompt('¿Cuánto necesitan juntar? ($):') || '0');
+  if(!monto) return;
+  const emoji = prompt('Elegí un emoji (Ej: ✈ 🚗 🏠 💍):') || '🎯';
+  const fechaLimite = prompt('¿Fecha límite? (Ej: 2026-12-01) — dejá vacío si no hay:') || '';
+
+  const metas = getMetasPareja();
+  metas.push({
+    id: Date.now().toString(),
+    nombre, monto, emoji, fechaLimite,
+    ahorrado: 0,
+    fecha: tod()
+  });
+  saveMetasPareja(metas);
+  rMetasPareja();
+  showToast(emoji + ' Meta agregada ✓');
+}
+
+function aportarMeta(id){
+  const metas = getMetasPareja();
+  const m = metas.find(x=>x.id===id);
+  if(!m) return;
+  const quien = prompt('¿Quién aporta? (Fiore / Nacho / Los dos):') || '';
+  const aporte = parseFloat(prompt('¿Cuánto aportan? ($):') || '0');
+  if(!aporte) return;
+  m.ahorrado = Math.min(m.monto, (m.ahorrado||0) + aporte);
+  if(!m.aportes) m.aportes = [];
+  m.aportes.push({quien, monto: aporte, fecha: tod()});
+  saveMetasPareja(metas);
+  rMetasPareja();
+  
+  const pct = Math.round(m.ahorrado/m.monto*100);
+  if(pct >= 100) showToast('🎉 ¡META CUMPLIDA! ¡Felicitaciones Fiore y Nacho!');
+  else showToast(`${m.emoji} +${fmt(aporte)} · ${pct}% de la meta`);
+}
+
+function eliminarMeta(id){
+  if(!confirm('¿Eliminar esta meta?')) return;
+  saveMetasPareja(getMetasPareja().filter(m=>m.id!==id));
+  rMetasPareja();
+}
+
+function rMetasPareja(){
+  const el = document.getElementById('metasParejaList');
+  if(!el) return;
+  const metas = getMetasPareja();
+
+  if(!metas.length){
+    el.innerHTML = `<div class="card" style="text-align:center;padding:24px">
+      <div style="font-size:2.5rem;margin-bottom:8px">🎯</div>
+      <div style="font-weight:600;margin-bottom:6px">¡Definan sus metas juntos!</div>
+      <div style="font-size:.82rem;color:var(--mut);margin-bottom:16px">Un viaje, un auto, la casa propia... ¿Cuál es el próximo sueño?</div>
+      <button class="btn bg" onclick="agregarMetaPareja()">+ Agregar primera meta</button>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = metas.map(m=>{
+    const ahorrado = m.ahorrado || 0;
+    const pct = Math.min(100, Math.round(ahorrado/m.monto*100));
+    const falta = Math.max(0, m.monto - ahorrado);
+    const completa = pct >= 100;
+    const ultimosAportes = (m.aportes||[]).slice(-3).reverse();
+    
+    let diasRestantes = null;
+    if(m.fechaLimite){
+      diasRestantes = Math.floor((new Date(m.fechaLimite) - new Date()) / 86400000);
+    }
+
+    return `<div class="card" style="margin-bottom:14px;${completa?'border:2px solid var(--ok)':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:1.6rem;margin-bottom:4px">${m.emoji}</div>
+          <div style="font-weight:700;font-size:1rem">${m.nombre}</div>
+          ${diasRestantes!==null?`<div style="font-size:.72rem;color:${diasRestantes<30?'var(--bad)':diasRestantes<90?'var(--wrn)':'var(--mut)'}">📅 ${diasRestantes>0?diasRestantes+' días restantes':'¡Fecha límite alcanzada!'}</div>`:''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--fh);font-size:1.3rem;font-weight:700;color:${completa?'var(--ok)':'var(--gld)'}">${fmt(ahorrado)}</div>
+          <div style="font-size:.72rem;color:var(--mut)">de ${fmt(m.monto)}</div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg);border-radius:8px;height:16px;overflow:hidden;margin-bottom:6px;position:relative">
+        <div style="width:${pct}%;height:100%;background:${completa?'linear-gradient(90deg,var(--ok),#6fd4a0)':'linear-gradient(90deg,var(--gld),var(--gll))'};border-radius:8px;transition:width .8s ease"></div>
+        <div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:${pct>30?'rgba(0,0,0,.6)':'var(--tx2)'}">${pct}%</div>
+      </div>
+      
+      ${completa?`<div style="text-align:center;padding:10px;background:rgba(76,175,125,.1);border-radius:8px;margin-bottom:10px">
+        <div style="font-size:1.5rem">🎉</div>
+        <div style="font-weight:700;color:var(--ok)">¡META CUMPLIDA! ¡Felicitaciones!</div>
+      </div>`:
+      `<div style="font-size:.78rem;color:var(--tx2);margin-bottom:10px">Falta: <strong style="color:var(--gld)">${fmt(falta)}</strong></div>`}
+
+      ${ultimosAportes.length?`<div style="font-size:.7rem;color:var(--mut);margin-bottom:8px">
+        ${ultimosAportes.map(a=>`<span style="margin-right:8px">👤 ${a.quien}: ${fmt(a.monto)} (${fD(a.fecha)})</span>`).join('')}
+      </div>`:''}
+
+      <div style="display:flex;gap:6px">
+        ${!completa?`<button class="btn bg" style="flex:1" onclick="aportarMeta('${m.id}')">💰 Aportar</button>`:''}
+        <button class="btn bd bsm" onclick="eliminarMeta('${m.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function rDashPareja(){
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  if(!rubro.includes('personal') && !rubro.includes('pareja') && !rubro.includes('hogar')) return;
+
+  // Add pareja summary card to dashboard if not already there
+  const existing = document.getElementById('dashParejaCard');
+  if(existing) { updateDashParejaCard(); return; }
+
+  const dashGreeting = document.getElementById('dashGreeting');
+  if(!dashGreeting) return;
+
+  const card = document.createElement('div');
+  card.id = 'dashParejaCard';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:14px;border:2px solid var(--gld);background:linear-gradient(135deg,var(--car),var(--car2))';
+  dashGreeting.parentNode.insertBefore(card, dashGreeting.nextSibling.nextSibling);
+  updateDashParejaCard();
+}
+
+function updateDashParejaCard(){
+  const card = document.getElementById('dashParejaCard');
+  if(!card) return;
+
+  const m = mes();
+  const gastos = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
+  const totalGastos = gastos.reduce((a,g)=>a+g.monto,0);
+
+  const cuotas = getCuotas().filter(c=>c.activa);
+  const totalCuotas = cuotas.reduce((a,c)=>a+c.montoCuota,0);
+  const cuotasUltimas = cuotas.filter(c=>c.cuotaActual===c.cantCuotas);
+
+  const metas = getMetasPareja();
+  const metasCercanas = metas.filter(m=>{
+    const pct = Math.round((m.ahorrado||0)/m.monto*100);
+    return pct >= 80 && pct < 100;
+  });
+
+  card.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="font-size:1.8rem">💑</div>
+      <div>
+        <div style="font-family:var(--fh);font-size:1rem;font-weight:700">Fiore & Nacho</div>
+        <div style="font-size:.72rem;color:var(--tx2)">Resumen del mes</div>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:12px">
+      <div style="text-align:center;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--mut);text-transform:uppercase">Gastado este mes</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:var(--bad)">${fmt(totalGastos)}</div>
+      </div>
+      <div style="text-align:center;padding:10px;background:var(--bg);border-radius:8px">
+        <div style="font-size:.65rem;color:var(--mut);text-transform:uppercase">Cuotas mensuales</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:var(--wrn)">${fmt(totalCuotas)}</div>
+        <div style="font-size:.65rem;color:var(--mut)">${cuotas.length} activas</div>
+      </div>
+    </div>
+    ${cuotasUltimas.length?`<div style="background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:.8rem;color:var(--bad)">
+      🔔 ${cuotasUltimas.map(c=>c.emoji+' '+c.nombre).join(', ')} — ¡ÚLTIMA CUOTA este mes!
+    </div>`:''}
+    ${metasCercanas.length?`<div style="background:rgba(76,175,125,.1);border:1px solid var(--ok);border-radius:8px;padding:8px 12px;font-size:.8rem;color:var(--ok)">
+      🎯 ${metasCercanas.map(m=>m.emoji+' '+m.nombre+' ('+Math.round((m.ahorrado||0)/m.monto*100)+'%)').join(', ')} — ¡Casi llegan a la meta!
+    </div>`:''}
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn bgh bsm" style="flex:1" onclick="go('cuotas')">💳 Ver cuotas</button>
+      <button class="btn bg bsm" style="flex:1" onclick="go('metasPareja')">🎯 Ver metas</button>
+    </div>
+  `;
+}
 
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
