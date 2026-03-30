@@ -622,7 +622,7 @@ textarea{resize:vertical;min-height:70px;}
           </div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" style="margin-bottom:14px" id="dashQuickBtns">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mVenta',null);go('ventas')">
             <span style="font-size:1.1rem">💰</span> Registrar venta
@@ -1669,6 +1669,9 @@ function setupApp(){
     quickBtns.innerHTML = `
       <button class="btn" style="padding:14px;font-size:.88rem;justify-content:center;background:rgba(76,175,125,.1);color:var(--ok);border:1px solid rgba(76,175,125,.25);grid-column:1/-1" onclick="go('turnos')">
         📅 Ver turnos de hoy</button>`;
+    // Hide objetivos de compra for turno-based businesses
+    const objCompraCard = document.getElementById('objetivosCompraCard');
+    if(objCompraCard) objCompraCard.style.display='none';
   }
 
   // Adaptar subtítulo de stock
