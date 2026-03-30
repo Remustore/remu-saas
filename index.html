@@ -3084,10 +3084,16 @@ function rDash(){
   const gan=tV-tG,repA=S.reparaciones.filter(r=>r.estado!=='entregado').length,eqD=S.equipos.filter(e=>e.estado==='disponible').length;
   const rubD=(currentTenant?.rubro||'').toLowerCase();
   const esBarberiaD=rubD.includes('barberia')||rubD.includes('barbería')||rubD.includes('salon')||rubD.includes('belleza');
+  // For barberia/salon, total income = service ventas + turnos
+  const tVServicio = vm.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
+  const tVProducto = vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
+  const tTurnosMes = esBarberiaD && getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes())&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
+  const totalMesReal = esBarberiaD ? tVProducto + Math.max(tVServicio, tTurnosMes) : tV;
+  const ganReal = totalMesReal - tG;
   const stat4 = esBarberiaD
     ? `<div class="stat"><div class="sl">Turnos este mes</div><div class="sv" style="color:var(--wrn)">${getTurnos?getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes())).length:0}</div></div>`
     : `<div class="stat"><div class="sl">Trabajos activos</div><div class="sv" style="color:var(--wrn)">${repA}</div><div class="ss">${eqD} equipos disponibles</div></div>`;
-  document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">Ventas del mes</div><div class="sv" style="color:var(--ok)">${fmt(tV)}</div><div class="ss">${vm.length} operaciones</div></div><div class="stat"><div class="sl">Gastos del mes</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${gan>=0?'var(--gld)':'var(--bad)'}"> ${fmt(gan)}</div></div>${stat4}`;
+  document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">Facturado del mes</div><div class="sv" style="color:var(--ok)">${fmt(totalMesReal)}</div><div class="ss">${vm.length} operaciones</div></div><div class="stat"><div class="sl">Gastos del mes</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${ganReal>=0?'var(--gld)':'var(--bad)'}"> ${fmt(ganReal)}</div></div>${stat4}`;
   const meta=S.meta||0,pct=meta>0?Math.min(100,Math.round(tV/meta*100)):0;
   document.getElementById('metaArc').style.strokeDashoffset=157-(157*pct/100);
   document.getElementById('mPct').textContent=pct+'%';document.getElementById('mVal').textContent=fmt(meta);document.getElementById('mVen').textContent=fmt(tV);
@@ -6198,9 +6204,13 @@ function rPanelDinero(){
   const reps = S.reparaciones.filter(r=>r.estado==='entregado'&&r.fecha&&r.fecha.startsWith(m));
   const gastos = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
   
-  const totalVentas = ventas.reduce((a,v)=>a+v.total,0);
+  const totalVentas = ventas.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
+  const totalServiciosVentas = ventas.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
   const totalReps = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
-  const totalIngresos = totalVentas + totalReps;
+  const totalTurnosIngresos = getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(m)&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
+  // Use max to avoid double counting turnos vs ventas de servicio
+  const ingresosTurnos = Math.max(totalServiciosVentas, totalTurnosIngresos);
+  const totalIngresos = totalVentas + totalReps + ingresosTurnos;
   
   const totalGastos = gastos.reduce((a,g)=>a+g.monto,0);
   
@@ -7391,9 +7401,12 @@ function updateBigNumbers(){
   if(esSalon || esBarberiaBig){
     const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado!=='cancelado').length : 0;
     const turnosTerminados = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').length : 0;
+    // Facturado = ventas del día (registradas automáticamente al terminar turno) + turnos terminados con precio
+    const facturadoVentas = S.ventas.filter(v=>v.fecha===hoy&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
     const facturadoTurnos = getTurnos ? getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
-    const totalFact = totalHoy + facturadoTurnos;
-    if(bvh) bvh.textContent = fmt(totalFact);
+    // Use the higher value to avoid double counting
+    const facturadoHoy = Math.max(facturadoVentas, facturadoTurnos);
+    if(bvh) bvh.textContent = fmt(facturadoHoy);
     if(btl) btl.textContent = turnosHoy;
     if(bsb) bsb.textContent = turnosTerminados;
   } else {
