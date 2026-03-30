@@ -1729,6 +1729,16 @@ function setupApp(){
       const el = document.getElementById(id);
       if(el) el.style.display = enabled ? '' : 'none';
     });
+  
+  // Para barbería: forzar ocultar módulos de servicio técnico
+  const rubroB = (currentTenant?.rubro||'').toLowerCase();
+  const esBarberia2 = rubroB.includes('barberia')||rubroB.includes('barbería');
+  if(esBarberia2){
+    ['nav-taller','nav-clientes','nav-equipos','nav-auditoria',
+     'nav-stock','nav-ventas','nav-turnosTec','nav-inversores'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.style.display='none';
+    });
+  }
   });
 
   document.getElementById('loginScreen').style.display='none';
@@ -4188,25 +4198,24 @@ async function saveTurno(){
   saveTurnosLocal(turnos);
 
   // Si terminado, ofrecer registrar venta
-  if(estado === 'terminado' && precioCobrado > 0 && !id){
-    if(confirm(`¿Registrar venta de ${fmt(precioCobrado)} por ${srv?.nombre||'servicio'}?`)){
-      const venta = {
-        id: Date.now(),
-        tipo: 'servicio',
-        nombre: srv?.nombre || 'Servicio salón',
-        cantidad: 1,
-        precio: precioCobrado,
-        total: precioCobrado,
-        costo: 0,
-        metodo: 'Efectivo',
-        fecha: fecha,
-        comPct: 0,
-        comision: 0
-      };
-      S.ventas.unshift(venta);
-      await dbUpsert('ventas', venta);
-      showToast('Venta registrada automáticamente ✓');
-    }
+  if(estado === 'terminado' && precioCobrado > 0){
+    // Auto-register venta without asking
+    const venta = {
+      id: Date.now(),
+      tipo: 'servicio',
+      nombre: srv?.nombre || obj.servicioNombre || 'Servicio',
+      cantidad: 1,
+      precio: precioCobrado,
+      total: precioCobrado,
+      costo: 0,
+      metodo: 'Efectivo',
+      fecha: fecha,
+      comPct: 0,
+      comision: 0
+    };
+    S.ventas.unshift(venta);
+    await dbUpsert('ventas', venta);
+    showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
   }
 
   closeM('mTurno');
@@ -4920,7 +4929,8 @@ Ya hay un turno a las ${conflicto.hora} con ${conflicto.cliente} (${conflicto.se
     empleadoId: emp?.id||'', empleadoNombre: emp?.nombre||'',
     servicioId: srv?.id||0, servicioNombre: srv?.nombre||servicio,
     sector: srv?.sector||'', duracion,
-    precio: 0, notas: 'Turno solicitado online', estado: 'confirmado',
+    precio: srv?.precio||0,
+    notas: 'Turno solicitado online', estado: 'confirmado',
     creadoEn: new Date().toISOString()
   };
   turnos.push(turno);
@@ -5033,9 +5043,10 @@ function mostrarFormularioTurnoOnline(tenant){
         <input id="onTel" placeholder="11 2345 6789" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
         
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Servicio</label>
-        <select id="onServicio" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-          ${turnosCfg.servicios.map(s=>`<option value="${s.id}">${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('')||'<option>Sin servicios configurados</option>'}
+        <select id="onServicio" onchange="mostrarPrecioServicio(this)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:8px">
+          ${turnosCfg.servicios.map(s=>`<option value="${s.id}" data-precio="${s.precio||0}" data-dur="${s.duracion}">${s.sector}: ${s.nombre} (${s.duracion} min)${s.precio>0?' — $'+s.precio.toLocaleString('es-AR'):''}</option>`).join('')||'<option>Sin servicios configurados</option>'}
         </select>
+        <div id="onPrecioInfo" style="background:rgba(184,151,106,.1);border:1px solid rgba(184,151,106,.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.82rem;color:#b8976a;display:none"></div>
         
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Profesional</label>
         <select id="onEmpleado" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
@@ -5149,6 +5160,22 @@ function mostrarMotivoOcupado(el){
   box.scrollIntoView({behavior:'smooth', block:'nearest'});
   // Auto hide after 4 seconds
   setTimeout(()=>{ box.style.display='none'; }, 4000);
+}
+
+function mostrarPrecioServicio(sel){
+  const opt = sel.options[sel.selectedIndex];
+  const precio = parseFloat(opt?.getAttribute('data-precio')||0);
+  const box = document.getElementById('onPrecioInfo');
+  if(!box) return;
+  if(precio > 0){
+    box.style.display = 'block';
+    box.innerHTML = '💰 Precio del servicio: <strong>$' + precio.toLocaleString('es-AR') + '</strong>';
+  } else {
+    box.style.display = 'none';
+  }
+  // Reload slots if date already selected
+  const fecha = document.getElementById('onFecha')?.value;
+  if(fecha) cargarHorasDisponibles(window.__onlineTenantId, window.__onlineTurnosCfg);
 }
 
 function seleccionarSlot(hora, el){
