@@ -2224,13 +2224,20 @@ async function loadAll(){
     ]);
     S.stock=stock; S.equipos=equipos; S.ventas=ventas;
     S.gastos=gastos.length ? gastos : getGastosFijos();
-    // Restore turnosCfg from Supabase if not in localStorage
-    const cfgKey = 'turnosCfg_' + (currentTenant?.id||'');
-    if(!localStorage.getItem(cfgKey) && precios){
-      const cfgRow = precios.find(p=>p.__turnosCfg);
-      if(cfgRow) localStorage.setItem(cfgKey, JSON.stringify(cfgRow.__turnosCfg));
-      // Filter out config rows from precios
-      precios = precios.filter(p=>!p.__turnosCfg);
+    // Restaurar turnosCfg y onlineCfg desde Supabase si no están en localStorage
+    const tid = currentTenant?.id||'';
+    if(precios){
+      const cfgRow = precios.find(p=>p.__turnosCfg || p.__tipo==='cfg');
+      if(cfgRow){
+        const tKey = TURNOS_CFG_KEY + '_' + tid;
+        const oKey = ONLINE_CFG_KEY  + '_' + tid;
+        if(cfgRow.__turnosCfg && !localStorage.getItem(tKey))
+          localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
+        if(cfgRow.__onlineCfg  && !localStorage.getItem(oKey))
+          localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
+      }
+      // Filtrar filas de configuración para que no entren en S.precios
+      precios = precios.filter(p=>!p.__turnosCfg && !p.__tipo);
     }
     S.reparaciones=reparaciones; S.precios=precios; S.meta=meta||0;
     S.inversores=inversores; S.movimientos_inv=movimientos_inv;
@@ -3958,6 +3965,7 @@ function saveTurnosConfig(){
   cfg.cierre = document.getElementById('horCierre')?.value || '20:00';
   cfg.dias = [...document.querySelectorAll('.diasSalon:checked')].map(c=>parseInt(c.value));
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   showToast('Configuración guardada ✓');
 }
 
@@ -4409,8 +4417,24 @@ function verHistorialCliente(nombre){
   document.body.appendChild(overlay);
 }
 
-function rTurnosConfig(){
-  const cfg = getTurnosCfg();
+async function rTurnosConfig(){
+  // Si no hay servicios en localStorage, intentar restaurar desde Supabase
+  let cfg = getTurnosCfg();
+  if(!cfg.servicios.length){
+    try {
+      const tenantId = currentTenant?.id||'';
+      const { data } = await sb.from('precios').select('data').eq('tenant_id', tenantId);
+      if(data){
+        const row = data.find(p=>p.data?.__turnosCfg || p.data?.__tipo==='cfg');
+        if(row?.data.__turnosCfg){
+          cfg = row.data.__turnosCfg;
+          localStorage.setItem(TURNOS_CFG_KEY + '_' + tenantId, JSON.stringify(cfg));
+          if(row.data.__onlineCfg)
+            localStorage.setItem(ONLINE_CFG_KEY + '_' + tenantId, JSON.stringify(row.data.__onlineCfg));
+        }
+      }
+    } catch(e){}
+  }
 
   // Servicios
   const srvEl = document.getElementById('serviciosTurnosList');
@@ -4467,6 +4491,7 @@ function agregarServicioTurno(){
   const cfg = getTurnosCfg();
   cfg.servicios.push({id:Date.now(), nombre, sector, duracion, precio});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   rTurnosConfig();
   showToast('Servicio agregado ✓');
 }
@@ -4482,6 +4507,7 @@ function editarServicioTurno(id){
   const precio = parseFloat(prompt('Precio ($):', s.precio) || s.precio);
   s.nombre=nombre; s.sector=sector; s.duracion=duracion; s.precio=precio;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   rTurnosConfig();
   showToast('Servicio actualizado ✓');
 }
@@ -4491,6 +4517,7 @@ function eliminarServicioTurno(id){
   const cfg = getTurnosCfg();
   cfg.servicios = cfg.servicios.filter(s=>s.id!==id);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   rTurnosConfig();
 }
 
@@ -4502,6 +4529,7 @@ function agregarEmpleado(){
   const cfg = getTurnosCfg();
   cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean), comision});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   rTurnosConfig();
   showToast('Empleado agregado ✓');
 }
@@ -4516,6 +4544,7 @@ function editarEmpleado(id){
   const comision = parseFloat(prompt('% de comisión:', e.comision||0) || e.comision||0);
   e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean); e.comision=comision;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   rTurnosConfig();
   showToast('Empleado actualizado ✓');
 }
@@ -4525,6 +4554,7 @@ function eliminarEmpleado(id){
   const cfg = getTurnosCfg();
   cfg.empleados = cfg.empleados.filter(e=>e.id!==id);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   rTurnosConfig();
 }
 
@@ -4780,14 +4810,49 @@ function getOnlineCfg(){
   return raw ? JSON.parse(raw) : {mensaje:'', insta:'', direccion:''};
 }
 
-function rTurnosOnline(){
-  const cfg = getOnlineCfg();
+// Calcula el ID del row de configuración en Supabase (determinístico por tenant)
+function _cfgRowId(tenantId){
+  const t = tenantId || currentTenant?.id || '';
+  return parseInt(t.replace(/-/g,'').substring(0,8),16) % 1000000 + 9999;
+}
+
+// Persiste turnosCfg + onlineCfg a Supabase (tabla precios, SELECT público)
+async function persistCfgToSupabase(){
+  if(!currentTenant?.id) return;
+  const turnosCfg = getTurnosCfg();
+  const onlineCfg = getOnlineCfg();
+  const rowId = _cfgRowId(currentTenant.id);
+  const row = {
+    id: rowId,
+    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg' },
+    tenant_id: currentTenant.id
+  };
+  try {
+    await sb.from('precios').upsert(row, { onConflict: 'id' });
+  } catch(e) { console.error('persistCfg error', e); }
+}
+
+async function rTurnosOnline(){
   const tenantId = currentTenant?.id||'';
   const link = window.location.origin + window.location.pathname + '?turno=' + tenantId;
-  
   const el = document.getElementById('turnosOnlineLink');
   if(el) el.textContent = link;
-  
+
+  // Restaurar onlineCfg: primero localStorage, sino buscar en Supabase
+  let cfg = getOnlineCfg();
+  if(!cfg.mensaje && !cfg.insta && !cfg.direccion){
+    try {
+      const { data } = await sb.from('precios').select('data').eq('tenant_id', tenantId);
+      if(data){
+        const row = data.find(p=>p.data?.__onlineCfg);
+        if(row?.data.__onlineCfg){
+          cfg = row.data.__onlineCfg;
+          localStorage.setItem(ONLINE_CFG_KEY + '_' + tenantId, JSON.stringify(cfg));
+        }
+      }
+    } catch(e){}
+  }
+
   if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
   if(document.getElementById('onlineInsta')) document.getElementById('onlineInsta').value = cfg.insta||'';
   if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
@@ -4945,6 +5010,7 @@ function saveOnlineConfig(){
     direccion: document.getElementById('onlineDireccion')?.value||''
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
   showToast('Configuración guardada ✓');
 }
 
@@ -4962,8 +5028,8 @@ Hacé click acá: ${link}`;
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
-function mostrarFormularioTurnoOnline(tenant, turnosCfgParam){
-  const cfg = JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}');
+function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
+  const cfg = onlineCfgParam || JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}');
   const turnosCfg = turnosCfgParam || (()=>{const r=localStorage.getItem('turnosCfg_'+tenant.id);return r?JSON.parse(r):{servicios:[],empleados:[]};})();
   
   document.body.innerHTML = `
@@ -7385,17 +7451,21 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     // Load tenant and show booking form directly
     const { data: tenant } = await sb.from('tenants').select('*').eq('id', turnoParam).single();
     if(tenant){
-      // Load turnosCfg from Supabase precios table
-      let turnosCfg = {servicios:[], empleados:[]};
+      // Cargar configuración desde Supabase (tabla precios tiene SELECT público)
+      let turnosCfg = {servicios:[], empleados:[], apertura:'09:00', cierre:'20:00', dias:[1,2,3,4,5,6]};
+      let onlineCfg  = {mensaje:'', insta:'', direccion:''};
       const { data: preciosData } = await sb.from('precios')
         .select('data')
         .eq('tenant_id', turnoParam);
 
       if(preciosData){
-        const cfgRow = preciosData.find(p=>p.data?.__turnosCfg);
-        if(cfgRow) turnosCfg = cfgRow.data.__turnosCfg;
+        const cfgRow = preciosData.find(p=>p.data?.__turnosCfg || p.data?.__tipo==='cfg');
+        if(cfgRow){
+          if(cfgRow.data.__turnosCfg) turnosCfg = cfgRow.data.__turnosCfg;
+          if(cfgRow.data.__onlineCfg)  onlineCfg  = cfgRow.data.__onlineCfg;
+        }
       }
-      mostrarFormularioTurnoOnline(tenant, turnosCfg);
+      mostrarFormularioTurnoOnline(tenant, turnosCfg, onlineCfg);
     } else {
       document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;color:#fff;font-family:sans-serif">Link inválido o negocio no encontrado.</div>';
     }
