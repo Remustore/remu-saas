@@ -1254,9 +1254,9 @@ textarea{resize:vertical;min-height:70px;}
 <!-- Taller -->
 <div class="mb" id="mTaller"><div class="md"><div class="mh"><div class="mt2" id="mTallerTitle">Nuevo trabajo</div><button class="xbtn" onclick="closeM('mTaller')">✕</button></div>
 <div class="mc"><input type="hidden" id="tId">
-<div class="fr"><div><label>Cliente</label>
-<input id="tCli" placeholder="Nombre del cliente" oninput="autocompleteCli(this.value)" autocomplete="off">
-<div id="cliSugg" style="position:absolute;background:var(--car2);border:1px solid var(--bor2);border-radius:8px;z-index:400;max-height:150px;overflow-y:auto;width:100%;display:none;"></div>
+<div class="fr"><div style="position:relative"><label>Cliente</label>
+<input id="tCli" placeholder="Nombre del cliente" oninput="autocompleteCli(this.value)" onblur="setTimeout(()=>{document.getElementById('cliSugg').style.display='none'},150)" autocomplete="off">
+<div id="cliSugg" style="position:absolute;background:var(--car2);border:1px solid var(--bor2);border-radius:8px;z-index:400;max-height:150px;overflow-y:auto;width:100%;display:none;top:100%;left:0"></div>
 </div><div><label>Teléfono / WA</label><input id="tTel" placeholder="11 2345 6789"></div></div>
 <div class="fr"><div><label>Equipo / Trabajo</label><input id="tEq" placeholder="Ej: iPhone 13, corte de pelo..."></div><div><label>IMEI (opcional)</label><input id="tIme" placeholder="Solo para celulares"></div></div>
 <div class="fr"><div><label>🔐 Contraseña / Patrón</label><div style="position:relative"><input id="tPass" placeholder="Ej: 1234, patrón Z, sin clave..." autocomplete="off" autocorrect="off" spellcheck="false" type="password" oninput="document.getElementById('tPassAlert').style.display=this.value?'block':'none'" style="padding-right:40px"><button type="button" onclick="(function(btn){var inp=document.getElementById('tPass');inp.type=inp.type==='password'?'text':'password';btn.textContent=inp.type==='password'?'👁':'🙈';})(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.9rem;padding:2px;color:var(--tx2)" title="Mostrar/ocultar">👁</button></div></div><div><label>Tipo de bloqueo</label><select id="tTipoPass"><option value="">Sin bloqueo</option><option value="pin">PIN numérico</option><option value="patron">Patrón</option><option value="huella">Huella / Face ID</option><option value="contrasena">Contraseña alfanumérica</option></select></div></div>
@@ -2671,15 +2671,19 @@ function sugerirGuia(val){
 function autocompleteCli(val){
   const box = document.getElementById('cliSugg');
   if(!val || val.length < 2){ box.style.display='none'; return; }
-  const clientes = [...new Set(S.reparaciones.map(r=>r.cliente).filter(c=>c&&c.toLowerCase().includes(val.toLowerCase())))].slice(0,5);
-  if(!clientes.length){ box.style.display='none'; return; }
+  const q = val.toLowerCase();
+  const nombres = [...new Set([
+    ...S.reparaciones.map(r=>r.cliente),
+    ...(S.ventas||[]).map(v=>v.cliente)
+  ].filter(c=>c&&c.toLowerCase().includes(q)))].slice(0,6);
+  if(!nombres.length){ box.style.display='none'; return; }
   box.style.display='block';
-  box.innerHTML = clientes.map(c=>`<div data-nombre="${esc(c)}" onclick="selCli(this.dataset.nombre)" style="padding:9px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--bor)">${esc(c)}</div>`).join('');
+  box.innerHTML = nombres.map(c=>`<div data-nombre="${esc(c)}" onclick="selCli(this.dataset.nombre)" style="padding:9px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--bor)">${esc(c)}</div>`).join('');
 }
 function selCli(nombre){
   document.getElementById('tCli').value = nombre;
   document.getElementById('cliSugg').style.display='none';
-  const prev = S.reparaciones.find(r=>r.cliente===nombre);
+  const prev = [...S.reparaciones,...(S.ventas||[])].find(r=>r.cliente===nombre);
   if(prev && prev.tel) document.getElementById('tTel').value = prev.tel;
 }
 
@@ -2969,7 +2973,7 @@ async function savePrecio(){
   }else{
     const item={id:Date.now(),...obj};S.precios.push(item);await dbUpsert('precios',item);pushUndo('Nuevo precio','precios',snap);
   }
-  closeM('mPrecio');rPrecios();
+  closeM('mPrecio');rPrecios();showToast('Precio guardado ✓');
 }
 
 async function delPrecio(id){
@@ -3048,7 +3052,7 @@ function rPrecios(){
 }
 
 // ═══ META ═══
-async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').value)||0; S.meta=v; await dbSetConfig('meta',v); rDash(); }
+async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').value)||0; S.meta=v; await dbSetConfig('meta',v); rDash(); showToast('Meta guardada ✓'); }
 
 // ═══ DASHBOARD ═══
 function rDash(){
@@ -3246,12 +3250,12 @@ async function saveInversor(){
   const obj={nombre:n,capital:cap,pct:parseFloat(document.getElementById('invPct').value)||10,fecha:document.getElementById('invFec').value||tod(),tel:document.getElementById('invTel').value,modalidad:document.getElementById('invMod').value,notas:document.getElementById('invNot').value};
   if(id){const i=S.inversores.findIndex(x=>x.id===parseInt(id));if(i>-1){S.inversores[i]={...S.inversores[i],...obj};await dbUpsert('inversores',S.inversores[i]);}}
   else{const item={id:Date.now(),...obj};S.inversores.push(item);await dbUpsert('inversores',item);const movInicial={id:Date.now()+1,invId:item.id,tipo:'ampliacion',monto:cap,concepto:'Capital inicial',fecha:obj.fecha,notas:'',costo:0,costoPag:'cliente'};S.movimientos_inv.push(movInicial);await dbUpsert('movimientos_inv',movInicial);}
-  closeM('mInversor');rInversores();if(invActivo){const inv=S.inversores.find(i=>i.id===invActivo);if(inv)renderDetalleInv(inv);}
+  closeM('mInversor');rInversores();showToast('Inversor guardado ✓');if(invActivo){const inv=S.inversores.find(i=>i.id===invActivo);if(inv)renderDetalleInv(inv);}
 }
 async function saveMovInv(){
   if(!invActivo)return;
   const obj={id:Date.now(),invId:invActivo,tipo:document.getElementById('movTipo').value,monto:parseFloat(document.getElementById('movMonto').value)||0,fecha:document.getElementById('movFec').value||tod(),concepto:document.getElementById('movConc').value,costo:parseFloat(document.getElementById('movCosto').value)||0,costoPag:document.getElementById('movCostoPag').value,notas:document.getElementById('movNot').value};
-  S.movimientos_inv.push(obj);await dbUpsert('movimientos_inv',obj);closeM('mMovInv');const inv=S.inversores.find(i=>i.id===invActivo);if(inv)renderDetalleInv(inv);rInversores();
+  S.movimientos_inv.push(obj);await dbUpsert('movimientos_inv',obj);closeM('mMovInv');showToast('Movimiento registrado ✓');const inv=S.inversores.find(i=>i.id===invActivo);if(inv)renderDetalleInv(inv);rInversores();
 }
 async function delMovInv(id){
   if(!confirm('¿Eliminar movimiento?'))return;
@@ -3266,7 +3270,7 @@ async function registrarLiquidacion(accion){
   const obj={id:Date.now(),invId:invActivo,tipo,monto:comMes,fecha:tod(),concepto:`Liquidación ${new Date().toLocaleDateString('es-AR',{month:'long',year:'numeric'})}`,notas:'',costo:0,costoPag:'cliente'};
   S.movimientos_inv.push(obj);await dbUpsert('movimientos_inv',obj);
   if(accion==='reinvertir'){inv.capital=calcCapital(inv,S.movimientos_inv.filter(m=>m.invId===invActivo));await dbUpsert('inversores',inv);}
-  renderDetalleInv(inv);rInversores();
+  renderDetalleInv(inv);rInversores();showToast(accion==='reinvertir'?'Ganancia reinvertida ✓':'Comisión pagada ✓');
 }
 
 // ═══ CAJAS ═══
@@ -3297,7 +3301,7 @@ async function saveMovCaja(){
     if(cajasGrid) cajasGrid.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:8px">Usá el módulo de Gastos para registrar tus gastos</div>';
     return;
   }
-  if(!S.movCaja)S.movCaja=[];S.movCaja.push(obj);await dbSetConfig('movCaja',S.movCaja);closeM('mMovCaja');rCajas();rDash();
+  if(!S.movCaja)S.movCaja=[];S.movCaja.push(obj);await dbSetConfig('movCaja',S.movCaja);closeM('mMovCaja');showToast('Movimiento registrado ✓');rCajas();rDash();
 }
 
 // ═══ OBJETIVOS ═══
@@ -3352,7 +3356,7 @@ function rObjetivos(){
 
 async function saveObjetivos(){
   const obj={repCant:parseInt(document.getElementById('objRepCant').value)||7,repPre:parseFloat(document.getElementById('objRepPre').value)||40000,accCant:parseInt(document.getElementById('objAccCant').value)||10,accPre:parseFloat(document.getElementById('objAccPre').value)||10000,eqCant:parseInt(document.getElementById('objEqCant').value)||1,eqPre:parseFloat(document.getElementById('objEqPre').value)||0};
-  S.objetivos=obj;await dbSetConfig('objetivos',obj);closeM('mObjetivos');rDash();
+  S.objetivos=obj;await dbSetConfig('objetivos',obj);closeM('mObjetivos');showToast('Objetivos guardados ✓');rDash();
 }
 
 function fillObjetivosModal(){
