@@ -655,7 +655,7 @@ textarea{resize:vertical;min-height:70px;}
             </div>
             <div style="flex:1">
               <div style="font-size:.7rem;color:var(--mut);margin-bottom:4px">Meta mensual</div>
-              <input id="metaIn" type="number" placeholder="$0" style="width:120px;margin-bottom:8px" id="metaIn">
+              <input id="metaIn" type="number" placeholder="$0" style="width:120px;margin-bottom:8px">
               <div style="font-size:.75rem;color:var(--tx2)">Ventas: <span id="mVen" style="color:var(--gld);font-weight:600">$0</span></div>
               <div style="font-size:.72rem;color:var(--mut)">Meta: <span id="mVal">$0</span></div>
               <button class="btn bsm bg" onclick="saveMeta()" style="margin-top:8px">Guardar</button>
@@ -730,6 +730,18 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div class="tw"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio venta</th><th>Margen</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
       </div>
+      <!-- HISTORIAL STOCK -->
+      <div class="card" id="stockMovCard" style="margin-top:14px">
+        <div class="ch">
+          <h3>📊 Historial de movimientos</h3>
+          <div style="display:flex;gap:8px;align-items:center">
+            <select id="stockMovFiltro" onchange="rStockMov()" style="padding:5px 10px;font-size:.75rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+              <option value="">Todos los productos</option>
+            </select>
+          </div>
+        </div>
+        <div id="stockMovList"></div>
+      </div>
     </div>
 
     <!-- EQUIPOS -->
@@ -780,18 +792,6 @@ textarea{resize:vertical;min-height:70px;}
       </div>
     </div>
 
-    <!-- HISTORIAL STOCK -->
-    <div class="card" id="stockMovCard" style="margin-top:14px">
-      <div class="ch">
-        <h3>📊 Historial de movimientos</h3>
-        <div style="display:flex;gap:8px;align-items:center">
-          <select id="stockMovFiltro" onchange="rStockMov()" style="padding:5px 10px;font-size:.75rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
-            <option value="">Todos los productos</option>
-          </select>
-        </div>
-      </div>
-      <div id="stockMovList"></div>
-    </div>
 
     <!-- AUDITORIA -->
     <div class="sec" id="sec-auditoria">
@@ -1109,7 +1109,7 @@ textarea{resize:vertical;min-height:70px;}
           <button class="tab" onclick="setAnFilt('semana',this)">Esta semana</button>
           <button class="tab" onclick="setAnFilt('hoy',this)">Hoy</button>
           <button class="tab" onclick="setAnFilt('custom',this)">Personalizado</button>
-          <div id="anCustom" style="display:none;gap:8px;display:none;align-items:center">
+          <div id="anCustom" style="display:none;gap:8px;align-items:center">
             <input type="date" id="anDesde" style="width:140px;padding:6px 10px" onchange="rAnalisis()">
             <span style="color:var(--tx2)">→</span>
             <input type="date" id="anHasta" style="width:140px;padding:6px 10px" onchange="rAnalisis()">
@@ -1259,7 +1259,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="cliSugg" style="position:absolute;background:var(--car2);border:1px solid var(--bor2);border-radius:8px;z-index:400;max-height:150px;overflow-y:auto;width:100%;display:none;"></div>
 </div><div><label>Teléfono / WA</label><input id="tTel" placeholder="11 2345 6789"></div></div>
 <div class="fr"><div><label>Equipo / Trabajo</label><input id="tEq" placeholder="Ej: iPhone 13, corte de pelo..."></div><div><label>IMEI (opcional)</label><input id="tIme" placeholder="Solo para celulares"></div></div>
-<div class="fr"><div><label>🔐 Contraseña / Patrón</label><input id="tPass" placeholder="Ej: 1234, patrón Z, sin clave..." autocomplete="off" autocorrect="off" spellcheck="false" type="password" oninput="document.getElementById('tPassAlert').style.display=this.value?'block':'none'"></div><div><label>Tipo de bloqueo</label><select id="tTipoPass"><option value="">Sin bloqueo</option><option value="pin">PIN numérico</option><option value="patron">Patrón</option><option value="huella">Huella / Face ID</option><option value="contrasena">Contraseña alfanumérica</option></select></div></div>
+<div class="fr"><div><label>🔐 Contraseña / Patrón</label><div style="position:relative"><input id="tPass" placeholder="Ej: 1234, patrón Z, sin clave..." autocomplete="off" autocorrect="off" spellcheck="false" type="password" oninput="document.getElementById('tPassAlert').style.display=this.value?'block':'none'" style="padding-right:40px"><button type="button" onclick="(function(btn){var inp=document.getElementById('tPass');inp.type=inp.type==='password'?'text':'password';btn.textContent=inp.type==='password'?'👁':'🙈';})(this)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.9rem;padding:2px;color:var(--tx2)" title="Mostrar/ocultar">👁</button></div></div><div><label>Tipo de bloqueo</label><select id="tTipoPass"><option value="">Sin bloqueo</option><option value="pin">PIN numérico</option><option value="patron">Patrón</option><option value="huella">Huella / Face ID</option><option value="contrasena">Contraseña alfanumérica</option></select></div></div>
 <div id="tPassAlert" style="display:none;background:rgba(201,148,76,.1);border:1px solid var(--wrn);border-radius:7px;padding:8px 12px;font-size:.75rem;color:var(--wrn);margin-top:4px">🔒 Dato confidencial — visible solo para el técnico. No se comparte con el cliente.</div>
 <div class="fr full"><div><label>Falla / Descripción</label><input id="tFal" placeholder="¿Qué necesita?" oninput="sugerirGuia(this.value)"></div></div>
 <div id="guiaRep" style="display:none;background:var(--bg);border:1px solid var(--gld);border-radius:8px;padding:12px;margin-top:8px;font-size:.8rem">
@@ -2316,22 +2316,31 @@ function openM(id, editId){
 function fillModalEdit(modal, id){
   if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';
+  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;
+    document.getElementById('mTallerTitle').textContent='Editar Trabajo';
+    document.getElementById('tId').value=id;
+    document.getElementById('tCli').value=t.cliente;
+    document.getElementById('tTel').value=t.tel||'';
+    document.getElementById('tEq').value=t.equipo||'';
+    document.getElementById('tIme').value=t.imei||'';
+    document.getElementById('tFal').value=t.falla||'';
+    document.getElementById('tPre').value=t.presupuesto||0;
+    document.getElementById('tEst').value=t.estado;
+    document.getElementById('tCosRep').value=t.costoRep||0;
+    document.getElementById('tFlete').value=t.flete||0;
+    document.getElementById('tNot').value=t.notas||'';
+    if(document.getElementById('tPass')){const pv=t.pass||t.password||'';document.getElementById('tPass').value=pv;document.getElementById('tPassAlert').style.display=pv?'block':'none';}
+    if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
     if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
     if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
-    updateGarantiaVence();if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
-    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
-    updateGarantiaVence();document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
+    if(document.getElementById('tFechaEnt'))document.getElementById('tFechaEnt').value=t.fechaEnt||'';
     if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
-    if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
-    if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
-    if(t.pass) document.getElementById('tPassAlert').style.display='block';
     if(document.getElementById('tGolpes'))document.getElementById('tGolpes').value=t.golpes||'';
     if(document.getElementById('tHumedad'))document.getElementById('tHumedad').value=t.humedad||'';
     if(document.getElementById('tEstPantalla'))document.getElementById('tEstPantalla').value=t.estPantalla||'funciona';
     if(document.getElementById('tEstFisico'))document.getElementById('tEstFisico').value=t.estFisico||'excelente';
     if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
-    calcGanTaller();}
+    updateGarantiaVence();calcGanTaller();}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
   if(modal==='mGasto'){const g=S.gastos.find(x=>x.id===id);if(!g)return;document.getElementById('gId').value=id;document.getElementById('gCon').value=g.concepto;document.getElementById('gTip').value=g.tipo;document.getElementById('gMon').value=g.monto;document.getElementById('gFec').value=g.fecha;document.getElementById('gNot').value=g.notas||'';}
   if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id);if(!p)return;document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDis').value=p.disponibilidad||'disponible';document.getElementById('prNot').value=p.notas||'';}
@@ -2721,15 +2730,13 @@ async function saveTaller(){
     tipoPass:document.getElementById('tTipoPass')?.value||'',
     equipo:document.getElementById('tEq').value,
     imei:document.getElementById('tIme').value,
-    sena:parseFloat(document.getElementById('tSena')?.value||0),
     sena:parseFloat(document.getElementById('tSena')?.value)||0,
-    password:document.getElementById('tPass')?.value||'',
-    tipoPass:document.getElementById('tTipoPass')?.value||'',
     falla:document.getElementById('tFal').value,
     presupuesto:pre,costoRep,flete,ganancia,margen,
     estado:document.getElementById('tEst').value,
     notas:document.getElementById('tNot').value,
     garantiaDias:parseInt(document.getElementById('tGarantia')?.value||30),
+    fechaEnt:document.getElementById('tFechaEnt')?.value||'',
     diagnostico:document.getElementById('tDiagnostico')?.value||'',
     golpes:document.getElementById('tGolpes')?.value||'',
     humedad:document.getElementById('tHumedad')?.value||'',
@@ -2803,8 +2810,8 @@ function buscarTaller(q){
     '<div style="font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">' + results.length + ' resultado(s)</div>' +
     results.map(r=>`<div style="padding:8px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div>
-        <div style="font-weight:600;font-size:.85rem">${r.cliente} — ${r.equipo||'—'}</div>
-        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${r.falla||''} · ${fD(r.fecha)} ${r.imei?'· IMEI: '+r.imei:''}</div>
+        <div style="font-weight:600;font-size:.85rem">${esc(r.cliente)} — ${esc(r.equipo||'—')}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${esc(r.falla||'')} · ${fD(r.fecha)} ${r.imei?'· IMEI: '+esc(r.imei):''}</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <span class="bx ${estados[r.estado]||'bgx'}">${r.estado}</span>
@@ -3253,35 +3260,6 @@ async function registrarLiquidacion(accion){
   S.movimientos_inv.push(obj);await dbUpsert('movimientos_inv',obj);
   if(accion==='reinvertir'){inv.capital=calcCapital(inv,S.movimientos_inv.filter(m=>m.invId===invActivo));await dbUpsert('inversores',inv);}
   renderDetalleInv(inv);rInversores();
-}
-
-// ═══ FILL EDIT ═══
-function fillEdit(modal,id){
-  const maps={
-    mStock:{arr:'stock',fields:{sId:'id',sNom:'nombre',sCat:'categoria',sCant:'cantidad',sMin:'minimo',sPre:'precio',sCos:'costo',sNot:'notas'},title:'Editar Producto'},
-    mGasto:{arr:'gastos',fields:{gId:'id',gCon:'concepto',gTip:'tipo',gMon:'monto',gFec:'fecha',gNot:'notas'},title:'Editar Gasto'},
-    mPrecio:{arr:'precios',fields:{prId:'id',prNom:'nombre',prMod:'modelo',prPre:'precio',prDisp:'disponibilidad',prNot:'notas'},title:'Editar Servicio'},
-  };
-  if(maps[modal]){const m=maps[modal];const item=S[m.arr].find(x=>x.id===id);if(!item)return;document.getElementById(modal).querySelector('.mt2').textContent=m.title;Object.entries(m.fields).forEach(([elId,key])=>{const el=document.getElementById(elId);if(el)el.value=item[key]||'';});return;}
-  if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';return;}
-  if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';['eId','eTipo','eMod','eMem','eCol','eIme','eBat','eFis','ePre','eCos','eNot'].forEach(k=>{const el=document.getElementById(k);if(el)el.value=({eId:e.id,eTipo:e.tipo,eMod:e.modelo,eMem:e.memoria,eCol:e.color,eIme:e.imei,eBat:e.bateria,eFis:e.estadoFisico,ePre:e.precio,eCos:e.costo,eNot:e.notas})[k]||'';});return;}
-  if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
-  if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;document.getElementById('mTallerTitle').textContent='Editar Trabajo';document.getElementById('tId').value=id;document.getElementById('tCli').value=t.cliente;document.getElementById('tTel').value=t.tel||'';document.getElementById('tEq').value=t.equipo||'';document.getElementById('tIme').value=t.imei||'';if(document.getElementById('tPass'))document.getElementById('tPass').value=t.password||'';
-    if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
-    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
-    updateGarantiaVence();if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';document.getElementById('tFal').value=t.falla||'';if(document.getElementById('tSena'))document.getElementById('tSena').value=t.sena||0;
-    if(document.getElementById('tGarantia'))document.getElementById('tGarantia').value=t.garantiaDias||30;
-    updateGarantiaVence();document.getElementById('tPre').value=t.presupuesto||0;document.getElementById('tEst').value=t.estado;document.getElementById('tCosRep').value=t.costoRep||0;document.getElementById('tFlete').value=t.flete||0;document.getElementById('tNot').value=t.notas||'';
-    if(document.getElementById('tDiagnostico'))document.getElementById('tDiagnostico').value=t.diagnostico||'';
-    if(document.getElementById('tPass'))document.getElementById('tPass').value=t.pass||'';
-    if(document.getElementById('tTipoPass'))document.getElementById('tTipoPass').value=t.tipoPass||'';
-    if(t.pass) document.getElementById('tPassAlert').style.display='block';
-    if(document.getElementById('tGolpes'))document.getElementById('tGolpes').value=t.golpes||'';
-    if(document.getElementById('tHumedad'))document.getElementById('tHumedad').value=t.humedad||'';
-    if(document.getElementById('tEstPantalla'))document.getElementById('tEstPantalla').value=t.estPantalla||'funciona';
-    if(document.getElementById('tEstFisico'))document.getElementById('tEstFisico').value=t.estFisico||'excelente';
-    if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
-    calcGanTaller();}
 }
 
 // ═══ CAJAS ═══
@@ -4984,47 +4962,33 @@ Hacé click acá: ${link}`;
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
-// ═══ CHECK TURNO ONLINE AL CARGAR ═══
-function checkTurnoOnlineParam(){
-  const params = new URLSearchParams(window.location.search);
-  const tenantId = params.get('turno');
-  if(!tenantId) return;
-  
-  // Load tenant and show booking form
-  sb.from('tenants').select('*').eq('id', tenantId).single().then(({data:tenant})=>{
-    if(!tenant) return;
-    mostrarFormularioTurnoOnline(tenant);
-  });
-}
-
-function mostrarFormularioTurnoOnline(tenant){
+function mostrarFormularioTurnoOnline(tenant, turnosCfgParam){
   const cfg = JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}');
-  const turnosCfgRaw = localStorage.getItem('turnosCfg_' + tenant.id);
-  const turnosCfg = turnosCfgRaw ? JSON.parse(turnosCfgRaw) : {servicios:[], empleados:[]};
+  const turnosCfg = turnosCfgParam || (()=>{const r=localStorage.getItem('turnosCfg_'+tenant.id);return r?JSON.parse(r):{servicios:[],empleados:[]};})();
   
   document.body.innerHTML = `
     <div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif">
       <div style="background:#141414;border:1px solid #242424;border-radius:16px;width:100%;max-width:420px;padding:24px">
-        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;text-align:center;margin-bottom:4px">${tenant.nombre}</div>
-        <div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:20px">${cfg.mensaje||'Reservá tu turno online'}</div>
-        ${cfg.direccion?`<div style="text-align:center;font-size:.75rem;color:#585044;margin-bottom:16px">📍 ${cfg.direccion}</div>`:''}
-        
+        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;text-align:center;margin-bottom:4px">${esc(tenant.nombre)}</div>
+        <div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:20px">${esc(cfg.mensaje||'Reservá tu turno online')}</div>
+        ${cfg.direccion?`<div style="text-align:center;font-size:.75rem;color:#585044;margin-bottom:16px">📍 ${esc(cfg.direccion)}</div>`:''}
+
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Tu nombre</label>
         <input id="onNombre" placeholder="Nombre completo" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-        
+
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">WhatsApp</label>
-        <input id="onTel" placeholder="11 2345 6789" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-        
+        <input id="onTel" placeholder="11 2345 6789" type="tel" inputmode="numeric" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Servicio</label>
         <select id="onServicio" onchange="mostrarPrecioServicio(this)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:8px">
-          ${turnosCfg.servicios.map(s=>`<option value="${s.id}" data-precio="${s.precio||0}" data-dur="${s.duracion}">${s.sector}: ${s.nombre} (${s.duracion} min)${s.precio>0?' — $'+s.precio.toLocaleString('es-AR'):''}</option>`).join('')||'<option>Sin servicios configurados</option>'}
+          ${turnosCfg.servicios.length?turnosCfg.servicios.map(s=>`<option value="${esc(String(s.id))}" data-precio="${parseFloat(s.precio)||0}" data-dur="${parseInt(s.duracion)||30}">${esc(s.sector)}: ${esc(s.nombre)} (${parseInt(s.duracion)||30} min)${s.precio>0?' — $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join(''):'<option value="">Sin servicios configurados</option>'}
         </select>
         <div id="onPrecioInfo" style="background:rgba(184,151,106,.1);border:1px solid rgba(184,151,106,.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.82rem;color:#b8976a;display:none"></div>
-        
+
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Profesional</label>
         <select id="onEmpleado" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
           <option value="">Sin preferencia</option>
-          ${turnosCfg.empleados.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')}
+          ${turnosCfg.empleados.map(e=>`<option value="${esc(String(e.id))}">${esc(e.nombre)}</option>`).join('')}
         </select>
         
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Fecha</label>
@@ -7422,15 +7386,16 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     const { data: tenant } = await sb.from('tenants').select('*').eq('id', turnoParam).single();
     if(tenant){
       // Load turnosCfg from Supabase precios table
+      let turnosCfg = {servicios:[], empleados:[]};
       const { data: preciosData } = await sb.from('precios')
         .select('data')
         .eq('tenant_id', turnoParam);
-      
+
       if(preciosData){
         const cfgRow = preciosData.find(p=>p.data?.__turnosCfg);
-        if(cfgRow) localStorage.setItem('turnosCfg_' + turnoParam, JSON.stringify(cfgRow.data.__turnosCfg));
+        if(cfgRow) turnosCfg = cfgRow.data.__turnosCfg;
       }
-      mostrarFormularioTurnoOnline(tenant);
+      mostrarFormularioTurnoOnline(tenant, turnosCfg);
     } else {
       document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;color:#fff;font-family:sans-serif">Link inválido o negocio no encontrado.</div>';
     }
