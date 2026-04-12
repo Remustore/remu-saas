@@ -10,6 +10,8 @@
 <title id="pageTitle">Sistema de Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.3/dist/purify.min.js"></script>
+<script src="config.js"></script>
 <style>
 :root{
   --bg:#080808;--sur:#0f0f0f;--car:#141414;--car2:#1a1a1a;
@@ -1514,17 +1516,31 @@ textarea{resize:vertical;min-height:70px;}
 
 <script>
 // ═══════════════════════════════════════════════
-// CONFIGURACIÓN SUPABASE
-// Reemplazá SURL y SKEY con tu proyecto Supabase
+// CONFIGURACIÓN — cargada desde config.js
+// ¡NUNCA pongas credenciales en este archivo!
+// Copiá config.example.js → config.js y completá.
 // ═══════════════════════════════════════════════
-const SURL = 'https://xycagqxhpwrbdurrjkdl.supabase.co';
-const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Y2FncXhocHdyYmR1cnJqa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNDMxMTgsImV4cCI6MjA4ODgxOTExOH0.AfXJcUn2hNsLX8ooO1jwOF1ogTqDnSp1Up-Fv2tnKDQ';
-
-// ═══ CREDENCIALES SUPERADMIN (cambiá esto) ═══
-const SUPER_EMAIL = 'superadmin@sistema.com';
-const SUPER_PASS  = 'SuperAdmin2026!';
+if (typeof window.APP_CONFIG === 'undefined') {
+  document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#c9524c;font-family:sans-serif;text-align:center;padding:20px"><div><strong>Error de configuración</strong><br><br>Falta el archivo <code>config.js</code>.<br>Copiá <code>config.example.js</code> a <code>config.js</code> y completá tus credenciales.</div></div>';
+  throw new Error('APP_CONFIG no definido — falta config.js');
+}
+const SURL = window.APP_CONFIG.supabaseUrl;
+const SKEY = window.APP_CONFIG.supabaseAnonKey;
 
 const sb = supabase.createClient(SURL, SKEY);
+
+// ═══ ESCAPE DE HTML — previene XSS ═══
+// Usá esc() para todo valor de base de datos que se inserte en innerHTML.
+// DOMPurify está disponible para casos donde necesites renderizar HTML de usuario.
+function esc(v){
+  if(v===null||v===undefined) return '';
+  return String(v)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 
 // ═══ ESTADO GLOBAL ═══
 let currentUser = null;    // usuario Supabase Auth
@@ -1554,83 +1570,31 @@ async function doLogin(){
   const pass  = document.getElementById('loginPass').value.trim();
   if(!email || !pass) return;
 
-  // Detectar superadmin (no pasa por Supabase Auth)
-  if(email === SUPER_EMAIL.toLowerCase() && pass === SUPER_PASS){
-    currentRole = 'superadmin';
-    document.getElementById('loginScreen').style.display='none';
-  // Populate dynamic stock categories
-  setupCategoriasStock();
-  setupPreciosTabs();
-  // Mostrar cuotas y metas solo para finanzas personales
-  const rubroFin = (currentTenant?.rubro||'').toLowerCase();
-  const esFinanzas = rubroFin.includes('personal') || rubroFin.includes('pareja') || rubroFin.includes('hogar');
-  ['nav-cuotas','nav-metasPareja'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.style.display = esFinanzas ? '' : 'none';
-  });
-  
-  // Para finanzas personales, ocultar módulos de negocio
-  if(esFinanzas){
-    const ocultarFinanzas = [
-      'nav-ventas','nav-stock','nav-equipos','nav-taller','nav-clientes',
-      'nav-auditoria','nav-precios','nav-turnos','nav-turnosTec',
-      'nav-turnosFijos','nav-listaEspera','nav-turnosOnline'
-    ];
-    ocultarFinanzas.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
-    
-    // Ocultar secciones del dashboard que no aplican
-    const dashQuick = document.getElementById('dashQuickBtns');
-    if(dashQuick) dashQuick.style.display='none';
-    
-    const energyCard = document.getElementById('energyCard');
-    if(energyCard) energyCard.style.display='none';
-    
-    const objCard = document.getElementById('objetivosCompraCard');
-    if(objCard) objCard.style.display='none';
-  }
-  // Mostrar turnos técnicos solo en Remu (no salon)
-  const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
-  const navTec = document.getElementById('nav-turnosTec');
-  if(navTec) navTec.style.display = esSalonCheck ? 'none' : '';
-  
-  // Si es empleado, ocultar todo excepto turnos y fichas
-  if(currentRole === 'empleado'){
-    aplicarModoEmpleado();
-  }
-  // Auto backup diario
-  const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
-  const lastBackup = localStorage.getItem(hoyKey);
-  if(lastBackup !== tod()){
-    setTimeout(()=>{
-      autoBackup();
-      localStorage.setItem(hoyKey, tod());
-    }, 3000);
-  }
-  
-  // Poll for new solicitudes every 2 minutes
-  setTimeout(checkNuevasSolicitudes, 5000);
-  setInterval(checkNuevasSolicitudes, 120000);
-  // Resumen semanal los lunes
-  const diaSemana = new Date().getDay();
-  if(diaSemana === 1) setTimeout(mostrarResumenSemanal, 1500);
-    document.getElementById('superadminScreen').style.display='flex';
-    loadTenants();
-    loadSaStats();
-    return;
-  }
-
   const btn = document.getElementById('loginBtn');
   const err = document.getElementById('loginErr');
   const lod = document.getElementById('loginLoading');
   btn.disabled = true; err.style.display='none'; lod.style.display='block';
 
   try {
+    // Toda autenticación pasa por Supabase Auth — sin contraseñas hardcodeadas.
+    // El rol 'superadmin' se detecta por user_metadata.rol en el JWT de Supabase.
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     if(error) throw error;
 
     currentUser = data.user;
-    // Buscar tenant del usuario
+    const rol = data.user.user_metadata?.rol || 'admin';
+
+    // Superadmin: usuario creado en Supabase Auth con user_metadata.rol = 'superadmin'
+    if(rol === 'superadmin'){
+      currentRole = 'superadmin';
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('superadminScreen').style.display='flex';
+      loadTenants();
+      loadSaStats();
+      return;
+    }
+
+    // Usuarios regulares (admin, empleado)
     const { data: td, error: te } = await sb.from('tenants')
       .select('*')
       .eq('id', data.user.user_metadata?.tenant_id)
@@ -1640,15 +1604,15 @@ async function doLogin(){
     if(!td.activo) throw new Error('Cuenta desactivada. Contactá al administrador.');
 
     currentTenant = td;
-    const rolUsuario = data.user.user_metadata?.rol || 'admin';
     const nombreEmpleado = data.user.user_metadata?.nombre_empleado || '';
-    currentRole = rolUsuario;
+    currentRole = rol;
     if(nombreEmpleado) window.currentEmpleadoNombre = nombreEmpleado;
     setupApp();
     await loadAll();
   } catch(e) {
     err.textContent = e.message || 'Email o contraseña incorrectos';
     err.style.display='block';
+    console.error('Login error:', e.message);
   } finally {
     btn.disabled=false; lod.style.display='none';
   }
@@ -1838,7 +1802,7 @@ function toggleRolFields(rol){
 async function loadTenantsForSelect(){
   const { data } = await sb.from('tenants').select('id,nombre').eq('activo',true);
   const sel = document.getElementById('saTenantExistente');
-  if(sel && data) sel.innerHTML = data.map(t=>`<option value="${t.id}">${t.nombre}</option>`).join('');
+  if(sel && data) sel.innerHTML = data.map(t=>`<option value="${esc(t.id)}">${esc(t.nombre)}</option>`).join('');
 }
 
 async function crearUsuario(){
@@ -2454,7 +2418,7 @@ function updateStockNotif(){
     if(bajos.length > 0){
       banner.style.display = 'block';
       const top5 = bajos.slice(0,5);
-      banner.innerHTML = `⚠ <strong>${bajos.length} producto${bajos.length!==1?'s':''} con stock bajo:</strong> ${top5.map(s=>`${s.nombre} (${s.cantidad} uds)`).join(', ')}${bajos.length>5?` y ${bajos.length-5} más`:''}`;
+      banner.innerHTML = `⚠ <strong>${bajos.length} producto${bajos.length!==1?'s':''} con stock bajo:</strong> ${top5.map(s=>`${esc(s.nombre)} (${s.cantidad} uds)`).join(', ')}${bajos.length>5?` y ${bajos.length-5} más`:''}`;
     } else {
       banner.style.display = 'none';
     }
@@ -2468,8 +2432,8 @@ function rStock(){
   if(!items.length){ tb.innerHTML=`<tr><td colspan="8">${emp('📦','Sin productos')}</td></tr>`; return; }
   tb.innerHTML = items.map(s=>{
     const mg = s.precio&&s.costo ? Math.round((s.precio-s.costo)/s.precio*100) : null;
-    return `<tr><td><strong>${s.nombre}</strong>${s.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${s.notas}</span>`:''}</td>
-    <td><span class="bx bg2">${s.categoria}</span></td>
+    return `<tr><td><strong>${esc(s.nombre)}</strong>${s.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(s.notas)}</span>`:''}</td>
+    <td><span class="bx bg2">${esc(s.categoria)}</span></td>
     <td><strong>${s.cantidad}</strong> <span style="color:var(--mut);font-size:.69rem">mín ${s.minimo}</span></td>
     <td>${fmt(s.precio)}</td>
     <td>${mg!==null?`<span style="color:${mg>50?'var(--ok)':mg>30?'var(--wrn)':'var(--bad)'};font-weight:600">${mg}%</span>`:'—'}</td>
@@ -2517,9 +2481,9 @@ function rEquipos(){
   if(!items.length){ tb.innerHTML=`<tr><td colspan="9">${emp('📱','Sin equipos')}</td></tr>`; return; }
   tb.innerHTML = items.map(e=>{
     const bc = !e.bateria?'mut':e.bateria>80?'ok':e.bateria>50?'wrn':'bad';
-    return `<tr><td><strong>${e.modelo}</strong>${e.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${e.notas}</span>`:''}</td>
-    <td style="font-size:.71rem;color:var(--mut)">${e.imei||'—'}</td><td>${e.memoria}</td><td>${e.color||'—'}</td>
-    <td style="color:var(--${bc})">${e.bateria?e.bateria+'%':'—'}</td><td>${e.estadoFisico||'—'}</td><td>${fmt(e.precio)}</td>
+    return `<tr><td><strong>${esc(e.modelo)}</strong>${e.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(e.notas)}</span>`:''}</td>
+    <td style="font-size:.71rem;color:var(--mut)">${esc(e.imei||'—')}</td><td>${esc(e.memoria)}</td><td>${esc(e.color||'—')}</td>
+    <td style="color:var(--${bc})">${e.bateria?e.bateria+'%':'—'}</td><td>${esc(e.estadoFisico||'—')}</td><td>${fmt(e.precio)}</td>
     <td>${e.tipo==='nuevo'?`<span class="bx bbl">Nuevo</span>`:`<span class="bx byw">Usado</span>`}</td>
     <td style="display:flex;gap:3px;flex-wrap:wrap">
       ${e.estado!=='vendido'?`<button class="btn bs bsm" onclick="mVendido(${e.id})">✓</button>`:`<span class="bx bgx">Vendido</span>`}
@@ -2533,10 +2497,10 @@ function rEquipos(){
 function popVSels(){
   const catF = document.getElementById('vCatFilt')?.value||'';
   const prodOpts = S.stock.filter(s=>s.cantidad>0&&(!catF||s.categoria===catF));
-  const optsHtml = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${s.nombre} (×${s.cantidad})</option>`).join('');
+  const optsHtml = prodOpts.map(s=>`<option value="${s.id}" data-precio="${s.precio}" data-costo="${s.costo}">${esc(s.nombre)} (×${s.cantidad})</option>`).join('');
   document.getElementById('vProd').innerHTML = (optsHtml||'') + '<option value="__nuevo__">➕ Agregar producto nuevo...</option>';
   autoFillPrecio();
-  document.getElementById('vEq').innerHTML = S.equipos.filter(e=>e.estado==='disponible').map(e=>`<option value="${e.id}">${e.modelo} ${e.memoria}${e.tipo==='usado'?' (Usado)':''} — ${fmt(e.precio)}</option>`).join('')||'<option>Sin equipos</option>';
+  document.getElementById('vEq').innerHTML = S.equipos.filter(e=>e.estado==='disponible').map(e=>`<option value="${e.id}">${esc(e.modelo)} ${esc(e.memoria)}${e.tipo==='usado'?' (Usado)':''} — ${fmt(e.precio)}</option>`).join('')||'<option>Sin equipos</option>';
 }
 
 function uVUI(){
@@ -2651,10 +2615,10 @@ function rVentas(){
   if(!S.ventas.length){ tb.innerHTML=`<tr><td colspan="7">${emp('💰','Sin ventas')}</td></tr>`; return; }
   tb.innerHTML = S.ventas.map(v=>`<tr>
     <td>${fD(v.fecha)}</td>
-    <td>${v.nombre}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}</td>
+    <td>${esc(v.nombre)}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}</td>
     <td>${v.cantidad}</td><td>${fmt(v.precio)}</td>
     <td><strong style="color:var(--gld)">${fmt(v.tipo==='equipo'&&v.comision?v.comision:v.total)}</strong></td>
-    <td><span class="bx bg2">${v.metodo}</span></td>
+    <td><span class="bx bg2">${esc(v.metodo)}</span></td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mVenta',${v.id})">✎</button><button class="btn bd bsm" onclick="delVenta(${v.id})">✕</button></td>
   </tr>`).join('');
 }
@@ -2694,7 +2658,7 @@ function autocompleteCli(val){
   const clientes = [...new Set(S.reparaciones.map(r=>r.cliente).filter(c=>c&&c.toLowerCase().includes(val.toLowerCase())))].slice(0,5);
   if(!clientes.length){ box.style.display='none'; return; }
   box.style.display='block';
-  box.innerHTML = clientes.map(c=>`<div onclick="selCli('${c.replace(/'/g,"\'")}')" style="padding:9px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--bor)">${c}</div>`).join('');
+  box.innerHTML = clientes.map(c=>`<div data-nombre="${esc(c)}" onclick="selCli(this.dataset.nombre)" style="padding:9px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--bor)">${esc(c)}</div>`).join('');
 }
 function selCli(nombre){
   document.getElementById('tCli').value = nombre;
@@ -2792,7 +2756,7 @@ async function delRep(id){
 function openAv(id){
   avId=id; const r=S.reparaciones.find(r=>r.id===id);
   const est=ESTS.find(e=>e.k===r.estado);
-  document.getElementById('avInfo').innerHTML=`<strong style="color:var(--tx)">${r.cliente}</strong> — ${r.equipo||'trabajo'}<br>Estado actual: <span class="bx ${est?.c||'bgx'}">${est?.l||r.estado}</span>`;
+  document.getElementById('avInfo').innerHTML=`<strong style="color:var(--tx)">${esc(r.cliente)}</strong> — ${esc(r.equipo||'trabajo')}<br>Estado actual: <span class="bx ${esc(est?.c||'bgx')}">${esc(est?.l||r.estado)}</span>`;
   document.getElementById('avEst').value=r.estado;document.getElementById('avNot').value='';document.getElementById('waH').style.display='none';
   openM('mAv',null);
 }
@@ -2976,7 +2940,7 @@ function rGastos(){
   document.getElementById('gStats').innerHTML=`<div class="stat"><div class="sl">Total este mes</div><div class="sv" style="color:var(--bad)">${fmt(tM)}</div></div><div class="stat"><div class="sl">Fijos mensuales</div><div class="sv">${fmt(tF)}</div><div class="ss">Variable este mes: ${fmt(tV)}</div></div>`;
   const tb=document.getElementById('tbG');const tc={fijo:'brd',variable:'byw',proveedor:'bbl'};
   if(!S.gastos.length){tb.innerHTML=`<tr><td colspan="5">${emp('🧾','Sin gastos')}</td></tr>`;return;}
-  tb.innerHTML=S.gastos.map(g=>`<tr><td><strong>${g.concepto}</strong>${g.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${g.notas}</span>`:''}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${g.tipo}</span></td><td><strong>${fmt(g.monto)}</strong></td><td>${fD(g.fecha)}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`).join('');
+  tb.innerHTML=S.gastos.map(g=>`<tr><td><strong>${esc(g.concepto)}</strong>${g.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(g.notas)}</span>`:''}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td>${fD(g.fecha)}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`).join('');
 }
 
 // ═══ PRECIOS ═══
@@ -3060,11 +3024,11 @@ function rPrecios(){
   const dc={disponible:'bgr',consultar:'byw','no disponible':'brd'};
   if(!items.length){tb.innerHTML=`<tr><td colspan="6">${emp('🔧','Sin servicios en esta categoría')}</td></tr>`;return;}
   tb.innerHTML=items.map(p=>`<tr>
-    <td><strong>${p.nombre}</strong></td>
-    <td style="font-size:.78rem;color:var(--tx2)">${p.modelo||'—'}</td>
+    <td><strong>${esc(p.nombre)}</strong></td>
+    <td style="font-size:.78rem;color:var(--tx2)">${esc(p.modelo||'—')}</td>
     <td><strong style="color:var(--gld);font-size:.95rem">${fmt(p.precio)}</strong></td>
-    <td><span class="bx ${dc[p.disponibilidad]||'bgx'}">${p.disponibilidad}</span></td>
-    <td style="font-size:.75rem;color:var(--mut)">${p.notas||'—'}</td>
+    <td><span class="bx ${dc[p.disponibilidad]||'bgx'}">${esc(p.disponibilidad)}</span></td>
+    <td style="font-size:.75rem;color:var(--mut)">${esc(p.notas||'—')}</td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mPrecio',${p.id})">✎</button><button class="btn bd bsm" onclick="delPrecio(${p.id})">✕</button></td>
   </tr>`).join('');
 }
@@ -7059,14 +7023,14 @@ function rClientes(){
     const total = c.trabajos.reduce((a,t)=>a+(t.presupuesto||0),0);
     return `<div style="padding:14px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div>
-        <div style="font-weight:600;font-size:.9rem">${c.nombre}</div>
-        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${c.tel?'📱 '+c.tel:'Sin teléfono'} · ${c.trabajos.length} trabajo${c.trabajos.length!==1?'s':''} · Última visita: ${c.ultimaVisita?fD(c.ultimaVisita):'—'}</div>
+        <div style="font-weight:600;font-size:.9rem">${esc(c.nombre)}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${c.tel?'📱 '+esc(c.tel):'Sin teléfono'} · ${c.trabajos.length} trabajo${c.trabajos.length!==1?'s':''} · Última visita: ${c.ultimaVisita?fD(c.ultimaVisita):'—'}</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         ${activos>0?`<span class="bx byw">${activos} activo${activos!==1?'s':''}</span>`:''}
         <span style="font-size:.8rem;color:var(--gld);font-weight:600">${fmt(total)}</span>
         ${c.tel?`<button class="btn bs bsm" onclick="window.open('https://wa.me/54${c.tel.replace(/\D/g,'')}')">📲 WA</button>`:''}
-        <button class="btn be bsm" onclick="verHistorial('${c.nombre.replace(/'/g,"\'")}')">Historial</button>
+        <button class="btn be bsm" data-nombre="${esc(c.nombre)}" onclick="verHistorial(this.dataset.nombre)">Historial</button>
       </div>
     </div>`;
   }).join('');
@@ -7076,13 +7040,13 @@ function verHistorial(nombre){
   const trabajos = S.reparaciones.filter(r=>r.cliente===nombre).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const ventas = S.ventas ? [] : [];
   const html = `<div style="padding:16px">
-    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:12px">📋 Historial — ${nombre}</div>
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:12px">📋 Historial — ${esc(nombre)}</div>
     ${trabajos.map(t=>`<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;font-size:.82rem">
-        <span style="font-weight:600">${t.equipo||'Trabajo'}</span>
-        <span class="bx ${t.estado==='entregado'?'bgx':t.estado==='listo'?'bgr':t.estado==='proceso'?'byw':'bbl'}">${t.estado}</span>
+        <span style="font-weight:600">${esc(t.equipo||'Trabajo')}</span>
+        <span class="bx ${t.estado==='entregado'?'bgx':t.estado==='listo'?'bgr':t.estado==='proceso'?'byw':'bbl'}">${esc(t.estado)}</span>
       </div>
-      <div style="font-size:.75rem;color:var(--tx2);margin-top:4px">${t.falla||''} · ${fD(t.fecha)} · ${fmt(t.presupuesto||0)}</div>
+      <div style="font-size:.75rem;color:var(--tx2);margin-top:4px">${esc(t.falla||'')} · ${fD(t.fecha)} · ${fmt(t.presupuesto||0)}</div>
     </div>`).join('')}
     ${!trabajos.length?'<div style="color:var(--mut);font-size:.82rem">Sin trabajos</div>':''}
   </div>`;
@@ -7110,8 +7074,8 @@ function gsSearch(q){
   const stocks = S.stock.filter(s=>s.nombre&&s.nombre.toLowerCase().includes(ql)).slice(0,4);
   if(stocks.length){
     results.push('<div class="gsr-section">📦 Stock</div>');
-    stocks.forEach(s=>results.push(`<div class="gsr-item" onclick="go('stock');document.getElementById('sQ').value='${s.nombre.replace(/'/g,"\'")}';rStock();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
-      <div><div class="gsr-name">${s.nombre}</div><div class="gsr-sub">${s.categoria} · ${s.cantidad} uds · ${fmt(s.precio)}</div></div>
+    stocks.forEach(s=>results.push(`<div class="gsr-item" data-nombre="${esc(s.nombre)}" onclick="go('stock');document.getElementById('sQ').value=this.dataset.nombre;rStock();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+      <div><div class="gsr-name">${esc(s.nombre)}</div><div class="gsr-sub">${esc(s.categoria)} · ${s.cantidad} uds · ${fmt(s.precio)}</div></div>
       <span class="bx ${s.cantidad<=s.minimo?'brd':'bgr'}">${s.cantidad<=s.minimo?'Bajo':'OK'}</span>
     </div>`));
   }
@@ -7120,8 +7084,8 @@ function gsSearch(q){
   const clientes = getClientes().filter(c=>c.nombre.toLowerCase().includes(ql)||c.tel.includes(ql)).slice(0,3);
   if(clientes.length){
     results.push('<div class="gsr-section">👥 Clientes</div>');
-    clientes.forEach(c=>results.push(`<div class="gsr-item" onclick="go('clientes');document.getElementById('cliQ').value='${c.nombre.replace(/'/g,"\'")}';rClientes();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
-      <div><div class="gsr-name">${c.nombre}</div><div class="gsr-sub">${c.tel||'Sin tel'} · ${c.trabajos.length} trabajos</div></div>
+    clientes.forEach(c=>results.push(`<div class="gsr-item" data-nombre="${esc(c.nombre)}" onclick="go('clientes');document.getElementById('cliQ').value=this.dataset.nombre;rClientes();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+      <div><div class="gsr-name">${esc(c.nombre)}</div><div class="gsr-sub">${esc(c.tel||'Sin tel')} · ${c.trabajos.length} trabajos</div></div>
     </div>`));
   }
 
@@ -7130,8 +7094,8 @@ function gsSearch(q){
   if(trabajos.length){
     results.push('<div class="gsr-section">🔧 Trabajos</div>');
     trabajos.forEach(t=>results.push(`<div class="gsr-item" onclick="go('taller');document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
-      <div><div class="gsr-name">${t.cliente}</div><div class="gsr-sub">${t.equipo||''} · ${t.falla||''} · ${t.estado}</div></div>
-      <span class="bx byw">${t.estado}</span>
+      <div><div class="gsr-name">${esc(t.cliente)}</div><div class="gsr-sub">${esc(t.equipo||'')} · ${esc(t.falla||'')} · ${esc(t.estado)}</div></div>
+      <span class="bx byw">${esc(t.estado)}</span>
     </div>`));
   }
 
