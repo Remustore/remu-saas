@@ -345,6 +345,32 @@ textarea{resize:vertical;min-height:70px;}
 
 /* MÓDULOS deshabilitados */
 .module-disabled{display:none !important;}
+
+/* ── MEJORAS MOBILE ── */
+@media(max-width:768px){
+  /* Sidebar nav items más grandes para touch */
+  .ni{padding:15px 16px;font-size:.9rem;min-height:48px;}
+  .nico{font-size:1rem;width:22px;}
+  /* Logo sidebar más compacto */
+  .la{padding:18px 16px 14px;}
+  .lm{font-size:.95rem;}
+  /* Topbar: ocultar búsqueda global en mobile muy pequeño */
+  #globalSearchWrap{display:none;}
+  /* Stats cards en mobile */
+  .stat{padding:14px;}
+  .sv{font-size:1.5rem !important;}
+  /* Botones de acción flotantes — más visibles */
+  .btn{min-height:42px;}
+  .bg{font-size:.85rem;}
+  /* Filas de tabla más compactas */
+  td,th{padding:9px 8px;}
+  /* Gastos/caja label */
+  .pt{font-size:1.05rem;}
+}
+/* Nav item seleccionado — dorado más visible en mobile */
+@media(max-width:768px){
+  .ni.active{background:var(--gld2);border-left:3px solid var(--gld);padding-left:13px;}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -540,31 +566,27 @@ textarea{resize:vertical;min-height:70px;}
     <div class="ls" id="sbSub">Sistema de Gestión</div>
   </div>
   <div class="ns">Principal</div>
-  <div class="ni" onclick="go('dashboard')"><span class="nico">◈</span>Dashboard</div>
-  <div class="ni" onclick="go('ventas')" id="nav-ventas"><span class="nico">◆</span>Ventas</div>
-  <div class="ns">Inventario</div>
-  <div class="ni" onclick="go('stock')" id="nav-stock"><span class="nico">▣</span>Stock<span id="stockBadge" class="nav-badge" style="display:none">0</span></div>
-  <div class="ni" onclick="go('equipos')" id="nav-equipos"><span class="nico">▤</span>Equipos</div>
-  <div class="ns">Operaciones</div>
-  <div class="ni" onclick="go('taller')" id="nav-taller"><span class="nico">◉</span>Taller/Servicios</div>
-  <div class="ni" onclick="go('clientes')" id="nav-clientes"><span class="nico">👥</span>Clientes</div>
-  <div class="ni" onclick="go('auditoria')" id="nav-auditoria"><span class="nico">📋</span>Control Stock</div>
-  <div class="ni" onclick="go('turnos')" id="nav-turnos"><span class="nico">📆</span>Turnos</div>
-  <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec"><span class="nico">🔧</span>Turnos técnicos</div>
-  <div class="ni" onclick="go('fichasClientes')" id="nav-fichas"><span class="nico">📋</span>Fichas</div>
-  <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos"><span class="nico">🔒</span>Turnos fijos</div>
-  <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera"><span class="nico">⏳</span>Lista de espera</div>
-  <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra"><span class="nico">🎯</span>Objetivos de compra</div>
-  <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline"><span class="nico">🔗</span>Turnos online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
-  <div class="ni" onclick="go('gastos')" id="nav-gastos"><span class="nico">◎</span>Gastos</div>
-  <div class="ns">Análisis</div>
-  <div class="ni" onclick="go('analisis')" id="nav-analisis"><span class="nico">◈</span>Análisis</div>
-  <div class="ns" id="ns-precios">Catálogo</div>
-  <div class="ni" onclick="go('precios')" id="nav-precios"><span class="nico">◎</span>Lista de precios</div>
-  <div class="ns" id="ns-inversores">Finanzas</div>
-  <div class="ni" onclick="go('inversores')" id="nav-inversores"><span class="nico">◈</span>Inversores</div>
-  <div class="ni" onclick="go('cuotas')" id="nav-cuotas"><span class="nico">💳</span>Cuotas</div>
-  <div class="ni" onclick="go('metasPareja')" id="nav-metasPareja"><span class="nico">🎯</span>Metas</div>
+  <div class="ni" onclick="go('dashboard')"><span class="nico">◈</span>Inicio</div>
+  <!-- TALLER DE CELULARES -->
+  <div class="ni" onclick="go('taller')" id="nav-taller" style="display:none"><span class="nico">🔧</span>Reparaciones</div>
+  <div class="ni" onclick="go('ventas')" id="nav-ventas" style="display:none"><span class="nico">💰</span>Ventas</div>
+  <div class="ni" onclick="go('stock')" id="nav-stock" style="display:none"><span class="nico">📦</span>Productos<span id="stockBadge" class="nav-badge" style="display:none">0</span></div>
+  <!-- BARBERÍA / SALÓN -->
+  <div class="ni" onclick="go('turnos')" id="nav-turnos" style="display:none"><span class="nico">📆</span>Agenda del día</div>
+  <div class="ni" onclick="go('clientes')" id="nav-clientes" style="display:none"><span class="nico">👥</span>Clientes</div>
+  <!-- COMPARTIDOS -->
+  <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline" style="display:none"><span class="nico">🔗</span>Reservas online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('gastos')" id="nav-gastos" style="display:none"><span class="nico">💵</span>Caja y Gastos</div>
+  <div class="ni" onclick="go('analisis')" id="nav-analisis" style="display:none"><span class="nico">📊</span>Análisis</div>
+  <div class="ni" onclick="go('precios')" id="nav-precios" style="display:none"><span class="nico">🏷</span>Mis precios</div>
+  <!-- INTERNOS (siempre ocultos en sidebar) -->
+  <div class="ni" onclick="go('equipos')" id="nav-equipos" style="display:none"><span class="nico">▤</span>Equipos</div>
+  <div class="ni" onclick="go('auditoria')" id="nav-auditoria" style="display:none"><span class="nico">📋</span>Control Stock</div>
+  <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec" style="display:none"><span class="nico">🔧</span>Turnos técnicos</div>
+  <div class="ni" onclick="go('fichasClientes')" id="nav-fichas" style="display:none"><span class="nico">📋</span>Fichas</div>
+  <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos" style="display:none"><span class="nico">🔒</span>Turnos fijos</div>
+  <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico">⏳</span>Lista de espera</div>
+  <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico">🎯</span>Objetivos de compra</div>
   <div class="sbf" id="sbFooter">
     <div style="font-weight:600;margin-bottom:4px" id="sbBizName"></div>
     <div id="sbUserEmail" style="margin-bottom:10px"></div>
@@ -800,10 +822,27 @@ textarea{resize:vertical;min-height:70px;}
     <!-- CLIENTES -->
     <div class="sec" id="sec-clientes">
       <div class="pt">Clientes</div>
-      <div class="ps">Historial y datos de contacto</div>
+      <div class="ps">Historial, visitas y fidelización</div>
+      <!-- Fidelización config -->
+      <div class="card" id="fidelCard" style="margin-bottom:14px;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-weight:600;font-size:.88rem">🎁 Alerta de fidelización</div>
+            <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">Avisarte cuando un cliente alcanza cierta cantidad de visitas</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:8px">
+              <label style="font-size:.78rem;color:var(--tx2)">Alertar cada</label>
+              <input type="number" id="fidelUmbral" min="1" max="99" value="10" style="width:60px;padding:6px 10px;text-align:center;font-size:.9rem;font-weight:700" oninput="saveFidelUmbral()">
+              <label style="font-size:.78rem;color:var(--tx2)">visitas</label>
+            </div>
+          </div>
+        </div>
+        <div id="fidelStats" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"></div>
+      </div>
       <div class="card">
         <div class="ch">
-          <div class="srch"><span>⌕</span><input id="cliQ" placeholder="Buscar cliente..." oninput="rClientes()"></div>
+          <div class="srch"><span>⌕</span><input id="cliQ" placeholder="Buscar cliente por nombre o teléfono..." oninput="rClientes()"></div>
         </div>
         <div id="cliList"></div>
       </div>
@@ -1697,72 +1736,13 @@ function setupApp(){
   // Aplicar branding del negocio
   applyBranding();
 
-  // Aplicar módulos habilitados
-  const mods = currentTenant.modulos || {};
-  const modMap = {
-    ventas: ['nav-ventas','sec-ventas'],
-    stock:  ['nav-stock','sec-stock','nav-auditoria','sec-auditoria'],
-    equipos:['nav-equipos','sec-equipos'],
-    taller: ['nav-taller','sec-taller','nav-clientes','sec-clientes','nav-agendaTecnico','sec-agendaTecnico'],
-    gastos: ['nav-gastos','sec-gastos'],
-    analisis:['nav-analisis','sec-analisis'],
-    precios:['nav-precios','sec-precios','ns-precios'],
-    inversores:['nav-inversores','sec-inversores','ns-inversores'],
-  };
-  Object.entries(modMap).forEach(([key, ids]) => {
-    const enabled = mods[key] !== false; // default true si no está en el objeto
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if(el) el.style.display = enabled ? '' : 'none';
-    });
-  
-  // Para barbería: forzar ocultar módulos de servicio técnico
-  const rubroB = (currentTenant?.rubro||'').toLowerCase();
-  const esBarberia2 = rubroB.includes('barberia')||rubroB.includes('barbería');
-  if(esBarberia2){
-    ['nav-taller','nav-clientes','nav-equipos','nav-auditoria',
-     'nav-stock','nav-ventas','nav-turnosTec','nav-inversores'].forEach(id=>{
-      const el=document.getElementById(id); if(el) el.style.display='none';
-    });
-  }
-  });
+  // Aplicar módulos según el rubro del tenant
+  aplicarModulosPorRubro(currentTenant.rubro||'');
 
   document.getElementById('loginScreen').style.display='none';
   // Populate dynamic stock categories
   setupCategoriasStock();
   setupPreciosTabs();
-  // Mostrar cuotas y metas solo para finanzas personales
-  const rubroFin = (currentTenant?.rubro||'').toLowerCase();
-  const esFinanzas = rubroFin.includes('personal') || rubroFin.includes('pareja') || rubroFin.includes('hogar');
-  ['nav-cuotas','nav-metasPareja'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.style.display = esFinanzas ? '' : 'none';
-  });
-  
-  // Para finanzas personales, ocultar módulos de negocio
-  if(esFinanzas){
-    const ocultarFinanzas = [
-      'nav-ventas','nav-stock','nav-equipos','nav-taller','nav-clientes',
-      'nav-auditoria','nav-precios','nav-turnos','nav-turnosTec',
-      'nav-turnosFijos','nav-listaEspera','nav-turnosOnline'
-    ];
-    ocultarFinanzas.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
-    
-    // Ocultar secciones del dashboard que no aplican
-    const dashQuick = document.getElementById('dashQuickBtns');
-    if(dashQuick) dashQuick.style.display='none';
-    
-    const energyCard = document.getElementById('energyCard');
-    if(energyCard) energyCard.style.display='none';
-    
-    const objCard = document.getElementById('objetivosCompraCard');
-    if(objCard) objCard.style.display='none';
-  }
-  // Mostrar turnos técnicos solo en Remu (no salon)
-  const rubroCheck = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonCheck = rubroCheck.includes('salon')||rubroCheck.includes('belleza')||rubroCheck.includes('peluq')||rubroCheck.includes('manicur')||rubroCheck.includes('barberia')||rubroCheck.includes('barbería');
-  const navTec = document.getElementById('nav-turnosTec');
-  if(navTec) navTec.style.display = esSalonCheck ? 'none' : '';
   
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
@@ -2313,7 +2293,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Dashboard', ventas:'Ventas', stock:'Stock', equipos:'Equipos', taller:'Taller / Servicios', clientes:'Clientes', auditoria:'Control Stock', agendaTecnico:'Agenda técnica', turnos:'Turnos', turnosConfig:'Configuración Turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Turnos online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Gastos', analisis:'Análisis', precios:'Lista de Precios', inversores:'Inversores', cuotas:'Cuotas', metasPareja:'Metas' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración de turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', cuotas:'Cuotas', metasPareja:'Metas' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -7247,39 +7227,70 @@ function updateDashParejaCard(){
 function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
 
 function getClientes(){
+  const r = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonRubro = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur');
   const mapa = {};
-  S.reparaciones.forEach(r=>{
-    if(!r.cliente) return;
-    const k = r.cliente.toLowerCase();
-    if(!mapa[k]){
-      mapa[k] = { nombre: r.cliente, tel: r.tel||'', trabajos: [], ultimaVisita: r.fecha||'' };
-    }
-    mapa[k].trabajos.push(r);
-    if((r.fecha||'') > mapa[k].ultimaVisita) mapa[k].ultimaVisita = r.fecha;
-    if(r.tel && !mapa[k].tel) mapa[k].tel = r.tel;
-  });
+  const agregar = (nombre, tel, fecha, gasto, servicio)=>{
+    if(!nombre) return;
+    const k = nombre.toLowerCase();
+    if(!mapa[k]) mapa[k] = {nombre, tel:tel||'', visitas:0, gasto:0, ultimaVisita:'', servicios:[]};
+    mapa[k].visitas++;
+    mapa[k].gasto += gasto||0;
+    if((fecha||'') > mapa[k].ultimaVisita) mapa[k].ultimaVisita = fecha||'';
+    if(tel && !mapa[k].tel) mapa[k].tel = tel;
+    if(servicio) mapa[k].servicios.push(servicio);
+  };
+  if(esSalonRubro && typeof getTurnos==='function'){
+    getTurnos().filter(t=>t.estado==='terminado').forEach(t=>agregar(t.cliente,t.tel,t.fecha,t.precio||0,t.servicioNombre));
+  } else {
+    S.reparaciones.forEach(r=>agregar(r.cliente,r.tel,r.fecha,r.presupuesto||0,r.equipo));
+  }
   return Object.values(mapa).sort((a,b)=>b.ultimaVisita.localeCompare(a.ultimaVisita));
+}
+
+function saveFidelUmbral(){
+  const v = parseInt(document.getElementById('fidelUmbral')?.value||'10');
+  if(v>0) dbSetConfig('fidelUmbral', v);
 }
 
 function rClientes(){
   const q = (document.getElementById('cliQ')?.value||'').toLowerCase();
-  const clientes = getClientes().filter(c=>!q||c.nombre.toLowerCase().includes(q)||c.tel.includes(q));
+  const todos = getClientes();
+  const clientes = todos.filter(c=>!q||c.nombre.toLowerCase().includes(q)||(c.tel||'').includes(q));
   const box = document.getElementById('cliList');
   if(!box) return;
-  if(!clientes.length){ box.innerHTML=`<div class="emp"><div class="ei">👥</div><div>Sin clientes registrados</div><div style="font-size:.75rem;color:var(--mut)">Los clientes se agregan automáticamente al crear trabajos en Taller</div></div>`; return; }
+  const r = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonR = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur');
+  // Mostrar fidelización card para salones/barberías
+  const fCard = document.getElementById('fidelCard');
+  if(fCard) fCard.style.display = esSalonR ? '' : 'none';
+  if(esSalonR){
+    const umbral = parseInt(dbGetConfig('fidelUmbral')||'10');
+    const inp = document.getElementById('fidelUmbral');
+    if(inp) inp.value = umbral;
+    const cerca = todos.filter(c=>c.visitas>0 && c.visitas%umbral===0).slice(0,5);
+    const fStats = document.getElementById('fidelStats');
+    if(fStats) fStats.innerHTML = cerca.length ? cerca.map(c=>`<div style="background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:8px;padding:8px 12px;font-size:.8rem"><div style="font-weight:700;color:var(--gld)">${esc(c.nombre)}</div><div style="color:var(--tx2);margin-top:2px">🎉 ${c.visitas} visitas — ¡fidelización!</div></div>`).join('') : `<div style="font-size:.78rem;color:var(--mut)">Nadie alcanzó el umbral aún. Umbral actual: cada ${umbral} visitas.</div>`;
+  }
+  if(!clientes.length){
+    box.innerHTML=`<div class="emp"><div class="ei">👥</div><div>Sin clientes registrados</div><div style="font-size:.75rem;color:var(--mut)">${esSalonR?'Los clientes se registran al completar turnos':'Los clientes se agregan al crear trabajos en Reparaciones'}</div></div>`;
+    return;
+  }
+  const umbral = esSalonR ? parseInt(dbGetConfig('fidelUmbral')||'10') : 0;
   box.innerHTML = clientes.map(c=>{
-    const activos = c.trabajos.filter(t=>t.estado!=='entregado').length;
-    const total = c.trabajos.reduce((a,t)=>a+(t.presupuesto||0),0);
+    const visitasBadge = esSalonR ? `<span class="bx bbl" style="font-weight:700">${c.visitas} visita${c.visitas!==1?'s':''}</span>` : '';
+    const fidelBadge = esSalonR && umbral>0 && c.visitas%umbral===0 && c.visitas>0 ? `<span class="bx" style="background:rgba(201,168,76,.18);color:var(--gld);border:1px solid var(--gld)">🎁 Premio</span>` : '';
+    const activos = esSalonR ? 0 : (c.trabajos||[]).filter(t=>t.estado!=='entregado').length;
     return `<div style="padding:14px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div>
+      <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:.9rem">${esc(c.nombre)}</div>
-        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${c.tel?'📱 '+esc(c.tel):'Sin teléfono'} · ${c.trabajos.length} trabajo${c.trabajos.length!==1?'s':''} · Última visita: ${c.ultimaVisita?fD(c.ultimaVisita):'—'}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${c.tel?'📱 '+esc(c.tel):'Sin teléfono'} · Última visita: ${c.ultimaVisita?fD(c.ultimaVisita):'—'} · Total gastado: <strong>${fmt(c.gasto)}</strong></div>
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
+        ${visitasBadge}${fidelBadge}
         ${activos>0?`<span class="bx byw">${activos} activo${activos!==1?'s':''}</span>`:''}
-        <span style="font-size:.8rem;color:var(--gld);font-weight:600">${fmt(total)}</span>
         ${c.tel?`<button class="btn bs bsm" onclick="window.open('https://wa.me/54${c.tel.replace(/\D/g,'')}')">📲 WA</button>`:''}
-        <button class="btn be bsm" data-nombre="${esc(c.nombre)}" onclick="verHistorial(this.dataset.nombre)">Historial</button>
+        ${!esSalonR?`<button class="btn be bsm" data-nombre="${esc(c.nombre)}" onclick="verHistorial(this.dataset.nombre)">Historial</button>`:''}
       </div>
     </div>`;
   }).join('');
@@ -7287,7 +7298,7 @@ function rClientes(){
 
 function verHistorial(nombre){
   const trabajos = S.reparaciones.filter(r=>r.cliente===nombre).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-  const ventas = S.ventas ? [] : [];
+  const ventas = [];
   const html = `<div style="padding:16px">
     <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:12px">📋 Historial — ${esc(nombre)}</div>
     ${trabajos.map(t=>`<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px">
@@ -7436,6 +7447,34 @@ function applyColor(color){
   document.documentElement.style.setProperty('--gld2', `rgba(${r},${g},${b},0.13)`);
   document.documentElement.style.setProperty('--gld3', `rgba(${r},${g},${b},0.06)`);
   document.documentElement.style.setProperty('--accent', color);
+}
+
+// ═══ DETECCIÓN DE MÓDULOS POR RUBRO ═══
+function aplicarModulosPorRubro(rubro){
+  const r = (rubro||'').toLowerCase();
+  const esTaller   = r.includes('taller')||r.includes('celular')||r.includes('reparac')||r.includes('tecnico')||r.includes('técnico');
+  const esBarberia = r.includes('barberia')||r.includes('barbería');
+  const esSalon    = r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('pestañ');
+
+  const showNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
+
+  // Todo oculto por defecto (ya están ocultos en el HTML con display:none)
+  // Sólo mostramos lo que corresponde al rubro
+
+  if(esTaller){
+    // 🔧 TALLER DE CELULARES
+    showNav('nav-taller','nav-stock','nav-ventas','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
+  } else if(esBarberia){
+    // ✂️ BARBERÍA
+    showNav('nav-turnos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios');
+  } else if(esSalon){
+    // 💅 SALÓN DE BELLEZA
+    showNav('nav-turnos','nav-turnosOnline','nav-clientes','nav-stock','nav-gastos','nav-analisis','nav-precios');
+  } else {
+    // Rubro no reconocido: mostrar todo para que nada quede oculto
+    showNav('nav-taller','nav-stock','nav-ventas','nav-turnos','nav-turnosOnline',
+            'nav-clientes','nav-gastos','nav-analisis','nav-precios');
+  }
 }
 
 function applyBranding(){
