@@ -353,6 +353,9 @@ textarea{resize:vertical;min-height:70px;}
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- ONBOARDING WIZARD -->
+<div id="onboardingScreen" style="position:fixed;inset:0;background:#080808;z-index:9000;display:none;overflow-y:auto;font-family:'Outfit',sans-serif"></div>
+
 <!-- LOADING -->
 <div id="loadingScreen">
   <div class="load-logo" id="loadLogo">SISTEMA</div>
@@ -2247,6 +2250,13 @@ async function loadAll(){
     renderAll();
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
+    // Onboarding wizard for fresh accounts
+    const _owKey = 'onboarding_v1_' + (currentTenant?.id||'');
+    if(!localStorage.getItem(_owKey)){
+      const _fresh = !S.precios.length && !S.reparaciones.length && !S.ventas.length;
+      if(_fresh) showOnboardingWizard();
+      else localStorage.setItem(_owKey, '1');
+    }
   }catch(e){ console.error('Load error', e); }
   document.getElementById('loadingScreen').style.display='none';
 }
@@ -7584,6 +7594,281 @@ async function silentRefresh(){
   }catch(e){}
 }
 setInterval(silentRefresh, 30000);
+
+// ═══════════════════════════════════════════════════════════════
+// ONBOARDING WIZARD
+// ═══════════════════════════════════════════════════════════════
+const _OB  = "width:100%;background:#0d0d0d;border:1px solid #222;color:#f5f0e8;padding:11px 14px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.87rem;outline:none;display:block;box-sizing:border-box;";
+const _OBP = "padding:12px 20px;background:#c9a84c;color:#080808;border:none;border-radius:9px;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;";
+const _OBO = "padding:12px 20px;background:transparent;color:#a89880;border:1px solid #2e2e2e;border-radius:9px;font-family:'Outfit',sans-serif;font-size:.88rem;cursor:pointer;";
+const _OBL = "display:block;font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;";
+let __ow   = {};
+
+function showOnboardingWizard(){
+  const scr = document.getElementById('onboardingScreen');
+  if(!scr) return;
+  const oc = getOnlineCfg(), tc = getTurnosCfg();
+  __ow = {
+    step: 0,
+    info: { mensaje: oc.mensaje||'', direccion: oc.direccion||'', insta: oc.insta||'' },
+    svcs: [], emps: [],
+    hrs: { apertura: tc.apertura||'09:00', cierre: tc.cierre||'20:00', dias: tc.dias||[1,2,3,4,5,6] }
+  };
+  scr.style.display = 'block';
+  _owR();
+}
+
+function _owR(){
+  const scr = document.getElementById('onboardingScreen');
+  if(!scr) return;
+  const s = __ow.step;
+  const pct = [0,25,50,75,100,100][s]||0;
+  const stepLabel = ['','Paso 1 de 4','Paso 2 de 4','Paso 3 de 4','Paso 4 de 4',''][s]||'';
+  const isEdge = s===0||s===5;
+  const body = s===0?_owS0():s===1?_owS1():s===2?_owS2():s===3?_owS3():s===4?_owS4():_owS5();
+  scr.innerHTML = `
+    <div style="min-height:100vh;color:#f5f0e8;display:flex;flex-direction:column">
+      ${!isEdge?`
+        <div style="height:3px;background:#1a1a1a"><div style="height:3px;background:linear-gradient(90deg,#c9a84c,#e8c96a);width:${pct}%;transition:width .4s ease"></div></div>
+        <div style="background:#0a0a0a;border-bottom:1px solid #1e1e1e;padding:13px 20px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-family:'Playfair Display',serif;font-size:.9rem;font-weight:700;color:#c9a84c;letter-spacing:1px">remu</span>
+          <span style="font-size:.72rem;color:#585044">${stepLabel}</span>
+        </div>
+      `:''}
+      <div style="flex:1;display:flex;align-items:${isEdge?'center':'flex-start'};justify-content:center;padding:${isEdge?'20px':'32px 16px 56px'}">
+        <div style="width:100%;max-width:460px">${body}</div>
+      </div>
+    </div>`;
+}
+
+function _owS0(){
+  const nb = esc(currentTenant?.nombre||'tu negocio');
+  const rb = esc(currentTenant?.rubro||'');
+  return `<div style="text-align:center">
+    <div style="font-size:3.5rem;margin-bottom:20px">🚀</div>
+    <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;margin-bottom:10px">¡Bienvenido a remu!</div>
+    <div style="font-size:1rem;font-weight:500;margin-bottom:4px">${nb}</div>
+    ${rb?`<div style="font-size:.78rem;color:#585044;margin-bottom:24px">${rb}</div>`:'<div style="margin-bottom:24px"></div>'}
+    <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-radius:14px;padding:22px;text-align:left;margin-bottom:28px">
+      <div style="font-size:.72rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:14px">En 4 pasos configuramos:</div>
+      <div style="display:flex;flex-direction:column;gap:11px;font-size:.85rem;color:#f5f0e8">
+        <div>📣&nbsp; Información pública para tus clientes</div>
+        <div>🏷&nbsp; Servicios y lista de precios</div>
+        <div>👥&nbsp; Tu equipo de trabajo</div>
+        <div>🕐&nbsp; Horarios de atención</div>
+      </div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1e1e1e;font-size:.72rem;color:#444">Al final te damos los links públicos listos para compartir. Solo toma 2 minutos.</div>
+    </div>
+    <button onclick="__ow.step=1;_owR()" style="${_OBP}width:100%;padding:14px;font-size:.95rem">Empezar configuración →</button>
+    <button onclick="_owSkip()" style="margin-top:12px;background:none;border:none;color:#444;font-family:'Outfit',sans-serif;font-size:.75rem;cursor:pointer;text-decoration:underline">Saltar, ir al panel directamente</button>
+  </div>`;
+}
+
+function _owS1(){
+  const i = __ow.info;
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Información pública</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:26px">Esto verán tus clientes al entrar a tu página de turnos.</div>
+    <label style="${_OBL}">Mensaje de bienvenida</label>
+    <input id="owMsg" value="${esc(i.mensaje)}" placeholder="Ej: ¡Gracias por elegirnos! Atendemos con turno previo." style="${_OB}margin-bottom:16px">
+    <label style="${_OBL}">Dirección del local</label>
+    <input id="owDir" value="${esc(i.direccion)}" placeholder="Ej: Av. Rivadavia 1234, Buenos Aires" style="${_OB}margin-bottom:16px">
+    <label style="${_OBL}">Instagram (opcional)</label>
+    <input id="owInsta" value="${esc(i.insta)}" placeholder="tunegocio" style="${_OB}margin-bottom:32px">
+    <div style="display:flex;gap:10px">
+      <button onclick="__ow.step=0;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button onclick="_owS1Save();__ow.step=2;_owR()" style="${_OBP}flex:1">Continuar →</button>
+    </div>
+  </div>`;
+}
+
+function _owS1Save(){
+  __ow.info.mensaje  = document.getElementById('owMsg')?.value||'';
+  __ow.info.direccion = document.getElementById('owDir')?.value||'';
+  __ow.info.insta    = (document.getElementById('owInsta')?.value||'').replace('@','').trim();
+}
+
+function _owS2(){
+  const esSalon = (currentTenant?.rubro||'').toLowerCase().match(/salon|belleza|peluq|barber|manicur/);
+  const chips = esSalon
+    ? ['Corte de pelo','Tintura','Mechas','Manicuria','Pedicura','Lifting','Depilación']
+    : ['Cambio de pantalla','Cambio de batería','Cambio de tapa','Desbloqueo','Conector de carga'];
+  const list = __ow.svcs.map((s,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#111;border:1px solid #1e1e1e;border-radius:8px;gap:8px">
+      <div style="min-width:0">
+        <span style="font-size:.85rem;font-weight:500">${esc(s.nombre)}</span>
+        ${s.modelo?`<span style="font-size:.73rem;color:#585044;margin-left:6px">${esc(s.modelo)}</span>`:''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-size:.88rem;color:#c9a84c;font-weight:600">${s.precio>0?'$'+Number(s.precio).toLocaleString('es-AR'):'Consultar'}</span>
+        <button onclick="__ow.svcs.splice(${i},1);_owR()" style="background:rgba(201,82,76,.15);border:1px solid rgba(201,82,76,.2);color:#c9524c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.8rem;line-height:1">✕</button>
+      </div>
+    </div>`).join('');
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Servicios y precios</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Agregá los servicios que ofrecés. Podés agregar más después.</div>
+    <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:14px">
+      <label style="${_OBL}">Nombre del servicio</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        ${chips.map(c=>`<button onclick="document.getElementById('owSN').value='${esc(c)}'" style="padding:4px 10px;border:1px solid #2e2e2e;background:transparent;color:#a89880;border-radius:20px;font-family:'Outfit',sans-serif;font-size:.72rem;cursor:pointer">${esc(c)}</button>`).join('')}
+      </div>
+      <input id="owSN" placeholder="Nombre del servicio" style="${_OB}margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div><label style="${_OBL}">Modelo / Tipo (opcional)</label><input id="owSM" placeholder="Ej: iPhone 13" style="${_OB}"></div>
+        <div><label style="${_OBL}">Precio ($)</label><input id="owSP" type="number" min="0" placeholder="0" style="${_OB}"></div>
+      </div>
+      <button onclick="_owAddSvc()" style="${_OBP}width:100%;padding:10px">+ Agregar servicio</button>
+    </div>
+    ${list?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${list}</div>`:'<div style="text-align:center;font-size:.78rem;color:#444;margin-bottom:16px;padding:12px">Todavía no agregaste servicios — son opcionales pero los necesitás para los turnos online.</div>'}
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button onclick="__ow.step=1;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button onclick="__ow.step=3;_owR()" style="${_OBP}flex:1">Continuar →</button>
+    </div>
+    <div style="text-align:center;margin-top:10px"><button onclick="__ow.step=3;_owR()" style="background:none;border:none;color:#444;font-family:'Outfit',sans-serif;font-size:.72rem;cursor:pointer;text-decoration:underline">Saltar →</button></div>
+  </div>`;
+}
+
+function _owAddSvc(){
+  const n = document.getElementById('owSN')?.value.trim();
+  if(!n) return;
+  __ow.svcs.push({nombre:n, modelo:document.getElementById('owSM')?.value.trim()||'', precio:parseFloat(document.getElementById('owSP')?.value)||0});
+  _owR();
+}
+
+function _owS3(){
+  const list = __ow.emps.map((e,i)=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;background:#111;border:1px solid #1e1e1e;border-radius:8px">
+      <span style="font-size:.85rem;font-weight:500">👤 ${esc(e.nombre)}</span>
+      <button onclick="__ow.emps.splice(${i},1);_owR()" style="background:rgba(201,82,76,.15);border:1px solid rgba(201,82,76,.2);color:#c9524c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.8rem;line-height:1">✕</button>
+    </div>`).join('');
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Tu equipo</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Agregá las personas que atienden — los clientes pueden elegir con quién atenderse. <span style="color:#585044">(Opcional)</span></div>
+    <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:14px;display:flex;gap:8px">
+      <input id="owEN" placeholder="Nombre del empleado/a" style="${_OB}flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')_owAddEmp()">
+      <button onclick="_owAddEmp()" style="${_OBP}padding:11px 16px;white-space:nowrap">+ Agregar</button>
+    </div>
+    ${list?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${list}</div>`:'<div style="text-align:center;font-size:.78rem;color:#444;margin-bottom:16px;padding:12px">Sin empleados — podés agregar tu equipo después desde Configuración.</div>'}
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button onclick="__ow.step=2;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button onclick="__ow.step=4;_owR()" style="${_OBP}flex:1">Continuar →</button>
+    </div>
+  </div>`;
+}
+
+function _owAddEmp(){
+  const n = document.getElementById('owEN')?.value.trim();
+  if(!n) return;
+  __ow.emps.push({nombre:n});
+  _owR();
+}
+
+function _owS4(){
+  const h = __ow.hrs;
+  const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Horarios de atención</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:24px">¿Cuándo atendés a tus clientes?</div>
+    <label style="${_OBL}">Horario de apertura y cierre</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
+      <div><div style="font-size:.72rem;color:#585044;margin-bottom:5px">Apertura</div><input type="time" id="owAp" value="${h.apertura}" style="${_OB}"></div>
+      <div><div style="font-size:.72rem;color:#585044;margin-bottom:5px">Cierre</div><input type="time" id="owCi" value="${h.cierre}" style="${_OB}"></div>
+    </div>
+    <label style="${_OBL}">Días de atención</label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px;margin-top:8px">
+      ${DIAS.map((d,i)=>`<label style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+        <div style="font-size:.72rem;color:#a89880;font-weight:500">${d}</div>
+        <input type="checkbox" class="owDia" value="${i}" ${h.dias.includes(i)?'checked':''} style="width:22px;height:22px;accent-color:#c9a84c;cursor:pointer">
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="__ow.step=3;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button id="owFinBtn" onclick="_owS4Save();_owFinish(this)" style="${_OBP}flex:1">Finalizar configuración →</button>
+    </div>
+  </div>`;
+}
+
+function _owS4Save(){
+  __ow.hrs.apertura = document.getElementById('owAp')?.value||'09:00';
+  __ow.hrs.cierre   = document.getElementById('owCi')?.value||'20:00';
+  __ow.hrs.dias     = [...document.querySelectorAll('.owDia:checked')].map(c=>parseInt(c.value));
+}
+
+async function _owFinish(btn){
+  if(btn){ btn.disabled=true; btn.textContent='Guardando...'; }
+  const tid = currentTenant.id;
+  // 1. Online config
+  const oc = {mensaje:__ow.info.mensaje, insta:__ow.info.insta, direccion:__ow.info.direccion};
+  localStorage.setItem(ONLINE_CFG_KEY + '_' + tid, JSON.stringify(oc));
+  // 2. Turnos config
+  const tc = getTurnosCfg();
+  tc.apertura = __ow.hrs.apertura;
+  tc.cierre   = __ow.hrs.cierre;
+  tc.dias     = __ow.hrs.dias.length ? __ow.hrs.dias : [1,2,3,4,5,6];
+  if(__ow.emps.length) tc.empleados = __ow.emps.map((e,i)=>({id:String(Date.now()+i),nombre:e.nombre,sectores:[],comision:0}));
+  // For salons: also create turno services from wizard services
+  const esSalon = (currentTenant?.rubro||'').toLowerCase().match(/salon|belleza|peluq|barber|manicur/);
+  if(esSalon && __ow.svcs.length && !tc.servicios?.length){
+    tc.servicios = __ow.svcs.map((s,i)=>({id:Date.now()+i+100,nombre:s.nombre,sector:s.modelo||'General',duracion:30,precio:s.precio||0}));
+  }
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + tid, JSON.stringify(tc));
+  // 3. Save services to precios table
+  for(let i=0; i<__ow.svcs.length; i++){
+    const sv = __ow.svcs[i];
+    if(!sv.nombre) continue;
+    const item = {id:Date.now()+i+1, nombre:sv.nombre, modelo:sv.modelo||'', precio:parseFloat(sv.precio)||0, disponibilidad:'disponible', notas:''};
+    S.precios.push(item);
+    await dbUpsert('precios', item);
+  }
+  // 4. Persist turnosCfg + onlineCfg to Supabase
+  await persistCfgToSupabase();
+  // 5. Mark done
+  localStorage.setItem('onboarding_v1_' + tid, '1');
+  // 6. Show done screen
+  __ow.step = 5;
+  _owR();
+}
+
+function _owS5(){
+  const tid  = currentTenant?.id||'';
+  const base = window.location.origin + window.location.pathname;
+  const tLink = base + '?turno='   + tid;
+  const pLink = base + '?precios=' + tid;
+  const nb = esc(currentTenant?.nombre||'Tu negocio');
+  const lCard = (icon, label, link, desc) => `
+    <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:10px">
+      <div style="font-size:.66rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">${icon} ${label}</div>
+      <div style="font-size:.74rem;color:#c9a84c;word-break:break-all;margin-bottom:6px;line-height:1.5">${esc(link)}</div>
+      <div style="font-size:.72rem;color:#444;margin-bottom:12px">${desc}</div>
+      <div style="display:flex;gap:8px">
+        <button onclick="navigator.clipboard.writeText('${esc(link)}').then(()=>showToast('Link copiado ✓'))" style="padding:7px 14px;background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.25);color:#c9a84c;border-radius:7px;font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;font-weight:600">Copiar link</button>
+        <button onclick="window.open('${esc(link)}','_blank')" style="padding:7px 14px;background:transparent;border:1px solid #2e2e2e;color:#a89880;border-radius:7px;font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer">Ver página →</button>
+      </div>
+    </div>`;
+  return `<div style="text-align:center">
+    <div style="font-size:3.5rem;margin-bottom:16px">🎉</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:800;color:#c9a84c;margin-bottom:8px">¡${nb} está listo!</div>
+    <div style="font-size:.85rem;color:#a89880;margin-bottom:28px">Tus páginas públicas ya están disponibles. Compartílas por WhatsApp o en tu bio de Instagram.</div>
+    <div style="text-align:left">
+      ${lCard('📅','Turnos online',tLink,'Los clientes reservan su turno sin llamar ni escribir.')}
+      ${lCard('🏷','Lista de precios',pLink,'Compartí tus precios actualizados en tiempo real.')}
+    </div>
+    <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:10px;padding:14px 16px;margin:20px 0;font-size:.78rem;color:#585044;text-align:left;line-height:1.7">
+      💡 <strong style="color:#a89880">Tips:</strong> Pegá el link de turnos en tu bio de Instagram. Enviá el link de precios por WhatsApp antes de que el cliente llegue. Podés seguir editando todo desde el panel.
+    </div>
+    <button onclick="_owExit()" style="${_OBP}width:100%;padding:14px;font-size:.95rem">Ir al panel de gestión →</button>
+  </div>`;
+}
+
+function _owExit(){
+  document.getElementById('onboardingScreen').style.display='none';
+  rPrecios(); rTurnos && rTurnos(); rDash && rDash();
+}
+
+function _owSkip(){
+  localStorage.setItem('onboarding_v1_' + (currentTenant?.id||''), '1');
+  document.getElementById('onboardingScreen').style.display='none';
+}
 
 // ═══ INIT ═══
 document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
