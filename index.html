@@ -23,10 +23,35 @@
   --accent:#c9a84c;
 }
 body.light-mode{
-  --bg:#f5f2ee;--sur:#ede9e3;--car:#e8e3db;--car2:#dfd9cf;
-  --bor:#ccc5b8;--bor2:#b8b0a0;
-  --tx:#1a1710;--tx2:#5c5040;--mut:#9a8e7a;
+  --bg:#f5f2ee;--sur:#ede9e3;--car:#e3ddd5;--car2:#d8d0c4;
+  --bor:#ccc4b4;--bor2:#b5ab98;
+  --tx:#1a1710;--tx2:#4a3f30;--mut:#7a6e5c;
+  /* Colores semánticos más oscuros para contraste sobre fondo claro */
+  --gld:#7a5c10;--gll:#966e18;--gld2:rgba(122,92,16,.12);--gld3:rgba(122,92,16,.06);
+  --ok:#1e6b38;--bad:#8a2020;--wrn:#7a4810;--inf:#1a4a8a;
+  --accent:#7a5c10;
 }
+/* Inputs y selects en modo claro */
+body.light-mode input,body.light-mode select,body.light-mode textarea{
+  background:var(--bg) !important;color:var(--tx) !important;
+  border-color:var(--bor2) !important;
+}
+body.light-mode input::placeholder,body.light-mode textarea::placeholder{color:var(--mut) !important;}
+/* Sidebar en modo claro */
+body.light-mode #sb{background:var(--sur);border-right:1px solid var(--bor);}
+body.light-mode .sb-item{color:var(--tx2);}
+body.light-mode .sb-item:hover,body.light-mode .sb-item.active{background:var(--car);color:var(--tx);}
+/* Cards y superficies */
+body.light-mode .card{background:var(--car);}
+body.light-mode .modal-body,.light-mode .md{background:var(--sur);}
+/* Topbar */
+body.light-mode #topBar{background:var(--sur);border-bottom:1px solid var(--bor);}
+/* Badges y spans de estado con colores legibles */
+body.light-mode .bbl{background:rgba(26,74,138,.12);color:var(--inf);}
+body.light-mode .bgr{background:rgba(30,107,56,.12);color:var(--ok);}
+body.light-mode .byw{background:rgba(122,72,16,.12);color:var(--wrn);}
+body.light-mode .brd{background:rgba(138,32,32,.12);color:var(--bad);}
+body.light-mode .bgx{background:rgba(122,92,16,.1);color:var(--gld);}
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;min-height:100vh;}
 ::-webkit-scrollbar{width:4px;height:4px;}
@@ -4204,7 +4229,7 @@ function openNuevoTurno(){
   if(!cfg.servicios.length){
     srvSel.innerHTML = '<option value="">Sin servicios — configurá primero en ⚙</option>';
   } else {
-    srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}">${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('');
+    srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}">${s.sector}: ${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
   }
   // Set date
   const fechaEl = document.getElementById('turnoFecha');
@@ -4214,6 +4239,7 @@ function openNuevoTurno(){
   document.getElementById('turnoTel').value = '';
   document.getElementById('turnoHora').value = '';
   document.getElementById('turnoNotas').value = '';
+  if(document.getElementById('turnoPrecio')) document.getElementById('turnoPrecio').value = '';
   document.getElementById('turnoConflicto').style.display = 'none';
   document.getElementById('mTurnoTitle').textContent = 'Nuevo turno';
   updateDuracionTurno();
@@ -4224,6 +4250,7 @@ function updateDuracionTurno(){
   const srv = document.getElementById('turnoServicio');
   const opt = srv.options[srv.selectedIndex];
   const dur = parseInt(opt?.getAttribute('data-dur')||'0');
+  const precio = parseFloat(opt?.getAttribute('data-precio')||'0');
   const hora = document.getElementById('turnoHora').value;
   document.getElementById('turnoDurLabel').textContent = dur ? dur + ' min' : '—';
   if(hora && dur){
@@ -4232,6 +4259,11 @@ function updateDuracionTurno(){
     document.getElementById('turnoFinLabel').textContent = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
   } else {
     document.getElementById('turnoFinLabel').textContent = '—';
+  }
+  // Auto-llenar precio: solo si el campo está vacío o en 0 (no sobreescribir precio editado)
+  const precioEl = document.getElementById('turnoPrecio');
+  if(precioEl && precio > 0 && !parseFloat(precioEl.value)){
+    precioEl.value = precio;
   }
   verificarConflicto();
 }
@@ -4324,11 +4356,10 @@ async function saveTurno(){
   };
 
   if(id){
-    const idx = turnos.findIndex(t=>t.id===id);
+    const idx = turnos.findIndex(t=>String(t.id)===String(id));
     if(idx>-1){
       turnos[idx] = obj;
     } else {
-      // id provided but not found - don't create duplicate, show error
       showToast('Error: turno no encontrado');
       return;
     }
@@ -4366,10 +4397,40 @@ async function saveTurno(){
 
 function cancelarTurno(id){
   if(!confirm('¿Eliminar este turno?')) return;
-  const turnos = getTurnos().filter(x=>x.id!==id);
+  const turnos = getTurnos().filter(x=>String(x.id)!==String(id));
   saveTurnosLocal(turnos);
   rTurnos();
   showToast('Turno eliminado ✓');
+}
+
+async function cambiarEstadoTurno(id, nuevoEstado){
+  const turnos = getTurnos();
+  const idx = turnos.findIndex(x=>String(x.id)===String(id));
+  if(idx === -1){ showToast('Turno no encontrado'); return; }
+  turnos[idx] = {...turnos[idx], estado: nuevoEstado};
+  saveTurnosLocal(turnos);
+  // Si se marca como terminado y tiene precio, registrar ingreso
+  if(nuevoEstado === 'terminado'){
+    const t = turnos[idx];
+    if(t.precio > 0){
+      const venta = {
+        id: Date.now(), tipo:'servicio',
+        nombre: t.servicioNombre || 'Servicio',
+        cantidad:1, precio:t.precio, total:t.precio,
+        costo:0, metodo:'Efectivo', fecha:t.fecha,
+        comPct:0, comision:0
+      };
+      S.ventas.unshift(venta);
+      await dbUpsert('ventas', venta);
+      showToast('✓ Finalizado · ' + fmt(t.precio) + ' registrado en ingresos');
+    } else {
+      showToast('✓ Turno finalizado');
+    }
+  } else {
+    const labels = {confirmado:'Confirmado ✅',llego:'Llegó 🟢',en_proceso:'En curso 🔄',no_vino:'No vino ❌'};
+    showToast(labels[nuevoEstado] || 'Estado actualizado');
+  }
+  rTurnos();
 }
 
 function editarTurno(id){
@@ -4379,7 +4440,7 @@ function editarTurno(id){
   const empSel = document.getElementById('turnoEmpleado');
   empSel.innerHTML = cfg.empleados.map(e=>`<option value="${e.id}" ${e.id==t.empleadoId?'selected':''}>${e.nombre}</option>`).join('');
   const srvSel = document.getElementById('turnoServicio');
-  srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" ${s.id===t.servicioId?'selected':''}>${s.sector}: ${s.nombre} (${s.duracion} min)</option>`).join('');
+  srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}" ${s.id===t.servicioId?'selected':''}>${s.sector}: ${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
   document.getElementById('turnoId').value = t.id;
   document.getElementById('turnoCli').value = t.cliente;
   document.getElementById('turnoTel').value = t.tel||'';
@@ -4455,12 +4516,21 @@ function rTurnos(){
 
   listaEl.innerHTML = turnos.map(t=>{
     const [h,m] = t.hora.split(':').map(Number);
-    const fin = new Date(2000,0,1,h,m+t.duracion);
+    const fin = new Date(2000,0,1,h,m+(t.duracion||60));
     const finStr = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
-    const borderColor = t.sector==='Peluquería'?'var(--inf)':t.sector==='Manicuria'?'var(--ok)':t.sector==='Maquillaje'?'var(--wrn)':'var(--bad)';
+    const borderColor = t.sector==='Peluquería'?'var(--inf)':t.sector==='Manicuria'?'var(--ok)':t.sector==='Maquillaje'?'var(--wrn)':'var(--gld)';
+    // Botones de acción según estado actual
+    const acciones = {
+      pendiente:   `<button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="cambiarEstadoTurno('${t.id}','confirmado')">✅ Confirmar</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
+      confirmado:  `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="cambiarEstadoTurno('${t.id}','llego')">🟢 Llegó</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
+      llego:       `<button class="btn bsm" style="background:rgba(201,148,76,.15);color:var(--wrn);border:1px solid rgba(201,148,76,.3)" onclick="cambiarEstadoTurno('${t.id}','en_proceso')">🔄 En curso</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
+      en_proceso:  `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="cambiarEstadoTurno('${t.id}','terminado')">✓ Finalizado</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
+      terminado:   `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span>`,
+      no_vino:     `<span style="font-size:.72rem;color:var(--bad)">❌ No asistió</span>`,
+    };
     return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${borderColor}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
-        <div style="flex:1">
+        <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-weight:600;font-size:.95rem">${t.cliente}</span>
             ${estadoBadge[t.estado]||''}
@@ -4471,11 +4541,10 @@ function rTurnos(){
           </div>
           ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${t.notas}</div>`:''}
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-          ${t.tel?`<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')">📲 WA</button>`:''}
-          <button class="btn bg2 bsm" onclick="verHistorialCliente('${t.cliente.replace(/'/g,"\'")}')">📋</button>
-          <button class="btn be bsm" onclick="editarTurno('${t.id}')">✎</button>
-          <button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;flex-shrink:0">
+          ${acciones[t.estado] || acciones['confirmado']}
+          ${t.tel?`<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')">📲</button>`:''}
+          <button class="btn be bsm" onclick="editarTurno('${t.id}')" title="Editar detalles">✎</button>
         </div>
       </div>
     </div>`;
