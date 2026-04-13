@@ -1500,6 +1500,15 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mf"><button class="btn" onclick="closeM('mTurno')">Cancelar</button><button class="btn bg" onclick="saveTurno()">Guardar turno</button></div>
 </div></div>
 
+<!-- Precio al finalizar turno -->
+<div class="mb" id="mPrecioFinalizar"><div class="md" style="max-width:380px"><div class="mh"><div class="mt2">💰 Registrar cobro</div><button class="xbtn" onclick="closeM('mPrecioFinalizar')">✕</button></div>
+<div class="mc">
+<p style="font-size:.82rem;color:var(--tx2);margin-bottom:10px">Este turno no tiene precio. ¿Cuánto cobrás?</p>
+<div id="mPFDesc" style="font-size:.8rem;color:var(--mut);margin-bottom:14px;padding:8px 10px;background:var(--bg);border-radius:6px"></div>
+<label>Monto cobrado ($)</label>
+<input type="number" id="mPFMonto" placeholder="0" min="0" style="font-size:1.1rem;text-align:center" autofocus>
+</div><div class="mf"><button class="btn" onclick="closeM('mPrecioFinalizar');_doEstadoTurno(window.__pendingFinalizarId,'terminado',null);window.__pendingFinalizarId=null">Sin cobro</button><button class="btn bg" onclick="confirmarFinalizarTurno()">Registrar y finalizar</button></div></div></div>
+
 <!-- Modal Turno Fijo -->
 <div class="mb" id="mTurnoFijo"><div class="md"><div class="mh"><div class="mt2" id="mTurnoFijoTitle">Nuevo turno fijo</div><button class="xbtn" onclick="closeM('mTurnoFijo')">✕</button></div>
 <div class="mc">
@@ -3187,6 +3196,40 @@ function rPreciosLink(){
 }
 
 function rPrecios(){
+  // Init link banner
+  const box = document.getElementById('preciosLinkBox');
+  if(box && currentTenant && !box.innerHTML){
+    const pLink = window.location.origin + window.location.pathname + '?precios=' + currentTenant.id;
+    box.innerHTML = `<div style="background:var(--gld3);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:.72rem;color:var(--gld);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px">🌐 Lista pública de precios</div>
+        <div style="font-size:.75rem;color:var(--tx2)">Tus clientes ven esta lista. Actualizala y compartila.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${esc(pLink)}" target="_blank" style="font-size:.78rem;padding:6px 14px;background:var(--gld2);border:1px solid rgba(201,168,76,.3);color:var(--gld);border-radius:6px;text-decoration:none;white-space:nowrap">Ver como cliente →</a>
+        <button onclick="navigator.clipboard.writeText('${esc(pLink)}').then(()=>showToast('Link copiado ✓'))" style="font-size:.78rem;padding:6px 14px;background:transparent;border:1px solid var(--bor2);color:var(--tx2);border-radius:6px;cursor:pointer;white-space:nowrap">🔗 Copiar link</button>
+      </div>
+    </div>`;
+  }
+  // Adapt tabs to rubro
+  const prTabs = document.getElementById('prTabs');
+  if(prTabs && currentTenant){
+    const rub = (currentTenant.rubro||'').toLowerCase();
+    const esSalon = rub.match(/salon|belleza|peluq|barber|manicur/);
+    if(esSalon && !prTabs.dataset.rubroInit){
+      prTabs.dataset.rubroInit = '1';
+      prFilt = '';
+      prTabs.innerHTML = `
+        <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+        <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
+        <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
+        <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
+        <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
+        <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>
+        <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otros</button>
+      `;
+    }
+  }
   const q=(document.getElementById('prQ')||{value:''}).value.toLowerCase();
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   let items = S.precios.filter(p=>{
@@ -3197,7 +3240,7 @@ function rPrecios(){
   });
   const tb=document.getElementById('tbPr');
   const dc={disponible:'bgr',consultar:'byw','no disponible':'brd'};
-  if(!items.length){tb.innerHTML=`<tr><td colspan="6">${emp('🔧','Sin servicios en esta categoría')}</td></tr>`;return;}
+  if(!items.length){tb.innerHTML=`<tr><td colspan="6">${emp('🔧','Sin servicios — usá + Agregar servicio para crear tu lista de precios pública')}</td></tr>`;return;}
   tb.innerHTML=items.map(p=>`<tr>
     <td><strong>${esc(p.nombre)}</strong></td>
     <td style="font-size:.78rem;color:var(--tx2)">${esc(p.modelo||'—')}</td>
@@ -4408,23 +4451,46 @@ async function cambiarEstadoTurno(id, nuevoEstado){
   const turnos = getTurnos();
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
   if(idx === -1){ showToast('Turno no encontrado'); return; }
+  // Si se finaliza sin precio cargado, pedir monto primero
+  if(nuevoEstado === 'terminado' && !(parseFloat(turnos[idx].precio) > 0)){
+    window.__pendingFinalizarId = id;
+    const t = turnos[idx];
+    document.getElementById('mPFDesc').textContent = (t.cliente||'') + (t.servicioNombre ? ' · '+t.servicioNombre : '');
+    document.getElementById('mPFMonto').value = '';
+    openM('mPrecioFinalizar');
+    return;
+  }
+  await _doEstadoTurno(id, nuevoEstado, null);
+}
+
+async function confirmarFinalizarTurno(){
+  const monto = parseFloat(document.getElementById('mPFMonto').value) || 0;
+  closeM('mPrecioFinalizar');
+  const id = window.__pendingFinalizarId;
+  if(id == null) return;
+  window.__pendingFinalizarId = null;
+  if(monto > 0){
+    const turnos = getTurnos();
+    const idx = turnos.findIndex(x=>String(x.id)===String(id));
+    if(idx !== -1){ turnos[idx] = {...turnos[idx], precio: monto}; saveTurnosLocal(turnos); }
+  }
+  await _doEstadoTurno(id, 'terminado', monto > 0 ? monto : null);
+}
+
+async function _doEstadoTurno(id, nuevoEstado, precioExtra){
+  const turnos = getTurnos();
+  const idx = turnos.findIndex(x=>String(x.id)===String(id));
+  if(idx === -1) return;
   turnos[idx] = {...turnos[idx], estado: nuevoEstado};
   saveTurnosLocal(turnos);
-  // Si se marca como terminado y tiene precio, registrar ingreso
   if(nuevoEstado === 'terminado'){
     const t = turnos[idx];
-    if(t.precio > 0){
-      const venta = {
-        id: Date.now(), tipo:'servicio',
-        nombre: t.servicioNombre || 'Servicio',
-        cantidad:1, precio:t.precio, total:t.precio,
-        costo:0, metodo:'Efectivo', fecha:t.fecha,
-        comPct:0, comision:0
-      };
+    const precio = (precioExtra != null) ? precioExtra : (parseFloat(t.precio)||0);
+    if(precio > 0){
+      const venta = { id: Date.now(), tipo:'servicio', nombre: t.servicioNombre||'Servicio', cantidad:1, precio, total:precio, costo:0, metodo:'Efectivo', fecha:t.fecha, comPct:0, comision:0 };
       S.ventas.unshift(venta);
       await dbUpsert('ventas', venta);
-      showToast('✓ Finalizado · ' + fmt(t.precio) + ' sumado a ingresos del día');
-      // Actualizar dashboard y caja en tiempo real
+      showToast('✓ Finalizado · '+fmt(precio)+' sumado a ingresos del día');
       if(document.getElementById('secDash')?.style.display !== 'none') rDash();
     } else {
       showToast('✓ Turno finalizado');
@@ -5308,7 +5374,10 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
         <select id="onServicio" onchange="mostrarPrecioServicio(this)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:8px">
           ${turnosCfg.servicios.length?turnosCfg.servicios.map(s=>`<option value="${esc(String(s.id))}" data-precio="${parseFloat(s.precio)||0}" data-dur="${parseInt(s.duracion)||30}">${esc(s.sector)}: ${esc(s.nombre)} (${parseInt(s.duracion)||30} min)${s.precio>0?' — $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join(''):'<option value="">Sin servicios configurados</option>'}
         </select>
-        <div id="onPrecioInfo" style="background:rgba(184,151,106,.1);border:1px solid rgba(184,151,106,.2);border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:.82rem;color:#b8976a;display:none"></div>
+        <div id="onPrecioInfo" style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.2rem">💰</span>
+          <div id="onPrecioTxt" style="font-size:.85rem;color:#c9a84c;font-weight:600">Cargando precio...</div>
+        </div>
 
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Profesional</label>
         <select id="onEmpleado" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
@@ -5336,6 +5405,9 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
   // Store globals for use in onchange handlers
   window.__onlineTenantId = tenant.id;
   window.__onlineTurnosCfg = turnosCfg;
+  // Show price for the first selected service immediately
+  const srvSel = document.getElementById('onServicio');
+  if(srvSel) mostrarPrecioServicio(srvSel);
 }
 
 // ═══════════════════════════════════════════════════
@@ -5544,7 +5616,13 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
     ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">💅 Los precios pueden variar según largo, tipo de cabello y técnica. Consultanos para presupuestos personalizados.</div>`
     : `<div style="background:rgba(201,82,76,.07);border-left:3px solid #c9524c;border-radius:8px;padding:14px 16px;font-size:.78rem;color:#a89880;line-height:1.7;margin-bottom:20px">⚠️ <strong style="color:#f5f0e8">Importante</strong> — Trabajamos con <strong>transplante de IC y Flex</strong> para que tu equipo <strong>NO MARQUE CARTELES</strong>.<br>⏰ <strong>Tiempo:</strong> 2–3 días hábiles &nbsp;·&nbsp; 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica.</div>`;
 
-  window.__preciosPublicItems = items;
+  // Pre-filtrar items por rubro para evitar mezcla de servicios
+  const phoneKw = /pantalla|tapa|bater[ií]a|conector|c[aá]mara|placa|puerto|flex|chip/i;
+  const salonKw = /corte|tintura|mechas|manicur|pedicur|lifting|depilac|maquillaje|tratamiento|keratina|brushing|permanente/i;
+  const itemsFiltrados = esSalon
+    ? items.filter(p => !phoneKw.test(p.nombre||''))
+    : items.filter(p => !salonKw.test(p.nombre||''));
+  window.__preciosPublicItems = itemsFiltrados;
   window.__preciosPublicCat = '';
 
   document.body.innerHTML = `
@@ -5566,7 +5644,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
 
         <!-- Search -->
         <div style="display:flex;align-items:center;background:#111;border:1px solid #222;border-radius:10px;padding:0 14px;margin-bottom:14px">
-          <span style="color:#444;font-size:1.1rem;margin-right:8px">⌕</span>
+          <span style="color:#a89880;font-size:1.1rem;margin-right:8px">⌕</span>
           <input id="pubPQ" placeholder="Buscar servicio o modelo..." oninput="pubRender()" autocomplete="off"
             style="flex:1;background:none;border:none;color:#f5f0e8;padding:12px 0;font-family:'Outfit';font-size:.88rem;outline:none">
         </div>
@@ -5579,7 +5657,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
 
         <!-- Grid -->
         <div id="pubGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
-        <div id="pubEmpty" style="display:none;text-align:center;padding:48px 0;color:#444">
+        <div id="pubEmpty" style="display:none;text-align:center;padding:48px 0;color:#a89880">
           <div style="font-size:2.5rem;margin-bottom:10px">🔍</div>
           <div style="font-size:.88rem">No se encontraron servicios</div>
         </div>
@@ -5640,7 +5718,7 @@ function pubRender(){
       <div style="font-weight:600;font-size:.9rem;padding-right:${p.disponibilidad==='consultar'?'72px':'0'};line-height:1.3">${esc(p.nombre)}</div>
       ${p.modelo ? `<div style="font-size:.72rem;color:#585044">${esc(p.modelo)}</div>` : ''}
       <div style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:#c9a84c;margin-top:6px">${p.precio > 0 ? fmt2(p.precio) : '<span style="font-size:.9rem;font-family:\'Outfit\',sans-serif;color:#585044">A consultar</span>'}</div>
-      ${p.notas ? `<div style="font-size:.7rem;color:#444;line-height:1.5;margin-top:2px">${esc(p.notas)}</div>` : ''}
+      ${p.notas ? `<div style="font-size:.7rem;color:#a89880;line-height:1.5;margin-top:2px">${esc(p.notas)}</div>` : ''}
     </div>
   `).join('');
 }
@@ -5734,13 +5812,12 @@ function mostrarMotivoOcupado(el){
 function mostrarPrecioServicio(sel){
   const opt = sel.options[sel.selectedIndex];
   const precio = parseFloat(opt?.getAttribute('data-precio')||0);
-  const box = document.getElementById('onPrecioInfo');
-  if(!box) return;
-  if(precio > 0){
-    box.style.display = 'block';
-    box.innerHTML = '💰 Precio del servicio: <strong>$' + precio.toLocaleString('es-AR') + '</strong>';
-  } else {
-    box.style.display = 'none';
+  const txt = document.getElementById('onPrecioTxt');
+  if(txt){
+    txt.textContent = precio > 0
+      ? 'Precio: $' + precio.toLocaleString('es-AR')
+      : 'Precio a consultar';
+    txt.style.color = precio > 0 ? '#c9a84c' : '#a89880';
   }
   // Reload slots if date already selected
   const fecha = document.getElementById('onFecha')?.value;
@@ -8124,10 +8201,10 @@ function _owS0(){
         <div>👥&nbsp; Tu equipo de trabajo</div>
         <div>🕐&nbsp; Horarios de atención</div>
       </div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1e1e1e;font-size:.72rem;color:#444">Al final te damos los links públicos listos para compartir. Solo toma 2 minutos.</div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid #1e1e1e;font-size:.72rem;color:#a89880">Al final te damos los links públicos listos para compartir. Solo toma 2 minutos.</div>
     </div>
     <button onclick="__ow.step=1;_owR()" style="${_OBP}width:100%;padding:14px;font-size:.95rem">Empezar configuración →</button>
-    <button onclick="_owSkip()" style="margin-top:12px;background:none;border:none;color:#444;font-family:'Outfit',sans-serif;font-size:.75rem;cursor:pointer;text-decoration:underline">Saltar, ir al panel directamente</button>
+    <button onclick="_owSkip()" style="margin-top:12px;background:none;border:none;color:#a89880;font-family:'Outfit',sans-serif;font-size:.75rem;cursor:pointer;text-decoration:underline">Saltar, ir al panel directamente</button>
   </div>`;
 }
 
@@ -8186,12 +8263,12 @@ function _owS2(){
       </div>
       <button onclick="_owAddSvc()" style="${_OBP}width:100%;padding:10px">+ Agregar servicio</button>
     </div>
-    ${list?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${list}</div>`:'<div style="text-align:center;font-size:.78rem;color:#444;margin-bottom:16px;padding:12px">Todavía no agregaste servicios — son opcionales pero los necesitás para los turnos online.</div>'}
+    ${list?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${list}</div>`:'<div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:16px;padding:12px">Todavía no agregaste servicios — son opcionales pero los necesitás para los turnos online.</div>'}
     <div style="display:flex;gap:10px;margin-top:8px">
       <button onclick="__ow.step=1;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
       <button onclick="__ow.step=3;_owR()" style="${_OBP}flex:1">Continuar →</button>
     </div>
-    <div style="text-align:center;margin-top:10px"><button onclick="__ow.step=3;_owR()" style="background:none;border:none;color:#444;font-family:'Outfit',sans-serif;font-size:.72rem;cursor:pointer;text-decoration:underline">Saltar →</button></div>
+    <div style="text-align:center;margin-top:10px"><button onclick="__ow.step=3;_owR()" style="background:none;border:none;color:#a89880;font-family:'Outfit',sans-serif;font-size:.72rem;cursor:pointer;text-decoration:underline">Saltar →</button></div>
   </div>`;
 }
 
@@ -8215,7 +8292,7 @@ function _owS3(){
       <input id="owEN" placeholder="Nombre del empleado/a" style="${_OB}flex:1;margin-bottom:0" onkeydown="if(event.key==='Enter')_owAddEmp()">
       <button onclick="_owAddEmp()" style="${_OBP}padding:11px 16px;white-space:nowrap">+ Agregar</button>
     </div>
-    ${list?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${list}</div>`:'<div style="text-align:center;font-size:.78rem;color:#444;margin-bottom:16px;padding:12px">Sin empleados — podés agregar tu equipo después desde Configuración.</div>'}
+    ${list?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${list}</div>`:'<div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:16px;padding:12px">Sin empleados — podés agregar tu equipo después desde Configuración.</div>'}
     <div style="display:flex;gap:10px;margin-top:8px">
       <button onclick="__ow.step=2;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
       <button onclick="__ow.step=4;_owR()" style="${_OBP}flex:1">Continuar →</button>
@@ -8306,7 +8383,7 @@ function _owS5(){
     <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:10px">
       <div style="font-size:.66rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px">${icon} ${label}</div>
       <div style="font-size:.74rem;color:#c9a84c;word-break:break-all;margin-bottom:6px;line-height:1.5">${esc(link)}</div>
-      <div style="font-size:.72rem;color:#444;margin-bottom:12px">${desc}</div>
+      <div style="font-size:.72rem;color:#a89880;margin-bottom:12px">${desc}</div>
       <div style="display:flex;gap:8px">
         <button onclick="navigator.clipboard.writeText('${esc(link)}').then(()=>showToast('Link copiado ✓'))" style="padding:7px 14px;background:rgba(201,168,76,.15);border:1px solid rgba(201,168,76,.25);color:#c9a84c;border-radius:7px;font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;font-weight:600">Copiar link</button>
         <button onclick="window.open('${esc(link)}','_blank')" style="padding:7px 14px;background:transparent;border:1px solid #2e2e2e;color:#a89880;border-radius:7px;font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer">Ver página →</button>
