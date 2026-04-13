@@ -1161,6 +1161,7 @@ textarea{resize:vertical;min-height:70px;}
     <!-- PRECIOS -->
     <div class="sec" id="sec-precios">
       <div class="pt">Lista de Precios</div><div class="ps" id="preciosSub">Servicios visibles para clientes</div>
+      <div id="preciosLinkBox" style="margin-bottom:14px"></div>
       <div id="preciosNotice" style="margin-bottom:14px"></div>
       <div class="card">
         <div style="margin-bottom:12px">
@@ -2730,6 +2731,7 @@ async function saveTaller(){
   const id=document.getElementById('tId').value;
   const cli=document.getElementById('tCli').value.trim(); if(!cli) return alert('Ingresá el nombre del cliente');
   const snap=JSON.parse(JSON.stringify(S.reparaciones));
+  const oldEstado = id ? (S.reparaciones.find(r=>r.id===parseInt(id))?.estado||'') : '';
   const costoRep=parseFloat(document.getElementById('tCosRep').value)||0;
   const flete=parseFloat(document.getElementById('tFlete').value)||0;
   const pre=parseFloat(document.getElementById('tPre').value)||0;
@@ -2763,6 +2765,10 @@ async function saveTaller(){
     S.reparaciones.unshift(item);await dbUpsert('reparaciones',item);pushUndo('Nuevo trabajo','reparaciones',snap);
   }
   closeM('mTaller'); rTaller(); showToast('Trabajo guardado ✓');
+  if(obj.estado==='listo' && oldEstado!=='listo'){
+    const saved = id ? S.reparaciones.find(r=>r.id===parseInt(id)) : S.reparaciones[0];
+    if(saved) showWA(saved);
+  }
 }
 
 async function delRep(id){
@@ -3005,6 +3011,7 @@ function setupPreciosTabs(){
     }
   }
   
+  rPreciosLink();
   if(!tabsEl) return;
   if(esSalon){
     tabsEl.innerHTML = `
@@ -3027,6 +3034,24 @@ function setupPreciosTabs(){
       <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otros</button>
     `;
   }
+}
+
+function rPreciosLink(){
+  const box = document.getElementById('preciosLinkBox');
+  if(!box || !currentTenant?.id) return;
+  const link = window.location.origin + window.location.pathname + '?precios=' + currentTenant.id;
+  window.__preciosPublicLink = link;
+  box.innerHTML = `<div style="background:var(--gld2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+    <div style="min-width:0">
+      <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">🔗 Página pública de precios</div>
+      <div style="font-size:.76rem;color:var(--gld);word-break:break-all;line-height:1.4">${esc(link)}</div>
+      <div style="font-size:.66rem;color:var(--mut);margin-top:3px">Compartí este link por WhatsApp o Instagram — tus clientes ven los precios sin registrarse</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0">
+      <button class="btn bg bsm" onclick="navigator.clipboard.writeText(window.__preciosPublicLink).then(()=>showToast('Link copiado ✓'))">Copiar</button>
+      <button class="btn bs bsm" onclick="window.open(window.__preciosPublicLink,'_blank')">Ver</button>
+    </div>
+  </div>`;
 }
 
 function rPrecios(){
@@ -4828,7 +4853,7 @@ async function persistCfgToSupabase(){
   const rowId = _cfgRowId(currentTenant.id);
   const row = {
     id: rowId,
-    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg' },
+    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'' },
     tenant_id: currentTenant.id
   };
   try {
@@ -5081,6 +5106,125 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
   // Store globals for use in onchange handlers
   window.__onlineTenantId = tenant.id;
   window.__onlineTurnosCfg = turnosCfg;
+}
+
+// ═══════════════════════════════════════════════════
+// PÁGINA PÚBLICA DE PRECIOS  (?precios=TENANT_UUID)
+// ═══════════════════════════════════════════════════
+function mostrarPreciosPublicos(tenantId, items, cfg){
+  const tenantName = cfg.__tenantName || 'Precios';
+  const rubro = cfg.__rubro || '';
+  const oc = cfg.__onlineCfg || {};
+  const esSalon = rubro.toLowerCase().match(/salon|belleza|peluq|barber|manicur/);
+  const turnoLink = window.location.origin + window.location.pathname + '?turno=' + tenantId;
+
+  const cats = esSalon
+    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'tintura',l:'🎨 Tintura'},{k:'manicuria',l:'💅 Manicuria'},{k:'maquillaje',l:'💄 Maquillaje'},{k:'lifting',l:'👁 Lifting'},{k:'depilacion',l:'✨ Depilación'}]
+    : [{k:'',l:'Todos'},{k:'pantalla',l:'📱 Pantallas'},{k:'tapa',l:'🔲 Tapas'},{k:'bateria',l:'🔋 Baterías'},{k:'conector',l:'🔌 Conectores'},{k:'camara',l:'📸 Cámaras'},{k:'otro',l:'🔧 Otros'}];
+
+  const notice = esSalon
+    ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">💅 Los precios pueden variar según largo, tipo de cabello y técnica. Consultanos para presupuestos personalizados.</div>`
+    : `<div style="background:rgba(201,82,76,.07);border-left:3px solid #c9524c;border-radius:8px;padding:14px 16px;font-size:.78rem;color:#a89880;line-height:1.7;margin-bottom:20px">⚠️ <strong style="color:#f5f0e8">Importante</strong> — Trabajamos con <strong>transplante de IC y Flex</strong> para que tu equipo <strong>NO MARQUE CARTELES</strong>.<br>⏰ <strong>Tiempo:</strong> 2–3 días hábiles &nbsp;·&nbsp; 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica.</div>`;
+
+  window.__preciosPublicItems = items;
+  window.__preciosPublicCat = '';
+
+  document.body.innerHTML = `
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <div style="min-height:100vh;background:#080808;font-family:'Outfit',sans-serif;color:#f5f0e8;-webkit-font-smoothing:antialiased">
+
+      <!-- HEADER -->
+      <div style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
+        <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(tenantName)}</div>
+        ${rubro ? `<div style="font-size:.66rem;color:#585044;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
+        ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
+        ${oc.direccion ? `<div style="font-size:.75rem;color:#585044;margin-top:8px">📍 ${esc(oc.direccion)}</div>` : ''}
+      </div>
+      ${oc.mensaje ? `<div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">${esc(oc.mensaje)}</div>` : ''}
+
+      <!-- CONTENT -->
+      <div style="max-width:720px;margin:0 auto;padding:24px 16px 48px">
+        ${notice}
+
+        <!-- Search -->
+        <div style="display:flex;align-items:center;background:#111;border:1px solid #222;border-radius:10px;padding:0 14px;margin-bottom:14px">
+          <span style="color:#444;font-size:1.1rem;margin-right:8px">⌕</span>
+          <input id="pubPQ" placeholder="Buscar servicio o modelo..." oninput="pubRender()" autocomplete="off"
+            style="flex:1;background:none;border:none;color:#f5f0e8;padding:12px 0;font-family:'Outfit';font-size:.88rem;outline:none">
+        </div>
+
+        <!-- Category tabs -->
+        <div id="pubCatTabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px">
+          ${cats.map((c,i)=>`<button data-cat="${esc(c.k)}" onclick="pubSetCat(this)"
+            style="padding:7px 15px;border-radius:20px;border:1px solid ${i===0?'#c9a84c':'#242424'};background:${i===0?'rgba(201,168,76,.15)':'transparent'};color:${i===0?'#c9a84c':'#a89880'};font-family:'Outfit';font-size:.78rem;cursor:pointer;white-space:nowrap">${c.l}</button>`).join('')}
+        </div>
+
+        <!-- Grid -->
+        <div id="pubGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
+        <div id="pubEmpty" style="display:none;text-align:center;padding:48px 0;color:#444">
+          <div style="font-size:2.5rem;margin-bottom:10px">🔍</div>
+          <div style="font-size:.88rem">No se encontraron servicios</div>
+        </div>
+
+        <!-- CTA + Share -->
+        <div style="margin-top:36px;display:flex;flex-direction:column;align-items:center;gap:12px">
+          <a href="${esc(turnoLink)}" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#c9a84c;color:#080808;border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem;font-family:'Outfit'">
+            📅 Reservar turno online
+          </a>
+          <button id="pubShareBtn" onclick="navigator.clipboard.writeText(location.href).then(()=>{var b=document.getElementById('pubShareBtn');b.textContent='¡Copiado! ✓';b.style.borderColor='#4caf7d';b.style.color='#4caf7d';setTimeout(()=>{b.textContent='🔗 Compartir lista de precios';b.style.borderColor='#2e2e2e';b.style.color='#a89880';},2500)})"
+            style="background:transparent;border:1px solid #2e2e2e;color:#a89880;padding:10px 22px;border-radius:8px;font-family:'Outfit';font-size:.82rem;cursor:pointer;transition:all .2s">
+            🔗 Compartir lista de precios
+          </button>
+        </div>
+
+        <div style="text-align:center;margin-top:28px;font-size:.62rem;color:#2e2e2e;letter-spacing:1.5px;text-transform:uppercase">Precios actualizados en tiempo real</div>
+      </div>
+    </div>
+  `;
+  pubRender();
+}
+
+function pubSetCat(btn){
+  window.__preciosPublicCat = btn.dataset.cat;
+  document.querySelectorAll('#pubCatTabs button').forEach(b=>{
+    const on = b === btn;
+    b.style.borderColor = on ? '#c9a84c' : '#242424';
+    b.style.background   = on ? 'rgba(201,168,76,.15)' : 'transparent';
+    b.style.color        = on ? '#c9a84c' : '#a89880';
+  });
+  pubRender();
+}
+
+function pubRender(){
+  const grid  = document.getElementById('pubGrid');
+  const empty = document.getElementById('pubEmpty');
+  if(!grid) return;
+  const q    = ((document.getElementById('pubPQ')||{}).value||'').toLowerCase();
+  const cat  = window.__preciosPublicCat||'';
+  const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const items = (window.__preciosPublicItems||[]).filter(p=>{
+    if(!p || p.disponibilidad === 'no disponible') return false;
+    const matchQ = !q   || norm(p.nombre).includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
+    const matchC = !cat || norm(p.nombre).includes(norm(cat));
+    return matchQ && matchC;
+  });
+  if(!items.length){
+    grid.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  grid.style.display = 'grid';
+  empty.style.display = 'none';
+  const fmt2 = n => '$'+Number(n).toLocaleString('es-AR');
+  grid.innerHTML = items.map(p=>`
+    <div style="background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:6px;position:relative">
+      ${p.disponibilidad==='consultar' ? `<div style="position:absolute;top:12px;right:12px;background:rgba(201,148,76,.15);color:#c9944c;border:1px solid rgba(201,148,76,.25);border-radius:20px;font-size:.6rem;padding:2px 8px;font-weight:600">Consultar</div>` : ''}
+      <div style="font-weight:600;font-size:.9rem;padding-right:${p.disponibilidad==='consultar'?'72px':'0'};line-height:1.3">${esc(p.nombre)}</div>
+      ${p.modelo ? `<div style="font-size:.72rem;color:#585044">${esc(p.modelo)}</div>` : ''}
+      <div style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:#c9a84c;margin-top:6px">${p.precio > 0 ? fmt2(p.precio) : '<span style="font-size:.9rem;font-family:\'Outfit\',sans-serif;color:#585044">A consultar</span>'}</div>
+      ${p.notas ? `<div style="font-size:.7rem;color:#444;line-height:1.5;margin-top:2px">${esc(p.notas)}</div>` : ''}
+    </div>
+  `).join('');
 }
 
 async function cargarHorasDisponibles(tenantId, turnosCfg){
@@ -7446,8 +7590,26 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 
 // Verificar sesión existente
 (async()=>{
-  // Si hay param ?turno= mostrar página de reserva sin login
   const urlParams = new URLSearchParams(window.location.search);
+
+  // ── Página pública de precios ──────────────────────────────────────────
+  const preciosParam = urlParams.get('precios');
+  if(preciosParam){
+    document.getElementById('loadingScreen').style.display='none';
+    const { data: rows } = await sb.from('precios').select('data').eq('tenant_id', preciosParam);
+    if(!rows || !rows.length){
+      document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Outfit\',sans-serif"><div style="text-align:center;color:#585044"><div style="font-size:3rem;margin-bottom:12px">🔍</div><div style="font-size:.9rem">No se encontraron precios para este negocio.</div></div></div>';
+      return;
+    }
+    const cfgRow = rows.find(r=>r.data?.__tipo==='cfg');
+    const cfg = cfgRow?.data || {};
+    const items = rows.filter(r=>r.data && !r.data.__tipo).map(r=>r.data).filter(Boolean);
+    mostrarPreciosPublicos(preciosParam, items, cfg);
+    return;
+  }
+
+  // ── Página pública de turnos ──────────────────────────────────────────
+  // Si hay param ?turno= mostrar página de reserva sin login
   const turnoParam = urlParams.get('turno');
   if(turnoParam){
     // Hide loading screen
