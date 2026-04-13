@@ -345,6 +345,10 @@ textarea{resize:vertical;min-height:70px;}
 
 /* MÓDULOS deshabilitados */
 .module-disabled{display:none !important;}
+/* TRIAL BANNER */
+#trialBanner{background:linear-gradient(90deg,rgba(201,148,76,.15),rgba(201,168,76,.1));border-bottom:1px solid rgba(201,168,76,.3);padding:8px 16px;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:.78rem;}
+#trialBanner span{color:var(--wrn)}
+#trialBanner a{color:var(--gld);font-weight:700;text-decoration:none;}
 
 /* ── MEJORAS MOBILE ── */
 @media(max-width:768px){
@@ -381,6 +385,29 @@ textarea{resize:vertical;min-height:70px;}
 
 <!-- ONBOARDING WIZARD -->
 <div id="onboardingScreen" style="position:fixed;inset:0;background:#080808;z-index:9000;display:none;overflow-y:auto;font-family:'Outfit',sans-serif"></div>
+
+<!-- TRIAL VENCIDO -->
+<div id="trialScreen" style="position:fixed;inset:0;background:#080808;z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif">
+  <div style="max-width:460px;width:100%;text-align:center">
+    <div style="font-size:3rem;margin-bottom:16px">⏰</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:800;color:#c9a84c;margin-bottom:10px">Tu período de prueba terminó</div>
+    <div style="color:#a89880;font-size:.95rem;line-height:1.7;margin-bottom:28px">Los 30 días gratuitos finalizaron. Para seguir usando el sistema y no perder tus datos, activá tu suscripción.</div>
+    <div style="background:#141414;border:1px solid #242424;border-radius:14px;padding:24px;margin-bottom:20px;text-align:left">
+      <div style="font-size:.7rem;color:#585044;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px">Tu plan</div>
+      <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c">$8.000 <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span></div>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Todos tus datos guardados</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones incluidas</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Soporte por WhatsApp</div>
+      </div>
+    </div>
+    <a href="https://wa.me/5493472628087?text=Hola!%20Quiero%20activar%20mi%20suscripci%C3%B3n%20de%20remu" target="_blank"
+       style="display:block;padding:15px;background:#c9a84c;color:#080808;border-radius:10px;font-weight:700;font-size:1rem;text-decoration:none;margin-bottom:12px">
+      Activar por WhatsApp →
+    </a>
+    <button onclick="doLogout()" style="background:none;border:none;color:#585044;font-size:.82rem;cursor:pointer;font-family:'Outfit',sans-serif">Cerrar sesión</button>
+  </div>
+</div>
 
 <!-- LOADING -->
 <div id="loadingScreen">
@@ -616,6 +643,12 @@ textarea{resize:vertical;min-height:70px;}
     </div>
   </div>
 
+  <!-- TRIAL BANNER -->
+  <div id="trialBanner">
+    <span id="trialBannerTxt">⏰ Tu período de prueba vence pronto</span>
+    <a href="https://wa.me/5493472628087?text=Hola!%20Quiero%20activar%20mi%20suscripci%C3%B3n%20de%20remu" target="_blank">Activar ahora →</a>
+  </div>
+
   <div class="cnt">
     <!-- DASHBOARD -->
     <div class="sec active" id="sec-dashboard">
@@ -805,7 +838,8 @@ textarea{resize:vertical;min-height:70px;}
 
     <!-- TALLER -->
     <div class="sec" id="sec-taller">
-      <div class="pt" id="tallerTitle">Taller / Servicios</div><div class="ps" id="tallerSub">Seguimiento de trabajos</div>
+      <div class="pt" id="tallerTitle">Reparaciones</div><div class="ps" id="tallerSub">Seguimiento de trabajos</div>
+      <div id="estadoLinkBox" style="margin-bottom:14px"></div>
       <div class="ch">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <div class="srch" style="max-width:220px"><span>⌕</span><input id="tallerIMEI" placeholder="Buscar IMEI o cliente..." oninput="buscarTaller(this.value)"></div>
@@ -2005,25 +2039,66 @@ async function loadTenants(){
   const el = document.getElementById('tenantsList');
   if(error || !data){ el.innerHTML='<div style="color:var(--bad);font-size:.8rem">Error al cargar</div>'; return; }
   if(!data.length){ el.innerHTML='<div style="color:var(--mut);font-size:.8rem">Sin clientes aún</div>'; return; }
+  // Stats summary
+  const activos = data.filter(t=>t.activo).length;
+  const conPago = data.filter(t=>t.modulos?.pago_activo).length;
+  const enTrial = data.filter(t=>t.activo && !t.modulos?.pago_activo).length;
+  document.getElementById('saStats').innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:8px"><div style="background:var(--bg);border:1px solid var(--bor);border-radius:8px;padding:10px;text-align:center"><div style="font-size:1.4rem;font-weight:800;color:var(--ok)">${activos}</div><div style="font-size:.7rem;color:var(--tx2)">Activos</div></div><div style="background:var(--bg);border:1px solid var(--bor);border-radius:8px;padding:10px;text-align:center"><div style="font-size:1.4rem;font-weight:800;color:var(--gld)">${conPago}</div><div style="font-size:.7rem;color:var(--tx2)">Con pago</div></div><div style="background:var(--bg);border:1px solid var(--bor);border-radius:8px;padding:10px;text-align:center"><div style="font-size:1.4rem;font-weight:800;color:var(--wrn)">${enTrial}</div><div style="font-size:.7rem;color:var(--tx2)">En trial</div></div></div>`;
   el.innerHTML = data.map(t => {
     const color = t.modulos?.color || '#c9a84c';
     const emoji = t.modulos?.emoji || '';
+    const mods = t.modulos || {};
+    const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(t.created_at||Date.now()).getTime() + 30*24*60*60*1000);
+    const diasTrial = Math.ceil((trialHasta - new Date()) / 86400000);
+    const trialLabel = mods.pago_activo
+      ? `<span class="tenant-badge" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.25)">💳 Pago activo</span>`
+      : diasTrial > 0
+        ? `<span class="tenant-badge" style="background:rgba(201,148,76,.12);color:var(--wrn);border:1px solid rgba(201,148,76,.2)">⏰ Trial: ${diasTrial}d</span>`
+        : `<span class="tenant-badge" style="background:rgba(201,82,76,.12);color:var(--bad);border:1px solid rgba(201,82,76,.2)">Trial vencido</span>`;
+    const fechaReg = t.created_at ? new Date(t.created_at).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'numeric'}) : '—';
+    const autoReg = mods.auto_registro ? '<span style="font-size:.65rem;color:var(--inf);background:rgba(76,142,201,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,142,201,.2)">auto</span>' : '';
     return `
-    <div class="tenant-row">
-      <div style="display:flex;align-items:center;gap:10px;flex:1">
-        <div style="width:32px;height:32px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">${emoji||t.nombre.slice(0,1).toUpperCase()}</div>
-        <div>
-          <div class="tenant-name">${t.nombre}</div>
-          <div class="tenant-email">${t.rubro || ''}</div>
+    <div class="tenant-row" style="flex-direction:column;align-items:flex-start;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;width:100%">
+        <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">${emoji||t.nombre.slice(0,1).toUpperCase()}</div>
+        <div style="flex:1;min-width:0">
+          <div class="tenant-name">${t.nombre} ${autoReg}</div>
+          <div class="tenant-email">${t.rubro||'Sin rubro'} · Registrado: ${fechaReg}</div>
         </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <span class="tenant-badge ${t.activo?'t-active':'t-inactive'}">${t.activo?'Activo':'Inactivo'}</span>
-        <button class="sa-btn outline" style="margin:0;padding:4px 10px;font-size:.72rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
-        <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:4px 10px;font-size:.72rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-left:46px">
+        ${trialLabel}
+        ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="activarPago('${t.id}')">✓ Marcar pagado</button>`:'<button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="desactivarPago(\''+t.id+'\')">Cancelar pago</button>'}
+        ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="extenderTrial('${t.id}')">+30 días trial</button>`:''}
+        <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
+        <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function activarPago(id){
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id',id).single();
+  const mods = {...(t?.modulos||{}), pago_activo:true};
+  await sb.from('tenants').update({modulos:mods}).eq('id',id);
+  showSaMsg('✓ Pago activado','ok'); loadTenants();
+}
+
+async function desactivarPago(id){
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id',id).single();
+  const mods = {...(t?.modulos||{}), pago_activo:false};
+  await sb.from('tenants').update({modulos:mods}).eq('id',id);
+  showSaMsg('Pago desactivado','ok'); loadTenants();
+}
+
+async function extenderTrial(id){
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id',id).single();
+  const actual = t?.modulos?.trial_hasta ? new Date(t.modulos.trial_hasta) : new Date();
+  const nuevo = new Date(Math.max(actual.getTime(), Date.now()) + 30*24*60*60*1000).toISOString();
+  const mods = {...(t?.modulos||{}), trial_hasta: nuevo};
+  await sb.from('tenants').update({modulos:mods}).eq('id',id);
+  showSaMsg('✓ Trial extendido 30 días más','ok'); loadTenants();
 }
 
 async function editarTenant(id){
@@ -2911,7 +2986,24 @@ function verEstadisticasTaller(){
   document.body.appendChild(overlay);
 }
 
+function rEstadoLink(){
+  const box = document.getElementById('estadoLinkBox');
+  if(!box || !currentTenant) return;
+  const link = window.location.origin + window.location.pathname + '?estado=' + currentTenant.id;
+  box.innerHTML = `<div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 16px">
+    <div>
+      <div style="font-size:.78rem;font-weight:600;margin-bottom:2px">🔍 Link para que tus clientes consulten el estado de su equipo</div>
+      <div style="font-size:.7rem;color:var(--tx2);word-break:break-all">${link}</div>
+    </div>
+    <div style="display:flex;gap:7px;flex-shrink:0">
+      <button class="btn bgh bsm" onclick="navigator.clipboard.writeText('${link}');showToast('Link copiado ✓')">Copiar</button>
+      <button class="btn bs bsm" onclick="window.open('${link}','_blank')">Ver →</button>
+    </div>
+  </div>`;
+}
+
 function rTaller(){
+  rEstadoLink();
   document.getElementById('kan').innerHTML=ESTS.map(est=>{
     const reps=S.reparaciones.filter(r=>r.estado===est.k);
     return`<div class="kc"><div class="kct">${est.l} <span style="color:var(--mut)">(${reps.length})</span></div>
@@ -5157,6 +5249,182 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
   // Store globals for use in onchange handlers
   window.__onlineTenantId = tenant.id;
   window.__onlineTurnosCfg = turnosCfg;
+}
+
+// ═══════════════════════════════════════════════════
+// PÁGINA PÚBLICA: AUTO-REGISTRO  (?registro=1)
+// ═══════════════════════════════════════════════════
+function mostrarPaginaRegistro(){
+  const STY = `
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#080808;color:#f5f0e8;font-family:'Outfit',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+    .rbox{background:#0f0f0f;border:1px solid #242424;border-radius:16px;padding:36px 32px;width:100%;max-width:420px}
+    .rlogo{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:800;color:#c9a84c;letter-spacing:2px;text-align:center;margin-bottom:4px}
+    .rsub{text-align:center;font-size:.72rem;color:#585044;letter-spacing:3px;text-transform:uppercase;margin-bottom:28px}
+    label{display:block;font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;margin-top:14px}
+    input,select{width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:12px 14px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.9rem;outline:none;transition:border .15s}
+    input:focus,select:focus{border-color:#c9a84c}
+    select option{background:#080808}
+    .rbtn{margin-top:22px;width:100%;padding:13px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .15s}
+    .rbtn:hover{background:#e8c96a}
+    .rbtn:disabled{opacity:.5;cursor:not-allowed}
+    .rerr{color:#c9524c;font-size:.78rem;margin-top:10px;display:none;text-align:center}
+    .rok{color:#4caf7d;font-size:.85rem;margin-top:12px;display:none;text-align:center;line-height:1.6}
+    .rlink{text-align:center;margin-top:16px;font-size:.78rem;color:#585044}
+    .rlink a{color:#c9a84c;text-decoration:none}
+    .rtrial{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:12px;margin-bottom:20px;text-align:center;font-size:.8rem;color:#c9a84c}
+    @media(max-width:480px){.rbox{padding:24px 18px}}
+  `;
+  document.head.innerHTML = `<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crear cuenta — remu</title><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"><style>${STY}</style>`;
+  document.body.innerHTML = `
+    <div class="rbox">
+      <div class="rlogo">remu</div>
+      <div class="rsub">Sistema de gestión</div>
+      <div class="rtrial">🎁 Primer mes gratis · Sin tarjeta · Cancelás cuando querés</div>
+      <label>Nombre de tu negocio</label>
+      <input id="rNombre" placeholder="Ej: Barbería El Punto, Tech Mobile..." autocomplete="off">
+      <label>Rubro</label>
+      <select id="rRubro">
+        <option value="">— Elegí tu rubro —</option>
+        <option value="Barbería">✂ Barbería</option>
+        <option value="Salón de belleza">💅 Salón de belleza / Peluquería</option>
+        <option value="Taller de celulares">📱 Taller de celulares / Servicio técnico</option>
+        <option value="Otro">🏠 Otro</option>
+      </select>
+      <label>Email</label>
+      <input id="rEmail" type="email" placeholder="tu@email.com" autocomplete="off">
+      <label>Contraseña</label>
+      <input id="rPass" type="password" placeholder="Mínimo 6 caracteres">
+      <label>Confirmá la contraseña</label>
+      <input id="rPass2" type="password" placeholder="Repetí la contraseña">
+      <button class="rbtn" id="rBtn" onclick="doRegistro()">Crear cuenta gratis</button>
+      <div class="rerr" id="rErr"></div>
+      <div class="rok" id="rOk"></div>
+      <div class="rlink">¿Ya tenés cuenta? <a href="index.html">Iniciar sesión →</a></div>
+    </div>
+  `;
+}
+
+async function doRegistro(){
+  const nombre = document.getElementById('rNombre').value.trim();
+  const rubro  = document.getElementById('rRubro').value;
+  const email  = document.getElementById('rEmail').value.trim().toLowerCase();
+  const pass   = document.getElementById('rPass').value;
+  const pass2  = document.getElementById('rPass2').value;
+  const btn = document.getElementById('rBtn');
+  const err = document.getElementById('rErr');
+  const ok  = document.getElementById('rOk');
+  err.style.display='none'; ok.style.display='none';
+  if(!nombre){ err.textContent='Ingresá el nombre de tu negocio.'; err.style.display='block'; return; }
+  if(!rubro){  err.textContent='Elegí tu rubro.'; err.style.display='block'; return; }
+  if(!email){  err.textContent='Ingresá tu email.'; err.style.display='block'; return; }
+  if(pass.length < 6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; err.style.display='block'; return; }
+  if(pass !== pass2){  err.textContent='Las contraseñas no coinciden.'; err.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Creando cuenta...';
+  try {
+    // 1. Crear tenant
+    const trialHasta = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+    const { data: tenant, error: te } = await sb.from('tenants').insert({
+      nombre, rubro,
+      modulos: { trial_hasta: trialHasta, pago_activo: false, auto_registro: true },
+      activo: true,
+      created_at: new Date().toISOString()
+    }).select().single();
+    if(te) throw new Error('Error al crear cuenta: ' + (te.message||JSON.stringify(te)));
+    // 2. Registrar usuario en Supabase Auth
+    const { data: usr, error: ue } = await sb.auth.signUp({
+      email, password: pass,
+      options: { data: { tenant_id: tenant.id, rol: 'admin', nombre_negocio: nombre } }
+    });
+    if(ue) throw new Error(ue.message);
+    ok.innerHTML = '✓ ¡Cuenta creada!<br><span style="font-size:.78rem;color:#a89880">Revisá tu email para confirmar tu cuenta y luego podés ingresar.</span>';
+    ok.style.display='block';
+    btn.textContent='¡Listo!';
+    setTimeout(()=>{ window.location.href='index.html'; }, 4000);
+  } catch(e){
+    err.textContent = e.message || 'Ocurrió un error. Intentá de nuevo.';
+    err.style.display='block';
+    btn.disabled=false; btn.textContent='Crear cuenta gratis';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// PÁGINA PÚBLICA: ESTADO DE EQUIPO  (?estado=TENANT_UUID)
+// ═══════════════════════════════════════════════════
+async function mostrarPaginaEstado(tenantId){
+  const { data: tenant } = await sb.from('tenants').select('nombre,rubro,modulos').eq('id', tenantId).single();
+  const nombre = tenant?.nombre || 'El local';
+  const color  = tenant?.modulos?.color || '#c9a84c';
+  const STY = `
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:#080808;color:#f5f0e8;font-family:'Outfit',sans-serif;min-height:100vh;padding:20px}
+    .sbox{max-width:480px;margin:0 auto}
+    .shead{text-align:center;padding:32px 0 24px}
+    .slogo{font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:800;color:${color};margin-bottom:4px}
+    .ssub{font-size:.78rem;color:#585044;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
+    .stit{font-family:'Playfair Display',serif;font-size:1.1rem;color:#f5f0e8;margin-bottom:6px}
+    .sdesc{font-size:.82rem;color:#a89880;line-height:1.6}
+    .sform{background:#0f0f0f;border:1px solid #242424;border-radius:12px;padding:20px;margin-bottom:20px}
+    input{width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:12px 14px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.95rem;outline:none;margin-bottom:10px}
+    input:focus{border-color:${color}}
+    .sbtn{width:100%;padding:12px;background:${color};color:#080808;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;font-family:'Outfit',sans-serif}
+    .scard{background:#0f0f0f;border:1px solid #242424;border-radius:12px;padding:18px;margin-bottom:10px}
+    .seq{font-weight:700;font-size:.95rem;margin-bottom:6px}
+    .scli{font-size:.78rem;color:#a89880;margin-bottom:10px}
+    .sbadge{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.5px}
+    .s-ingresado{background:rgba(76,142,201,.15);color:#4c8ec9;border:1px solid rgba(76,142,201,.3)}
+    .s-proceso{background:rgba(201,148,76,.15);color:#c9944c;border:1px solid rgba(201,148,76,.3)}
+    .s-listo{background:rgba(76,175,125,.15);color:#4caf7d;border:1px solid rgba(76,175,125,.3)}
+    .s-entregado{background:rgba(88,80,68,.15);color:#585044;border:1px solid rgba(88,80,68,.3)}
+    .sempty{text-align:center;padding:32px;color:#585044;font-size:.85rem}
+    .sback{display:block;text-align:center;margin-top:20px;font-size:.75rem;color:#585044;text-decoration:none}
+    @media(max-width:480px){body{padding:12px}}
+  `;
+  document.head.innerHTML = `<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Estado de tu equipo — ${nombre}</title><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"><style>${STY}</style>`;
+  document.body.innerHTML = `
+    <div class="sbox">
+      <div class="shead">
+        <div class="slogo">${nombre}</div>
+        <div class="ssub">Estado de tu equipo</div>
+        <div class="stit">¿En qué está tu celular?</div>
+        <div class="sdesc">Ingresá tu nombre o número de WhatsApp y te mostramos el estado de tu reparación.</div>
+      </div>
+      <div class="sform">
+        <input id="sBusq" placeholder="Nombre o teléfono..." autocomplete="off" onkeydown="if(event.key==='Enter')buscarEstado()">
+        <button class="sbtn" onclick="buscarEstado()">Consultar estado</button>
+      </div>
+      <div id="sResultados"></div>
+      <a class="sback" href="javascript:history.back()">← Volver</a>
+    </div>
+  `;
+  window.__estadoTenantId = tenantId;
+}
+
+async function buscarEstado(){
+  const q = (document.getElementById('sBusq')?.value||'').trim().toLowerCase();
+  const box = document.getElementById('sResultados');
+  if(!q || q.length < 2){ box.innerHTML='<div class="sempty">Ingresá al menos 2 caracteres para buscar.</div>'; return; }
+  box.innerHTML='<div class="sempty">Buscando...</div>';
+  const { data, error } = await sb.from('reparaciones').select('data').eq('tenant_id', window.__estadoTenantId);
+  if(error){ box.innerHTML='<div class="sempty">No se pudo consultar. Contactá directamente con el local.</div>'; return; }
+  const reps = (data||[]).map(r=>r.data).filter(r=>r && (
+    (r.cliente||'').toLowerCase().includes(q) ||
+    (r.tel||'').replace(/\D/g,'').includes(q.replace(/\D/g,''))
+  )).filter(r=>r.estado !== 'entregado' || true); // show all including entregado
+  if(!reps.length){ box.innerHTML='<div class="sempty">No encontramos reparaciones con ese nombre o teléfono.<br><br>Si creés que es un error, contactá al local directamente.</div>'; return; }
+  const estadoLabel = { ingresado:'Ingresado', proceso:'En proceso', listo:'✓ Listo para retirar', entregado:'Entregado' };
+  const estadoClass = { ingresado:'s-ingresado', proceso:'s-proceso', listo:'s-listo', entregado:'s-entregado' };
+  box.innerHTML = reps.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(r=>`
+    <div class="scard">
+      <div class="seq">${r.equipo||'Equipo sin identificar'} ${r.marca?'— '+r.marca:''}</div>
+      <div class="scli">👤 ${r.cliente||'—'} ${r.tel?'· 📱 '+r.tel:''}</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span class="sbadge ${estadoClass[r.estado]||'s-ingresado'}">${estadoLabel[r.estado]||r.estado||'Sin estado'}</span>
+        <span style="font-size:.72rem;color:#585044">${r.fecha?'Ingresó: '+new Date(r.fecha).toLocaleDateString('es-AR',{day:'numeric',month:'long'}):''}</span>
+      </div>
+      ${r.estado==='listo'?`<div style="margin-top:10px;padding:8px 12px;background:rgba(76,175,125,.08);border-radius:6px;font-size:.78rem;color:#4caf7d">¡Tu equipo está listo! Pasá a buscarlo. <strong>Llevá tu comprobante.</strong></div>`:''}
+    </div>
+  `).join('');
 }
 
 // ═══════════════════════════════════════════════════
@@ -7977,6 +8245,21 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 (async()=>{
   const urlParams = new URLSearchParams(window.location.search);
 
+  // ── Auto-registro ──────────────────────────────────────────────────────
+  if(urlParams.get('registro')){
+    document.getElementById('loadingScreen').style.display='none';
+    mostrarPaginaRegistro();
+    return;
+  }
+
+  // ── Estado de equipo ──────────────────────────────────────────────────
+  const estadoParam = urlParams.get('estado');
+  if(estadoParam){
+    document.getElementById('loadingScreen').style.display='none';
+    await mostrarPaginaEstado(estadoParam);
+    return;
+  }
+
   // ── Página pública de precios ──────────────────────────────────────────
   const preciosParam = urlParams.get('precios');
   if(preciosParam){
@@ -8033,6 +8316,21 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
       const nombreEmpSesion = session.user.user_metadata?.nombre_empleado || '';
       currentRole = rolSesion;
       if(nombreEmpSesion) window.currentEmpleadoNombre = nombreEmpSesion;
+      // ── Trial check (solo admin, no empleados ni superadmin) ──
+      if(rolSesion === 'admin'){
+        const mods = td.modulos || {};
+        const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
+        const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
+        if(!mods.pago_activo && diasRestantes <= 0){
+          document.getElementById('loadingScreen').style.display='none';
+          document.getElementById('trialScreen').style.display='flex';
+          return;
+        }
+        if(!mods.pago_activo && diasRestantes <= 7){
+          const banner = document.getElementById('trialBanner');
+          if(banner){ banner.style.display='flex'; document.getElementById('trialBannerTxt').textContent = `⏰ Tu período de prueba vence en ${diasRestantes} día${diasRestantes!==1?'s':''}. Después el sistema se pausará.`; }
+        }
+      }
       setupApp();
       await loadAll();
     } else {

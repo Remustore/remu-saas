@@ -35,7 +35,11 @@ DROP POLICY IF EXISTS "tenants_select_own" ON tenants;
 CREATE POLICY "tenants_select_own" ON tenants
   FOR SELECT USING (id = auth.tenant_id());
 
--- Superadmin gestiona tenants vía service_role (no necesita policy de INSERT aquí)
+-- Auto-registro: cualquier usuario (incluso anon) puede insertar su propio tenant
+-- Esto es necesario para el flujo de registro desde la landing page
+DROP POLICY IF EXISTS "tenants_insert_registro" ON tenants;
+CREATE POLICY "tenants_insert_registro" ON tenants
+  FOR INSERT WITH CHECK (true);
 
 
 -- ══════════════════════════════════════════════
@@ -91,6 +95,12 @@ DROP POLICY IF EXISTS "reparaciones_tenant_all" ON reparaciones;
 CREATE POLICY "reparaciones_tenant_all" ON reparaciones
   FOR ALL USING (tenant_id = auth.tenant_id())
   WITH CHECK (tenant_id = auth.tenant_id());
+
+-- SELECT público para la página de estado de equipo (?estado=TENANT_UUID)
+-- Permite a los clientes consultar el estado de su reparación sin login
+DROP POLICY IF EXISTS "reparaciones_select_public" ON reparaciones;
+CREATE POLICY "reparaciones_select_public" ON reparaciones
+  FOR SELECT USING (true);
 
 
 -- ══════════════════════════════════════════════
