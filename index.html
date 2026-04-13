@@ -2317,6 +2317,16 @@ async function loadAll(){
     S.inversores=inversores; S.movimientos_inv=movimientos_inv;
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
+    // Auto-precargar servicios para tenants nuevos (primer login tras confirmar email)
+    if(currentRole === 'admin' && !S.precios.length && !S.reparaciones.length && !S.ventas.length && currentTenant?.rubro){
+      const _pcKey = 'precargado_' + (currentTenant?.id||'');
+      if(!localStorage.getItem(_pcKey)){
+        await precargarServiciosTenant(currentTenant.id, currentTenant.rubro, currentTenant.nombre);
+        localStorage.setItem(_pcKey, '1');
+        const preciosNuevos = await dbLoad('precios');
+        if(preciosNuevos) S.precios = preciosNuevos.filter(p=>!p.__turnosCfg && !p.__tipo);
+      }
+    }
     renderAll();
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
@@ -5322,22 +5332,34 @@ async function doRegistro(){
   if(pass !== pass2){  err.textContent='Las contraseñas no coinciden.'; err.style.display='block'; return; }
   btn.disabled=true; btn.textContent='Creando cuenta...';
   try {
-    // 1. Crear tenant
+    // 1. Generar ID del tenant en el cliente (evita el problema de SELECT después de INSERT con RLS anon)
+    const tenantId = crypto.randomUUID();
     const trialHasta = new Date(Date.now() + 30*24*60*60*1000).toISOString();
-    const { data: tenant, error: te } = await sb.from('tenants').insert({
+    const { error: te } = await sb.from('tenants').insert({
+      id: tenantId,
       nombre, rubro,
       modulos: { trial_hasta: trialHasta, pago_activo: false, auto_registro: true },
       activo: true,
       created_at: new Date().toISOString()
-    }).select().single();
+    });
     if(te) throw new Error('Error al crear cuenta: ' + (te.message||JSON.stringify(te)));
     // 2. Registrar usuario en Supabase Auth
     const { data: usr, error: ue } = await sb.auth.signUp({
       email, password: pass,
-      options: { data: { tenant_id: tenant.id, rol: 'admin', nombre_negocio: nombre } }
+      options: { data: { tenant_id: tenantId, rol: 'admin', nombre_negocio: nombre } }
     });
     if(ue) throw new Error(ue.message);
-    ok.innerHTML = '✓ ¡Cuenta creada!<br><span style="font-size:.78rem;color:#a89880">Revisá tu email para confirmar tu cuenta y luego podés ingresar.</span>';
+    // 3. Intentar login automático (funciona si email confirm está desactivado en Supabase)
+    btn.textContent='Configurando tu sistema...';
+    const { data: loginData, error: le } = await sb.auth.signInWithPassword({ email, password: pass });
+    if(!le && loginData?.session){
+      // Login exitoso — precargar servicios según rubro y redirigir directo al sistema
+      await precargarServiciosTenant(tenantId, rubro, nombre);
+      window.location.href = 'index.html';
+      return;
+    }
+    // Si requiere confirmación de email: mostrar mensaje y redirigir al login
+    ok.innerHTML = '✓ ¡Cuenta creada!<br><span style="font-size:.78rem;color:#a89880">Revisá tu email para confirmar tu cuenta y luego ingresá con tu email y contraseña.</span>';
     ok.style.display='block';
     btn.textContent='¡Listo!';
     setTimeout(()=>{ window.location.href='index.html'; }, 4000);

@@ -10,8 +10,9 @@
 --   - El tenant_id del usuario viene del JWT claim (user_metadata.tenant_id).
 --   - turnos_solicitudes permite INSERT público (para booking online).
 --
--- IMPORTANTE: el superadmin opera siempre con service_role key (solo
--- en backend/Edge Functions), nunca con la anon key del cliente.
+-- IMPORTANTE: el superadmin usa la anon key con políticas RLS basadas en JWT.
+--   El JWT del superadmin contiene user_metadata.rol = 'superadmin'.
+--   Las funciones auth.is_superadmin() y auth.tenant_id() extraen estos valores.
 -- ═══════════════════════════════════════════════════════════════════════
 
 
@@ -23,23 +24,46 @@ AS $$
   SELECT (auth.jwt() -> 'user_metadata' ->> 'tenant_id');
 $$;
 
+-- ── Helper: verificar si el usuario es superadmin ─────────────────────
+CREATE OR REPLACE FUNCTION auth.is_superadmin() RETURNS boolean
+  LANGUAGE sql STABLE
+AS $$
+  SELECT (auth.jwt() -> 'user_metadata' ->> 'rol') = 'superadmin';
+$$;
+
 
 -- ══════════════════════════════════════════════
 -- TABLA: tenants
 -- Los usuarios sólo ven su propio tenant.
--- Sólo el superadmin (service_role) puede crear/borrar tenants.
+-- El superadmin puede ver y modificar todos los tenants.
 -- ══════════════════════════════════════════════
 ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 
+-- Tenant ve su propio registro
 DROP POLICY IF EXISTS "tenants_select_own" ON tenants;
 CREATE POLICY "tenants_select_own" ON tenants
   FOR SELECT USING (id = auth.tenant_id());
+
+-- Superadmin ve todos los tenants
+DROP POLICY IF EXISTS "tenants_select_superadmin" ON tenants;
+CREATE POLICY "tenants_select_superadmin" ON tenants
+  FOR SELECT USING (auth.is_superadmin());
 
 -- Auto-registro: cualquier usuario (incluso anon) puede insertar su propio tenant
 -- Esto es necesario para el flujo de registro desde la landing page
 DROP POLICY IF EXISTS "tenants_insert_registro" ON tenants;
 CREATE POLICY "tenants_insert_registro" ON tenants
   FOR INSERT WITH CHECK (true);
+
+-- Superadmin puede actualizar cualquier tenant (activar/desactivar, pago, trial)
+DROP POLICY IF EXISTS "tenants_update_superadmin" ON tenants;
+CREATE POLICY "tenants_update_superadmin" ON tenants
+  FOR UPDATE USING (auth.is_superadmin()) WITH CHECK (true);
+
+-- Tenant puede actualizar su propio registro (configuración, personalización)
+DROP POLICY IF EXISTS "tenants_update_own" ON tenants;
+CREATE POLICY "tenants_update_own" ON tenants
+  FOR UPDATE USING (id = auth.tenant_id()) WITH CHECK (id = auth.tenant_id());
 
 
 -- ══════════════════════════════════════════════
@@ -106,7 +130,7 @@ CREATE POLICY "reparaciones_select_public" ON reparaciones
 -- ══════════════════════════════════════════════
 -- TABLA: precios
 -- SELECT público (para la página de booking online del tenant).
--- INSERT/UPDATE/DELETE sólo para el tenant dueño.
+-- INSERT/UPDATE/DELETE sólo para el tenant dueño o superadmin.
 -- ══════════════════════════════════════════════
 ALTER TABLE precios ENABLE ROW LEVEL SECURITY;
 
@@ -118,6 +142,11 @@ DROP POLICY IF EXISTS "precios_write_tenant" ON precios;
 CREATE POLICY "precios_write_tenant" ON precios
   FOR ALL USING (tenant_id = auth.tenant_id())
   WITH CHECK (tenant_id = auth.tenant_id());
+
+-- Superadmin puede escribir precios (necesario para precargar servicios al crear tenant)
+DROP POLICY IF EXISTS "precios_write_superadmin" ON precios;
+CREATE POLICY "precios_write_superadmin" ON precios
+  FOR ALL USING (auth.is_superadmin()) WITH CHECK (auth.is_superadmin());
 
 
 -- ══════════════════════════════════════════════
