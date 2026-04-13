@@ -1481,8 +1481,8 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mc">
   <input type="hidden" id="turnoId">
   <div class="fr"><div><label>Cliente</label><input id="turnoCli" placeholder="Nombre del cliente"></div><div><label>Teléfono / WA</label><input id="turnoTel" placeholder="11 2345 6789"></div></div>
-  <div class="fr"><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div><div><label>Empleado</label><select id="turnoEmpleado"></select></div></div>
-  <div class="fr"><div><label>Fecha</label><input type="date" id="turnoFecha"></div><div><label>Hora</label><input type="time" id="turnoHora" step="1800"></div></div>
+  <div class="fr"><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div><div><label>Empleado</label><select id="turnoEmpleado" onchange="verificarConflicto()"></select></div></div>
+  <div class="fr"><div><label>Fecha</label><input type="date" id="turnoFecha" onchange="updateDuracionTurno()"></div><div><label>Hora</label><input type="time" id="turnoHora" step="1800" onchange="updateDuracionTurno()"></div></div>
   <div id="turnoDurBox" style="background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--tx2)">
     Duración estimada: <strong id="turnoDurLabel" style="color:var(--gld)">—</strong>
     · Finaliza: <strong id="turnoFinLabel" style="color:var(--tx)">—</strong>
@@ -4285,14 +4285,15 @@ function verificarConflicto(){
 
   const turnos = getTurnos().filter(t=>
     t.fecha===fecha &&
-    t.empleadoId==empleado &&
-    t.id != turnoIdActual
+    String(t.empleadoId)===String(empleado) &&
+    String(t.id)!==String(turnoIdActual) &&
+    t.estado !== 'cancelado' && t.estado !== 'no_vino'
   );
 
   const cfg = getTurnosCfg();
   const conflicto = turnos.find(t=>{
     const srvT = cfg.servicios.find(s=>s.id==t.servicioId);
-    const durT = srvT?.duracion||60;
+    const durT = t.duracion || srvT?.duracion || 60;
     const [th,tm] = t.hora.split(':').map(Number);
     const tInicio = th*60+tm;
     const tFin = tInicio+durT;
@@ -4302,7 +4303,7 @@ function verificarConflicto(){
   if(conflicto){
     const srvC = cfg.servicios.find(s=>s.id==conflicto.servicioId);
     box.style.display='block';
-    box.textContent = `⚠ Conflicto con turno de ${conflicto.cliente} a las ${conflicto.hora} (${srvC?.nombre||'servicio'})`;
+    box.innerHTML = `⚠ <strong>${conflicto.empleadoNombre||'El profesional'}</strong> ya tiene turno de <strong>${conflicto.cliente}</strong> a las ${conflicto.hora} (${srvC?.nombre||conflicto.servicioNombre||'servicio'}) — podés guardarlo igual si querés`;
   } else {
     box.style.display='none';
   }
@@ -4422,7 +4423,9 @@ async function cambiarEstadoTurno(id, nuevoEstado){
       };
       S.ventas.unshift(venta);
       await dbUpsert('ventas', venta);
-      showToast('✓ Finalizado · ' + fmt(t.precio) + ' registrado en ingresos');
+      showToast('✓ Finalizado · ' + fmt(t.precio) + ' sumado a ingresos del día');
+      // Actualizar dashboard y caja en tiempo real
+      if(document.getElementById('secDash')?.style.display !== 'none') rDash();
     } else {
       showToast('✓ Turno finalizado');
     }
@@ -4495,11 +4498,16 @@ function rTurnos(){
   // Day stats
   const statsEl = document.getElementById('turnosDayStats');
   const totalDia = getTurnos().filter(t=>t.fecha===fecha&&t.estado!=='cancelado');
+  const finalizadosDia = totalDia.filter(t=>t.estado==='terminado');
+  const facturadoDia = finalizadosDia.reduce((s,t)=>s+(parseFloat(t.precio)||0),0);
   statsEl.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
-    <div class="stat" style="flex:1;min-width:100px"><div class="sl">Turnos hoy</div><div class="sv">${totalDia.length}</div></div>
+    <div class="stat" style="flex:1;min-width:90px"><div class="sl">Turnos</div><div class="sv">${totalDia.length}</div></div>
+    <div class="stat" style="flex:1;min-width:90px;border-left:2px solid rgba(76,175,125,.3)"><div class="sl">Finalizados</div><div class="sv" style="color:var(--ok)">${finalizadosDia.length}</div></div>
+    <div class="stat" style="flex:1;min-width:120px;border-left:2px solid rgba(201,168,76,.3)"><div class="sl">Facturado hoy</div><div class="sv" style="color:var(--gld)">${facturadoDia>0?fmt(facturadoDia):'$0'}</div></div>
     ${cfg.empleados.map(e=>{
       const n=totalDia.filter(t=>t.empleadoId==e.id).length;
-      return `<div class="stat" style="flex:1;min-width:100px"><div class="sl">${e.nombre}</div><div class="sv">${n}</div></div>`;
+      const f=totalDia.filter(t=>t.empleadoId==e.id&&t.estado==='terminado').length;
+      return `<div class="stat" style="flex:1;min-width:90px"><div class="sl">${e.nombre}</div><div class="sv">${n}<span style="font-size:.7rem;color:var(--ok);margin-left:4px">${f>0?'('+f+'✓)':''}</span></div></div>`;
     }).join('')}
   </div>`;
 
