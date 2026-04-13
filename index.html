@@ -599,6 +599,20 @@ textarea{resize:vertical;min-height:70px;}
     <div class="sec active" id="sec-dashboard">
       <div class="pt" id="dashGreeting">Buenos días</div>
       <div class="ps" id="dashSub">Resumen del negocio</div>
+      <div id="dashFiltBar" style="margin-bottom:14px">
+        <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+          <button class="tab active" onclick="setDFilt('mes',this)">Este mes</button>
+          <button class="tab" onclick="setDFilt('semana',this)">Esta semana</button>
+          <button class="tab" onclick="setDFilt('hoy',this)">Hoy</button>
+          <button class="tab" onclick="setDFilt('año',this)">Este año</button>
+          <button class="tab" onclick="setDFilt('custom',this)">Personalizado</button>
+          <div id="dashCustom" style="display:none;gap:8px;align-items:center">
+            <input type="date" id="dashDesde" style="padding:5px 9px;font-size:.8rem" onchange="rDash()">
+            <span style="color:var(--tx2);font-size:.8rem">→</span>
+            <input type="date" id="dashHasta" style="padding:5px 9px;font-size:.8rem" onchange="rDash()">
+          </div>
+        </div>
+      </div>
       <!-- BARRA DE ENERGÍA -->
       <div class="card" style="margin-bottom:14px" id="energyCard">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
@@ -1111,6 +1125,7 @@ textarea{resize:vertical;min-height:70px;}
           <button class="tab active" onclick="setAnFilt('mes',this)">Este mes</button>
           <button class="tab" onclick="setAnFilt('semana',this)">Esta semana</button>
           <button class="tab" onclick="setAnFilt('hoy',this)">Hoy</button>
+          <button class="tab" onclick="setAnFilt('año',this)">Este año</button>
           <button class="tab" onclick="setAnFilt('custom',this)">Personalizado</button>
           <div id="anCustom" style="display:none;gap:8px;align-items:center">
             <input type="date" id="anDesde" style="width:140px;padding:6px 10px" onchange="rAnalisis()">
@@ -3097,28 +3112,32 @@ function rDash(){
   setTimeout(rObjetivosCompra, 200);
   setTimeout(rDashPareja, 250);
   setTimeout(rDivision, 150);
-  const m=mes();
-  const vm=S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
+  const vm=filtrarDash(S.ventas,'fecha');
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
-  const tG=S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m)).reduce((a,g)=>a+g.monto,0);
-  const gan=tV-tG,repA=S.reparaciones.filter(r=>r.estado!=='entregado').length,eqD=S.equipos.filter(e=>e.estado==='disponible').length;
+  const tG=filtrarDash(S.gastos,'fecha').reduce((a,g)=>a+g.monto,0);
+  const repA=S.reparaciones.filter(r=>r.estado!=='entregado').length,eqD=S.equipos.filter(e=>e.estado==='disponible').length;
   const rubD=(currentTenant?.rubro||'').toLowerCase();
   const esBarberiaD=rubD.includes('barberia')||rubD.includes('barbería')||rubD.includes('salon')||rubD.includes('belleza');
   // For barberia/salon, total income = service ventas + turnos
   const tVServicio = vm.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
   const tVProducto = vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
-  const tTurnosMes = esBarberiaD && getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes())&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
-  const totalMesReal = esBarberiaD ? tVProducto + Math.max(tVServicio, tTurnosMes) : tV;
+  const tTurnosMes = esBarberiaD && getTurnos ? filtrarDash(getTurnos().filter(t=>t.estado==='terminado'),'fecha').reduce((a,t)=>a+(t.precio||0),0) : 0;
+  const repEntregadas = !esBarberiaD ? filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado'),'fecha') : [];
+  const tR = repEntregadas.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const totalMesReal = esBarberiaD ? tVProducto + Math.max(tVServicio, tTurnosMes) : tV + tR;
   const ganReal = totalMesReal - tG;
+  const filtLabel = getDFiltLabel();
+  const opCount = vm.length + repEntregadas.length;
   const stat4 = esBarberiaD
-    ? `<div class="stat"><div class="sl">Turnos este mes</div><div class="sv" style="color:var(--wrn)">${getTurnos?getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes())).length:0}</div></div>`
+    ? `<div class="stat"><div class="sl">Turnos ${filtLabel.toLowerCase()}</div><div class="sv" style="color:var(--wrn)">${getTurnos?filtrarDash(getTurnos(),'fecha').length:0}</div></div>`
     : `<div class="stat"><div class="sl">Trabajos activos</div><div class="sv" style="color:var(--wrn)">${repA}</div><div class="ss">${eqD} equipos disponibles</div></div>`;
-  document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">Facturado del mes</div><div class="sv" style="color:var(--ok)">${fmt(totalMesReal)}</div><div class="ss">${vm.length} operaciones</div></div><div class="stat"><div class="sl">Gastos del mes</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${ganReal>=0?'var(--gld)':'var(--bad)'}"> ${fmt(ganReal)}</div></div>${stat4}`;
-  const meta=S.meta||0,pct=meta>0?Math.min(100,Math.round(tV/meta*100)):0;
+  document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">${filtLabel}</div><div class="sv" style="color:var(--ok)">${fmt(totalMesReal)}</div><div class="ss">${opCount} operaciones</div></div><div class="stat"><div class="sl">Gastos del período</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${ganReal>=0?'var(--gld)':'var(--bad)'}"> ${fmt(ganReal)}</div></div>${stat4}`;
+  const meta=S.meta||0,pct=meta>0?Math.min(100,Math.round(totalMesReal/meta*100)):0;
   document.getElementById('metaArc').style.strokeDashoffset=157-(157*pct/100);
-  document.getElementById('mPct').textContent=pct+'%';document.getElementById('mVal').textContent=fmt(meta);document.getElementById('mVen').textContent=fmt(tV);
+  document.getElementById('mPct').textContent=pct+'%';document.getElementById('mVal').textContent=fmt(meta);document.getElementById('mVen').textContent=fmt(totalMesReal);
   const mg=tV>0?Math.round((tV-tC)/tV*100):0;
-  document.getElementById('flujo').innerHTML=`<div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${gan>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(gan)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
+  const flujoIngs=tR>0?`<div class="fi2"><span>Ventas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Ingresos taller</span><span style="color:var(--ok);font-weight:600">${fmt(tR)}</span></div>`:`<div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>`;
+  document.getElementById('flujo').innerHTML=`${flujoIngs}<div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
   const cnt={};S.ventas.forEach(v=>{cnt[v.nombre]=(cnt[v.nombre]||0)+v.cantidad;});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topS').innerHTML=top.length?top.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${n}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} uds</div></div>`).join(''):emp('📉','Sin ventas registradas');
@@ -3140,7 +3159,7 @@ function rDash(){
     const dias = Math.floor((vence-new Date())/86400000);
     als.push({t:'w',m:`🛡 Garantía de <strong>${r.cliente}</strong> (${r.equipo}) vence en ${dias} día${dias!==1?'s':''}`});
   });
-  if(gan<0)als.push({t:'b',m:`Los gastos superan las ventas en <strong>${fmt(Math.abs(gan))}</strong>`});
+  if(ganReal<0)als.push({t:'b',m:`Los gastos superan los ingresos en <strong>${fmt(Math.abs(ganReal))}</strong>`});
   if(meta>0&&pct>=100)als.push({t:'o',m:`¡Meta de ${fmt(meta)} alcanzada! 🎉`});
   document.getElementById('alerts').innerHTML=als.length?als.map(a=>`<div class="al ${a.t==='w'?'aw':a.t==='o'?'ao':'ab'}"><span>${a.t==='w'?'⚠':a.t==='o'?'✓':'✕'}</span><span>${a.m}</span></div>`).join(''):`<div class="al ai"><span>✓</span><span>Sin alertas. Todo en orden.</span></div>`;
   const bizName = currentTenant?.nombre || 'tu negocio';
@@ -3149,7 +3168,7 @@ function rDash(){
   if(tV===0)cns.push({i:'💡',t:'Registrá tu primera venta',d:'Registrar cada operación te da datos reales para crecer.'});
   if(top.length>0)cns.push({i:'⭐',t:`Estrella: ${top[0][0]}`,d:`Es tu artículo más vendido. Mantené stock constante para no perder ventas.`});
   if(pct>=100)cns.push({i:'🚀',t:'¡Meta alcanzada!',d:'Excelente. Subí la meta el mes que viene y reinvertí en más stock.'});
-  if(gan>0)cns.push({i:'🏦',t:'Resultado positivo',d:'Guardá un 20% del resultado neto como fondo de emergencia del negocio.'});
+  if(ganReal>0)cns.push({i:'🏦',t:'Resultado positivo',d:'Guardá un 20% del resultado neto como fondo de emergencia del negocio.'});
   if(!cns.length)cns.push({i:'💼',t:'Seguí cargando operaciones',d:`Con más datos el sistema te dará consejos personalizados para hacer crecer ${bizName}.`});
   document.getElementById('cons').innerHTML=cns.slice(0,4).map(c=>`<div class="co"><span class="coi">${c.i}</span><div class="cot"><strong>${c.t}</strong>${c.d}</div></div>`).join('');
 }
@@ -3195,6 +3214,7 @@ function rAnalisisRep(){
   document.getElementById('tbRepAn').innerHTML=reps.map(r=>`<tr><td>${fD(r.fecha)}</td><td>${r.cliente}</td><td style="font-size:.75rem">${r.equipo||'—'}</td><td style="color:var(--gld);font-weight:600">${fmt(r.presupuesto)}</td><td>${fmt(r.costoRep||0)}</td><td>${fmt(r.flete||0)}</td><td style="font-weight:700;color:${(r.margen||0)>=50?'var(--ok)':(r.margen||0)>=30?'var(--wrn)':'var(--bad)'}">${fmt(r.ganancia||r.presupuesto)}</td><td><span style="padding:2px 7px;border-radius:4px;font-size:.72rem;font-weight:700;background:${(r.margen||0)>=50?'rgba(74,222,128,.15)':(r.margen||0)>=30?'rgba(250,204,21,.15)':'rgba(248,113,113,.15)'};color:${(r.margen||0)>=50?'var(--ok)':(r.margen||0)>=30?'var(--wrn)':'var(--bad)'}">${r.margen||0}%</span></td></tr>`).join('');
 }
 
+// ═══ FILTROS — Análisis ═══
 let anFilt = 'mes';
 function setAnFilt(f, btn){
   anFilt = f;
@@ -3206,36 +3226,77 @@ function setAnFilt(f, btn){
 }
 
 function getAnRango(){
-  const hoy = tod();
-  if(anFilt==='hoy') return hoy;
-  if(anFilt==='semana'){
-    const d = new Date(); d.setDate(d.getDate()-7);
-    return d.toISOString().slice(0,10);
-  }
-  if(anFilt==='custom'){
-    return document.getElementById('anDesde')?.value || mes();
-  }
-  return mes(); // default: mes actual
+  if(anFilt==='hoy') return tod();
+  if(anFilt==='semana'){ const d=new Date();d.setDate(d.getDate()-7);return d.toISOString().slice(0,10); }
+  if(anFilt==='año') return new Date().getFullYear()+'-01-01';
+  if(anFilt==='custom') return document.getElementById('anDesde')?.value||mes();
+  return mes();
 }
 
 function filtrarPorRango(items, campoFecha){
   if(anFilt==='mes') return items.filter(i=>i[campoFecha]&&i[campoFecha].startsWith(mes()));
   if(anFilt==='hoy') return items.filter(i=>i[campoFecha]===tod());
+  if(anFilt==='año') return items.filter(i=>i[campoFecha]&&i[campoFecha].startsWith(String(new Date().getFullYear())));
   if(anFilt==='semana'){
-    const desde = getAnRango();
+    const desde=getAnRango();
     return items.filter(i=>i[campoFecha]&&i[campoFecha]>=desde);
   }
   if(anFilt==='custom'){
-    const desde = document.getElementById('anDesde')?.value;
-    const hasta = document.getElementById('anHasta')?.value;
+    const desde=document.getElementById('anDesde')?.value;
+    const hasta=document.getElementById('anHasta')?.value;
     return items.filter(i=>{
       if(!i[campoFecha]) return false;
-      if(desde && i[campoFecha] < desde) return false;
-      if(hasta && i[campoFecha] > hasta) return false;
+      if(desde && i[campoFecha]<desde) return false;
+      if(hasta && i[campoFecha]>hasta) return false;
       return true;
     });
   }
   return items;
+}
+
+// ═══ FILTROS — Dashboard ═══
+let dFilt = 'mes';
+function setDFilt(f, btn){
+  dFilt = f;
+  document.querySelectorAll('#dashFiltBar .tab').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const custom = document.getElementById('dashCustom');
+  if(custom) custom.style.display = f==='custom' ? 'flex' : 'none';
+  rDash();
+}
+
+function filtrarDash(items, field){
+  if(!items) return [];
+  if(dFilt==='hoy') return items.filter(i=>i[field]===tod());
+  if(dFilt==='semana'){
+    const d=new Date();d.setDate(d.getDate()-7);
+    const desde=d.toISOString().slice(0,10);
+    return items.filter(i=>i[field]&&i[field]>=desde);
+  }
+  if(dFilt==='año') return items.filter(i=>i[field]&&i[field].startsWith(String(new Date().getFullYear())));
+  if(dFilt==='custom'){
+    const desde=document.getElementById('dashDesde')?.value;
+    const hasta=document.getElementById('dashHasta')?.value;
+    return items.filter(i=>{
+      if(!i[field]) return false;
+      if(desde && i[field]<desde) return false;
+      if(hasta && i[field]>hasta) return false;
+      return true;
+    });
+  }
+  return items.filter(i=>i[field]&&i[field].startsWith(mes())); // mes (default)
+}
+
+function getDFiltLabel(){
+  if(dFilt==='hoy') return 'Facturado hoy';
+  if(dFilt==='semana') return 'Esta semana';
+  if(dFilt==='año') return 'Este año';
+  if(dFilt==='custom'){
+    const d=document.getElementById('dashDesde')?.value;
+    const h=document.getElementById('dashHasta')?.value;
+    return (d&&h)?d+' → '+h:'Período personalizado';
+  }
+  return 'Este mes';
 }
 
 function rAnalisis(){
