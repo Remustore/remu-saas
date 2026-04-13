@@ -55,6 +55,9 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,8,.9);backdrop-filter:
 .hero-btns{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .hero-note{font-size:.75rem;color:var(--mut)}
 .hero-note span{color:var(--ok)}
+.hero-guarantees{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:4px}
+.hero-guarantees span{display:flex;align-items:center;gap:6px;background:rgba(76,175,125,.1);border:1px solid rgba(76,175,125,.25);color:#6fd4a0;font-size:.85rem;font-weight:500;padding:7px 14px;border-radius:30px}
+.hero-guarantees strong{font-size:1rem;color:var(--ok)}
 
 /* Stats bar */
 .hero-stats{display:flex;justify-content:center;gap:0;margin-top:52px;border:1px solid var(--bor);border-radius:14px;overflow:hidden;background:var(--sur)}
@@ -175,15 +178,15 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
 <section class="hero">
   <div class="container">
     <div class="hero-tag">
-      <span class="tag">✂ Barberías · 📱 Talleres de celulares</span>
+      <span class="tag">✂ Barberías &nbsp;·&nbsp; 💅 Salones de belleza &nbsp;·&nbsp; 📱 Talleres de celulares</span>
     </div>
     <h1>
       El sistema que tu negocio<br>
       <em>necesitaba desde siempre</em>
     </h1>
     <p class="hero-sub">
-      Turnos online, control de reparaciones, caja, precios y WhatsApp integrado.
-      Todo desde el celular. Sin planillas. Sin líos. Diseñado para Argentina.
+      Turnos online, agenda del día, caja, clientes y precios — todo en un solo lugar.
+      Lo usás desde el celular. Sin planillas. Sin líos. Hecho para Argentina.
     </p>
     <div class="hero-btns">
       <a href="#contacto" class="btn-primary" style="font-size:1rem;padding:15px 32px">
@@ -193,11 +196,11 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
         Ver cómo funciona
       </a>
     </div>
-    <p class="hero-note">
-      <span>✓</span> Primer mes gratis &nbsp;·&nbsp;
-      <span>✓</span> Sin tarjeta de crédito &nbsp;·&nbsp;
-      <span>✓</span> Cancelás cuando querés
-    </p>
+    <div class="hero-guarantees">
+      <span><strong>✓</strong> Primer mes gratis</span>
+      <span><strong>✓</strong> Sin tarjeta de crédito</span>
+      <span><strong>✓</strong> Cancelás cuando querés</span>
+    </div>
     <div class="hero-stats">
       <div class="stat-item">
         <div class="stat-num">100%</div>
