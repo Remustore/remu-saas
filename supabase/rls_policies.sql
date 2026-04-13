@@ -27,7 +27,7 @@ ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "tenants_select_own" ON tenants;
 CREATE POLICY "tenants_select_own" ON tenants
   FOR SELECT USING (
-    id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 -- Superadmin ve todos los tenants
@@ -53,9 +53,9 @@ CREATE POLICY "tenants_update_superadmin" ON tenants
 DROP POLICY IF EXISTS "tenants_update_own" ON tenants;
 CREATE POLICY "tenants_update_own" ON tenants
   FOR UPDATE USING (
-    id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -67,9 +67,9 @@ ALTER TABLE stock ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "stock_tenant_all" ON stock;
 CREATE POLICY "stock_tenant_all" ON stock
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -81,9 +81,9 @@ ALTER TABLE equipos ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "equipos_tenant_all" ON equipos;
 CREATE POLICY "equipos_tenant_all" ON equipos
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -95,9 +95,9 @@ ALTER TABLE ventas ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "ventas_tenant_all" ON ventas;
 CREATE POLICY "ventas_tenant_all" ON ventas
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -109,9 +109,9 @@ ALTER TABLE gastos ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "gastos_tenant_all" ON gastos;
 CREATE POLICY "gastos_tenant_all" ON gastos
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -123,9 +123,9 @@ ALTER TABLE reparaciones ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "reparaciones_tenant_all" ON reparaciones;
 CREATE POLICY "reparaciones_tenant_all" ON reparaciones
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 -- SELECT público para la página de estado de equipo (?estado=TENANT_UUID)
@@ -149,9 +149,9 @@ CREATE POLICY "precios_select_public" ON precios
 DROP POLICY IF EXISTS "precios_write_tenant" ON precios;
 CREATE POLICY "precios_write_tenant" ON precios
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 -- Superadmin puede escribir precios (para precargar servicios al crear tenant)
@@ -172,9 +172,9 @@ ALTER TABLE inversores ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "inversores_tenant_all" ON inversores;
 CREATE POLICY "inversores_tenant_all" ON inversores
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -186,9 +186,9 @@ ALTER TABLE movimientos_inv ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "movimientos_inv_tenant_all" ON movimientos_inv;
 CREATE POLICY "movimientos_inv_tenant_all" ON movimientos_inv
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
@@ -206,9 +206,9 @@ CREATE POLICY "turnos_solicitudes_insert_public" ON turnos_solicitudes
 DROP POLICY IF EXISTS "turnos_solicitudes_tenant_manage" ON turnos_solicitudes;
 CREATE POLICY "turnos_solicitudes_tenant_manage" ON turnos_solicitudes
   FOR ALL USING (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   ) WITH CHECK (
-    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')
+    tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
 
