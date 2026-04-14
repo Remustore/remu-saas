@@ -1115,7 +1115,10 @@ textarea{resize:vertical;min-height:70px;}
         <label>Instagram (opcional)</label>
         <input id="onlineInsta" placeholder="@tu_salon" style="margin-bottom:10px">
         <label>Dirección</label>
-        <input id="onlineDireccion" placeholder="Ej: Av. San Martín 1234, Marcos Juárez">
+        <input id="onlineDireccion" placeholder="Ej: Av. San Martín 1234, Marcos Juárez" style="margin-bottom:10px">
+        <label>Teléfono / WhatsApp del negocio</label>
+        <input id="onlineTel" type="tel" placeholder="Ej: 1145678901 (sin +54, sin 0)" style="margin-bottom:4px">
+        <div style="font-size:.72rem;color:var(--mut)">Se muestra como botón "💬 Hablar con un asesor" en la página de turnos online.</div>
         <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
@@ -1506,7 +1509,7 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mb" id="mTurno"><div class="md"><div class="mh"><div class="mt2" id="mTurnoTitle">Nuevo turno</div><button class="xbtn" onclick="closeM('mTurno')">✕</button></div>
 <div class="mc">
   <input type="hidden" id="turnoId">
-  <div class="fr"><div><label>Cliente</label><div style="position:relative"><input id="turnoCli" placeholder="Nombre del cliente" oninput="autocompleteCliTurno(this.value)" autocomplete="off"><div id="turnoCliSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--car2);border:1px solid var(--bor2);border-radius:0 0 7px 7px;z-index:500;max-height:200px;overflow-y:auto"></div></div></div><div><label>Teléfono / WA</label><input id="turnoTel" placeholder="11 2345 6789"></div></div>
+  <div class="fr"><div><label>Cliente</label><div style="position:relative"><input id="turnoCli" placeholder="Nombre del cliente" oninput="autocompleteCliTurno(this.value)" autocomplete="off"><div id="turnoCliSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--car2);border:1px solid var(--bor2);border-radius:0 0 7px 7px;z-index:500;max-height:200px;overflow-y:auto"></div></div><div id="turnoFichaLink" style="display:none;margin-top:4px"></div></div><div><label>Teléfono / WA</label><input id="turnoTel" placeholder="11 2345 6789"></div></div>
   <div class="fr"><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div><div><label>Empleado</label><select id="turnoEmpleado" onchange="verificarConflicto()"></select></div></div>
   <div class="fr"><div><label>Fecha</label><input type="date" id="turnoFecha" onchange="updateDuracionTurno()"></div><div><label>Hora</label><input type="time" id="turnoHora" step="1800" onchange="updateDuracionTurno()"></div></div>
   <div id="turnoDurBox" style="background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--tx2)">
@@ -2442,6 +2445,13 @@ async function loadAll(){
           localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
         if(cfgRow.__onlineCfg  && !localStorage.getItem(oKey))
           localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
+        if(cfgRow.__fichasCli){
+          const fKey = 'fichasCli_' + tid;
+          const existF = localStorage.getItem(fKey);
+          // Merge: local wins for keys present locally, Supabase fills missing ones
+          const merged = {...cfgRow.__fichasCli, ...(existF ? JSON.parse(existF) : {})};
+          localStorage.setItem(fKey, JSON.stringify(merged));
+        }
       }
       // Filtrar filas de configuración para que no entren en S.precios
       precios = precios.filter(p=>!p.__turnosCfg && !p.__tipo);
@@ -2923,6 +2933,22 @@ function selCliTurno(nombre, tel){
   if(inp) inp.value = nombre;
   if(box) box.style.display='none';
   if(tel){ const telInp = document.getElementById('turnoTel'); if(telInp && !telInp.value) telInp.value = tel; }
+  mostrarFichaLinkTurno(nombre);
+}
+
+function mostrarFichaLinkTurno(nombre){
+  const r = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonR = /barber|salon|belleza|peluq|manicur/i.test(r);
+  const linkBox = document.getElementById('turnoFichaLink');
+  if(!linkBox) return;
+  if(!esSalonR || !nombre || nombre.length < 2){ linkBox.style.display='none'; return; }
+  const ficha = getFichaCli(nombre);
+  const colorTxt = ficha.colorCodigo ? `🎨 ${ficha.colorCodigo}` : '';
+  const alergiaTxt = ficha.alergias ? `⚠️ ${ficha.alergias}` : '';
+  const badges = [colorTxt, alergiaTxt].filter(Boolean).join(' · ');
+  linkBox.style.display = 'block';
+  linkBox.innerHTML = `<button type="button" onclick="abrirFichaCli('${nombre.replace(/'/g,"\\'")}');"
+    style="background:none;border:none;padding:0;cursor:pointer;font-size:.75rem;color:var(--gld);font-family:var(--fb)">📋 Ver ficha${badges?` · ${badges}`:''}</button>`;
 }
 // Close turno autocomplete on outside click
 document.addEventListener('click', function(e){
@@ -5265,6 +5291,11 @@ async function rTurnosConfig(){
           localStorage.setItem(TURNOS_CFG_KEY + '_' + tenantId, JSON.stringify(cfg));
           if(row.data.__onlineCfg)
             localStorage.setItem(ONLINE_CFG_KEY + '_' + tenantId, JSON.stringify(row.data.__onlineCfg));
+          if(row.data.__fichasCli){
+            const fKey = 'fichasCli_' + tenantId;
+            if(!localStorage.getItem(fKey))
+              localStorage.setItem(fKey, JSON.stringify(row.data.__fichasCli));
+          }
         }
       }
     } catch(e){}
@@ -5641,7 +5672,7 @@ const ONLINE_CFG_KEY = 'turnosOnlineCfg';
 
 function getOnlineCfg(){
   const raw = localStorage.getItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''));
-  return raw ? JSON.parse(raw) : {mensaje:'', insta:'', direccion:''};
+  return raw ? JSON.parse(raw) : {mensaje:'', insta:'', direccion:'', tel:''};
 }
 
 // Calcula el ID del row de configuración en Supabase (determinístico por tenant)
@@ -5658,7 +5689,7 @@ async function persistCfgToSupabase(){
   const rowId = _cfgRowId(currentTenant.id);
   const row = {
     id: rowId,
-    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'' },
+    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __fichasCli: getFichasCli(), __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'' },
     tenant_id: currentTenant.id
   };
   try {
@@ -5690,6 +5721,7 @@ async function rTurnosOnline(){
   if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
   if(document.getElementById('onlineInsta')) document.getElementById('onlineInsta').value = cfg.insta||'';
   if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
+  if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
   
   cargarSolicitudes();
 }
@@ -5841,7 +5873,8 @@ function saveOnlineConfig(){
   const cfg = {
     mensaje: document.getElementById('onlineMensaje')?.value||'',
     insta: document.getElementById('onlineInsta')?.value||'',
-    direccion: document.getElementById('onlineDireccion')?.value||''
+    direccion: document.getElementById('onlineDireccion')?.value||'',
+    tel: (document.getElementById('onlineTel')?.value||'').replace(/\D/g,'')
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
@@ -5910,6 +5943,14 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
         ${cfg.insta?`<div style="text-align:center;margin-top:16px;font-size:.78rem;color:#a89880">📸 ${cfg.insta}</div>`:''}
       </div>
     </div>
+    ${cfg.tel ? `
+    <a href="https://wa.me/549${cfg.tel.replace(/\D/g,'')}?text=${encodeURIComponent('Hola! Quisiera consultar antes de reservar mi turno en '+esc(tenant.nombre)+' 😊')}"
+       target="_blank"
+       style="position:fixed;bottom:24px;right:20px;display:flex;align-items:center;gap:10px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:50px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.88rem;box-shadow:0 4px 20px rgba(37,211,102,.5);z-index:999;transition:transform .15s"
+       onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      💬 Hablar con un asesor
+    </a>` : ''}
   `;
   // Store globals for use in onchange handlers
   window.__onlineTenantId = tenant.id;
@@ -8250,6 +8291,104 @@ function saveFidelUmbral(){
   if(v>0) dbSetConfig('fidelUmbral', v);
 }
 
+// ── FICHAS DE CLIENTES ─────────────────────────────────────────────
+const _fCliKey = () => 'fichasCli_' + (currentTenant?.id||'');
+
+function getFichasCli(){
+  const raw = localStorage.getItem(_fCliKey());
+  return raw ? JSON.parse(raw) : {};
+}
+
+function normNomCli(n){ return (n||'').toLowerCase().trim(); }
+
+function getFichaCli(nombre){
+  return getFichasCli()[normNomCli(nombre)] || {colorCodigo:'', alergias:'', notas:''};
+}
+
+function saveFichaCli(nombre, data){
+  const fichas = getFichasCli();
+  fichas[normNomCli(nombre)] = {...(fichas[normNomCli(nombre)]||{}), ...data};
+  localStorage.setItem(_fCliKey(), JSON.stringify(fichas));
+  persistCfgToSupabase().catch(()=>{});
+}
+
+function abrirFichaCli(nombre){
+  const cli = getClientes().find(c=>c.nombre===nombre) || {nombre, visitas:0, gasto:0, ultimaVisita:'', servicios:[]};
+  const ficha = getFichaCli(nombre);
+  // Build service history
+  const r = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonR = /barber|salon|belleza|peluq|manicur/i.test(r);
+  const historial = esSalonR
+    ? getTurnos().filter(t=>t.cliente===nombre && t.estado==='terminado').sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))
+    : [];
+  const histHtml = historial.length
+    ? historial.map(t=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bor);gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:.82rem;font-weight:600">${esc(t.servicioNombre||'Servicio')}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">${fD(t.fecha)} · ${esc(t.empleadoNombre||'')} ${t.precio>0?'· '+fmt(t.precio):''}</div>
+        </div>
+      </div>`).join('')
+    : `<div style="font-size:.78rem;color:var(--mut)">Sin servicios registrados aún</div>`;
+
+  const html = `
+  <div style="padding:20px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:48px;height:48px;background:var(--gld3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">👤</div>
+      <div>
+        <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700">${esc(cli.nombre)}</div>
+        <div style="font-size:.75rem;color:var(--tx2)">${cli.visitas} visita${cli.visitas!==1?'s':''} · Última: ${cli.ultimaVisita?fD(cli.ultimaVisita):'—'} · Total: ${fmt(cli.gasto)}</div>
+      </div>
+    </div>
+    ${ficha.colorCodigo?`<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:20px;padding:4px 12px;font-size:.78rem;margin-bottom:14px"><span style="color:var(--gld)">🎨</span><strong style="color:var(--gld)">${esc(ficha.colorCodigo)}</strong></div>`:''}
+    ${ficha.alergias?`<div style="background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:8px 12px;font-size:.78rem;color:var(--bad);margin-bottom:14px">⚠️ Alergias/patologías: <strong>${esc(ficha.alergias)}</strong></div>`:''}
+
+    <!-- Historial -->
+    <div style="font-weight:700;font-size:.82rem;margin-bottom:8px">📋 Historial de servicios</div>
+    <div style="max-height:180px;overflow-y:auto;margin-bottom:16px">${histHtml}</div>
+
+    <!-- Datos editables -->
+    <div style="border-top:1px solid var(--bor);padding-top:14px">
+      <div style="font-weight:700;font-size:.82rem;margin-bottom:10px">✏️ Datos del profesional</div>
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:3px">🎨 Color / Tono usado</label>
+      <input id="fichaColor" value="${esc(ficha.colorCodigo||'')}" placeholder="Ej: Wella 7.1, Igora 6-1, mechas californianas..."
+        style="width:100%;margin-bottom:10px">
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:3px">⚠️ Alergias / Patologías</label>
+      <input id="fichaAlergias" value="${esc(ficha.alergias||'')}" placeholder="Ej: alérgica al amonio, cuero cabelludo sensible..."
+        style="width:100%;margin-bottom:10px">
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:3px">📝 Notas del profesional</label>
+      <textarea id="fichaNotas" placeholder="Preferencias, observaciones, detalles técnicos..."
+        style="width:100%;min-height:80px;resize:vertical;padding:10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-family:var(--fb);font-size:.85rem;outline:none">${esc(ficha.notas||'')}</textarea>
+    </div>
+  </div>`;
+
+  let overlay = document.getElementById('fichaCliOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'fichaCliOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto">
+      ${html}
+      <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn" onclick="document.getElementById('fichaCliOverlay').remove()">Cancelar</button>
+        <button class="btn bg" onclick="
+          saveFichaCli('${nombre.replace(/'/g,"\\'")}', {
+            colorCodigo: document.getElementById('fichaColor').value.trim(),
+            alergias: document.getElementById('fichaAlergias').value.trim(),
+            notas: document.getElementById('fichaNotas').value.trim()
+          });
+          showToast('Ficha guardada ✓');
+          document.getElementById('fichaCliOverlay').remove();
+          rClientes();
+        ">Guardar ficha</button>
+      </div>
+    </div>`;
+  overlay.style.display = 'flex';
+}
+
 function rClientes(){
   const q = (document.getElementById('cliQ')?.value||'').toLowerCase();
   const todos = getClientes();
@@ -8274,20 +8413,25 @@ function rClientes(){
     return;
   }
   const umbral = esSalonR ? parseInt(dbGetConfig('fidelUmbral')||'10') : 0;
+  const fichas = esSalonR ? getFichasCli() : {};
   box.innerHTML = clientes.map(c=>{
     const visitasBadge = esSalonR ? `<span class="bx bbl" style="font-weight:700">${c.visitas} visita${c.visitas!==1?'s':''}</span>` : '';
     const fidelBadge = esSalonR && umbral>0 && c.visitas%umbral===0 && c.visitas>0 ? `<span class="bx" style="background:rgba(201,168,76,.18);color:var(--gld);border:1px solid var(--gld)">🎁 Premio</span>` : '';
     const activos = esSalonR ? 0 : (c.trabajos||[]).filter(t=>t.estado!=='entregado').length;
+    const ficha = esSalonR ? (fichas[normNomCli(c.nombre)]||{}) : {};
+    const colorBadge = esSalonR && ficha.colorCodigo ? `<span class="bx" style="background:rgba(201,168,76,.12);color:var(--gld);border:1px solid rgba(201,168,76,.3);font-size:.7rem">🎨 ${esc(ficha.colorCodigo)}</span>` : '';
+    const alergiaBadge = esSalonR && ficha.alergias ? `<span class="bx" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25);font-size:.7rem">⚠️ Alergia</span>` : '';
     return `<div style="padding:14px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:.9rem">${esc(c.nombre)}</div>
         <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${c.tel?'📱 '+esc(c.tel):'Sin teléfono'} · Última visita: ${c.ultimaVisita?fD(c.ultimaVisita):'—'} · Total gastado: <strong>${fmt(c.gasto)}</strong></div>
+        ${(colorBadge||alergiaBadge)?`<div style="display:flex;gap:5px;margin-top:5px;flex-wrap:wrap">${colorBadge}${alergiaBadge}</div>`:''}
       </div>
       <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
         ${visitasBadge}${fidelBadge}
         ${activos>0?`<span class="bx byw">${activos} activo${activos!==1?'s':''}</span>`:''}
         ${c.tel?`<button class="btn bs bsm" onclick="window.open('https://wa.me/54${c.tel.replace(/\D/g,'')}')">📲 WA</button>`:''}
-        ${!esSalonR?`<button class="btn be bsm" data-nombre="${esc(c.nombre)}" onclick="verHistorial(this.dataset.nombre)">Historial</button>`:''}
+        ${esSalonR?`<button class="btn bsm" style="border:1px solid var(--bor2);color:var(--tx2)" data-nombre="${esc(c.nombre)}" onclick="abrirFichaCli(this.dataset.nombre)">📋 Ficha</button>`:`<button class="btn be bsm" data-nombre="${esc(c.nombre)}" onclick="verHistorial(this.dataset.nombre)">Historial</button>`}
       </div>
     </div>`;
   }).join('');
