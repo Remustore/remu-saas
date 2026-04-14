@@ -3302,14 +3302,16 @@ function setPrFilt(f, btn){
 
 function setupPreciosTabs(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur')||rubro.includes('barberia')||rubro.includes('barbería');
+  const esBarber = /barber/i.test(rubro);
+  const esSalon = esBarber || rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
   const tabsEl = document.getElementById('prTabs');
-  
+  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
+
   // Dynamic notice
   const notice = document.getElementById('preciosNotice');
   if(notice){
     if(esSalon){
-      notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">💅 Lista de servicios de ' + (currentTenant?.nombre||'el salón') + '</strong><br>Los precios pueden variar según el largo, tipo de cabello y técnica aplicada. Consultanos para presupuestos personalizados.</div>';
+      notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">' + rubroIcon + ' Lista de servicios de ' + (currentTenant?.nombre||'el salón') + '</strong><br>Los precios pueden variar según el largo, tipo de cabello y técnica aplicada. Consultanos para presupuestos personalizados.</div>';
     } else {
       notice.innerHTML = '<div style="background:var(--gld2);border-left:3px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">⚠️ Importante — Leer antes de contratar</strong><br>Nuestra prioridad es entregar trabajos con <strong>transplante de IC y Flex</strong> logrando que tu equipo <strong>NO MARQUE CARTELES</strong>. Si se daña por golpe quedará marcando <strong style="color:var(--wrn)">PIEZA DESCONOCIDA</strong>.<br><br>⏰ <strong>Tiempo de reparación:</strong> 2 a 3 días hábiles · 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica o pre-programada.</div>';
     }
@@ -3318,15 +3320,20 @@ function setupPreciosTabs(){
   rPreciosLink();
   if(!tabsEl) return;
   if(esSalon){
-    tabsEl.innerHTML = `
-      <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
-      <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
-      <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
-      <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
-      <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
-      <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
-      <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>
-    `;
+    tabsEl.innerHTML = esBarber
+      ? `<button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+         <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
+         <button class="tab" onclick="setPrFilt('barba',this)">🪒 Barba</button>
+         <button class="tab" onclick="setPrFilt('coloracion',this)">🎨 Coloración</button>
+         <button class="tab" onclick="setPrFilt('tratamiento',this)">✨ Tratamientos</button>
+         <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otros</button>`
+      : `<button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+         <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
+         <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
+         <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
+         <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
+         <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
+         <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>`;
   } else {
     tabsEl.innerHTML = `
       <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
@@ -4616,14 +4623,13 @@ async function sincronizarBloqueoManual(turno, accion){
 async function liberarSlotSupabase(turno){
   if(!sb || !currentTenant?.id || !turno?.fecha || !turno?.hora) return;
   try {
-    const empId = turno.empleadoId ? (parseInt(turno.empleadoId)||null) : null;
-    let q = sb.from('turnos_solicitudes')
+    // Eliminar TODOS los registros de ese slot (sin filtrar por empleado)
+    // para garantizar que el horario quede libre en la página pública
+    await sb.from('turnos_solicitudes')
       .delete()
       .eq('tenant_id', currentTenant.id)
       .eq('fecha', turno.fecha)
       .eq('hora', turno.hora);
-    if(empId !== null) q = q.eq('empleado_id', empId);
-    await q;
   } catch(e){ console.warn('[liberarSlot]', e); }
 }
 
@@ -5943,14 +5949,17 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
         ${cfg.insta?`<div style="text-align:center;margin-top:16px;font-size:.78rem;color:#a89880">📸 ${cfg.insta}</div>`:''}
       </div>
     </div>
-    ${cfg.tel ? `
-    <a href="https://wa.me/549${cfg.tel.replace(/\D/g,'')}?text=${encodeURIComponent('Hola! Quisiera consultar antes de reservar mi turno en '+esc(tenant.nombre)+' 😊')}"
-       target="_blank"
-       style="position:fixed;bottom:24px;right:20px;display:flex;align-items:center;gap:10px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:50px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.88rem;box-shadow:0 4px 20px rgba(37,211,102,.5);z-index:999;transition:transform .15s"
-       onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-      💬 Hablar con un asesor
-    </a>` : ''}
+    ${(()=>{
+      const waTel = (cfg.tel||'').replace(/\D/g,'');
+      const waMsg = encodeURIComponent('Hola! Quisiera consultar antes de reservar mi turno en ' + (tenant.nombre||'') + ' 😊');
+      const waHref = waTel ? 'https://wa.me/549' + waTel + '?text=' + waMsg : 'https://api.whatsapp.com/send?text=' + waMsg;
+      return `<a href="${waHref}" target="_blank"
+         style="position:fixed;bottom:24px;right:20px;display:flex;align-items:center;gap:10px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:50px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.88rem;box-shadow:0 4px 20px rgba(37,211,102,.5);z-index:999;transition:transform .15s"
+         onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        💬 Hablar con un asesor
+      </a>`;
+    })()}
   `;
   // Store globals for use in onchange handlers
   window.__onlineTenantId = tenant.id;
@@ -6357,24 +6366,22 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
 
   const disponibles = slots.filter(s=>!s.ocupado);
 
-  if(!disponibles.length){
+  if(!disponibles.length && slots.length){
+    // Todos ocupados — mostrar todos como reservados
+  } else if(!slots.length){
     grid.innerHTML = '<div style="color:#c9524c;font-size:.8rem;text-align:center;padding:12px">Sin horarios disponibles para este día</div>';
     return;
   }
 
   grid.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
     slots.map(s=>{
-      if(s.ocupado) return `<div 
-        onclick="mostrarMotivoOcupado(this)" 
-        title="Turno ocupado"
-        style="padding:8px 14px;border-radius:8px;background:#1a1a1a;color:#6a5a4a;font-size:.85rem;border:1px solid #333;text-decoration:line-through;cursor:pointer;position:relative">
-        ${s.hora}
-        <span style="position:absolute;top:-6px;right:-6px;background:#c9524c;color:#fff;border-radius:50%;width:14px;height:14px;font-size:.55rem;display:flex;align-items:center;justify-content:center;font-weight:700">✕</span>
-      </div>`;
-      return `<div onclick="seleccionarSlot('${s.hora}',this)" style="padding:8px 14px;border-radius:8px;background:#080808;color:#a89880;font-size:.85rem;border:1px solid #2e2e2e;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='#b8976a'" onmouseout="this.style.borderColor=this.dataset.sel?'#b8976a':'#2e2e2e'">${s.hora}</div>`;
+      if(s.ocupado) return `<div style="padding:8px 14px;border-radius:8px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);font-size:.82rem;cursor:default;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;text-align:center">
+          <span style="color:#585044;text-decoration:line-through">${s.hora}</span>
+          <span style="font-size:.6rem;font-weight:700;color:#b8976a;text-transform:uppercase;letter-spacing:.5px;background:rgba(201,148,76,.18);padding:1px 6px;border-radius:10px">Reservado</span>
+        </div>`;
+      return `<div onclick="seleccionarSlot('${s.hora}',this)" style="padding:8px 14px;border-radius:8px;background:#080808;color:#a89880;font-size:.85rem;border:1px solid #2e2e2e;cursor:pointer;transition:all .15s;min-width:72px;text-align:center" onmouseover="this.style.borderColor='#b8976a';this.style.color='#c9a84c'" onmouseout="if(!this.dataset.sel){this.style.borderColor='#2e2e2e';this.style.color='#a89880'}">${s.hora}</div>`;
     }).join('') + '</div>' +
-    '<div style="font-size:.7rem;color:#a89880;margin-top:10px">✓ Disponible &nbsp;·&nbsp; ✕ Ocupado (tocá para ver el motivo)</div>' +
-    '<div id="motivoOcupado" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:8px;font-size:.8rem;color:#e07070"></div>';
+    (disponibles.length === 0 ? '<div style="font-size:.78rem;color:#c9524c;margin-top:10px;text-align:center">Todos los horarios de este día están reservados</div>' : '<div style="font-size:.7rem;color:#a89880;margin-top:10px">Tocá un horario disponible para seleccionarlo</div>');
 
   // Reset hora hidden input
   document.getElementById('onHora').value = '';
