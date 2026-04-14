@@ -426,9 +426,20 @@ textarea{resize:vertical;min-height:70px;}
         <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Soporte por WhatsApp</div>
       </div>
     </div>
+    <!-- Botón principal: Mercado Pago -->
+    <button onclick="iniciarPagoMP()" id="btnPagarMP"
+       style="display:block;width:100%;padding:15px;background:#009ee3;color:#fff;border-radius:10px;font-weight:700;font-size:1rem;border:none;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
+      💳 Pagar con Mercado Pago →
+    </button>
+    <!-- Se muestra después de hacer click en pagar -->
+    <button onclick="confirmarPagoMP()" id="btnYaPague"
+       style="display:none;width:100%;padding:13px;background:rgba(76,175,125,.15);color:#4caf7d;border:1px solid rgba(76,175,125,.3);border-radius:10px;font-weight:600;font-size:.9rem;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
+      ✓ Ya pagué → Activar ahora
+    </button>
+    <!-- Fallback WhatsApp -->
     <a href="https://wa.me/5493472628087?text=Hola!%20Quiero%20activar%20mi%20suscripci%C3%B3n%20de%20Remu%20Gesti%C3%B3n" target="_blank"
-       style="display:block;padding:15px;background:#c9a84c;color:#080808;border-radius:10px;font-weight:700;font-size:1rem;text-decoration:none;margin-bottom:12px">
-      Activar por WhatsApp →
+       style="display:block;padding:11px;background:transparent;color:#a89880;border-radius:10px;font-size:.82rem;text-decoration:none;margin-bottom:8px;border:1px solid #242424">
+      💬 Activar por WhatsApp
     </a>
     <button onclick="doLogout()" style="background:none;border:none;color:#585044;font-size:.82rem;cursor:pointer;font-family:'Outfit',sans-serif">Cerrar sesión</button>
   </div>
@@ -600,6 +611,18 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <button class="sa-btn outline" onclick="loadTenants()" style="margin-top:12px">↻ Actualizar lista</button>
       </div>
+    </div>
+
+    <!-- MP CONFIG -->
+    <div class="sa-card" style="margin-top:20px">
+      <h3>💳 Configuración de cobro</h3>
+      <p style="font-size:.8rem;color:var(--mut);margin-bottom:12px">Link de pago de Mercado Pago para la pantalla de trial vencido. Crealo desde tu cuenta MP (mpago.la o Checkout Pro).</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="saInputMpLink" type="url" placeholder="https://mpago.la/tu-link-de-cobro"
+          style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.82rem;outline:none">
+        <button class="sa-btn" style="margin:0;white-space:nowrap" onclick="guardarMpLink()">Guardar</button>
+      </div>
+      <div id="saMpMsg" style="font-size:.75rem;color:var(--ok);margin-top:6px;display:none">✓ Link guardado</div>
     </div>
 
     <!-- STATS -->
@@ -2090,6 +2113,10 @@ function showSaMsg(txt, tipo){
 }
 
 async function loadTenants(){
+  // Pre-fill MP link config from localStorage
+  const savedMpLink = localStorage.getItem('remu_mp_link');
+  const mpInp = document.getElementById('saInputMpLink');
+  if(mpInp && savedMpLink && !mpInp.value) mpInp.value = savedMpLink;
   const { data, error } = await sb.from('tenants').select('*').order('created_at', { ascending:false });
   const el = document.getElementById('tenantsList');
   if(error || !data){ el.innerHTML='<div style="color:var(--bad);font-size:.8rem">Error al cargar</div>'; return; }
@@ -2154,6 +2181,57 @@ async function extenderTrial(id){
   const mods = {...(t?.modulos||{}), trial_hasta: nuevo};
   await sb.from('tenants').update({modulos:mods}).eq('id',id);
   showSaMsg('✓ Trial extendido 30 días más','ok'); loadTenants();
+}
+
+// Guarda el link de MP en localStorage (sólo superadmin)
+function guardarMpLink(){
+  const val = (document.getElementById('saInputMpLink')?.value||'').trim();
+  if(!val){ alert('Ingresá un link válido'); return; }
+  localStorage.setItem('remu_mp_link', val);
+  const msg = document.getElementById('saMpMsg');
+  if(msg){ msg.style.display='block'; setTimeout(()=>msg.style.display='none', 3000); }
+}
+
+// ── MERCADO PAGO ──────────────────────────────────────────────────
+// Abre el link de pago de MP y muestra el botón "Ya pagué"
+function iniciarPagoMP(){
+  const mpLink = currentTenant?.modulos?.mp_link
+    || localStorage.getItem('remu_mp_link')
+    || '';
+  if(!mpLink){
+    alert('El link de pago no está configurado aún. Usá WhatsApp para activar tu suscripción.');
+    return;
+  }
+  const sep = mpLink.includes('?') ? '&' : '?';
+  window.open(mpLink + sep + 'ref=' + (currentTenant?.id||''), '_blank');
+  // Mostrar botón "Ya pagué" tras 4 segundos
+  setTimeout(()=>{
+    const btn = document.getElementById('btnYaPague');
+    if(btn) btn.style.display = 'block';
+  }, 4000);
+}
+
+// Activa el tenant por 30 días tras confirmación del usuario
+async function confirmarPagoMP(){
+  if(!confirm('¿Confirmar que realizaste el pago de $8.000 ARS?\n\nSe activará tu suscripción por 30 días.')) return;
+  await activarSuscripcionTenant();
+}
+
+// Activa la suscripción del tenant actual por 30 días
+async function activarSuscripcionTenant(){
+  if(!sb || !currentTenant?.id) return;
+  const nuevo = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+  const mods = {...(currentTenant.modulos||{}), pago_activo: true, trial_hasta: nuevo, ultimo_pago: new Date().toISOString()};
+  const { error } = await sb.from('tenants').update({modulos: mods}).eq('id', currentTenant.id);
+  if(error){
+    alert('Error al activar. Contactá soporte por WhatsApp.');
+    return;
+  }
+  currentTenant = {...currentTenant, modulos: mods};
+  document.getElementById('trialScreen').style.display = 'none';
+  showToast('✓ Suscripción activada por 30 días. ¡Gracias!');
+  setupApp();
+  await loadAll();
 }
 
 async function editarTenant(id){
@@ -3269,6 +3347,16 @@ function rPrecios(){
         <button onclick="navigator.clipboard.writeText('${esc(pLink)}').then(()=>showToast('Link copiado ✓'))" style="font-size:.78rem;padding:6px 14px;background:transparent;border:1px solid var(--bor2);color:var(--tx2);border-radius:6px;cursor:pointer;white-space:nowrap">🔗 Copiar link</button>
       </div>
     </div>`;
+  }
+  // Update section title/icon based on rubro
+  if(currentTenant && !document.getElementById('sec-precios').dataset.rubroIconInit){
+    document.getElementById('sec-precios').dataset.rubroIconInit = '1';
+    const rubI = (currentTenant.rubro||'').toLowerCase();
+    const rubroIconI = /barber/i.test(rubI) ? '💈' : /salon|belleza|peluq|manicur/i.test(rubI) ? '💇' : '📱';
+    const ptEl = document.querySelector('#sec-precios .pt');
+    const psEl = document.querySelector('#sec-precios .ps');
+    if(ptEl) ptEl.textContent = rubroIconI + ' Lista de Precios';
+    if(psEl) psEl.textContent = /barber/i.test(rubI) ? 'Servicios y precios de tu barbería' : /salon|belleza|peluq|manicur/i.test(rubI) ? 'Servicios y precios de tu salón' : 'Servicios visibles para clientes';
   }
   // Adapt tabs to rubro
   const prTabs = document.getElementById('prTabs');
@@ -4497,6 +4585,22 @@ async function sincronizarBloqueoManual(turno, accion){
   } catch(e){ console.warn('[sync turno] error:', e); }
 }
 
+// Libera un slot de turnos_solicitudes completamente (cualquier estado)
+// Se usa al cancelar o finalizar un turno para que quede disponible online
+async function liberarSlotSupabase(turno){
+  if(!sb || !currentTenant?.id || !turno?.fecha || !turno?.hora) return;
+  try {
+    const empId = turno.empleadoId ? (parseInt(turno.empleadoId)||null) : null;
+    let q = sb.from('turnos_solicitudes')
+      .delete()
+      .eq('tenant_id', currentTenant.id)
+      .eq('fecha', turno.fecha)
+      .eq('hora', turno.hora);
+    if(empId !== null) q = q.eq('empleado_id', empId);
+    await q;
+  } catch(e){ console.warn('[liberarSlot]', e); }
+}
+
 // Sincroniza todos los turnos manuales a Supabase al iniciar sesión
 async function resyncTurnosToSupabase(){
   if(!sb || !currentTenant?.id) return;
@@ -4732,7 +4836,7 @@ async function saveTurno(){
   if(estado !== 'cancelado' && estado !== 'no_vino' && estado !== 'terminado'){
     await sincronizarBloqueoManual(obj, 'crear');
   } else {
-    await sincronizarBloqueoManual(obj, 'borrar');
+    await liberarSlotSupabase(obj);
   }
 
   // Si terminado, ofrecer registrar venta
@@ -4766,7 +4870,7 @@ function cancelarTurno(id){
   const turno = getTurnos().find(x=>String(x.id)===String(id));
   const turnos = getTurnos().filter(x=>String(x.id)!==String(id));
   saveTurnosLocal(turnos);
-  if(turno) sincronizarBloqueoManual(turno, 'borrar');
+  if(turno) liberarSlotSupabase(turno);
   rTurnos();
   showToast('Turno eliminado ✓');
 }
@@ -4814,9 +4918,9 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   const turnoAntes = turnos[idx];
   turnos[idx] = {...turnos[idx], estado: nuevoEstado};
   saveTurnosLocal(turnos);
-  // Si el turno se finaliza o no vino, liberar el bloqueo en Supabase
-  if(nuevoEstado === 'terminado' || nuevoEstado === 'no_vino'){
-    sincronizarBloqueoManual(turnoAntes, 'borrar');
+  // Si el turno se finaliza, cancela o no vino, liberar el slot en Supabase
+  if(nuevoEstado === 'terminado' || nuevoEstado === 'no_vino' || nuevoEstado === 'cancelado'){
+    liberarSlotSupabase(turnoAntes);
   }
   if(nuevoEstado === 'terminado'){
     const t = turnos[idx];
@@ -6032,8 +6136,9 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
     ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'tintura',l:'🎨 Tintura'},{k:'manicuria',l:'💅 Manicuria'},{k:'maquillaje',l:'💄 Maquillaje'},{k:'lifting',l:'👁 Lifting'},{k:'depilacion',l:'✨ Depilación'}]
     : [{k:'',l:'Todos'},{k:'pantalla',l:'📱 Pantallas'},{k:'tapa',l:'🔲 Tapas'},{k:'bateria',l:'🔋 Baterías'},{k:'conector',l:'🔌 Conectores'},{k:'camara',l:'📸 Cámaras'},{k:'otro',l:'🔧 Otros'}];
 
+  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
   const notice = (esBarber || esSalon)
-    ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">${esBarber?'🪒':'💅'} Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.</div>`
+    ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">${rubroIcon} Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.</div>`
     : `<div style="background:rgba(201,82,76,.07);border-left:3px solid #c9524c;border-radius:8px;padding:14px 16px;font-size:.78rem;color:#a89880;line-height:1.7;margin-bottom:20px">⚠️ <strong style="color:#f5f0e8">Importante</strong> — Trabajamos con <strong>transplante de IC y Flex</strong> para que tu equipo <strong>NO MARQUE CARTELES</strong>.<br>⏰ <strong>Tiempo:</strong> 2–3 días hábiles &nbsp;·&nbsp; 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica.</div>`;
 
   // Pre-filtrar items por rubro para evitar mezcla de servicios
@@ -6051,6 +6156,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
 
       <!-- HEADER -->
       <div style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
+        <div style="font-size:2.2rem;margin-bottom:6px">${rubroIcon}</div>
         <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(tenantName)}</div>
         ${rubro ? `<div style="font-size:.66rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
         ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
@@ -8967,6 +9073,13 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
       // ── Trial check (solo admin, no empleados ni superadmin) ──
       if(rolSesion === 'admin'){
         const mods = td.modulos || {};
+        // Auto-activar si regresa de pago exitoso de Mercado Pago
+        const urlPago = new URLSearchParams(window.location.search);
+        if(urlPago.get('mp_ok') === '1' && !mods.pago_activo){
+          history.replaceState({}, '', window.location.pathname);
+          await activarSuscripcionTenant();
+          return;
+        }
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
         if(!mods.pago_activo && diasRestantes <= 0){
