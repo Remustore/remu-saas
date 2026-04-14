@@ -2552,6 +2552,7 @@ function openM(id, editId){
     el.querySelectorAll('input:not([type=checkbox]):not([type=color])').forEach(i=>{ if(i.id!=='vFec') i.value=''; });
     el.querySelectorAll('select').forEach(s=>s.selectedIndex=0);
     el.querySelectorAll('textarea').forEach(t=>t.value='');
+    if(id==='mPrecio') el.querySelector('.mt2').textContent='Agregar Servicio';
   }
   el.classList.add('open');
   if(editId) fillModalEdit(id, editId);
@@ -2587,7 +2588,7 @@ function fillModalEdit(modal, id){
     updateGarantiaVence();calcGanTaller();}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
   if(modal==='mGasto'){const g=S.gastos.find(x=>x.id===id);if(!g)return;document.getElementById('gId').value=id;document.getElementById('gCon').value=g.concepto;document.getElementById('gTip').value=g.tipo;document.getElementById('gMon').value=g.monto;document.getElementById('gFec').value=g.fecha;document.getElementById('gNot').value=g.notas||'';}
-  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id);if(!p)return;document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDis').value=p.disponibilidad||'disponible';document.getElementById('prNot').value=p.notas||'';}
+  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id);if(!p)return;document.getElementById('mPrecio').querySelector('.mt2').textContent='Editar Servicio';document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDisp').value=p.disponibilidad||'disponible';document.getElementById('prNot').value=p.notas||'';}
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';}
 }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }
@@ -5123,7 +5124,7 @@ function rTurnosHorario(){
   const estadoColor = {confirmado:'var(--inf)',llego:'var(--ok)',en_proceso:'var(--wrn)',terminado:'var(--mut)',no_vino:'var(--bad)'};
 
   const totalMin = (ch*60+cm) - (ah*60+am);
-  const SLOT = 60; // 1 hora por fila
+  const SLOT = 30; // 30 min por fila
   const horas = [];
   for(let m = ah*60+am; m < ch*60+cm; m += SLOT) horas.push(m);
 
@@ -6194,9 +6195,17 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
   // Pre-filtrar items por rubro para evitar mezcla de servicios
   const phoneKw = /pantalla|tapa|bater[ií]a|conector|c[aá]mara|placa|puerto|flex|chip/i;
   const salonKw = /corte|tintura|mechas|manicur|pedicur|lifting|depilac|maquillaje|tratamiento|keratina|brushing|permanente/i;
-  const itemsFiltrados = (esBarber || esSalon)
+  const itemsFiltradosBase = (esBarber || esSalon)
     ? items.filter(p => !phoneKw.test(p.nombre||''))
     : items.filter(p => !salonKw.test(p.nombre||''));
+  // Deduplicar por nombre: si hay duplicados (onboarding + manual), conservar el de mayor precio
+  const dedupMap = new Map();
+  itemsFiltradosBase.forEach(p => {
+    const key = (p.nombre||'').trim().toLowerCase();
+    const prev = dedupMap.get(key);
+    if(!prev || (p.precio||0) > (prev.precio||0)) dedupMap.set(key, p);
+  });
+  const itemsFiltrados = Array.from(dedupMap.values());
   window.__preciosPublicItems = itemsFiltrados;
   window.__preciosPublicCat = '';
 
