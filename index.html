@@ -702,8 +702,8 @@ textarea{resize:vertical;min-height:70px;}
           <div id="energyMsg" style="font-family:var(--fh);font-size:1rem;font-weight:700">Cargando...</div>
           <div id="energyPct" style="font-size:.82rem;color:var(--tx2)"></div>
         </div>
-        <div style="background:var(--bg);border-radius:20px;height:18px;overflow:hidden;position:relative">
-          <div id="energyBar" style="height:100%;border-radius:20px;transition:width .8s ease,background .5s ease;width:0%"></div>
+        <div style="background:var(--car2);border:1px solid var(--bor);border-radius:20px;height:18px;overflow:hidden;position:relative">
+          <div id="energyBar" style="height:100%;border-radius:20px;transition:width .8s ease,background .5s ease;width:0%;min-width:4px"></div>
         </div>
         <div id="energySub" style="font-size:.75rem;color:var(--tx2);margin-top:8px"></div>
       </div>
@@ -3302,10 +3302,28 @@ function rPrecios(){
   }
   const q=(document.getElementById('prQ')||{value:''}).value.toLowerCase();
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const prCatKw = {
+    'corte':       /corte|degradado|capado|navaja|pelo|cabello/i,
+    'barba':       /barba|afeitado|contorno|bigote|perfil/i,
+    'coloracion':  /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+    'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+    'tratamiento': /tratamiento|keratina|brushing|hidrat|botox|permanente|alisado|briz/i,
+    'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
+    'lifting':     /lifting|pesta[ñn]/i,
+    'depilacion':  /depilac|cera|laser/i,
+    'pantalla':    /pantalla|display|lcd/i,
+    'bateria':     /bater[ií]a/i,
+    'conector':    /conector|carga|puerto/i,
+    'otro':        /.*/
+  };
   let items = S.precios.filter(p=>{
     const n = norm(p.nombre);
     const matchQ = !q || n.includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
-    const matchF = !prFilt || n.includes(norm(prFilt));
+    let matchF = !prFilt;
+    if(!matchF){
+      const kw = prCatKw[norm(prFilt)];
+      matchF = kw ? kw.test(p.nombre) : n.includes(norm(prFilt));
+    }
     return matchQ && matchF;
   });
   const tb=document.getElementById('tbPr');
@@ -3327,10 +3345,7 @@ async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').
 // ═══ AVISOS DIARIOS (recordatorios + horarios equipo) ═══
 function mostrarAvisosDaily(){
   const box = document.getElementById('dashAvisos');
-  if(!box || !getTurnos) return;
-  const rub = (currentTenant?.rubro||'').toLowerCase();
-  const esSalon = /barber|salon|belleza|peluq/i.test(rub);
-  if(!esSalon){ box.innerHTML=''; return; }
+  if(!box) return;
 
   const mañana = new Date(); mañana.setDate(mañana.getDate()+1);
   const mañanaStr = mañana.toISOString().slice(0,10);
@@ -3370,7 +3385,7 @@ function mostrarAvisosDaily(){
   }
 
   // Aviso horarios equipo: primer turno del día por empleado
-  if(cfg.empleados && cfg.empleados.length > 1 && (turnosHoy.length || turnosMañana.length)){
+  if(cfg.empleados && cfg.empleados.length > 0 && (turnosHoy.length || turnosMañana.length)){
     const dia = turnosMañana.length ? mañanaStr : hoyStr;
     const turnosDia = dia === mañanaStr ? turnosMañana : turnosHoy;
     const etiqueta = dia === mañanaStr ? 'mañana' : 'hoy';
@@ -4443,27 +4458,43 @@ async function sincronizarBloqueoManual(turno, accion){
   try {
     if(accion === 'crear'){
       if(!turno.fecha || !turno.hora) return;
-      await sb.from('turnos_solicitudes').upsert({
-        tenant_id: currentTenant.id,
-        nombre: turno.cliente || 'Bloqueado',
-        tel: turno.tel || '',
-        servicio_id: turno.servicioId || null,
-        empleado_id: turno.empleadoId ? String(turno.empleadoId) : null,
-        fecha: turno.fecha,
-        hora: turno.hora,
-        estado: 'bloqueado',
-        created_at: new Date().toISOString()
-      }, { onConflict: 'tenant_id,fecha,hora,empleado_id', ignoreDuplicates: false });
-    } else if(accion === 'borrar'){
-      if(!turno.fecha || !turno.hora) return;
-      await sb.from('turnos_solicitudes')
+      const empId = turno.empleadoId ? (parseInt(turno.empleadoId)||null) : null;
+      // Borrar primero cualquier bloqueo previo para este slot y empleado
+      let delQ = sb.from('turnos_solicitudes')
         .delete()
         .eq('tenant_id', currentTenant.id)
         .eq('fecha', turno.fecha)
         .eq('hora', turno.hora)
         .eq('estado', 'bloqueado');
+      if(empId !== null){ delQ = delQ.eq('empleado_id', empId); }
+      else { delQ = delQ.is('empleado_id', null); }
+      await delQ;
+      // Insertar el bloqueo nuevo
+      const { error } = await sb.from('turnos_solicitudes').insert({
+        tenant_id: currentTenant.id,
+        nombre: turno.cliente || 'Bloqueado',
+        tel: turno.tel || '',
+        servicio_id: turno.servicioId || null,
+        empleado_id: empId,
+        fecha: turno.fecha,
+        hora: turno.hora,
+        estado: 'bloqueado',
+        created_at: new Date().toISOString()
+      });
+      if(error) console.warn('[sync turno] insert error:', error.message);
+    } else if(accion === 'borrar'){
+      if(!turno.fecha || !turno.hora) return;
+      const empId = turno.empleadoId ? (parseInt(turno.empleadoId)||null) : null;
+      let delQ = sb.from('turnos_solicitudes')
+        .delete()
+        .eq('tenant_id', currentTenant.id)
+        .eq('fecha', turno.fecha)
+        .eq('hora', turno.hora)
+        .eq('estado', 'bloqueado');
+      if(empId !== null){ delQ = delQ.eq('empleado_id', empId); }
+      await delQ;
     }
-  } catch(e){ /* no crítico */ }
+  } catch(e){ console.warn('[sync turno] error:', e); }
 }
 
 // Sincroniza todos los turnos manuales a Supabase al iniciar sesión
@@ -4695,11 +4726,13 @@ async function saveTurno(){
 
   // Si editando y fecha/hora/empleado cambió, borrar bloqueo anterior
   if(id && turnoOriginal && (turnoOriginal.fecha !== obj.fecha || turnoOriginal.hora !== obj.hora || turnoOriginal.empleadoId !== obj.empleadoId)){
-    sincronizarBloqueoManual(turnoOriginal, 'borrar');
+    await sincronizarBloqueoManual(turnoOriginal, 'borrar');
   }
   // Sincronizar bloqueo en Supabase para página pública
   if(estado !== 'cancelado' && estado !== 'no_vino' && estado !== 'terminado'){
-    sincronizarBloqueoManual(obj, 'crear');
+    await sincronizarBloqueoManual(obj, 'crear');
+  } else {
+    await sincronizarBloqueoManual(obj, 'borrar');
   }
 
   // Si terminado, ofrecer registrar venta
@@ -6085,10 +6118,25 @@ function pubRender(){
   const q    = ((document.getElementById('pubPQ')||{}).value||'').toLowerCase();
   const cat  = window.__preciosPublicCat||'';
   const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const pubCatKw = {
+    'corte':       /corte|degradado|capado|navaja|pelo|cabello/i,
+    'barba':       /barba|afeitado|contorno|bigote|perfil/i,
+    'coloracion':  /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+    'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+    'tratamiento': /tratamiento|keratina|brushing|hidrat|botox|permanente|alisado|briz/i,
+    'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
+    'lifting':     /lifting|pesta[ñn]/i,
+    'depilacion':  /depilac|cera|laser/i,
+    'otro':        /.*/
+  };
   const items = (window.__preciosPublicItems||[]).filter(p=>{
     if(!p || p.disponibilidad === 'no disponible') return false;
-    const matchQ = !q   || norm(p.nombre).includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
-    const matchC = !cat || norm(p.nombre).includes(norm(cat));
+    const matchQ = !q || norm(p.nombre).includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
+    let matchC = !cat;
+    if(!matchC){
+      const kw = pubCatKw[norm(cat)];
+      matchC = kw ? kw.test(p.nombre) : norm(p.nombre).includes(norm(cat));
+    }
     return matchQ && matchC;
   });
   if(!items.length){
@@ -6243,57 +6291,70 @@ async function enviarSolicitudTurno(tenantId){
     return;
   }
 
-  // Verificar disponibilidad — incluye turnos confirmados y bloqueados manuales
-  const { data: existentes } = await sb.from('turnos_solicitudes')
-    .select('hora, servicio_id, estado')
-    .eq('tenant_id', tenantId)
-    .eq('fecha', fecha)
-    .in('estado', ['confirmado','bloqueado','pendiente']);
-
-  if(existentes && existentes.some(t => t.hora === hora)){
-    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya fue reservado. Por favor elegí otro.';}
-    return;
-  }
-  
   // Verificar turnos fijos del tenant
   const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
   if(fijosRaw){
-    const fijos = JSON.parse(fijosRaw);
-    const fechaObj = new Date(fecha + 'T00:00:00');
-    const diaSemana = fechaObj.getDay();
-    const fijoConflicto = fijos.find(f=>f.activo && f.dia===diaSemana && f.hora===hora);
-    if(fijoConflicto){
-      if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario está reservado. Por favor elegí otro.';}
-      return;
-    }
+    try {
+      const fijos = JSON.parse(fijosRaw);
+      const fechaObj = new Date(fecha + 'T00:00:00');
+      const diaSemana = fechaObj.getDay();
+      const fijoConflicto = fijos.find(f=>f.activo && f.dia===diaSemana && f.hora===hora);
+      if(fijoConflicto){
+        if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario está reservado. Por favor elegí otro.';}
+        return;
+      }
+    } catch(e){}
   }
 
-  // Save turno request to Supabase
-  sb.from('turnos_solicitudes').insert({
+  // Insertar inmediatamente con estado='pendiente'
+  const tsInsert = new Date().toISOString();
+  const { data: inserted, error: insertErr } = await sb.from('turnos_solicitudes').insert({
     tenant_id: tenantId,
-    nombre, tel, servicio_id: servicioId,
-    empleado_id: empleadoId||null,
+    nombre, tel, servicio_id: servicioId||null,
+    empleado_id: empleadoId ? (parseInt(empleadoId)||null) : null,
     fecha, hora,
     estado: 'pendiente',
-    created_at: new Date().toISOString()
-  }).then(({error})=>{
-    if(msg){
-      msg.style.display='block';
-      if(error){
-        msg.style.color='#c9524c';
-        msg.textContent='Error al enviar. Intentá de nuevo.';
-      } else {
-        msg.style.color='#4caf7d';
-        msg.textContent='✓ Solicitud enviada. Te confirmaremos por WhatsApp.';
-        setTimeout(()=>{
-          document.getElementById('onNombre').value='';
-          document.getElementById('onTel').value='';
-          document.getElementById('onFecha').value='';
-          document.getElementById('onHora').value='';
-        },1000);
-      }
-    }
-  });
+    created_at: tsInsert
+  }).select('id,created_at').single();
+
+  if(insertErr){
+    if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Error al enviar. Intentá de nuevo.';}
+    return;
+  }
+
+  // Verificar conflicto: ¿hay otro registro (confirmado/bloqueado/pendiente anterior) para este slot?
+  const { data: existentes } = await sb.from('turnos_solicitudes')
+    .select('id,created_at,estado')
+    .eq('tenant_id', tenantId)
+    .eq('fecha', fecha)
+    .eq('hora', hora)
+    .in('estado', ['confirmado','bloqueado','pendiente']);
+
+  const conflicto = (existentes||[]).some(t =>
+    t.id !== inserted.id && (t.estado === 'confirmado' || t.estado === 'bloqueado' ||
+    (t.estado === 'pendiente' && t.created_at < tsInsert))
+  );
+
+  if(conflicto){
+    // Alguien más llegó primero — eliminar nuestra solicitud
+    await sb.from('turnos_solicitudes').delete().eq('id', inserted.id);
+    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya fue reservado. Por favor elegí otro.';}
+    // Recargar slots
+    if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
+    return;
+  }
+
+  if(msg){
+    msg.style.display='block';
+    msg.style.color='#4caf7d';
+    msg.textContent='✓ Solicitud enviada. Te confirmaremos por WhatsApp.';
+    setTimeout(()=>{
+      document.getElementById('onNombre').value='';
+      document.getElementById('onTel').value='';
+      document.getElementById('onFecha').value='';
+      document.getElementById('onHora').value='';
+    },1000);
+  }
 }
 
 function getCategorias(){
