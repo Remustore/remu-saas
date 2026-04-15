@@ -31,7 +31,7 @@ window.APP_CONFIG = {
   --bg:#080808;--sur:#0f0f0f;--car:#141414;--car2:#1a1a1a;
   --bor:#242424;--bor2:#2e2e2e;
   --gld:#c9a84c;--gll:#e8c96a;--gld2:rgba(201,168,76,.13);--gld3:rgba(201,168,76,.06);
-  --tx:#f5f0e8;--tx2:#a89880;--mut:#585044;
+  --tx:#f5f0e8;--tx2:#a89880;--mut:#857a6e;
   --ok:#4caf7d;--bad:#c9524c;--wrn:#c9944c;--inf:#4c8ec9;
   --fh:'Playfair Display',serif;--fb:'Outfit',sans-serif;--r:10px;
   --accent:#c9a84c;
@@ -149,7 +149,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;m
 /* MAIN */
 #mn{margin-left:215px;min-height:100vh;display:none;flex-direction:column;}
 .topbar{background:var(--sur);border-bottom:1px solid var(--bor);padding:13px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:12px;}
-.tb-title{font-family:var(--fh);font-size:1.05rem;font-weight:700;}
+.tb-title{font-family:var(--fh);font-size:1.05rem;font-weight:700;color:var(--tx);}
 .tb-right{display:flex;align-items:center;gap:10px;}
 .tb-date{font-size:.7rem;color:var(--mut);}
 .tb-user{font-size:.72rem;color:var(--gld);background:var(--gld2);padding:4px 10px;border-radius:20px;border:1px solid rgba(201,168,76,.2);}
@@ -169,7 +169,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;m
 .sec.active{display:block;}
 @keyframes fi{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
-.pt{font-family:var(--fh);font-size:1.4rem;font-weight:700;margin-bottom:2px;}
+.pt{font-family:var(--fh);font-size:1.4rem;font-weight:700;margin-bottom:2px;color:var(--tx);}
 .ps{color:var(--tx2);font-size:.77rem;margin-bottom:20px;}
 h3{font-family:var(--fh);font-size:.93rem;font-weight:700;}
 .gl{height:1px;background:linear-gradient(90deg,var(--gld),transparent);margin:14px 0;}
@@ -677,7 +677,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico">⏳</span>Lista de espera</div>
   <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico">🎯</span>Objetivos de compra</div>
   <div class="sbf" id="sbFooter">
-    <div style="font-weight:600;margin-bottom:4px" id="sbBizName"></div>
+    <div style="font-weight:600;margin-bottom:4px;color:var(--tx2)" id="sbBizName"></div>
     <div id="sbUserEmail" style="margin-bottom:10px"></div>
     <div style="color:var(--mut);font-size:.62rem;margin-bottom:8px" id="sbUndoInfo">Último cambio revertible</div>
     <span onclick="doUndo()" style="color:var(--gld);cursor:pointer;font-size:.73rem">↩ Deshacer</span>
@@ -5908,7 +5908,8 @@ Ya hay un turno a las ${conflicto.hora} con ${conflicto.cliente} (${conflicto.se
   await sb.from('turnos_solicitudes').update({estado:'confirmado'}).eq('id', id);
   showToast('Turno confirmado ✓');
   cargarSolicitudes();
-  
+  rTurnos(); // Refresh day agenda so the new confirmed slot appears immediately
+
   // Open WA to notify client
   if(tel){
     const neg = currentTenant?.nombre||'el negocio';
