@@ -683,6 +683,7 @@ textarea{resize:vertical;min-height:70px;}
     <span onclick="doUndo()" style="color:var(--gld);cursor:pointer;font-size:.73rem">↩ Deshacer</span>
   </div>
   <div class="logout-btn" onclick="doLogout()">⎋ Cerrar sesión</div>
+  <div class="logout-btn" style="color:var(--bad);margin-top:4px;font-size:.72rem" onclick="borrarTodosMisDatos()">🗑 Borrar todos mis datos</div>
 </div>
 
 <!-- MAIN -->
@@ -1946,6 +1947,44 @@ function setupApp(){
   document.getElementById('sb').style.display='flex';
   document.getElementById('mn').style.display='flex';
   go('dashboard');
+}
+
+async function borrarTodosMisDatos(){
+  if(!currentTenant?.id) return;
+  const confirmMsg = '⚠️ ¿Estás seguro?\n\nEsto va a BORRAR PERMANENTEMENTE:\n• Todas las ventas\n• Todo el stock\n• Todos los equipos\n• Todas las reparaciones\n• Todos los gastos\n• Todos los precios\n• Todos los turnos\n• Toda la configuración\n\nEsta acción NO SE PUEDE DESHACER.\n\nEscribí "BORRAR TODO" para confirmar:';
+  const input = prompt(confirmMsg);
+  if(input !== 'BORRAR TODO') { showToast('Cancelado'); return; }
+
+  showToast('Borrando datos...');
+  try {
+    const tid = currentTenant.id;
+    // Borrar todas las tablas del tenant en Supabase
+    await Promise.all([
+      sb.from('ventas').delete().eq('tenant_id', tid),
+      sb.from('stock').delete().eq('tenant_id', tid),
+      sb.from('equipos').delete().eq('tenant_id', tid),
+      sb.from('reparaciones').delete().eq('tenant_id', tid),
+      sb.from('gastos').delete().eq('tenant_id', tid),
+      sb.from('precios').delete().eq('tenant_id', tid),
+      sb.from('inversores').delete().eq('tenant_id', tid),
+      sb.from('movimientos_inv').delete().eq('tenant_id', tid),
+      sb.from('turnos_solicitudes').delete().eq('tenant_id', tid),
+    ]);
+    // Limpiar localStorage del tenant
+    const keysToRemove = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && (k.includes(tid) || k.startsWith('turnos_') || k.startsWith('turnosCfg_') || k.startsWith('fichasCli_') || k.startsWith('fichasClientes_') || k.startsWith('turnosFijos_') || k.startsWith('auditoria_') || k.startsWith('onlineCfg_') || k.startsWith('listaEspera_')))
+        keysToRemove.push(k);
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    // Reset estado en memoria
+    S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+    showToast('✓ Todos los datos fueron borrados');
+    setTimeout(()=>{ renderAll(); rDash(); }, 300);
+  } catch(e) {
+    alert('Error al borrar datos: ' + (e.message||e));
+  }
 }
 
 async function doLogout(){
@@ -5435,7 +5474,11 @@ function rTurnosSemana(){
     ${dias.map(d=>{
       const turnos = getTurnos().filter(t=>t.fecha===d&&t.estado!=='cancelado').sort((a,b)=>a.hora.localeCompare(b.hora));
       const esHoy = d===tod();
-      return `<div style="background:var(--car);border-radius:8px;padding:6px;min-height:80px;border:1px solid ${esHoy?'var(--gld)':'var(--bor)'};cursor:pointer" onclick="document.getElementById('turnosFecha').value='${d}';setVistaTurnos('lista')">
+      const blqEmps2 = cfg.empleados.filter(e=>tieneBloqueoEnDia(e.bloqueos||[], d));
+      const tieneBlq2 = blqEmps2.length > 0;
+      const blqEmps = blqEmps2; const tieneBlq = tieneBlq2;
+      return `<div style="background:var(--car);border-radius:8px;padding:6px;min-height:80px;border:1px solid ${esHoy?'var(--gld)':tieneBlq?'rgba(201,82,76,.4)':'var(--bor)'};cursor:pointer;position:relative${tieneBlq?';background:rgba(201,82,76,.04)':''}" onclick="document.getElementById('turnosFecha').value='${d}';setVistaTurnos('lista')">
+        ${tieneBlq?`<div style="position:absolute;top:3px;right:4px;font-size:.65rem" title="${blqEmps.map(e=>e.nombre).join(', ')} — no disponible">🚫</div>`:''}
         ${turnos.map(t=>`<div style="background:${estadoColors[t.estado]||'var(--inf)'};opacity:.85;border-radius:4px;padding:3px 5px;margin-bottom:3px;font-size:.65rem;color:#fff;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${t.hora} ${t.cliente}</div>`).join('')}
         ${!turnos.length?`<div style="color:var(--mut);font-size:.65rem;text-align:center;margin-top:8px">—</div>`:''}
       </div>`;
@@ -5451,6 +5494,7 @@ function rTurnosCalendario(){
   const primerDia = new Date(y,m-1,1);
   const ultimoDia = new Date(y,m,0);
   const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const cfgCal = getTurnosCfg();
 
   let startDay = primerDia.getDay(); if(startDay===0) startDay=7;
   const dias = [];
@@ -5473,8 +5517,11 @@ function rTurnosCalendario(){
         const turnos = getTurnos().filter(t=>t.fecha===fechaDia&&t.estado!=='cancelado');
         const esHoy = fechaDia===tod();
         const esSel = fechaDia===fecha;
-        return `<div style="background:${esSel?'var(--gld2)':esHoy?'var(--car2)':'var(--car)'};border:1px solid ${esSel?'var(--gld)':esHoy?'var(--bor2)':'var(--bor)'};border-radius:6px;padding:4px;min-height:48px;cursor:pointer;text-align:center" onclick="document.getElementById('turnosFecha').value='${fechaDia}';setVistaTurnos('lista')">
-          <div style="font-size:.8rem;font-weight:${esHoy||esSel?700:400};color:${esSel?'var(--gld)':esHoy?'var(--tx)':'var(--tx2)'}">${d}</div>
+        const blqCalEmps = cfgCal.empleados.filter(e=>tieneBloqueoEnDia(e.bloqueos||[], fechaDia));
+        const tieneBlqCal = blqCalEmps.length > 0;
+        return `<div style="background:${esSel?'var(--gld2)':tieneBlqCal?'rgba(201,82,76,.06)':esHoy?'var(--car2)':'var(--car)'};border:1px solid ${esSel?'var(--gld)':tieneBlqCal?'rgba(201,82,76,.35)':esHoy?'var(--bor2)':'var(--bor)'};border-radius:6px;padding:4px;min-height:48px;cursor:pointer;text-align:center;position:relative" onclick="document.getElementById('turnosFecha').value='${fechaDia}';setVistaTurnos('lista')">
+          ${tieneBlqCal?`<div style="position:absolute;top:2px;right:3px;font-size:.55rem" title="${blqCalEmps.map(e=>e.nombre).join(', ')} no disponible">🚫</div>`:''}
+          <div style="font-size:.8rem;font-weight:${esHoy||esSel?700:400};color:${esSel?'var(--gld)':tieneBlqCal?'var(--bad)':esHoy?'var(--tx)':'var(--tx2)'}">${d}</div>
           ${turnos.length?`<div style="background:var(--gld);color:#080808;border-radius:10px;font-size:.6rem;font-weight:700;padding:1px 5px;margin-top:2px">${turnos.length}</div>`:''}
         </div>`;
       }).join('')}
@@ -5750,6 +5797,7 @@ function guardarBloqueo(){
   document.getElementById('bloqueoMotivo').value='';
   rBloqueosList(empId);
   rTurnosConfig();
+  rTurnos(); // Actualizar agenda y vista semanal/mensual de inmediato
   showToast('Bloqueo agregado ✓');
 }
 
@@ -5763,6 +5811,7 @@ function eliminarBloqueo(empId, bloqueoId){
   persistCfgToSupabase();
   rBloqueosList(empId);
   rTurnosConfig();
+  rTurnos();
   showToast('Bloqueo eliminado ✓');
 }
 
@@ -6728,13 +6777,14 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     .in('estado', ['confirmado','bloqueado','pendiente']);
 
   const ocupados = new Set((solicitudes||[]).map(s=>(s.hora||'').substring(0,5)));
+  const bloqueadosDueno = new Set(); // slots bloqueados por el dueño (NO por clientes)
 
   // Get turnos fijos bloqueados
   const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
   if(fijosRaw){
     const fijos = JSON.parse(fijosRaw);
     const diaSemana = new Date(fecha+'T00:00:00').getDay();
-    fijos.filter(f=>f.activo && f.dia===diaSemana).forEach(f=>ocupados.add(f.hora));
+    fijos.filter(f=>f.activo && f.dia===diaSemana).forEach(f=>{ ocupados.add(f.hora); bloqueadosDueno.add(f.hora); });
   }
 
   // Bloqueos de disponibilidad — aplica siempre
@@ -6743,7 +6793,6 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     const empIdSel = (empSelEl?.value||'').trim();
     // Con empleado específico: aplica solo sus bloqueos.
     // Sin preferencia (vacío): un slot queda bloqueado si TODOS los empleados están bloqueados
-    // (con 1 solo empleado esto equivale a aplicar sus bloqueos siempre)
     const empsCheck = empIdSel
       ? [cfg.empleados.find(e=>String(e.id)===String(empIdSel))].filter(Boolean)
       : cfg.empleados;
@@ -6755,8 +6804,10 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
         const hh=String(Math.floor(cur2/60)).padStart(2,'0');
         const mm2=String(cur2%60).padStart(2,'0');
         const horaSlot=hh+':'+mm2;
-        if(empsCheck.every(e=>esBloqueadoEnFecha(e.bloqueos||[], fecha, horaSlot)))
+        if(empsCheck.every(e=>esBloqueadoEnFecha(e.bloqueos||[], fecha, horaSlot))){
           ocupados.add(horaSlot);
+          bloqueadosDueno.add(horaSlot);
+        }
         cur2+=30;
       }
     }
@@ -6779,7 +6830,7 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     const h = String(Math.floor(cur/60)).padStart(2,'0');
     const m = String(cur%60).padStart(2,'0');
     const hora = h+':'+m;
-    slots.push({hora, ocupado: ocupados.has(hora)});
+    slots.push({hora, ocupado: ocupados.has(hora), bloqueado: bloqueadosDueno.has(hora)});
     cur += 30;
   }
 
@@ -6794,6 +6845,10 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
 
   grid.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
     slots.map(s=>{
+      if(s.bloqueado) return `<div style="padding:8px 14px;border-radius:8px;background:rgba(201,82,76,.07);border:1px solid rgba(201,82,76,.25);font-size:.82rem;cursor:default;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;text-align:center">
+          <span style="color:#585044">${s.hora}</span>
+          <span style="font-size:.6rem;font-weight:700;color:#c9524c;text-transform:uppercase;letter-spacing:.5px;background:rgba(201,82,76,.15);padding:1px 6px;border-radius:10px">🚫 No disp.</span>
+        </div>`;
       if(s.ocupado) return `<div style="padding:8px 14px;border-radius:8px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);font-size:.82rem;cursor:default;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;text-align:center">
           <span style="color:#585044;text-decoration:line-through">${s.hora}</span>
           <span style="font-size:.6rem;font-weight:700;color:#b8976a;text-transform:uppercase;letter-spacing:.5px;background:rgba(201,148,76,.18);padding:1px 6px;border-radius:10px">Reservado</span>
@@ -9637,6 +9692,28 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
         if(cfgRow.data.__onlineCfg)  onlineCfg  = cfgRow.data.__onlineCfg;
         if(cfgRow.data.__tenantName)  tenantNombre = cfgRow.data.__tenantName;
         if(cfgRow.data.__rubro)       tenantRubro  = cfgRow.data.__rubro;
+      }
+      // Usar ítems del catálogo de precios (sección "Precios" de la app) para el selector de servicios.
+      // Solo se usan los items reales (no rows de configuración) con nombre definido.
+      const itemsPrecios = preciosData
+        .filter(p => p.data && !p.data.__tipo && !p.data.__turnosCfg && p.data.nombre)
+        .map(p => p.data)
+        .filter(p => (p.disponibilidad||'disponible') !== 'no_disponible');
+      if(itemsPrecios.length > 0){
+        // Combinar: los ítems del catálogo REEMPLAZAN a turnosCfg.servicios.
+        // Si el nombre coincide con un servicio de turnosCfg, se usa su duración; si no, 30 min por defecto.
+        const durMap = {};
+        (turnosCfg.servicios||[]).forEach(s=>{ durMap[(s.nombre||'').toLowerCase()] = s.duracion||30; });
+        turnosCfg = {
+          ...turnosCfg,
+          servicios: itemsPrecios.map(p=>({
+            id: p.id,
+            nombre: p.nombre,
+            sector: p.categoria || p.sector || '',
+            precio: parseFloat(p.precio)||0,
+            duracion: durMap[(p.nombre||'').toLowerCase()] || p.duracion || 30
+          }))
+        };
       }
     }
 
