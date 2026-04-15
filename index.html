@@ -1581,6 +1581,56 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mf"><button class="btn" onclick="closeM('mTurnoFijo')">Cancelar</button><button class="btn bg" onclick="guardarTurnoFijo()">Guardar turno fijo</button></div>
 </div></div>
 
+<!-- Modal Bloqueos de Disponibilidad -->
+<div class="mb" id="mBloqueoEmp"><div class="md"><div class="mh"><div class="mt2" id="mBloqueoEmpTitle">🚫 Bloqueos de disponibilidad</div><button class="xbtn" onclick="closeM('mBloqueoEmp')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="bloqueoEmpId">
+  <div style="font-size:.82rem;color:var(--tx2);margin-bottom:14px" id="bloqueoEmpNombreLbl"></div>
+  <label>Tipo de bloqueo</label>
+  <select id="bloqueoTipo" onchange="onChangeTipoBloqueo()">
+    <option value="dia_unico">📅 Día único</option>
+    <option value="rango_fechas">📆 Rango de fechas</option>
+    <option value="semanal">🔁 Recurrente semanal</option>
+  </select>
+  <div id="bloqueoFieldsDiaUnico" style="margin-top:8px">
+    <label>Fecha bloqueada</label>
+    <input type="date" id="bloqueoFecha">
+  </div>
+  <div id="bloqueoFieldsRango" style="display:none;margin-top:8px">
+    <div class="fr">
+      <div><label>Desde</label><input type="date" id="bloqueoFechaIni"></div>
+      <div><label>Hasta</label><input type="date" id="bloqueoFechaFin"></div>
+    </div>
+  </div>
+  <div id="bloqueoFieldsSemanal" style="display:none;margin-top:8px">
+    <label>Día de la semana</label>
+    <select id="bloqueoDiaSemana">
+      <option value="1">Lunes</option>
+      <option value="2">Martes</option>
+      <option value="3">Miércoles</option>
+      <option value="4">Jueves</option>
+      <option value="5">Viernes</option>
+      <option value="6">Sábado</option>
+      <option value="0">Domingo</option>
+    </select>
+  </div>
+  <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px">
+    <div style="font-size:.72rem;color:var(--tx2);font-weight:600;margin-bottom:8px">⏰ Horario bloqueado</div>
+    <div class="fr">
+      <div><label>Desde</label><input type="time" id="bloqueoHoraIni" step="1800"></div>
+      <div><label>Hasta</label><input type="time" id="bloqueoHoraFin" step="1800"></div>
+    </div>
+    <div style="font-size:.7rem;color:var(--mut);margin-top:6px">Dejá los horarios vacíos para bloquear el día completo</div>
+  </div>
+  <div style="margin-top:10px">
+    <label>Motivo (opcional)</label>
+    <input id="bloqueoMotivo" placeholder="Ej: Escuela, Vacaciones, Médico...">
+  </div>
+  <button class="btn bg" style="width:100%;margin-top:14px" onclick="guardarBloqueo()">+ Agregar bloqueo</button>
+  <div id="bloqueosList" style="margin-top:16px;border-top:1px solid var(--bor);padding-top:12px"></div>
+</div>
+</div></div>
+
 <!-- Modal Nuevo Producto Rápido -->
 <div class="mb" id="mNuevoProd"><div class="md"><div class="mh"><div class="mt2">➕ Nuevo producto</div><button class="xbtn" onclick="closeM('mNuevoProd')">✕</button></div>
 <div class="mc">
@@ -4617,6 +4667,38 @@ function getTurnosCfg(){
   };
 }
 
+// Devuelve true si la hora (HH:MM) en la fecha dada cae dentro de algún bloqueo del empleado
+function esBloqueadoEnFecha(bloqueos, fecha, hora){
+  if(!bloqueos||!bloqueos.length) return false;
+  const [h,m]=(hora||'00:00').split(':').map(Number);
+  const slotMin=h*60+m;
+  const diaSemana=new Date(fecha+'T12:00:00').getDay();
+  return bloqueos.some(b=>{
+    if(b.tipo==='dia_unico'){
+      if(b.fecha!==fecha) return false;
+      if(!b.horaInicio) return true;
+      const [ih,im]=b.horaInicio.split(':').map(Number);
+      const [fh,fm]=(b.horaFin||'23:59').split(':').map(Number);
+      return slotMin>=ih*60+im&&slotMin<fh*60+fm;
+    }
+    if(b.tipo==='rango_fechas'){
+      if(fecha<b.fechaInicio||fecha>b.fechaFin) return false;
+      if(!b.horaInicio) return true;
+      const [ih,im]=b.horaInicio.split(':').map(Number);
+      const [fh,fm]=(b.horaFin||'23:59').split(':').map(Number);
+      return slotMin>=ih*60+im&&slotMin<fh*60+fm;
+    }
+    if(b.tipo==='semanal'){
+      if(parseInt(b.diaSemana)!==diaSemana) return false;
+      if(!b.horaInicio) return true;
+      const [ih,im]=b.horaInicio.split(':').map(Number);
+      const [fh,fm]=(b.horaFin||'23:59').split(':').map(Number);
+      return slotMin>=ih*60+im&&slotMin<fh*60+fm;
+    }
+    return false;
+  });
+}
+
 function saveTurnosConfig(){
   const cfg = getTurnosCfg();
   cfg.apertura = document.getElementById('horApertura')?.value || '09:00';
@@ -4841,6 +4923,23 @@ async function verificarConflicto(){
   } catch(e){ /* no crítico */ }
 
   const cfg = getTurnosCfg();
+
+  // Verificar bloqueos de disponibilidad del profesional
+  const empBloqs = cfg.empleados?.find(e=>String(e.id)===String(empleado))?.bloqueos||[];
+  if(empBloqs.length){
+    // Chequear si algún slot dentro de la duración del servicio está bloqueado
+    const bloqueado = Array.from({length:Math.max(1,Math.ceil(dur/30))},(_,i)=>{
+      const [hh,mm]=hora.split(':').map(Number);
+      const t=hh*60+mm+i*30;
+      return esBloqueadoEnFecha(empBloqs, fecha, String(Math.floor(t/60)).padStart(2,'0')+':'+String(t%60).padStart(2,'0'));
+    }).some(Boolean);
+    if(bloqueado){
+      box.style.display='block';
+      box.innerHTML='🚫 <strong>Horario bloqueado:</strong> este profesional marcó no disponibilidad para ese día/horario. Podés guardarlo igual si es necesario.';
+      return;
+    }
+  }
+
   const conflicto = turnos.find(t=>{
     const srvT = cfg.servicios.find(s=>s.id==t.servicioId);
     const durT = t.duracion || srvT?.duracion || 60;
@@ -5415,6 +5514,7 @@ async function rTurnosConfig(){
       </div>
       <div style="display:flex;gap:6px">
         <button class="btn bgh bsm" onclick="verCajaEmpleada('${e.id}')">📊 Caja</button>
+        <button class="btn bs bsm" onclick="openBloqueos('${e.id}')">🚫 Bloqueos${(e.bloqueos&&e.bloqueos.length)?`<span style="background:var(--bad);color:#fff;border-radius:10px;padding:0 5px;font-size:.65rem;margin-left:4px">${e.bloqueos.length}</span>`:''}</button>
         <button class="btn be bsm" onclick="editarEmpleado('${e.id}')">✎</button>
         <button class="btn bd bsm" onclick="eliminarEmpleado('${e.id}')">✕</button>
       </div>
@@ -5470,6 +5570,115 @@ function eliminarServicioTurno(id){
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
   rTurnosConfig();
+}
+
+// ═══ BLOQUEOS DE DISPONIBILIDAD ═══
+function openBloqueos(empId){
+  const cfg = getTurnosCfg();
+  const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
+  if(!emp) return;
+  document.getElementById('bloqueoEmpId').value = empId;
+  document.getElementById('mBloqueoEmpTitle').textContent = '🚫 Bloqueos — ' + emp.nombre;
+  document.getElementById('bloqueoEmpNombreLbl').textContent = 'Marcá días u horarios donde ' + emp.nombre + ' no estará disponible. Los clientes online no verán esos slots.';
+  document.getElementById('bloqueoTipo').value = 'dia_unico';
+  document.getElementById('bloqueoFecha').value = '';
+  document.getElementById('bloqueoFechaIni').value = '';
+  document.getElementById('bloqueoFechaFin').value = '';
+  document.getElementById('bloqueoDiaSemana').value = '1';
+  document.getElementById('bloqueoHoraIni').value = '';
+  document.getElementById('bloqueoHoraFin').value = '';
+  document.getElementById('bloqueoMotivo').value = '';
+  onChangeTipoBloqueo();
+  rBloqueosList(empId);
+  openM('mBloqueoEmp', null);
+}
+
+function onChangeTipoBloqueo(){
+  const tipo = document.getElementById('bloqueoTipo').value;
+  document.getElementById('bloqueoFieldsDiaUnico').style.display = tipo==='dia_unico' ? '' : 'none';
+  document.getElementById('bloqueoFieldsRango').style.display = tipo==='rango_fechas' ? '' : 'none';
+  document.getElementById('bloqueoFieldsSemanal').style.display = tipo==='semanal' ? '' : 'none';
+}
+
+function rBloqueosList(empId){
+  const cfg = getTurnosCfg();
+  const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
+  const bloqueos = emp?.bloqueos||[];
+  const el = document.getElementById('bloqueosList');
+  if(!el) return;
+  if(!bloqueos.length){
+    el.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Sin bloqueos configurados. Agregá uno arriba.</div>';
+    return;
+  }
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  el.innerHTML='<div style="font-size:.72rem;color:var(--tx2);font-weight:600;margin-bottom:8px">BLOQUEOS ACTIVOS</div>'+
+    bloqueos.map(b=>{
+      const horario=b.horaInicio?`${b.horaInicio}–${b.horaFin||'cierre'}`:'Día completo';
+      let desc='';
+      if(b.tipo==='dia_unico') desc=`📅 ${fD(b.fecha)} · ${horario}`;
+      else if(b.tipo==='rango_fechas') desc=`📆 ${fD(b.fechaInicio)} al ${fD(b.fechaFin)} · ${horario}`;
+      else if(b.tipo==='semanal') desc=`🔁 Todos los ${dias[parseInt(b.diaSemana)]||'—'} · ${horario}`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bor);gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:.83rem;font-weight:600">${desc}</div>
+          ${b.motivo?`<div style="font-size:.72rem;color:var(--mut)">${esc(b.motivo)}</div>`:''}
+        </div>
+        <button class="btn bd bsm" onclick="eliminarBloqueo('${empId}','${b.id}')">✕</button>
+      </div>`;
+    }).join('');
+}
+
+function guardarBloqueo(){
+  const empId = document.getElementById('bloqueoEmpId').value;
+  const tipo = document.getElementById('bloqueoTipo').value;
+  const horaIni = document.getElementById('bloqueoHoraIni').value;
+  const horaFin = document.getElementById('bloqueoHoraFin').value;
+  const motivo = document.getElementById('bloqueoMotivo').value.trim();
+  const bloqueo = {id:Date.now().toString(), tipo, horaInicio:horaIni, horaFin, motivo};
+  if(tipo==='dia_unico'){
+    const fecha = document.getElementById('bloqueoFecha').value;
+    if(!fecha){ alert('Ingresá la fecha del bloqueo'); return; }
+    bloqueo.fecha = fecha;
+  } else if(tipo==='rango_fechas'){
+    const fi = document.getElementById('bloqueoFechaIni').value;
+    const ff = document.getElementById('bloqueoFechaFin').value;
+    if(!fi||!ff){ alert('Ingresá fecha de inicio y fin'); return; }
+    if(fi>ff){ alert('La fecha de inicio debe ser anterior al fin'); return; }
+    bloqueo.fechaInicio=fi; bloqueo.fechaFin=ff;
+  } else if(tipo==='semanal'){
+    bloqueo.diaSemana = parseInt(document.getElementById('bloqueoDiaSemana').value);
+  }
+  if(horaIni && !horaFin){ alert('Si ingresás hora de inicio también ingresá la hora de fin'); return; }
+  if(horaIni && horaFin && horaIni>=horaFin){ alert('La hora de inicio debe ser anterior a la hora de fin'); return; }
+  const cfg = getTurnosCfg();
+  const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
+  if(!emp) return;
+  if(!emp.bloqueos) emp.bloqueos=[];
+  emp.bloqueos.push(bloqueo);
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
+  document.getElementById('bloqueoFecha').value='';
+  document.getElementById('bloqueoFechaIni').value='';
+  document.getElementById('bloqueoFechaFin').value='';
+  document.getElementById('bloqueoHoraIni').value='';
+  document.getElementById('bloqueoHoraFin').value='';
+  document.getElementById('bloqueoMotivo').value='';
+  rBloqueosList(empId);
+  rTurnosConfig();
+  showToast('Bloqueo agregado ✓');
+}
+
+function eliminarBloqueo(empId, bloqueoId){
+  if(!confirm('¿Eliminar este bloqueo?')) return;
+  const cfg = getTurnosCfg();
+  const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
+  if(!emp) return;
+  emp.bloqueos=(emp.bloqueos||[]).filter(b=>String(b.id)!==String(bloqueoId));
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  persistCfgToSupabase();
+  rBloqueosList(empId);
+  rTurnosConfig();
+  showToast('Bloqueo eliminado ✓');
 }
 
 function agregarEmpleado(){
@@ -6009,7 +6218,7 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
         </div>
 
         <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Profesional</label>
-        <select id="onEmpleado" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
+        <select id="onEmpleado" onchange="cargarHorasDisponibles(window.__onlineTenantId, window.__onlineTurnosCfg)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
           <option value="">Sin preferencia</option>
           ${turnosCfg.empleados.map(e=>`<option value="${esc(String(e.id))}">${esc(e.nombre)}</option>`).join('')}
         </select>
@@ -6430,6 +6639,24 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     const fijos = JSON.parse(fijosRaw);
     const diaSemana = new Date(fecha+'T00:00:00').getDay();
     fijos.filter(f=>f.activo && f.dia===diaSemana).forEach(f=>ocupados.add(f.hora));
+  }
+
+  // Bloqueos de disponibilidad del empleado seleccionado
+  const empSelEl = document.getElementById('onEmpleado');
+  const empIdSel = empSelEl?.value || '';
+  if(empIdSel && cfg.empleados){
+    const empBloqueos = cfg.empleados.find(e=>String(e.id)===String(empIdSel))?.bloqueos||[];
+    if(empBloqueos.length){
+      const [ah2,am2]=(cfg.apertura||'09:00').split(':').map(Number);
+      const [ch2,cm2]=(cfg.cierre||'20:00').split(':').map(Number);
+      let cur2=ah2*60+am2;
+      while(cur2<=ch2*60+cm2){
+        const hh=String(Math.floor(cur2/60)).padStart(2,'0');
+        const mm=String(cur2%60).padStart(2,'0');
+        if(esBloqueadoEnFecha(empBloqueos, fecha, hh+':'+mm)) ocupados.add(hh+':'+mm);
+        cur2+=30;
+      }
+    }
   }
 
   // Get duration of selected service
