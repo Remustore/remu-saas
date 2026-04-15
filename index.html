@@ -4667,6 +4667,18 @@ function getTurnosCfg(){
   };
 }
 
+// Devuelve el primer bloqueo que afecta algún momento del día (sin importar la hora específica)
+function tieneBloqueoEnDia(bloqueos, fecha){
+  if(!bloqueos||!bloqueos.length) return null;
+  const diaSemana=new Date(fecha+'T12:00:00').getDay();
+  return bloqueos.find(b=>{
+    if(b.tipo==='dia_unico') return b.fecha===fecha;
+    if(b.tipo==='rango_fechas') return fecha>=b.fechaInicio&&fecha<=b.fechaFin;
+    if(b.tipo==='semanal') return parseInt(b.diaSemana)===diaSemana;
+    return false;
+  })||null;
+}
+
 // Devuelve true si la hora (HH:MM) en la fecha dada cae dentro de algún bloqueo del empleado
 function esBloqueadoEnFecha(bloqueos, fecha, hora){
   if(!bloqueos||!bloqueos.length) return false;
@@ -5207,10 +5219,13 @@ function rTurnos(){
   }
   turnos.sort((a,b)=>a.hora.localeCompare(b.hora));
 
-  // Update empleado tabs
+  // Update empleado tabs (con indicador 🚫 si tiene bloqueo ese día)
   const tabsEl = document.getElementById('empleadoTabs');
   tabsEl.innerHTML = `<button class="tab ${turnosFiltroEmpleado==='todos'?'active':''}" onclick="setEmpleadoFiltro('todos',this)">Todos</button>` +
-    cfg.empleados.map(e=>`<button class="tab ${turnosFiltroEmpleado==e.id?'active':''}" onclick="setEmpleadoFiltro('${e.id}',this)">${e.nombre}</button>`).join('');
+    cfg.empleados.map(e=>{
+      const blqDia = tieneBloqueoEnDia(e.bloqueos||[], fecha);
+      return `<button class="tab ${turnosFiltroEmpleado==e.id?'active':''}" onclick="setEmpleadoFiltro('${e.id}',this)">${e.nombre}${blqDia?'&nbsp;🚫':''}</button>`;
+    }).join('');
 
   // Day stats
   const statsEl = document.getElementById('turnosDayStats');
@@ -5228,10 +5243,31 @@ function rTurnos(){
     }).join('')}
   </div>`;
 
+  // Banners de bloqueo por empleado
+  const dias7=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const bloqueosBanners = cfg.empleados.map(e=>{
+    const blq = tieneBloqueoEnDia(e.bloqueos||[], fecha);
+    if(!blq) return '';
+    const horario = blq.horaInicio ? `${blq.horaInicio}–${blq.horaFin||'cierre'}` : 'todo el día';
+    let desc = '';
+    if(blq.tipo==='semanal') desc=`Todos los ${dias7[parseInt(blq.diaSemana)]}`;
+    else if(blq.tipo==='rango_fechas') desc=`${fD(blq.fechaInicio)} al ${fD(blq.fechaFin)}`;
+    else desc=fD(blq.fecha);
+    // Si hay filtro de empleado activo, solo mostrar el banner del empleado seleccionado
+    if(turnosFiltroEmpleado!=='todos'&&!turnosFiltroEmpleado.startsWith('auto_')&&String(turnosFiltroEmpleado)!==String(e.id)) return '';
+    return `<div style="margin-bottom:8px;padding:10px 14px;border-radius:10px;border-left:3px solid var(--bad);background:rgba(201,82,76,.07);display:flex;align-items:center;gap:10px">
+      <span style="font-size:1.2rem;flex-shrink:0">🚫</span>
+      <div>
+        <div style="font-size:.83rem;font-weight:700;color:var(--bad)">No disponible: ${esc(e.nombre)}</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${desc} · ${horario}${blq.motivo?` · <em>${esc(blq.motivo)}</em>`:''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
   // Lista de turnos
   const listaEl = document.getElementById('turnosLista');
   if(!turnos.length){
-    listaEl.innerHTML = `<div class="card">${emp('📅','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurno()">+ Agendar turno</button></div></div>`;
+    listaEl.innerHTML = bloqueosBanners + `<div class="card">${emp('📅','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurno()">+ Agendar turno</button></div></div>`;
     return;
   }
 
@@ -5239,7 +5275,7 @@ function rTurnos(){
 
   const estadoBadge = {confirmado:'<span class="bx bbl">✅ Confirmado</span>',llego:'<span class="bx bgr">🟢 Llegó</span>',en_proceso:'<span class="bx byw">🔄 En proceso</span>',terminado:'<span class="bx bgx">✓ Terminado</span>',no_vino:'<span class="bx brd">❌ No vino</span>'};
 
-  listaEl.innerHTML = turnos.map(t=>{
+  listaEl.innerHTML = bloqueosBanners + turnos.map(t=>{
     const [h,m] = t.hora.split(':').map(Number);
     const fin = new Date(2000,0,1,h,m+(t.duracion||60));
     const finStr = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
@@ -5590,7 +5626,7 @@ function openBloqueos(empId){
   document.getElementById('bloqueoMotivo').value = '';
   onChangeTipoBloqueo();
   rBloqueosList(empId);
-  openM('mBloqueoEmp', null);
+  document.getElementById('mBloqueoEmp').classList.add('open');
 }
 
 function onChangeTipoBloqueo(){
