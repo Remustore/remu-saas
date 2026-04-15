@@ -2185,10 +2185,32 @@ async function precargarServiciosTenant(tenantId, rubro, nombre){
   const servicios = SERVICIOS_POR_RUBRO[tipo];
   const base = Date.now();
   
+  // Función para inferir categoría del tab a partir del nombre y sector del servicio
+  function inferirCategoria(nombre, sector, tipo){
+    const n = (nombre||'').toLowerCase();
+    const s = (sector||'').toLowerCase();
+    if(tipo==='barberia'||tipo==='salon'){
+      if(/corte|degradado|degradé|capado|navaja|pelo|cabello|fade/i.test(n)) return 'corte';
+      if(/barba|afeitado|contorno|bigote|perfil/i.test(n)) return 'barba';
+      if(/color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte|babylight/i.test(n)) return tipo==='barberia'?'coloracion':'tintura';
+      if(/tratamiento|keratina|brushing|hidrat|botox|permanente|alisado/i.test(n)) return 'tratamiento';
+      if(/manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i.test(n)) return 'manicuria';
+      if(/lifting|pesta[ñn]/i.test(n)) return 'lifting';
+      if(/depilac|cera|laser/i.test(n)) return 'depilacion';
+      if(/maquillaje/i.test(n)) return 'maquillaje';
+    } else {
+      if(/pantalla|display|lcd/i.test(n)) return 'pantalla';
+      if(/bater[ií]a/i.test(n)) return 'bateria';
+      if(/tapa/i.test(n)) return 'tapa';
+      if(/conector|carga|puerto/i.test(n)) return 'conector';
+      if(/c[aá]mara/i.test(n)) return 'camara';
+    }
+    return 'otro';
+  }
   // Guardar en Supabase como precios (lista de servicios)
   const preciosInserts = servicios.map((s,i) => ({
     id: base + i,
-    data: {id: base+i, nombre: s.nombre, modelo: s.sector, precio: s.precio, disponibilidad:'disponible', notas:''},
+    data: {id: base+i, nombre: s.nombre, modelo: s.sector, categoria: inferirCategoria(s.nombre, s.sector, tipo), precio: s.precio, disponibilidad:'disponible', notas:''},
     tenant_id: tenantId
   }));
   
@@ -3390,7 +3412,7 @@ function initPrCatSelect(valorActual){
   const esSalon = esBarber || /salon|belleza|peluq|manicur/i.test(rub);
   let opts;
   if(esBarber) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'barba',l:'🪒 Barba'},{v:'coloracion',l:'🎨 Coloración'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'otro',l:'🔧 Otros'}];
-  else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'manicuria',l:'💅 Manicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
+  else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'manicuria',l:'💅 Manicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
   else opts = [{v:'',l:'— Sin categoría'},{v:'pantalla',l:'📱 Pantallas'},{v:'tapa',l:'🔲 Tapas'},{v:'bateria',l:'🔋 Baterías'},{v:'conector',l:'🔌 Conectores'},{v:'camara',l:'📸 Cámaras'},{v:'otro',l:'🔧 Otros'}];
   sel.innerHTML = opts.map(o=>`<option value="${o.v}"${o.v===valorActual?' selected':''}>${o.l}</option>`).join('');
   // Adapt label
@@ -3528,6 +3550,28 @@ function rPrecios(){
     const rub = (currentTenant.rubro||'').toLowerCase();
     const esBarberP = /barber/i.test(rub);
     const esSalonP  = /salon|belleza|peluq|manicur/i.test(rub);
+    // Auto-asignar categoria a servicios precargados sin categoría
+    if((esBarberP||esSalonP) && S.precios.some(p=>!p.categoria)){
+      const tipo2 = esBarberP?'barberia':'salon';
+      S.precios.forEach(p=>{
+        if(!p.categoria){
+          const cat = (()=>{
+            const n=(p.nombre||'').toLowerCase();
+            if(/corte|degradado|degradé|capado|navaja|pelo|cabello|fade/i.test(n)) return 'corte';
+            if(/barba|afeitado|contorno|bigote|perfil/i.test(n)) return 'barba';
+            if(/color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte|babylight/i.test(n)) return tipo2==='barberia'?'coloracion':'tintura';
+            if(/tratamiento|keratina|brushing|hidrat|botox|permanente|alisado/i.test(n)) return 'tratamiento';
+            if(/manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i.test(n)) return 'manicuria';
+            if(/lifting|pesta[ñn]/i.test(n)) return 'lifting';
+            if(/depilac|cera|laser/i.test(n)) return 'depilacion';
+            if(/maquillaje/i.test(n)) return 'maquillaje';
+            return 'otro';
+          })();
+          p.categoria = cat;
+          dbUpsert('precios', p).catch(()=>{});
+        }
+      });
+    }
     if(esBarberP || esSalonP){
       prTabs.dataset.rubroInit = '1';
       prFilt = '';
@@ -3541,7 +3585,9 @@ function rPrecios(){
         : `<button class="tab active" onclick="setPrFilt('',this)">Todos</button>
            <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
            <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
+           <button class="tab" onclick="setPrFilt('tratamiento',this)">✨ Tratamientos</button>
            <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
+           <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
            <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
            <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>
            <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otros</button>`;
@@ -3555,19 +3601,24 @@ function rPrecios(){
   const q=(document.getElementById('prQ')||{value:''}).value.toLowerCase();
   const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const prCatKw = {
-    'corte':       /corte|degradado|capado|navaja|pelo|cabello/i,
+    'corte':       /corte|degradado|degradé|capado|navaja|pelo|cabello|fade/i,
     'barba':       /barba|afeitado|contorno|bigote|perfil/i,
-    'coloracion':  /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
-    'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+    'coloracion':  /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte|babylight/i,
+    'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte|babylight/i,
     'tratamiento': /tratamiento|keratina|brushing|hidrat|botox|permanente|alisado|briz/i,
+    'maquillaje':  /maquillaje|makeup|novias?|quincea/i,
     'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
     'lifting':     /lifting|pesta[ñn]/i,
     'depilacion':  /depilac|cera|laser/i,
     'pantalla':    /pantalla|display|lcd/i,
     'bateria':     /bater[ií]a/i,
+    'tapa':        /tapa|back|trasera/i,
     'conector':    /conector|carga|puerto/i,
-    'otro':        /.*/
+    'camara':      /c[aá]mara/i,
+    'otro':        null  // 'otro' se maneja aparte: ítems sin categoría específica
   };
+  // Lista de todos los keywords para determinar si un ítem cae en 'otro'
+  const todosKw = [prCatKw.corte,prCatKw.barba,prCatKw.coloracion,prCatKw.tintura,prCatKw.tratamiento,prCatKw.maquillaje,prCatKw.manicuria,prCatKw.lifting,prCatKw.depilacion,prCatKw.pantalla,prCatKw.bateria,prCatKw.tapa,prCatKw.conector,prCatKw.camara].filter(Boolean);
   // Deduplicar por nombre: si hay duplicados (onboarding precio:0 + manual con precio), conservar el mayor precio
   const dedupPr = new Map();
   S.precios.forEach(p=>{
@@ -3580,11 +3631,17 @@ function rPrecios(){
     const matchQ = !q || n.includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
     let matchF = !prFilt;
     if(!matchF){
-      // Use explicit categoria field first, then keyword fallback
-      if(p.categoria && p.categoria === prFilt){ matchF = true; }
-      else {
-        const kw = prCatKw[norm(prFilt)];
-        matchF = kw ? kw.test(p.nombre) : n.includes(norm(prFilt));
+      if(prFilt === 'otro'){
+        // 'Otros': ítems con categoria='otro' o sin categoría conocida y sin keyword match
+        if(p.categoria === 'otro' || !p.categoria){ matchF = !todosKw.some(kw=>kw.test(p.nombre)); }
+        else { matchF = p.categoria === 'otro'; }
+      } else {
+        // Use explicit categoria field first, then keyword fallback
+        if(p.categoria && p.categoria === prFilt){ matchF = true; }
+        else {
+          const kw = prCatKw[norm(prFilt)];
+          matchF = kw ? kw.test(p.nombre) : n.includes(norm(prFilt));
+        }
       }
     }
     return matchQ && matchF;
@@ -3953,11 +4010,8 @@ function getCajas(){
   (S.movCaja||[]).filter(m=>(!m.fecha||m.fecha===hoy)).forEach(m=>{if(m.tipo==='ingreso')cajas[m.caja]+=m.monto||0;else if(m.tipo==='egreso')cajas[m.caja]-=m.monto||0;});
   // Reparaciones entregadas hoy
   S.reparaciones.filter(r=>r.estado==='entregado'&&(r.fechaEnt||r.fecha)===hoy).forEach(r=>{cajas.servicio+=r.presupuesto||0;});
-  // Turnos terminados hoy (salones/barberías)
-  const rub=(currentTenant?.rubro||'').toLowerCase();
-  if(/barber|salon|belleza|peluq/i.test(rub)&&typeof getTurnos==='function'){
-    getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').forEach(t=>{cajas.servicio+=parseFloat(t.precio)||0;});
-  }
+  // NOTA: los turnos terminados YA se registran como venta en _doEstadoTurno(),
+  // por lo que S.ventas ya los incluye. Sumarlos aquí causaría duplicación.
   return cajas;
 }
 
@@ -3994,17 +4048,8 @@ function cierreDiario(){
     const m = v.metodo||'Efectivo';
     metodos[m] = (metodos[m]||0) + (v.total||0);
   });
-  // Incluir turnos de hoy (si son de barbería/salón)
-  const rub = (currentTenant?.rubro||'').toLowerCase();
-  const esBarb = /barber|salon|belleza|peluq/i.test(rub);
-  if(esBarb && typeof getTurnos === 'function'){
-    getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').forEach(t=>{
-      if(t.precio > 0){
-        const m = t.metodo||'Efectivo';
-        metodos[m] = (metodos[m]||0) + (parseFloat(t.precio)||0);
-      }
-    });
-  }
+  // Los turnos de salón/barbería se registran como ventas en _doEstadoTurno(),
+  // ya están en S.ventas. No sumarlos nuevamente para evitar duplicación.
 
   const metodoRows = Object.entries(metodos).map(([m,v])=>
     `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor)">
@@ -4031,7 +4076,7 @@ function cierreDiario(){
   openM('mCierreDiario');
 }
 
-function guardarCierreDiario(resetear){
+async function guardarCierreDiario(resetear){
   const data = window.__cierreDiarioData;
   if(!data) return;
   const cierresKey = 'cierres_caja_'+(currentTenant?.id||'');
@@ -4040,10 +4085,20 @@ function guardarCierreDiario(resetear){
   localStorage.setItem(cierresKey, JSON.stringify(historial));
   closeM('mCierreDiario');
   if(resetear){
-    // Marcar un reset visual: guardar timestamp del cierre
+    // Guardar timestamp del cierre
     localStorage.setItem('caja_reset_'+(currentTenant?.id||'')+'_'+data.fecha, Date.now());
-    showToast('💾 Cierre guardado · Caja reiniciada');
+    // Limpiar movCaja del día para que la caja arranque en cero
+    const hoy = tod();
+    S.movCaja = (S.movCaja||[]).filter(m => m.fecha && m.fecha !== hoy);
+    try { await dbSetConfig('movCaja', S.movCaja); } catch(e){}
+    // Resetear también ventas del día en memoria (solo en pantalla, no borra Supabase)
+    // La caja visual queda en $0 porque movCaja está limpio y ventas quedan en Supabase
+    // Refresh UI
+    rCajas();
+    rDash();
+    showToast('💾 Cierre guardado · Caja reiniciada en $0');
   } else {
+    rCajas();
     showToast('💾 Cierre del día guardado ✓');
   }
 }
@@ -5174,7 +5229,8 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
       S.ventas.unshift(venta);
       await dbUpsert('ventas', venta);
       showToast('✓ Finalizado · '+fmt(precio)+' · '+metodo);
-      if(document.getElementById('secDash')?.style.display !== 'none') rDash();
+      rCajas();
+      rDash();
     } else {
       showToast('✓ Turno finalizado');
     }
@@ -6919,6 +6975,35 @@ async function enviarSolicitudTurno(tenantId){
     return;
   }
 
+  // Prevenir doble envío: deshabilitar botón durante el proceso
+  const submitBtn = document.querySelector('button[onclick*="enviarSolicitudTurno"]');
+  if(submitBtn){
+    if(submitBtn.disabled) return; // Ya hay un envío en curso
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Enviando...';
+  }
+
+  // Verificar si este cliente ya tiene una solicitud pendiente o confirmada para el mismo turno
+  const { data: existenteCliente } = await sb.from('turnos_solicitudes')
+    .select('id,estado')
+    .eq('tenant_id', tenantId)
+    .eq('fecha', fecha)
+    .eq('hora', hora)
+    .in('estado', ['pendiente','confirmado'])
+    .limit(5);
+  const yaExiste = (existenteCliente||[]).some(t => {
+    // Misma hora ya reservada por cualquiera → avisar
+    return true;
+  });
+  // Verificar duplicado EXACTO del mismo cliente (mismo nombre/tel/fecha/hora)
+  const duplicadoExacto = (existenteCliente||[]).length > 0;
+  if(duplicadoExacto){
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Solicitar turno'; }
+    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya está reservado. Por favor elegí otro horario disponible.';}
+    if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
+    return;
+  }
+
   // Verificar turnos fijos del tenant
   const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
   if(fijosRaw){
@@ -6946,6 +7031,7 @@ async function enviarSolicitudTurno(tenantId){
   }).select('id,created_at').single();
 
   if(insertErr){
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Solicitar turno'; }
     if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Error al enviar. Intentá de nuevo.';}
     return;
   }
@@ -6976,12 +7062,14 @@ async function enviarSolicitudTurno(tenantId){
     msg.style.display='block';
     msg.style.color='#4caf7d';
     msg.textContent='✓ Solicitud enviada. Te confirmaremos por WhatsApp.';
+    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='✓ Enviado'; }
     setTimeout(()=>{
       document.getElementById('onNombre').value='';
       document.getElementById('onTel').value='';
       document.getElementById('onFecha').value='';
       document.getElementById('onHora').value='';
-    },1000);
+      if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Solicitar turno'; }
+    },3000);
   }
 }
 
@@ -8743,7 +8831,7 @@ function updateDashParejaCard(){
   `;
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); }
+function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); }
 
 function getClientes(){
   const r = (currentTenant?.rubro||'').toLowerCase();
