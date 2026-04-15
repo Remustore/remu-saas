@@ -2563,7 +2563,21 @@ async function loadAll(){
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbGetConfig('movCaja')
     ]);
-    S.stock=stock; S.equipos=equipos; S.ventas=ventas;
+    S.stock=stock; S.equipos=equipos;
+    // Deduplicar ventas por turnoId: si hay múltiples ventas del mismo turno (bug anterior),
+    // conservar solo la primera. Ventas sin turnoId (ventas manuales) se conservan todas.
+    const ventasSinDuplicar = [];
+    const turnoIdsVistos = new Set();
+    for(const v of (ventas||[])){
+      if(v.turnoId){
+        if(!turnoIdsVistos.has(v.turnoId)){ turnoIdsVistos.add(v.turnoId); ventasSinDuplicar.push(v); }
+        else console.warn('[loadAll] Venta duplicada eliminada en memoria — turnoId:', v.turnoId, '$'+v.total);
+      } else {
+        ventasSinDuplicar.push(v);
+      }
+    }
+    if(ventasSinDuplicar.length !== (ventas||[]).length) console.warn('[loadAll] Se eliminaron', (ventas||[]).length - ventasSinDuplicar.length, 'ventas duplicadas de S.ventas');
+    S.ventas = ventasSinDuplicar;
     S.gastos=gastos.length ? gastos : getGastosFijos();
     // Restaurar turnosCfg y onlineCfg desde Supabase si no están en localStorage
     const tid = currentTenant?.id||'';
@@ -5139,26 +5153,37 @@ async function saveTurno(){
     await liberarSlotSupabase(obj);
   }
 
-  // Si terminado, ofrecer registrar venta
-  if(estado === 'terminado' && precioCobrado > 0){
-    // Auto-register venta without asking
-    const venta = {
-      id: Date.now(),
-      tipo: 'servicio',
-      nombre: srv?.nombre || obj.servicioNombre || 'Servicio',
-      cantidad: 1,
-      precio: precioCobrado,
-      total: precioCobrado,
-      costo: 0,
-      metodo: 'Efectivo',
-      fecha: fecha,
-      comPct: 0,
-      comision: 0
-    };
-    S.ventas.unshift(venta);
-    await dbUpsert('ventas', venta);
-    console.log('[_doEstadoTurno] Venta creada:', venta.nombre, '$'+venta.total, '| Total S.ventas hoy:', S.ventas.filter(v=>v.fecha===fecha).reduce((a,v)=>a+v.total,0));
-    showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
+  // Si terminado, registrar venta — SOLO si el turno NO estaba ya terminado antes de este guardado.
+  // Esto previene crear venta doble cuando el usuario edita un turno que ya fue finalizado.
+  const yaEstabaTerminado = turnoOriginal && turnoOriginal.estado === 'terminado';
+  console.log('[guardarTurno] estado:', estado, '| yaEstabaTerminado:', yaEstabaTerminado, '| precioCobrado:', precioCobrado);
+  if(estado === 'terminado' && precioCobrado > 0 && !yaEstabaTerminado){
+    // Verificar que no exista ya una venta para este turno (idempotencia)
+    const turnoIdStr = String(obj.id);
+    const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
+    console.log('[guardarTurno] turnoId:', turnoIdStr, '| yaExisteVenta:', yaExisteVenta, '| S.ventas.length:', S.ventas.length);
+    if(!yaExisteVenta){
+      const venta = {
+        id: Date.now(),
+        turnoId: turnoIdStr,
+        tipo: 'servicio',
+        nombre: srv?.nombre || obj.servicioNombre || 'Servicio',
+        cantidad: 1,
+        precio: precioCobrado,
+        total: precioCobrado,
+        costo: 0,
+        metodo: obj.metodo || 'Efectivo',
+        fecha: fecha,
+        comPct: 0,
+        comision: 0
+      };
+      S.ventas.unshift(venta);
+      await dbUpsert('ventas', venta);
+      console.log('[guardarTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total);
+      showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
+    } else {
+      console.log('[guardarTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
+    }
   }
 
   closeM('mTurno');
@@ -5228,10 +5253,20 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
     const precio = (precioExtra != null) ? precioExtra : (parseFloat(t.precio)||0);
     const metodo = metodoExtra || t.metodo || 'Efectivo';
     if(precio > 0){
-      const venta = { id: Date.now(), tipo:'servicio', nombre: t.servicioNombre||'Servicio', cantidad:1, precio, total:precio, costo:0, metodo, fecha:t.fecha, comPct:0, comision:0 };
-      S.ventas.unshift(venta);
-      await dbUpsert('ventas', venta);
-      showToast('✓ Finalizado · '+fmt(precio)+' · '+metodo);
+      // Verificar que no exista ya una venta para este turno (idempotencia)
+      const turnoIdStr = String(id);
+      const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
+      console.log('[_doEstadoTurno] turnoId:', turnoIdStr, '| precio:', precio, '| yaExisteVenta:', yaExisteVenta, '| S.ventas tipo servicio:', S.ventas.filter(v=>v.tipo==='servicio').map(v=>'$'+v.total+'('+v.turnoId+')'));
+      if(!yaExisteVenta){
+        const venta = { id: Date.now(), turnoId: turnoIdStr, tipo:'servicio', nombre: t.servicioNombre||'Servicio', cantidad:1, precio, total:precio, costo:0, metodo, fecha:t.fecha, comPct:0, comision:0 };
+        S.ventas.unshift(venta);
+        await dbUpsert('ventas', venta);
+        console.log('[_doEstadoTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total, '| Total S.ventas hoy:', S.ventas.filter(v=>v.fecha===t.fecha).reduce((a,v)=>a+v.total,0));
+        showToast('✓ Finalizado · '+fmt(precio)+' · '+metodo);
+      } else {
+        console.log('[_doEstadoTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
+        showToast('✓ Turno finalizado');
+      }
       rCajas();
       rDash();
     } else {
@@ -9422,7 +9457,11 @@ async function silentRefresh(){
       dbLoad('inversores'),dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'),dbGetConfig('movCaja')
     ]);
-    S.stock=stock;S.equipos=equipos;S.ventas=ventas;S.gastos=gastos;
+    S.stock=stock;S.equipos=equipos;
+    // Deduplicar por turnoId igual que en loadAll()
+    const _vSinDup=[];const _tIds=new Set();
+    for(const v of (ventas||[])){if(v.turnoId){if(!_tIds.has(v.turnoId)){_tIds.add(v.turnoId);_vSinDup.push(v);}}else{_vSinDup.push(v);}}
+    S.ventas=_vSinDup;S.gastos=gastos;
     S.reparaciones=reparaciones;S.precios=precios;S.meta=meta||0;
     S.inversores=inversores;S.movimientos_inv=movimientos_inv;
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
