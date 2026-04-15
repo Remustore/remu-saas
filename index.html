@@ -9,9 +9,23 @@
 <meta name="theme-color" content="#080808">
 <title id="pageTitle">Sistema de Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<meta name="description" content="Sistema de gestión para barberías, salones de belleza y talleres. Turnos, caja, precios, clientes y más.">
+<meta property="og:title" content="Remu Gestión">
+<meta property="og:description" content="Sistema de gestión para barberías, salones y talleres de celulares.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://remugestion.com.ar">
+<link rel="canonical" href="https://remugestion.com.ar">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.3/dist/purify.min.js"></script>
-<script src="config.js"></script>
+<!-- Configuración de producción (supabase anon key es pública por diseño) -->
+<script>
+window.APP_CONFIG = {
+  supabaseUrl: 'https://xycagqxhpwrbdurrjkdl.supabase.co',
+  supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Y2FncXhocHdyYmR1cnJqa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNDMxMTgsImV4cCI6MjA4ODgxOTExOH0.AfXJcUn2hNsLX8ooO1jwOF1ogTqDnSp1Up-Fv2tnKDQ'
+};
+</script>
+<!-- config.js permite override local de credenciales (ignorado por git) -->
+<script src="config.js" onerror="void 0"></script>
 <style>
 :root{
   --bg:#080808;--sur:#0f0f0f;--car:#141414;--car2:#1a1a1a;
@@ -1690,13 +1704,11 @@ textarea{resize:vertical;min-height:70px;}
 
 <script>
 // ═══════════════════════════════════════════════
-// CONFIGURACIÓN — cargada desde config.js
-// ¡NUNCA pongas credenciales en este archivo!
-// Copiá config.example.js → config.js y completá.
+// CONFIGURACIÓN — valores de producción inlinados en el <head> + override opcional vía config.js (local dev)
 // ═══════════════════════════════════════════════
-if (typeof window.APP_CONFIG === 'undefined') {
-  document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#c9524c;font-family:sans-serif;text-align:center;padding:20px"><div><strong>Error de configuración</strong><br><br>Falta el archivo <code>config.js</code>.<br>Copiá <code>config.example.js</code> a <code>config.js</code> y completá tus credenciales.</div></div>';
-  throw new Error('APP_CONFIG no definido — falta config.js');
+if (typeof window.APP_CONFIG === 'undefined' || !window.APP_CONFIG.supabaseUrl) {
+  document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#080808;color:#c9524c;font-family:sans-serif;text-align:center;padding:20px"><div><strong>Error de configuración</strong><br><br>No se encontraron las credenciales de Supabase.</div></div>';
+  throw new Error('APP_CONFIG no definido');
 }
 const SURL = window.APP_CONFIG.supabaseUrl;
 const SKEY = window.APP_CONFIG.supabaseAnonKey;
