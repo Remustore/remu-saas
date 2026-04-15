@@ -3752,10 +3752,12 @@ function rDash(){
   // For barberia/salon, total income = service ventas + turnos
   const tVServicio = vm.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
   const tVProducto = vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
-  const tTurnosMes = esBarberiaD && getTurnos ? filtrarDash(getTurnos().filter(t=>t.estado==='terminado'),'fecha').reduce((a,t)=>a+(t.precio||0),0) : 0;
   const repEntregadas = !esBarberiaD ? filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado'),'fecha') : [];
   const tR = repEntregadas.reduce((a,r)=>a+(r.presupuesto||0),0);
-  const totalMesReal = esBarberiaD ? tVProducto + Math.max(tVServicio, tTurnosMes) : tV + tR;
+  // Los turnos finalizados crean venta tipo:'servicio' → tVServicio ya los incluye.
+  // NO leer getTurnos() aquí para no duplicar. Fuente única: S.ventas.
+  const totalMesReal = esBarberiaD ? tVProducto + tVServicio : tV + tR;
+  console.log('[rDash] tVServicio:', tVServicio, '| tVProducto:', tVProducto, '| totalMesReal:', totalMesReal);
   const ganReal = totalMesReal - tG;
   const filtLabel = getDFiltLabel();
   const opCount = vm.length + repEntregadas.length;
@@ -5155,6 +5157,7 @@ async function saveTurno(){
     };
     S.ventas.unshift(venta);
     await dbUpsert('ventas', venta);
+    console.log('[_doEstadoTurno] Venta creada:', venta.nombre, '$'+venta.total, '| Total S.ventas hoy:', S.ventas.filter(v=>v.fecha===fecha).reduce((a,v)=>a+v.total,0));
     showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
   }
 
@@ -7521,9 +7524,10 @@ function rGrafico7Dias(){
   const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
 
   const datos = dias.map(fecha=>{
+    // Los turnos finalizados ya crean venta tipo:'servicio' en _doEstadoTurno().
+    // Sumar turnos por separado causa doble conteo. S.ventas es la fuente de verdad.
     const ventas = S.ventas.filter(v=>v.fecha===fecha).reduce((a,v)=>a+v.total,0);
-    const turnos = esTurnos && getTurnos ? getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
-    return ventas + turnos;
+    return ventas;
   });
 
   const maxVal = Math.max(...datos, 1);
@@ -7600,12 +7604,8 @@ function rGraficoDias(){
 
   const porDia = [0,0,0,0,0,0,0]; // Dom=0 ... Sab=6
   
-  if(esTurnos && getTurnos){
-    getTurnos().filter(t=>t.fecha>=desde&&t.estado==='terminado').forEach(t=>{
-      const d = new Date(t.fecha+'T00:00:00').getDay();
-      porDia[d]++;
-    });
-  }
+  // Nota: para barberías/salones no se suma getTurnos() por separado porque
+  // cada turno finalizado ya genera una venta en S.ventas (tipo:'servicio').
   S.ventas.filter(v=>v.fecha>=desde).forEach(v=>{
     const d = new Date(v.fecha+'T00:00:00').getDay();
     porDia[d]++;
@@ -8161,7 +8161,9 @@ function generarResumenMesPDF(){
   const tG = gastos.reduce((a,g)=>a+g.monto,0);
   const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
   const tT = turnos.reduce((a,t)=>a+(t.precio||0),0);
-  const totalIngresos = tV + tR + tT;
+  // Para barberías/salones, los turnos ya están incluidos en tV como ventas tipo:'servicio'.
+  // Sumar tT causaría doble conteo. Solo agregarlo en rubros sin turnos (talleres, etc).
+  const totalIngresos = esTurnos ? tV + tR : tV + tR + tT;
   const ganancia = totalIngresos - tG;
   
   const comisiones = rComisionesMes();
