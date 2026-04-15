@@ -998,6 +998,7 @@ textarea{resize:vertical;min-height:70px;}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn bg" style="padding:7px 14px;font-size:.8rem" onclick="go('turnosConfig')">⚙ Configurar turnos</button>
+          <button class="btn bs bsm" onclick="avisarEquipoDia()" title="Enviar a cada profesional sus turnos del día por WhatsApp">📲 Avisar equipo</button>
           <button class="btn bg bsm" onclick="openNuevoTurno()">+ Nuevo turno</button>
         </div>
       </div>
@@ -5188,8 +5189,18 @@ function editarTurno(id){
 }
 
 function enviarRecordatorioWA(id){
-  const t = getTurnos().find(x=>x.id===id);
+  const turnos = getTurnos();
+  const t = turnos.find(x=>x.id===id);
   if(!t||!t.tel) return alert('Este cliente no tiene teléfono registrado');
+  // Si ya fue avisado, pedir confirmación antes de reenviar
+  if(t.avisado){
+    let hace = '';
+    if(t.avisadoAt){
+      const mins = Math.round((Date.now()-new Date(t.avisadoAt).getTime())/60000);
+      hace = mins < 60 ? ` hace ${mins} min` : ` hace ${Math.round(mins/60)} hs`;
+    }
+    if(!confirm(`Ya se envió recordatorio a ${t.cliente}${hace}. ¿Enviar de nuevo?`)) return;
+  }
   const negocio = currentTenant?.nombre||'el salón';
   const msg = `Hola ${t.cliente} 👋
 
@@ -5203,6 +5214,13 @@ Te recordamos tu turno en *${negocio}*:
 ¡Te esperamos! Si no podés asistir avisanos con anticipación. 🙏`;
   const tel = t.tel.replace(/\D/g,'');
   window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+  // Marcar como avisado en localStorage
+  const idx = turnos.findIndex(x=>x.id===id);
+  if(idx>=0){
+    turnos[idx] = {...turnos[idx], avisado:true, avisadoAt:new Date().toISOString()};
+    saveTurnosLocal(turnos);
+    rTurnos();
+  }
 }
 
 function rTurnos(){
@@ -5304,7 +5322,9 @@ function rTurnos(){
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;flex-shrink:0">
           ${acciones[t.estado] || acciones['confirmado']}
-          ${t.tel?`<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')">📲</button>`:''}
+          ${t.tel?(t.avisado
+            ?`<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3);font-size:.68rem" onclick="enviarRecordatorioWA('${t.id}')" title="Recordatorio enviado — click para reenviar">📲 ✓</button>`
+            :`<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')" title="Enviar recordatorio WA">📲</button>`):''}
           <button class="btn be bsm" onclick="editarTurno('${t.id}')" title="Editar detalles">✎</button>
         </div>
       </div>
@@ -5547,6 +5567,7 @@ async function rTurnosConfig(){
         <strong style="font-size:.88rem">👤 ${e.nombre}</strong>
         ${e.sectores?.length?`<span style="color:var(--tx2);font-size:.75rem;margin-left:8px">${e.sectores.join(', ')}</span>`:''}
         ${e.comision>0?`<span style="color:var(--gld);font-size:.75rem;margin-left:8px">💰 ${e.comision}% comisión</span>`:''}
+        ${e.tel?`<span style="color:var(--ok);font-size:.73rem;margin-left:8px">📱 ${e.tel}</span>`:`<span style="color:var(--bad);font-size:.73rem;margin-left:8px">sin tel</span>`}
       </div>
       <div style="display:flex;gap:6px">
         <button class="btn bgh bsm" onclick="verCajaEmpleada('${e.id}')">📊 Caja</button>
@@ -5606,6 +5627,33 @@ function eliminarServicioTurno(id){
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
   rTurnosConfig();
+}
+
+// Envía WA con el listado completo de turnos del día a cada empleado
+function avisarEquipoDia(){
+  const fecha = document.getElementById('turnosFecha')?.value || tod();
+  const cfg = getTurnosCfg();
+  const turnos = getTurnos().filter(t=>t.fecha===fecha&&t.estado!=='cancelado');
+  const negocio = currentTenant?.nombre||'el salón';
+  const sinTel = cfg.empleados.filter(e=>!e.tel);
+  const conTurnos = cfg.empleados.filter(e=>{
+    const mis = turnos.filter(t=>String(t.empleadoId)===String(e.id));
+    return mis.length > 0 && e.tel;
+  });
+  if(!conTurnos.length){
+    const msg = sinTel.length
+      ? `Sin empleados con turno y teléfono cargado para ese día.\n\nSin teléfono: ${sinTel.map(e=>e.nombre).join(', ')}\n\nEditá cada empleado (✎) para agregar su número de WhatsApp.`
+      : `No hay turnos asignados a empleados con teléfono para el ${fD(fecha)}.`;
+    return alert(msg);
+  }
+  conTurnos.forEach((e, i)=>{
+    const misTurnos = turnos.filter(t=>String(t.empleadoId)===String(e.id)).sort((a,b)=>a.hora.localeCompare(b.hora));
+    const lista = misTurnos.map(t=>`• ${t.hora} — ${esc(t.cliente)} (${esc(t.servicioNombre||'servicio')})`).join('\n');
+    const texto = `Hola ${e.nombre}! 👋\n\nTus turnos del *${fD(fecha)}* en *${negocio}*:\n\n${lista}\n\nTotal: *${misTurnos.length} turno${misTurnos.length>1?'s':''}* 💪`;
+    setTimeout(()=>{ window.open(`https://wa.me/549${e.tel}?text=${encodeURIComponent(texto)}`,'_blank'); }, i*400);
+  });
+  if(sinTel.length) showToast(`Avisando a ${conTurnos.length} profesional${conTurnos.length>1?'es':''}. Sin tel: ${sinTel.map(e=>e.nombre).join(', ')}`);
+  else showToast(`Avisando a ${conTurnos.length} profesional${conTurnos.length>1?'es':''}...`);
 }
 
 // ═══ BLOQUEOS DE DISPONIBILIDAD ═══
@@ -5723,8 +5771,9 @@ function agregarEmpleado(){
   if(!nombre) return;
   const sectores = prompt('Sectores que atiende (ej: Peluquería, Manicuria)') || '';
   const comision = parseFloat(prompt('% de comisión sobre cada servicio (0 si no aplica):') || '0');
+  const tel = (prompt('WhatsApp del empleado (para avisarle sus turnos — sin +54, sin 0):') || '').replace(/\D/g,'');
   const cfg = getTurnosCfg();
-  cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean), comision});
+  cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean), comision, tel});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
   rTurnosConfig();
@@ -5739,7 +5788,8 @@ function editarEmpleado(id){
   if(!nombre) return;
   const sectores = prompt('Sectores:', e.sectores?.join(', ')||'') || '';
   const comision = parseFloat(prompt('% de comisión:', e.comision||0) || e.comision||0);
-  e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean); e.comision=comision;
+  const tel = (prompt('WhatsApp del empleado (para avisarle sus turnos):', e.tel||'') || '').replace(/\D/g,'');
+  e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean); e.comision=comision; e.tel=tel;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
   rTurnosConfig();
@@ -6660,6 +6710,15 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
   const cfg = turnosCfg || {servicios:[], empleados:[]};
   const apertura = cfg.apertura || '09:00';
   const cierre = cfg.cierre || '20:00';
+
+  // Verificar si el día de la semana está habilitado
+  const diasTrabajo = cfg.dias && cfg.dias.length > 0 ? cfg.dias : [1,2,3,4,5,6];
+  const diaSel = new Date(fecha+'T12:00:00').getDay();
+  if(!diasTrabajo.includes(diaSel)){
+    const nombDia = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
+    grid.innerHTML = `<div style="background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:10px;padding:16px;text-align:center"><div style="font-size:1.1rem;margin-bottom:6px">❌</div><div style="font-size:.85rem;color:#f5c0be;font-weight:600">No atendemos los ${nombDia}s</div><div style="font-size:.75rem;color:#a89880;margin-top:4px">Por favor elegí otro día disponible</div></div>`;
+    return;
+  }
 
   // Get occupied slots from Supabase solicitudes (confirmed + manual blocks)
   const { data: solicitudes } = await sb.from('turnos_solicitudes')
