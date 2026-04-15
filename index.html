@@ -5686,9 +5686,10 @@ function guardarBloqueo(){
   }
   if(horaIni && !horaFin){ alert('Si ingresás hora de inicio también ingresá la hora de fin'); return; }
   if(horaIni && horaFin && horaIni>=horaFin){ alert('La hora de inicio debe ser anterior a la hora de fin'); return; }
+  if(!empId){ alert('Error: no se identificó el profesional. Cerrá el modal y volvé a intentarlo.'); return; }
   const cfg = getTurnosCfg();
   const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
-  if(!emp) return;
+  if(!emp){ alert('Error: profesional no encontrado (id: '+empId+'). Recargá la página.'); return; }
   if(!emp.bloqueos) emp.bloqueos=[];
   emp.bloqueos.push(bloqueo);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
@@ -6677,19 +6678,26 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     fijos.filter(f=>f.activo && f.dia===diaSemana).forEach(f=>ocupados.add(f.hora));
   }
 
-  // Bloqueos de disponibilidad del empleado seleccionado
-  const empSelEl = document.getElementById('onEmpleado');
-  const empIdSel = empSelEl?.value || '';
-  if(empIdSel && cfg.empleados){
-    const empBloqueos = cfg.empleados.find(e=>String(e.id)===String(empIdSel))?.bloqueos||[];
-    if(empBloqueos.length){
+  // Bloqueos de disponibilidad — aplica siempre
+  if(cfg.empleados && cfg.empleados.length > 0){
+    const empSelEl = document.getElementById('onEmpleado');
+    const empIdSel = (empSelEl?.value||'').trim();
+    // Con empleado específico: aplica solo sus bloqueos.
+    // Sin preferencia (vacío): un slot queda bloqueado si TODOS los empleados están bloqueados
+    // (con 1 solo empleado esto equivale a aplicar sus bloqueos siempre)
+    const empsCheck = empIdSel
+      ? [cfg.empleados.find(e=>String(e.id)===String(empIdSel))].filter(Boolean)
+      : cfg.empleados;
+    if(empsCheck.length > 0){
       const [ah2,am2]=(cfg.apertura||'09:00').split(':').map(Number);
       const [ch2,cm2]=(cfg.cierre||'20:00').split(':').map(Number);
       let cur2=ah2*60+am2;
       while(cur2<=ch2*60+cm2){
         const hh=String(Math.floor(cur2/60)).padStart(2,'0');
-        const mm=String(cur2%60).padStart(2,'0');
-        if(esBloqueadoEnFecha(empBloqueos, fecha, hh+':'+mm)) ocupados.add(hh+':'+mm);
+        const mm2=String(cur2%60).padStart(2,'0');
+        const horaSlot=hh+':'+mm2;
+        if(empsCheck.every(e=>esBloqueadoEnFecha(e.bloqueos||[], fecha, horaSlot)))
+          ocupados.add(horaSlot);
         cur2+=30;
       }
     }
