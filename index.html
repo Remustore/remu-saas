@@ -762,7 +762,7 @@ textarea{resize:vertical;min-height:70px;}
         <div class="ch"><h3>🛒 Objetivos de compra</h3><button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Agregar</button></div>
         <div id="objetivosCompraList"></div>
       </div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Movimiento manual</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
+      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card">
           <div class="ch"><h3>Meta mensual</h3></div>
@@ -788,7 +788,7 @@ textarea{resize:vertical;min-height:70px;}
         <div class="card"><h3>Flujo de caja</h3><div style="margin-top:10px" id="flujo"></div></div>
       </div>
       <div class="g2" style="margin-bottom:14px">
-        <div class="card"><div class="ch"><h3>🏆 Más vendidos</h3></div><div id="topS"></div></div>
+        <div class="card" id="topSCard"><div class="ch"><h3>🏆 Más vendidos</h3></div><div id="topS"></div></div>
         <div class="card" id="resumenSemCard" style="display:none;margin-bottom:14px;border-left:3px solid var(--gld)">
         <div class="ch"><h3>📅 Resumen de la semana pasada</h3><button class="btn bsm" onclick="document.getElementById('resumenSemCard').style.display='none'">✕</button></div>
         <div id="resumenSemContent"></div>
@@ -1517,6 +1517,7 @@ textarea{resize:vertical;min-height:70px;}
     · Finaliza: <strong id="turnoFinLabel" style="color:var(--tx)">—</strong>
   </div>
   <div id="turnoConflicto" style="display:none;background:rgba(201,82,76,.1);border:1px solid var(--bad);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--bad)"></div>
+  <div id="fidelTurnoAlert" style="display:none;background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:8px;padding:10px 14px;margin-top:8px;font-size:.82rem;color:var(--gld);align-items:center;justify-content:space-between;gap:8px"><span id="fidelTurnoMsg"></span><button class="btn bsm" id="fidelResetBtn" onclick="resetFidelCli(this.dataset.nombre,this.dataset.visitas)" style="border:1px solid var(--gld);color:var(--gld);font-size:.72rem;padding:4px 10px">✓ Premio entregado</button></div>
   <div class="fr"><div><label>Estado</label><select id="turnoEstado">
     <option value="confirmado">✅ Confirmado</option>
     <option value="llego">🟢 Llegó</option>
@@ -1617,8 +1618,8 @@ textarea{resize:vertical;min-height:70px;}
 <div class="mb" id="mPrecio"><div class="md"><div class="mh"><div class="mt2">Agregar Servicio</div><button class="xbtn" onclick="closeM('mPrecio')">✕</button></div>
 <div class="mc"><input type="hidden" id="prId">
 <div class="fr full"><div><label>Nombre del servicio</label><input id="prNom" placeholder="Ej: Cambio de pantalla, corte..."></div></div>
-<div class="fr"><div><label>Modelo/Tipo compatible</label><input id="prMod" placeholder="Ej: iPhone 14, todo tipo..."></div><div><label>Precio ($)</label><input type="number" id="prPre" placeholder="0"></div></div>
-<div class="fr"><div><label>Disponibilidad</label><select id="prDisp"><option value="disponible">Disponible</option><option value="consultar">Consultar</option><option value="no disponible">No disponible</option></select></div></div>
+<div class="fr"><div><label id="prModLabel">Sector / Descripción</label><input id="prMod" placeholder="Ej: Peluquería, iPhone 14, todo tipo..."></div><div><label>Precio ($)</label><input type="number" id="prPre" placeholder="0"></div></div>
+<div class="fr"><div><label>Categoría (para filtros)</label><select id="prCat"><option value="">— Sin categoría</option></select></div><div><label>Disponibilidad</label><select id="prDisp"><option value="disponible">Disponible</option><option value="consultar">Consultar</option><option value="no disponible">No disponible</option></select></div></div>
 <div class="fr full"><div><label>Notas / aclaraciones</label><input id="prNot" placeholder="Opcional..."></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mPrecio')">Cancelar</button><button class="btn bg" onclick="savePrecio()">Guardar</button></div></div></div>
 
@@ -1652,11 +1653,11 @@ textarea{resize:vertical;min-height:70px;}
 </div></div></div>
 
 <!-- Mov Caja -->
-<div class="mb" id="mMovCaja"><div class="md"><div class="mh"><div class="mt2">💵 Movimiento manual de caja</div><button class="xbtn" onclick="closeM('mMovCaja')">✕</button></div>
+<div class="mb" id="mMovCaja"><div class="md"><div class="mh"><div class="mt2">💵 Otro ingreso / egreso</div><button class="xbtn" onclick="closeM('mMovCaja')">✕</button></div>
 <div class="mc">
-<div class="fr"><div><label>Caja</label><select id="mcCaja"><option value="servicio">🔧 Servicio técnico</option><option value="accesorios">📦 Accesorios</option><option value="equipos">📱 Equipos</option><option value="general">💼 General</option></select></div><div><label>Tipo</label><select id="mcTipo"><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option><option value="transferencia">Transferencia entre cajas</option></select></div></div>
+<div class="fr"><div><label>Tipo</label><select id="mcTipo"><option value="ingreso">⬆ Ingreso</option><option value="egreso">⬇ Egreso</option></select></div><div><label>Caja</label><select id="mcCaja"><option value="general">💼 General</option><option value="servicio">✂ Servicios</option><option value="accesorios">📦 Productos</option><option value="equipos">📱 Equipos</option></select></div></div>
 <div class="fr"><div><label>Monto ($)</label><input type="number" id="mcMonto" placeholder="0"></div><div><label>Fecha</label><input type="date" id="mcFec"></div></div>
-<div class="fr full"><div><label>Concepto</label><input id="mcConc" placeholder="Ej: Retiro para gastos..."></div></div>
+<div class="fr full"><div><label>Concepto</label><input id="mcConc" placeholder="Ej: Retiro para gastos, venta extra..."></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mMovCaja')">Cancelar</button><button class="btn bg" onclick="saveMovCaja()">Guardar</button></div></div></div>
 
 <!-- Inversor -->
@@ -2070,8 +2071,14 @@ async function precargarServiciosTenant(tenantId, rubro, nombre){
   if(r.includes('barberia')||r.includes('barbería')) tipo = 'barberia';
   else if(r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')) tipo = 'salon';
   else if(r.includes('telefonia')||r.includes('telefonía')||r.includes('tecnico')||r.includes('técnico')) tipo = 'telefonia';
-  
+
   if(!tipo) return; // Rubro desconocido, no precargar
+
+  // Verificar si ya existen servicios para este tenant (evitar duplicados)
+  try {
+    const { count } = await sb.from('precios').select('*', {count:'exact', head:true}).eq('tenant_id', tenantId);
+    if(count && count > 0) return; // Ya tiene precios, no precargar
+  } catch(e){}
 
   const servicios = SERVICIOS_POR_RUBRO[tipo];
   const base = Date.now();
@@ -2552,7 +2559,7 @@ function openM(id, editId){
     el.querySelectorAll('input:not([type=checkbox]):not([type=color])').forEach(i=>{ if(i.id!=='vFec') i.value=''; });
     el.querySelectorAll('select').forEach(s=>s.selectedIndex=0);
     el.querySelectorAll('textarea').forEach(t=>t.value='');
-    if(id==='mPrecio') el.querySelector('.mt2').textContent='Agregar Servicio';
+    if(id==='mPrecio'){ el.querySelector('.mt2').textContent='Agregar Servicio'; initPrCatSelect(''); }
   }
   el.classList.add('open');
   if(editId) fillModalEdit(id, editId);
@@ -2588,7 +2595,7 @@ function fillModalEdit(modal, id){
     updateGarantiaVence();calcGanTaller();}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
   if(modal==='mGasto'){const g=S.gastos.find(x=>x.id===id);if(!g)return;document.getElementById('gId').value=id;document.getElementById('gCon').value=g.concepto;document.getElementById('gTip').value=g.tipo;document.getElementById('gMon').value=g.monto;document.getElementById('gFec').value=g.fecha;document.getElementById('gNot').value=g.notas||'';}
-  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id);if(!p)return;document.getElementById('mPrecio').querySelector('.mt2').textContent='Editar Servicio';document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDisp').value=p.disponibilidad||'disponible';document.getElementById('prNot').value=p.notas||'';}
+  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id)||S.precios.find(x=>String(x.id)===String(id));if(!p)return;document.getElementById('mPrecio').querySelector('.mt2').textContent='Editar Servicio';initPrCatSelect(p.categoria||'');document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDisp').value=p.disponibilidad||'disponible';document.getElementById('prCat').value=p.categoria||'';document.getElementById('prNot').value=p.notas||'';}
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';}
 }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }
@@ -3273,11 +3280,27 @@ function rGastos(){
 }
 
 // ═══ PRECIOS ═══
+function initPrCatSelect(valorActual){
+  const sel = document.getElementById('prCat');
+  if(!sel) return;
+  const rub = (currentTenant?.rubro||'').toLowerCase();
+  const esBarber = /barber/i.test(rub);
+  const esSalon = esBarber || /salon|belleza|peluq|manicur/i.test(rub);
+  let opts;
+  if(esBarber) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'barba',l:'🪒 Barba'},{v:'coloracion',l:'🎨 Coloración'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'otro',l:'🔧 Otros'}];
+  else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'manicuria',l:'💅 Manicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
+  else opts = [{v:'',l:'— Sin categoría'},{v:'pantalla',l:'📱 Pantallas'},{v:'tapa',l:'🔲 Tapas'},{v:'bateria',l:'🔋 Baterías'},{v:'conector',l:'🔌 Conectores'},{v:'camara',l:'📸 Cámaras'},{v:'otro',l:'🔧 Otros'}];
+  sel.innerHTML = opts.map(o=>`<option value="${o.v}"${o.v===valorActual?' selected':''}>${o.l}</option>`).join('');
+  // Adapt label
+  const lbl = document.getElementById('prModLabel');
+  if(lbl) lbl.textContent = (esBarber||esSalon) ? 'Sector' : 'Modelo / Tipo compatible';
+}
+
 async function savePrecio(){
   const id=document.getElementById('prId').value;
   const n=document.getElementById('prNom').value.trim();if(!n)return alert('Ingresá el nombre del servicio');
   const snap=JSON.parse(JSON.stringify(S.precios));
-  const obj={nombre:n,modelo:document.getElementById('prMod').value,precio:parseFloat(document.getElementById('prPre').value)||0,disponibilidad:document.getElementById('prDisp').value,notas:document.getElementById('prNot').value};
+  const obj={nombre:n,modelo:document.getElementById('prMod').value,categoria:document.getElementById('prCat').value,precio:parseFloat(document.getElementById('prPre').value)||0,disponibilidad:document.getElementById('prDisp').value,notas:document.getElementById('prNot').value};
   if(id){
     const i=S.precios.findIndex(p=>p.id===parseInt(id));
     if(i>-1){S.precios[i]={...S.precios[i],...obj};await dbUpsert('precios',S.precios[i]);pushUndo('Editar precio','precios',snap);}
@@ -3348,10 +3371,15 @@ function setupPreciosTabs(){
   }
 }
 
+function tenantSlug(nombre){
+  return (nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'')||'mi-negocio';
+}
+
 function rPreciosLink(){
   const box = document.getElementById('preciosLinkBox');
   if(!box || !currentTenant?.id) return;
-  const link = window.location.origin + window.location.pathname + '?precios=' + currentTenant.id;
+  const slug = tenantSlug(currentTenant.nombre||'');
+  const link = window.location.origin + window.location.pathname + '?precios=' + slug;
   window.__preciosPublicLink = link;
   box.innerHTML = `<div style="background:var(--gld2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div style="min-width:0">
@@ -3370,7 +3398,7 @@ function rPrecios(){
   // Init link banner
   const box = document.getElementById('preciosLinkBox');
   if(box && currentTenant && !box.innerHTML){
-    const pLink = window.location.origin + window.location.pathname + '?precios=' + currentTenant.id;
+    const pLink = window.location.origin + window.location.pathname + '?precios=' + tenantSlug(currentTenant.nombre||'');
     box.innerHTML = `<div style="background:var(--gld3);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <div style="flex:1;min-width:180px">
         <div style="font-size:.72rem;color:var(--gld);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px">🌐 Lista pública de precios</div>
@@ -3438,13 +3466,24 @@ function rPrecios(){
     'conector':    /conector|carga|puerto/i,
     'otro':        /.*/
   };
-  let items = S.precios.filter(p=>{
+  // Deduplicar por nombre: si hay duplicados (onboarding precio:0 + manual con precio), conservar el mayor precio
+  const dedupPr = new Map();
+  S.precios.forEach(p=>{
+    const key = (p.nombre||'').trim().toLowerCase();
+    const prev = dedupPr.get(key);
+    if(!prev || (parseFloat(p.precio)||0) > (parseFloat(prev.precio)||0)) dedupPr.set(key, p);
+  });
+  let items = Array.from(dedupPr.values()).filter(p=>{
     const n = norm(p.nombre);
     const matchQ = !q || n.includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
     let matchF = !prFilt;
     if(!matchF){
-      const kw = prCatKw[norm(prFilt)];
-      matchF = kw ? kw.test(p.nombre) : n.includes(norm(prFilt));
+      // Use explicit categoria field first, then keyword fallback
+      if(p.categoria && p.categoria === prFilt){ matchF = true; }
+      else {
+        const kw = prCatKw[norm(prFilt)];
+        matchF = kw ? kw.test(p.nombre) : n.includes(norm(prFilt));
+      }
     }
     return matchQ && matchF;
   });
@@ -3574,6 +3613,7 @@ function rDash(){
   const cnt={};S.ventas.forEach(v=>{cnt[v.nombre]=(cnt[v.nombre]||0)+v.cantidad;});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topS').innerHTML=top.length?top.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${n}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} uds</div></div>`).join(''):emp('📉','Sin ventas registradas');
+  const topSCard=document.getElementById('topSCard');if(topSCard)topSCard.style.display=esBarberiaD?'none':'';
   const als=[];
   const stockBajoItems=[...new Map(S.stock.filter(s=>s.cantidad<=s.minimo).map(s=>[s.nombre,s])).values()].slice(0,5);
   stockBajoItems.forEach(s=>als.push({t:'w',m:`<strong>${s.nombre}</strong>: stock bajo (${s.cantidad} uds)`}));
@@ -3808,7 +3848,14 @@ function getCajas(){
   const hoy=tod();
   S.ventas.filter(v=>v.fecha===hoy).forEach(v=>{if(v.tipo==='servicio')cajas.servicio+=v.total||0;else if(v.tipo==='producto')cajas.accesorios+=v.total||0;else if(v.tipo==='equipo')cajas.equipos+=v.comision||v.total||0;});
   S.gastos.filter(g=>g.fecha===hoy).forEach(g=>{const c=g.caja||'general';cajas[c]-=g.monto||0;});
-  (S.movCaja||[]).forEach(m=>{if(m.tipo==='ingreso')cajas[m.caja]+=m.monto||0;else if(m.tipo==='egreso')cajas[m.caja]-=m.monto||0;});
+  (S.movCaja||[]).filter(m=>(!m.fecha||m.fecha===hoy)).forEach(m=>{if(m.tipo==='ingreso')cajas[m.caja]+=m.monto||0;else if(m.tipo==='egreso')cajas[m.caja]-=m.monto||0;});
+  // Reparaciones entregadas hoy
+  S.reparaciones.filter(r=>r.estado==='entregado'&&(r.fechaEnt||r.fecha)===hoy).forEach(r=>{cajas.servicio+=r.presupuesto||0;});
+  // Turnos terminados hoy (salones/barberías)
+  const rub=(currentTenant?.rubro||'').toLowerCase();
+  if(/barber|salon|belleza|peluq/i.test(rub)&&typeof getTurnos==='function'){
+    getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').forEach(t=>{cajas.servicio+=parseFloat(t.precio)||0;});
+  }
   return cajas;
 }
 
@@ -4993,6 +5040,26 @@ function editarTurno(id){
   if(document.getElementById('turnoPrecio')) document.getElementById('turnoPrecio').value = t.precio||0;
   document.getElementById('mTurnoTitle').textContent = 'Editar turno';
   document.getElementById('turnoConflicto').style.display='none';
+  // Fidelización: mostrar alerta si el cliente completó umbral de visitas
+  const fidelAlert = document.getElementById('fidelTurnoAlert');
+  const fidelMsg = document.getElementById('fidelTurnoMsg');
+  const fidelBtn = document.getElementById('fidelResetBtn');
+  if(fidelAlert && t.cliente){
+    const rub=(currentTenant?.rubro||'').toLowerCase();
+    const esSalonF=/barber|salon|belleza|peluq|manicur/i.test(rub);
+    if(esSalonF){
+      const umbral=parseInt(dbGetConfig('fidelUmbral')||'10');
+      const ficha=getFichaCli(t.cliente);
+      const totalVisitas=getTurnos().filter(x=>x.cliente===t.cliente&&x.estado==='terminado').length;
+      const resetOffset=parseInt(ficha.fidelVisitasAlReset||0);
+      const visitasActivas=totalVisitas-resetOffset;
+      if(umbral>0&&visitasActivas>0&&visitasActivas%umbral===0){
+        fidelAlert.style.display='flex';
+        if(fidelMsg)fidelMsg.innerHTML=`🎁 <strong>${esc(t.cliente)}</strong> completó <strong>${visitasActivas}</strong> visitas — ¡ofrecele su premio!`;
+        if(fidelBtn){fidelBtn.dataset.nombre=t.cliente;fidelBtn.dataset.visitas=totalVisitas;}
+      }else{fidelAlert.style.display='none';}
+    }else{if(fidelAlert)fidelAlert.style.display='none';}
+  }
   updateDuracionTurno();
   openM('mTurno', null);
 }
@@ -5696,7 +5763,7 @@ async function persistCfgToSupabase(){
   const rowId = _cfgRowId(currentTenant.id);
   const row = {
     id: rowId,
-    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __fichasCli: getFichasCli(), __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'' },
+    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __fichasCli: getFichasCli(), __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: tenantSlug(currentTenant.nombre||'') },
     tenant_id: currentTenant.id
   };
   try {
@@ -6221,7 +6288,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
         ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
         ${oc.direccion ? `<div style="font-size:.75rem;color:#a89880;margin-top:8px">📍 ${esc(oc.direccion)}</div>` : ''}
       </div>
-      ${oc.mensaje ? `<div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">${esc(oc.mensaje)}</div>` : ''}
+      <div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">${esc(oc.mensaje||'¡Bienvenido! 👋 Reservá tu turno de forma rápida y sencilla. Elegí el servicio, el profesional y el horario que mejor te quede. ¡Nos alegra tenerte!')}</div>
 
       <!-- CONTENT -->
       <div style="max-width:720px;margin:0 auto;padding:24px 16px 48px">
@@ -6342,7 +6409,7 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     .eq('fecha', fecha)
     .in('estado', ['confirmado','bloqueado','pendiente']);
 
-  const ocupados = new Set((solicitudes||[]).map(s=>s.hora));
+  const ocupados = new Set((solicitudes||[]).map(s=>(s.hora||'').substring(0,5)));
 
   // Get turnos fijos bloqueados
   const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
@@ -8302,6 +8369,14 @@ function getClientes(){
   return Object.values(mapa).sort((a,b)=>b.ultimaVisita.localeCompare(a.ultimaVisita));
 }
 
+function resetFidelCli(nombre, visitasTotales){
+  if(!nombre) return;
+  saveFichaCli(nombre, {fidelVisitasAlReset: parseInt(visitasTotales)||0});
+  const fidelAlert = document.getElementById('fidelTurnoAlert');
+  if(fidelAlert) fidelAlert.style.display='none';
+  showToast('Premio marcado como entregado ✓');
+}
+
 function saveFidelUmbral(){
   const v = parseInt(document.getElementById('fidelUmbral')?.value||'10');
   if(v>0) dbSetConfig('fidelUmbral', v);
@@ -8346,13 +8421,23 @@ function abrirFichaCli(nombre){
       </div>`).join('')
     : `<div style="font-size:.78rem;color:var(--mut)">Sin servicios registrados aún</div>`;
 
+  // Fidelización check para el overlay
+  const umbralFidel=parseInt(dbGetConfig('fidelUmbral')||'10');
+  const resetOffset=parseInt(ficha.fidelVisitasAlReset||0);
+  const visitasActivas=cli.visitas-resetOffset;
+  const mostrarFidel=umbralFidel>0&&visitasActivas>0&&visitasActivas%umbralFidel===0;
+
   const html = `
   <div style="padding:20px">
+    ${mostrarFidel?`<div style="background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div>🎁 <strong style="color:var(--gld)">${esc(cli.nombre)}</strong> completó <strong style="color:var(--gld)">${visitasActivas}</strong> visitas — ¡ofrecele su premio!</div>
+      <button class="btn bsm" onclick="resetFidelCli('${nombre.replace(/'/g,"\\'")}',${cli.visitas});document.getElementById('fichaCliOverlay').remove();rClientes();" style="border:1px solid var(--gld);color:var(--gld);font-size:.72rem">✓ Premio entregado</button>
+    </div>`:''}
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="width:48px;height:48px;background:var(--gld3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">👤</div>
       <div>
         <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700">${esc(cli.nombre)}</div>
-        <div style="font-size:.75rem;color:var(--tx2)">${cli.visitas} visita${cli.visitas!==1?'s':''} · Última: ${cli.ultimaVisita?fD(cli.ultimaVisita):'—'} · Total: ${fmt(cli.gasto)}</div>
+        <div style="font-size:.75rem;color:var(--tx2)">${cli.visitas} visita${cli.visitas!==1?'s':''} · Activas: ${visitasActivas} · Última: ${cli.ultimaVisita?fD(cli.ultimaVisita):'—'} · Total: ${fmt(cli.gasto)}</div>
       </div>
     </div>
     ${ficha.colorCodigo?`<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:20px;padding:4px 12px;font-size:.78rem;margin-bottom:14px"><span style="color:var(--gld)">🎨</span><strong style="color:var(--gld)">${esc(ficha.colorCodigo)}</strong></div>`:''}
@@ -9162,7 +9247,19 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
   const preciosParam = urlParams.get('precios');
   if(preciosParam){
     document.getElementById('loadingScreen').style.display='none';
-    const { data: rows } = await sb.from('precios').select('data').eq('tenant_id', preciosParam);
+    // Detectar si es UUID o slug
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(preciosParam);
+    let preciosTenantId = isUUID ? preciosParam : null;
+    if(!preciosTenantId){
+      // Buscar por slug en filas cfg de precios (tabla pública)
+      const { data: slugRows } = await sb.from('precios').select('tenant_id').contains('data', {__slug: preciosParam, __tipo: 'cfg'}).limit(1);
+      if(slugRows?.[0]) preciosTenantId = slugRows[0].tenant_id;
+    }
+    if(!preciosTenantId){
+      document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Outfit\',sans-serif"><div style="text-align:center;color:#a89880"><div style="font-size:3rem;margin-bottom:12px">🔍</div><div style="font-size:.9rem">No se encontró este negocio.</div></div></div>';
+      return;
+    }
+    const { data: rows } = await sb.from('precios').select('data').eq('tenant_id', preciosTenantId);
     if(!rows || !rows.length){
       document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:\'Outfit\',sans-serif"><div style="text-align:center;color:#a89880"><div style="font-size:3rem;margin-bottom:12px">🔍</div><div style="font-size:.9rem">No se encontraron precios para este negocio.</div></div></div>';
       return;
@@ -9170,7 +9267,7 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     const cfgRow = rows.find(r=>r.data?.__tipo==='cfg');
     const cfg = cfgRow?.data || {};
     const items = rows.filter(r=>r.data && !r.data.__tipo).map(r=>r.data).filter(Boolean);
-    mostrarPreciosPublicos(preciosParam, items, cfg);
+    mostrarPreciosPublicos(preciosTenantId, items, cfg);
     return;
   }
 

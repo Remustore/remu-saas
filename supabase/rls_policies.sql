@@ -195,13 +195,19 @@ CREATE POLICY "movimientos_inv_tenant_all" ON movimientos_inv
 -- ══════════════════════════════════════════════
 -- TABLA: turnos_solicitudes
 -- INSERT público (clientes sin cuenta piden turno online).
--- SELECT/UPDATE/DELETE sólo para el tenant.
+-- SELECT público (para que la página de booking muestre slots ocupados sin login).
+-- UPDATE/DELETE sólo para el tenant.
 -- ══════════════════════════════════════════════
 ALTER TABLE turnos_solicitudes ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "turnos_solicitudes_insert_public" ON turnos_solicitudes;
 CREATE POLICY "turnos_solicitudes_insert_public" ON turnos_solicitudes
   FOR INSERT WITH CHECK (true);
+
+-- SELECT público: necesario para que el booking online muestre horarios ocupados
+DROP POLICY IF EXISTS "turnos_solicitudes_select_public" ON turnos_solicitudes;
+CREATE POLICY "turnos_solicitudes_select_public" ON turnos_solicitudes
+  FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "turnos_solicitudes_tenant_manage" ON turnos_solicitudes;
 CREATE POLICY "turnos_solicitudes_tenant_manage" ON turnos_solicitudes
