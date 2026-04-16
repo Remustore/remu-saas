@@ -135,14 +135,14 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;m
 #sb{position:fixed;left:0;top:0;bottom:0;width:215px;background:var(--sur);border-right:1px solid var(--bor);display:none;flex-direction:column;z-index:200;transition:transform .3s;overflow-y:auto;}
 .la{padding:24px 20px 18px;border-bottom:1px solid var(--bor);}
 .lm{font-family:var(--fh);font-size:1rem;font-weight:800;color:var(--gld);letter-spacing:1px;line-height:1.2;word-break:break-word;}
-.ls{font-size:.6rem;color:var(--mut);letter-spacing:3px;text-transform:uppercase;margin-top:3px;}
-.ns{padding:16px 13px 5px;font-size:.59rem;color:var(--mut);letter-spacing:2px;text-transform:uppercase;}
-.ni{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:2px 7px;border-radius:7px;cursor:pointer;color:var(--tx2);font-size:.81rem;font-weight:500;transition:all .15s;border:1px solid transparent;}
+.ls{font-size:.6rem;color:var(--tx2);letter-spacing:3px;text-transform:uppercase;margin-top:3px;}
+.ns{padding:16px 13px 5px;font-size:.59rem;color:var(--tx2);letter-spacing:2px;text-transform:uppercase;}
+.ni{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:2px 7px;border-radius:7px;cursor:pointer;color:var(--tx);font-size:.81rem;font-weight:500;transition:all .15s;border:1px solid transparent;}
 .nav-badge{background:var(--bad);color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:auto;min-width:18px;text-align:center;}
 .ni:hover{background:var(--car);color:var(--tx);}
 .ni.active{background:var(--gld2);color:var(--gld);border-color:rgba(201,168,76,.2);}
 .nico{font-size:.9rem;width:17px;text-align:center;}
-.sbf{margin-top:auto;padding:14px 16px;border-top:1px solid var(--bor);font-size:.67rem;color:var(--mut);line-height:1.7;}
+.sbf{margin-top:auto;padding:14px 16px;border-top:1px solid var(--bor);font-size:.67rem;color:var(--tx2);line-height:1.7;}
 .logout-btn{display:flex;align-items:center;gap:7px;padding:8px 12px;margin:6px 7px;border-radius:7px;cursor:pointer;color:var(--bad);font-size:.78rem;font-weight:500;background:rgba(201,82,76,.07);border:1px solid rgba(201,82,76,.15);}
 .logout-btn:hover{background:rgba(201,82,76,.15);}
 
@@ -677,9 +677,9 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico">⏳</span>Lista de espera</div>
   <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico">🎯</span>Objetivos de compra</div>
   <div class="sbf" id="sbFooter">
-    <div style="font-weight:600;margin-bottom:4px;color:var(--tx2)" id="sbBizName"></div>
+    <div style="font-weight:600;margin-bottom:4px;color:var(--tx)" id="sbBizName"></div>
     <div id="sbUserEmail" style="margin-bottom:10px"></div>
-    <div style="color:var(--mut);font-size:.62rem;margin-bottom:8px" id="sbUndoInfo">Último cambio revertible</div>
+    <div style="color:var(--tx2);font-size:.62rem;margin-bottom:8px" id="sbUndoInfo">Último cambio revertible</div>
     <span onclick="doUndo()" style="color:var(--gld);cursor:pointer;font-size:.73rem">↩ Deshacer</span>
   </div>
   <div class="logout-btn" onclick="doLogout()">⎋ Cerrar sesión</div>
@@ -701,8 +701,8 @@ textarea{resize:vertical;min-height:70px;}
     <div class="tb-right">
       <div class="tb-date" id="tbDate"></div>
       <div class="tb-sync"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">Conectado</span></div>
-      <div class="tb-user" id="tbUser"></div><button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bor2);color:var(--tx2);padding:5px 10px;border-radius:7px;font-size:.75rem;cursor:pointer;margin-left:8px" title="Alternar modo">🌙</button>
-      <button style="background:none;border:1px solid var(--bor);color:var(--tx2);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" onclick="descargarBackup()">💾</button>
+      <div class="tb-user" id="tbUser"></div><button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bor2);color:var(--tx);padding:5px 10px;border-radius:7px;font-size:.75rem;cursor:pointer;margin-left:8px" title="Alternar modo">🌙</button>
+      <button style="background:none;border:1px solid var(--bor);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" onclick="descargarBackup()">💾</button>
     </div>
   </div>
 
