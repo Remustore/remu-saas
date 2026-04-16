@@ -1133,9 +1133,9 @@ textarea{resize:vertical;min-height:70px;}
         <input id="onlineInsta" placeholder="@tu_salon" style="margin-bottom:10px">
         <label>Dirección</label>
         <input id="onlineDireccion" placeholder="Ej: Av. San Martín 1234, Marcos Juárez" style="margin-bottom:10px">
-        <label>Teléfono / WhatsApp del negocio</label>
-        <input id="onlineTel" type="tel" placeholder="Ej: 1145678901 (sin +54, sin 0)" style="margin-bottom:4px">
-        <div style="font-size:.72rem;color:var(--mut)">Se muestra como botón "💬 Hablar con un asesor" en la página de turnos online.</div>
+        <label>Número de WhatsApp del negocio</label>
+        <input id="onlineTel" type="tel" placeholder="Ej: 5493472628087" style="margin-bottom:4px">
+        <div style="font-size:.72rem;color:var(--mut)">Ingresá tu número con código de país, ej: <strong>5493472628087</strong> (54 = Argentina, 9 = celular, luego el número sin 0 ni 15). Se usa en el botón "💬 Hablar con un asesor" de la página pública, recordatorios a clientes y avisos al equipo.</div>
         <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
@@ -6605,7 +6605,7 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
     ${(()=>{
       const waTel = (cfg.tel||'').replace(/\D/g,'');
       const waMsg = encodeURIComponent('Hola! Quisiera consultar antes de reservar mi turno en ' + (tenant.nombre||'') + ' 😊');
-      const waHref = waTel ? 'https://wa.me/549' + waTel + '?text=' + waMsg : 'https://api.whatsapp.com/send?text=' + waMsg;
+      const waHref = waTel ? 'https://wa.me/' + waTel + '?text=' + waMsg : 'https://api.whatsapp.com/send?text=' + waMsg;
       return `<a href="${waHref}" target="_blank"
          style="position:fixed;bottom:24px;right:20px;display:flex;align-items:center;gap:10px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:50px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.88rem;box-shadow:0 4px 20px rgba(37,211,102,.5);z-index:999;transition:transform .15s"
          onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
@@ -9405,6 +9405,10 @@ function aplicarModulosPorRubro(rubro){
     showNav('nav-taller','nav-stock','nav-ventas','nav-turnos','nav-turnosOnline',
             'nav-clientes','nav-gastos','nav-analisis','nav-precios');
   }
+
+  // Ocultar tab "Servicios" en Análisis para barberías/salones (no aplica reparaciones)
+  const tabRep = document.getElementById('tabRep');
+  if(tabRep) tabRep.style.display = (esBarberia || esSalon) ? 'none' : '';
 }
 
 function applyBranding(){
