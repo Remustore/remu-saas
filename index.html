@@ -322,7 +322,7 @@ textarea{resize:vertical;min-height:70px;}
   
   /* Tablas → scroll horizontal */
   .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  table{min-width:500px;}
+  table{min-width:360px;}
   th,td{padding:8px 8px;font-size:.75rem;}
   
   /* Botones más grandes para touch */
@@ -344,7 +344,7 @@ textarea{resize:vertical;min-height:70px;}
   
   /* Formularios */
   .fr{grid-template-columns:1fr;}
-  input,select,textarea{font-size:16px;} /* evita zoom en iOS */
+  input,select,textarea{font-size:16px !important;} /* evita zoom en iOS — !important para overridear inline styles */
   
   /* Undo bar */
   #undoBar{width:90%;left:5%;transform:none;bottom:16px;}
@@ -413,6 +413,48 @@ textarea{resize:vertical;min-height:70px;}
 /* Nav item seleccionado — dorado más visible en mobile */
 @media(max-width:768px){
   .ni.active{background:var(--gld2);border-left:3px solid var(--gld);padding-left:13px;}
+}
+
+/* ── MOBILE RESPONSIVE v2 ── */
+@media(max-width:768px){
+  /* Botones pequeños: forzar touch target mínimo */
+  .bsm{min-height:40px;display:inline-flex;align-items:center;justify-content:center;}
+
+  /* Botón cerrar modal: touch target 44px */
+  .xbtn{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;}
+
+  /* Modal: padding más compacto */
+  .mh{padding:13px 14px;}
+  .mc{padding:14px 14px;}
+
+  /* Modal footer: apilar botones en vertical */
+  .mf{flex-direction:column;gap:8px;padding:12px 14px;}
+  .mf .btn{width:100%;justify-content:center;}
+
+  /* Tab buttons: touch target mínimo */
+  .tab{min-height:36px;display:inline-flex;align-items:center;justify-content:center;}
+
+  /* Superadmin: evitar zoom en iOS */
+  .sa-form input,.sa-form select{font-size:16px !important;}
+
+  /* Login box: menos padding en pantallas chicas */
+  .login-box{padding:28px 20px;}
+
+  /* Topbar: título con truncado para no comprimir botones */
+  .tb-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.95rem;}
+  .topbar{gap:8px;}
+
+  /* Vista semanal: scroll horizontal (7 columnas no caben en 390px) */
+  #turnosSemana{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  /* Agenda: date input full width en mobile */
+  #turnosFecha{max-width:none !important;flex:1;}
+
+  /* Stat chips en agenda: tamaño mínimo para no desbordarse */
+  #turnosDayStats .stat{min-width:80px !important;}
+
+  /* Modales con max-width inline: que no se salgan en mobile */
+  .md[style*="max-width"]{max-width:calc(100vw - 0px) !important;}
 }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -5733,7 +5775,7 @@ function rTurnosSemana(){
   const cfg = getTurnosCfg();
   const estadoColors = {confirmado:'var(--inf)',llego:'var(--ok)',en_proceso:'var(--wrn)',terminado:'var(--mut)',no_vino:'var(--bad)'};
 
-  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
+  el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div style="min-width:560px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px">
     ${dias.map((d,i)=>{
       const esHoy = d===tod();
       return `<div style="text-align:center;padding:6px 4px;font-size:.72rem;font-weight:${esHoy?700:400};color:${esHoy?'var(--gld)':'var(--tx2)'}">
@@ -5754,7 +5796,7 @@ function rTurnosSemana(){
         ${!turnos.length?`<div style="color:var(--mut);font-size:.65rem;text-align:center;margin-top:8px">—</div>`:''}
       </div>`;
     }).join('')}
-  </div>`;
+  </div></div></div>`;
 }
 
 function rTurnosCalendario(){
