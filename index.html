@@ -6,8 +6,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#080808">
-<title id="pageTitle">Sistema de Gestión</title>
+<meta name="apple-mobile-web-app-title" content="Remu">
+<meta name="theme-color" content="#c9a84c">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<title id="pageTitle">Remu Gestión</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <meta name="description" content="Sistema de gestión para barberías, salones de belleza y talleres. Turnos, caja, precios, clientes y más.">
 <meta property="og:title" content="Remu Gestión">
@@ -475,7 +479,7 @@ textarea{resize:vertical;min-height:70px;}
     <div style="color:#a89880;font-size:.95rem;line-height:1.7;margin-bottom:28px">Los 30 días gratuitos finalizaron. Para seguir usando el sistema y no perder tus datos, activá tu suscripción.</div>
     <div style="background:#141414;border:1px solid #242424;border-radius:14px;padding:24px;margin-bottom:20px;text-align:left">
       <div style="font-size:.7rem;color:#e0d5c5;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px">Tu plan</div>
-      <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c">$8.000 <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span></div>
+      <div id="trialPrecioDisplay" style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c">$8.000 <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span></div>
       <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Todos tus datos guardados</div>
         <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones incluidas</div>
@@ -671,14 +675,33 @@ textarea{resize:vertical;min-height:70px;}
 
     <!-- MP CONFIG -->
     <div class="sa-card" style="margin-top:20px">
-      <h3>💳 Configuración de cobro</h3>
-      <p style="font-size:.8rem;color:var(--mut);margin-bottom:12px">Link de pago de Mercado Pago para la pantalla de trial vencido. Crealo desde tu cuenta MP (mpago.la o Checkout Pro).</p>
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="saInputMpLink" type="url" placeholder="https://mpago.la/tu-link-de-cobro"
-          style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.82rem;outline:none">
-        <button class="sa-btn" style="margin:0;white-space:nowrap" onclick="guardarMpLink()">Guardar</button>
+      <h3>💳 Configuración de Mercado Pago</h3>
+      <p style="font-size:.78rem;color:var(--mut);margin-bottom:14px;line-height:1.6">
+        Configurá el cobro de suscripciones. El link de pago se muestra cuando el trial vence.<br>
+        <strong style="color:var(--tx2)">Cómo crear el link:</strong> MP Dashboard → Cobrar → Crear link de pago → copiá la URL.
+      </p>
+
+      <div class="sa-form">
+        <label>Access Token de Mercado Pago <span style="color:var(--mut);font-weight:400">(se guarda cifrado)</span></label>
+        <input id="saInputMpToken" type="password" placeholder="APP_USR-..." autocomplete="off">
+
+        <label>Link de pago (Checkout Pro / mpago.la)</label>
+        <input id="saInputMpLink" type="url" placeholder="https://mpago.la/tu-link-de-cobro">
+
+        <label>Precio de suscripción (ARS)</label>
+        <input id="saInputMpPrecio" type="number" placeholder="8000" value="8000">
+
+        <div style="margin-top:6px;padding:10px;background:rgba(76,142,201,.08);border:1px solid rgba(76,142,201,.2);border-radius:7px;font-size:.75rem;color:var(--tx2);line-height:1.5">
+          💡 <strong>URL de retorno</strong> que tenés que configurar en MP:<br>
+          <code id="mpReturnUrl" style="color:var(--gld);word-break:break-all"></code>
+        </div>
       </div>
-      <div id="saMpMsg" style="font-size:.75rem;color:var(--ok);margin-top:6px;display:none">✓ Link guardado</div>
+
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="sa-btn" style="margin:0;flex:1" onclick="guardarMpLink()">💾 Guardar configuración</button>
+        <button class="sa-btn outline" style="margin:0" onclick="loadMpConfig()">↻ Cargar</button>
+      </div>
+      <div id="saMpMsg" style="font-size:.75rem;margin-top:8px;display:none"></div>
     </div>
 
     <!-- STATS -->
@@ -1882,6 +1905,7 @@ async function doLogin(){
       document.getElementById('superadminScreen').style.display='flex';
       loadTenants();
       loadSaStats();
+      loadMpConfig();
       return;
     }
 
@@ -2371,53 +2395,150 @@ async function extenderTrial(id){
   showSaMsg('✓ Trial extendido 30 días más','ok'); loadTenants();
 }
 
-// Guarda el link de MP en localStorage (sólo superadmin)
-function guardarMpLink(){
-  const val = (document.getElementById('saInputMpLink')?.value||'').trim();
-  if(!val){ alert('Ingresá un link válido'); return; }
-  localStorage.setItem('remu_mp_link', val);
-  const msg = document.getElementById('saMpMsg');
-  if(msg){ msg.style.display='block'; setTimeout(()=>msg.style.display='none', 3000); }
+// ── MERCADO PAGO CONFIG (Superadmin) ──────────────────────────────────
+const MP_GLOBAL_ROW_ID = 7777777; // ID fijo para el row global de config en Supabase
+
+async function guardarMpLink(){
+  const link  = (document.getElementById('saInputMpLink')?.value||'').trim();
+  const token = (document.getElementById('saInputMpToken')?.value||'').trim();
+  const precio = parseInt(document.getElementById('saInputMpPrecio')?.value||'8000')||8000;
+  if(!link){ alert('Ingresá el link de pago de Mercado Pago'); return; }
+
+  // 1. Guardar en localStorage (fallback offline)
+  localStorage.setItem('remu_mp_link', link);
+  localStorage.setItem('remu_mp_precio', String(precio));
+  if(token) localStorage.setItem('remu_mp_token', token);
+
+  // 2. Guardar en Supabase (accesible por todos los tenants)
+  const cfgData = { mp_link: link, mp_precio: precio, updated_at: new Date().toISOString() };
+  if(token) cfgData.mp_access_token = token;
+  const showMsg = (txt, ok=true) => {
+    const el = document.getElementById('saMpMsg');
+    if(!el) return;
+    el.textContent = txt;
+    el.style.color = ok ? 'var(--ok)' : 'var(--wrn)';
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+  };
+  try {
+    const { error } = await sb.from('precios').upsert({
+      id: MP_GLOBAL_ROW_ID,
+      tenant_id: '__remu_system__',
+      data: cfgData
+    }, { onConflict: 'id' });
+    if(error) throw error;
+    showMsg('✓ Configuración guardada en Supabase — disponible para todos los tenants');
+  } catch(e) {
+    console.warn('MP config save error:', e);
+    showMsg('⚠ Guardado solo localmente (Supabase: ' + (e?.message||'error') + ')');
+  }
 }
 
-// ── MERCADO PAGO ──────────────────────────────────────────────────
-// Abre el link de pago de MP y muestra el botón "Ya pagué"
-function iniciarPagoMP(){
-  const mpLink = currentTenant?.modulos?.mp_link
-    || localStorage.getItem('remu_mp_link')
-    || '';
+async function loadMpConfig(){
+  // Mostrar URL de retorno
+  const retUrl = document.getElementById('mpReturnUrl');
+  if(retUrl) retUrl.textContent = window.location.origin + window.location.pathname + '?mp_ok=1';
+
+  // Prioridad: Supabase → localStorage
+  let cfg = null;
+  try {
+    const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
+    cfg = data?.[0]?.data || null;
+  } catch(e){}
+
+  const link  = cfg?.mp_link  || localStorage.getItem('remu_mp_link')  || '';
+  const token = cfg?.mp_access_token || localStorage.getItem('remu_mp_token') || '';
+  const precio = cfg?.mp_precio || localStorage.getItem('remu_mp_precio') || '8000';
+
+  if(document.getElementById('saInputMpLink'))   document.getElementById('saInputMpLink').value = link;
+  if(document.getElementById('saInputMpToken'))  document.getElementById('saInputMpToken').value = token;
+  if(document.getElementById('saInputMpPrecio')) document.getElementById('saInputMpPrecio').value = precio;
+
+  // Actualizar precio en trial screen si está visible
+  _actualizarPrecioTrial(parseInt(precio) || 8000);
+
+  return { link, token, precio: parseInt(precio) || 8000 };
+}
+
+function _actualizarPrecioTrial(precio){
+  const el = document.getElementById('trialPrecioDisplay');
+  if(!el) return;
+  const fmt = precio.toLocaleString('es-AR');
+  el.innerHTML = `$${fmt} <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span>`;
+}
+
+async function showTrialScreen(){
+  document.getElementById('loadingScreen').style.display='none';
+  document.getElementById('trialScreen').style.display='flex';
+  // Cargar precio dinámico
+  try {
+    const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
+    const cfg = data?.[0]?.data;
+    if(cfg?.mp_precio) _actualizarPrecioTrial(parseInt(cfg.mp_precio) || 8000);
+    if(cfg?.mp_link)   localStorage.setItem('remu_mp_link', cfg.mp_link);
+  } catch(e){}
+}
+
+// ── MERCADO PAGO ────────────────────────────────────────────────────
+async function iniciarPagoMP(){
+  // 1. Buscar link: modulos del tenant → localStorage → Supabase global
+  let mpLink = currentTenant?.modulos?.mp_link || localStorage.getItem('remu_mp_link') || '';
   if(!mpLink){
-    alert('El link de pago no está configurado aún. Usá WhatsApp para activar tu suscripción.');
+    try {
+      const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
+      mpLink = data?.[0]?.data?.mp_link || '';
+      if(mpLink) localStorage.setItem('remu_mp_link', mpLink); // cachear
+    } catch(e){}
+  }
+  if(!mpLink){
+    alert('El link de pago no está configurado. Contactá soporte por WhatsApp.');
     return;
   }
+
+  // 2. Abrir checkout con ref del tenant y URL de retorno
+  const returnUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?mp_ok=1');
   const sep = mpLink.includes('?') ? '&' : '?';
-  window.open(mpLink + sep + 'ref=' + (currentTenant?.id||''), '_blank');
-  // Mostrar botón "Ya pagué" tras 4 segundos
-  setTimeout(()=>{
+  window.open(mpLink + sep + 'ref=' + (currentTenant?.id||'') + '&back_url=' + returnUrl, '_blank');
+
+  // 3. Mostrar botón "Ya pagué" después de 5 segundos
+  setTimeout(() => {
     const btn = document.getElementById('btnYaPague');
     if(btn) btn.style.display = 'block';
-  }, 4000);
+  }, 5000);
 }
 
-// Activa el tenant por 30 días tras confirmación del usuario
+// Activa el tenant por 30 días tras confirmación manual del usuario
 async function confirmarPagoMP(){
-  if(!confirm('¿Confirmar que realizaste el pago de $8.000 ARS?\n\nSe activará tu suscripción por 30 días.')) return;
-  await activarSuscripcionTenant();
+  // Obtener precio actual desde global config
+  let precio = localStorage.getItem('remu_mp_precio') || '8.000';
+  try {
+    const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
+    if(data?.[0]?.data?.mp_precio) precio = data[0].data.mp_precio.toLocaleString('es-AR');
+  } catch(e){}
+  if(!confirm(`¿Confirmar que realizaste el pago de $${precio} ARS?\n\nSe activará tu suscripción por 30 días.`)) return;
+  await activarSuscripcionTenant('manual');
 }
 
 // Activa la suscripción del tenant actual por 30 días
-async function activarSuscripcionTenant(){
+async function activarSuscripcionTenant(origen = 'mp_ok'){
   if(!sb || !currentTenant?.id) return;
-  const nuevo = new Date(Date.now() + 30*24*60*60*1000).toISOString();
-  const mods = {...(currentTenant.modulos||{}), pago_activo: true, trial_hasta: nuevo, ultimo_pago: new Date().toISOString()};
-  const { error } = await sb.from('tenants').update({modulos: mods}).eq('id', currentTenant.id);
+  const ahora = new Date().toISOString();
+  const nuevo  = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+  const mods = {
+    ...(currentTenant.modulos||{}),
+    pago_activo: true,
+    trial_hasta: nuevo,
+    ultimo_pago: ahora,
+    ultimo_pago_origen: origen   // 'mp_ok' | 'manual' | 'superadmin'
+  };
+  const { error } = await sb.from('tenants').update({ modulos: mods }).eq('id', currentTenant.id);
   if(error){
     alert('Error al activar. Contactá soporte por WhatsApp.');
     return;
   }
   currentTenant = {...currentTenant, modulos: mods};
   document.getElementById('trialScreen').style.display = 'none';
-  showToast('✓ Suscripción activada por 30 días. ¡Gracias!');
+  showToast('✓ Suscripción activada por 30 días. ¡Gracias!', 'ok');
   setupApp();
   await loadAll();
 }
@@ -10153,8 +10274,7 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
         if(!mods.pago_activo && diasRestantes <= 0){
-          document.getElementById('loadingScreen').style.display='none';
-          document.getElementById('trialScreen').style.display='flex';
+          showTrialScreen();
           return;
         }
         if(!mods.pago_activo && diasRestantes <= 7){
@@ -10173,6 +10293,74 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     document.getElementById('loginScreen').style.display='flex';
   }
 })();
+</script>
+
+<!-- ── PWA: Banner de instalación ── -->
+<div id="pwaInstallBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#141414;border-top:2px solid rgba(201,168,76,.35);padding:14px 16px;z-index:9900;align-items:center;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,.6);font-family:'Outfit',sans-serif">
+  <img src="icon.svg" style="width:44px;height:44px;border-radius:10px;flex-shrink:0" onerror="this.style.display='none'">
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:700;font-size:.9rem;color:#f5f0e8">Instalá Remu Gestión</div>
+    <div style="font-size:.75rem;color:#a89880;margin-top:1px">Accedé rápido desde tu pantalla de inicio</div>
+  </div>
+  <button onclick="installPWA()" style="background:#c9a84c;color:#080808;border:none;padding:9px 18px;border-radius:8px;font-weight:700;font-size:.82rem;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;flex-shrink:0">Instalar</button>
+  <button onclick="dismissPWABanner()" style="background:none;border:none;color:#a89880;font-size:1.3rem;cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1">✕</button>
+</div>
+
+<script>
+// ── PWA: Service Worker ─────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => {
+        // Check for updates every 60 min
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+      })
+      .catch(e => console.warn('[SW] Registration failed:', e));
+  });
+}
+
+// ── PWA: Prompt de instalación ──────────────────────────────────────
+let _pwaInstallEvt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _pwaInstallEvt = e;
+  // No mostrar si ya instalado o fue descartado hoy
+  const dismissed = localStorage.getItem('pwa_dismissed');
+  if (dismissed && Date.now() - parseInt(dismissed) < 7 * 86400000) return;
+  setTimeout(() => {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'flex';
+  }, 4000);
+});
+
+function installPWA() {
+  if (!_pwaInstallEvt) return;
+  _pwaInstallEvt.prompt();
+  _pwaInstallEvt.userChoice.then(choice => {
+    _pwaInstallEvt = null;
+    document.getElementById('pwaInstallBanner').style.display = 'none';
+  });
+}
+
+function dismissPWABanner() {
+  document.getElementById('pwaInstallBanner').style.display = 'none';
+  localStorage.setItem('pwa_dismissed', Date.now().toString());
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('pwaInstallBanner').style.display = 'none';
+  _pwaInstallEvt = null;
+  if (typeof showToast === 'function') showToast('✓ App instalada correctamente');
+});
+
+// ── PWA: Shortcuts (?go=...) ────────────────────────────────────────
+const _pwaGo = new URLSearchParams(location.search).get('go');
+if (_pwaGo) {
+  window.addEventListener('DOMContentLoaded', () => {
+    if (typeof go === 'function') setTimeout(() => go(_pwaGo), 1500);
+  });
+}
 </script>
 </body>
 </html>

@@ -1,0 +1,43 @@
+{
+  "name": "Remu Gestión",
+  "short_name": "Remu",
+  "description": "Sistema de gestión para barberías, salones y negocios",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#c9a84c",
+  "orientation": "portrait-primary",
+  "lang": "es-AR",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Turnos de hoy",
+      "short_name": "Turnos",
+      "description": "Ver agenda del día",
+      "url": "./?go=turnos",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Nueva venta",
+      "short_name": "Venta",
+      "description": "Registrar venta rápida",
+      "url": "./?go=ventas",
+      "icons": [{ "src": "icon.svg", "sizes": "any" }]
+    }
+  ]
+}
