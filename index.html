@@ -3859,8 +3859,9 @@ function rDash(){
   document.getElementById('alerts').innerHTML=als.length?als.map(a=>`<div class="al ${a.t==='w'?'aw':a.t==='o'?'ao':'ab'}"><span>${a.t==='w'?'⚠':a.t==='o'?'✓':'✕'}</span><span>${a.m}</span></div>`).join(''):`<div class="al ai"><span>✓</span><span>Sin alertas. Todo en orden.</span></div>`;
   const bizName = currentTenant?.nombre || 'tu negocio';
   const cns=[];
-  if(mg<20&&tV>0)cns.push({i:'📊',t:'Revisá tus márgenes',d:'El margen está por debajo del 20%. Analizá subida de precios o reducción de costos de compra.'});
-  if(tV===0)cns.push({i:'💡',t:'Registrá tu primera venta',d:'Registrar cada operación te da datos reales para crecer.'});
+  if(mg<20&&ingresoFlujo>0)cns.push({i:'📊',t:'Revisá tus márgenes',d:'El margen está por debajo del 20%. Analizá subida de precios o reducción de costos de compra.'});
+  // Para barberías: "primera venta" no aplica — verificar con totalMesReal (turnos)
+  if(esBarberiaD ? totalMesReal===0 : tV===0)cns.push({i:'💡',t:esBarberiaD?'Agendá tu primer turno':'Registrá tu primera venta',d:esBarberiaD?'Agendá el primer turno del día para ver los números en tiempo real.':'Registrar cada operación te da datos reales para crecer.'});
   if(top.length>0)cns.push({i:'⭐',t:`Estrella: ${top[0][0]}`,d:`Es tu artículo más vendido. Mantené stock constante para no perder ventas.`});
   if(pct>=100)cns.push({i:'🚀',t:'¡Meta alcanzada!',d:'Excelente. Subí la meta el mes que viene y reinvertí en más stock.'});
   if(ganReal>0)cns.push({i:'🏦',t:'Resultado positivo',d:'Guardá un 20% del resultado neto como fondo de emergencia del negocio.'});
@@ -5351,7 +5352,13 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
   if(idx === -1) return;
   const turnoAntes = turnos[idx];
-  turnos[idx] = {...turnos[idx], estado: nuevoEstado};
+  // Calcular precio y metodo ANTES de guardar para persistirlos en el turno
+  const _precio = (precioExtra != null) ? precioExtra : (parseFloat(turnoAntes.precio)||0);
+  const _metodo = metodoExtra || turnoAntes.metodo || 'Efectivo';
+  const _upd = { estado: nuevoEstado };
+  // Persistir precio y metodo en el turno para que getCajas() / rDash() los lean correctamente
+  if(nuevoEstado === 'terminado' && _precio > 0){ _upd.precio = _precio; _upd.metodo = _metodo; }
+  turnos[idx] = {...turnos[idx], ..._upd};
   saveTurnosLocal(turnos);
   // Si el turno se finaliza, cancela o no vino, liberar el slot en Supabase
   if(nuevoEstado === 'terminado' || nuevoEstado === 'no_vino' || nuevoEstado === 'cancelado'){
@@ -5359,8 +5366,8 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   }
   if(nuevoEstado === 'terminado'){
     const t = turnos[idx];
-    const precio = (precioExtra != null) ? precioExtra : (parseFloat(t.precio)||0);
-    const metodo = metodoExtra || t.metodo || 'Efectivo';
+    const precio = _precio;
+    const metodo = _metodo;
     if(precio > 0){
       const rubTenantDE = (currentTenant?.rubro||'').toLowerCase();
       const esSalonBarberDE = /barber|barbería|salon|belleza/i.test(rubTenantDE);
@@ -7675,20 +7682,22 @@ function rGrafico7Dias(){
   const el = document.getElementById('grafico7dias');
   if(!el) return;
 
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esTurnos = /barberia|barbería|salon|belleza/i.test(rubro);
+
+  // Para barberías: los ingresos viven en getTurnos() — esta card no aporta datos útiles
+  const card7d = el.closest('.card');
+  if(esTurnos){ if(card7d) card7d.style.display='none'; return; }
+  if(card7d) card7d.style.display='';
+
   const dias = [];
   for(let i=6; i>=0; i--){
     const d = new Date(); d.setDate(d.getDate()-i);
     dias.push(d.toISOString().slice(0,10));
   }
 
-  const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
-
   const datos = dias.map(fecha=>{
-    // Los turnos finalizados ya crean venta tipo:'servicio' en _doEstadoTurno().
-    // Sumar turnos por separado causa doble conteo. S.ventas es la fuente de verdad.
-    const ventas = S.ventas.filter(v=>v.fecha===fecha).reduce((a,v)=>a+v.total,0);
-    return ventas;
+    return S.ventas.filter(v=>v.fecha===fecha).reduce((a,v)=>a+v.total,0);
   });
 
   const maxVal = Math.max(...datos, 1);
@@ -7717,15 +7726,29 @@ function rGraficoPagos(){
   const el = document.getElementById('graficoPagos');
   if(!el) return;
 
-  const ventas = filtrarDash(S.ventas, 'fecha');
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esTurnosPago = /barberia|barbería|salon|belleza/i.test(rubro);
 
-  if(!ventas.length){
-    el.innerHTML = '<div style="color:var(--mut);font-size:.78rem;padding:16px 0;text-align:center">Sin ventas en este período</div>';
+  // Para barberías: ingresos reales viven en getTurnos(), no en S.ventas
+  let entradas;
+  if(esTurnosPago && getTurnos){
+    const tFilt = filtrarDash(getTurnos().filter(t=>t.estado==='terminado'), 'fecha');
+    const vFilt = filtrarDash(S.ventas.filter(v=>v.tipo!=='servicio'), 'fecha');
+    entradas = [
+      ...tFilt.map(t=>({metodo: t.metodo||'Efectivo', total: t.precio||0})),
+      ...vFilt.map(v=>({metodo: v.metodo||'Efectivo', total: v.total}))
+    ];
+  } else {
+    entradas = filtrarDash(S.ventas, 'fecha').map(v=>({metodo: v.metodo||'Efectivo', total: v.total}));
+  }
+
+  if(!entradas.length){
+    el.innerHTML = '<div style="color:var(--mut);font-size:.78rem;padding:16px 0;text-align:center">Sin registros en este período</div>';
     return;
   }
 
   const metodos = {};
-  ventas.forEach(v=>{
+  entradas.forEach(v=>{
     const k = v.metodo||'Efectivo';
     metodos[k] = (metodos[k]||0) + v.total;
   });
@@ -7764,17 +7787,23 @@ function rGraficoDias(){
   const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
 
   const porDia = [0,0,0,0,0,0,0]; // Dom=0 ... Sab=6
-  
-  // Nota: para barberías/salones no se suma getTurnos() por separado porque
-  // cada turno finalizado ya genera una venta en S.ventas (tipo:'servicio').
-  S.ventas.filter(v=>v.fecha>=desde).forEach(v=>{
-    const d = new Date(v.fecha+'T00:00:00').getDay();
-    porDia[d]++;
-  });
-  S.reparaciones.filter(r=>r.fecha>=desde).forEach(r=>{
-    const d = new Date(r.fecha+'T00:00:00').getDay();
-    porDia[d]++;
-  });
+
+  if(esTurnos && getTurnos){
+    // Para barberías: contar turnos terminados (fuente real de actividad)
+    getTurnos().filter(t=>t.fecha>=desde&&t.estado==='terminado').forEach(t=>{
+      const d = new Date(t.fecha+'T00:00:00').getDay();
+      porDia[d]++;
+    });
+  } else {
+    S.ventas.filter(v=>v.fecha>=desde).forEach(v=>{
+      const d = new Date(v.fecha+'T00:00:00').getDay();
+      porDia[d]++;
+    });
+    S.reparaciones.filter(r=>r.fecha>=desde).forEach(r=>{
+      const d = new Date(r.fecha+'T00:00:00').getDay();
+      porDia[d]++;
+    });
+  }
 
   const nombres = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   // Reorder to start from Monday
@@ -8075,8 +8104,8 @@ function rDivision(){
   
   // Only show for Remu (not salon/barberia)
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esRemu = rubro.includes('telefon')||rubro.includes('tecnico')||rubro.includes('técnico')||rubro.includes('remu')||(!rubro.includes('salon')&&!rubro.includes('barberia')&&!rubro.includes('belleza'));
-  
+  const esRemu = rubro.includes('telefon')||rubro.includes('tecnico')||rubro.includes('técnico')||rubro.includes('remu')||(!rubro.includes('salon')&&!rubro.includes('barberia')&&!rubro.includes('barbería')&&!rubro.includes('belleza'));
+
   if(!esRemu){ card.style.display='none'; return; }
   card.style.display='block';
 
