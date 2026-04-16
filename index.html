@@ -703,6 +703,7 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tb-sync"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">Conectado</span></div>
       <div class="tb-user" id="tbUser"></div><button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bor2);color:var(--tx);padding:5px 10px;border-radius:7px;font-size:.75rem;cursor:pointer;margin-left:8px" title="Alternar modo">🌙</button>
       <button style="background:none;border:1px solid var(--bor);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" onclick="descargarBackup()">💾</button>
+      <button id="saBackBtn" onclick="volverAlSuperadmin()" style="display:none;align-items:center;gap:5px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gld);padding:5px 12px;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;">⚙ Volver al panel</button>
     </div>
   </div>
 
@@ -1542,6 +1543,15 @@ textarea{resize:vertical;min-height:70px;}
     <option value="no_vino">❌ No vino</option>
   </select></div><div><label>Precio cobrado ($)</label><input type="number" id="turnoPrecio" placeholder="0"></div></div>
   <div class="fr full"><div><label>Notas</label><input id="turnoNotas" placeholder="Observaciones..."></div></div>
+  <div id="turnoFijoCheck" style="margin-top:10px;display:none">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px">
+      <input type="checkbox" id="turnoEsFijo" style="width:16px;height:16px;cursor:pointer;accent-color:var(--gld)">
+      <div>
+        <div style="font-size:.85rem;font-weight:600;color:var(--tx)">🔒 Turno recurrente</div>
+        <div style="font-size:.72rem;color:var(--tx2);margin-top:2px">Se repite cada semana en este día y hora</div>
+      </div>
+    </label>
+  </div>
 </div>
 <div class="mf"><button class="btn" onclick="closeM('mTurno')">Cancelar</button><button class="btn bg" onclick="saveTurno()">Guardar turno</button></div>
 </div></div>
@@ -1567,14 +1577,15 @@ textarea{resize:vertical;min-height:70px;}
     <option value="6">Sábado</option>
     <option value="0">Domingo</option>
   </select></div><div><label>Hora</label><input type="time" id="tfHora" step="1800"></div></div>
-  <div class="fr"><div><label>Servicio</label><select id="tfServicio"></select></div><div><label>Duración estimada</label><select id="tfDuracion">
+  <div class="fr"><div><label>Profesional</label><select id="tfEmpleado"></select></div><div><label>Servicio</label><select id="tfServicio"></select></div></div>
+  <div class="fr"><div><label>Duración estimada</label><select id="tfDuracion">
     <option value="20">20 min</option>
     <option value="30" selected>30 min</option>
     <option value="45">45 min</option>
     <option value="60">1 hora</option>
     <option value="90">1:30 hs</option>
     <option value="120">2 horas</option>
-  </select></div></div>
+  </select></div><div></div></div>
   <div class="fr full"><div><label>Notas</label><input id="tfNotas" placeholder="Observaciones..."></div></div>
   <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:10px;margin-top:8px;font-size:.78rem;color:var(--tx2)">
     🔒 Este horario quedará <strong style="color:var(--gld)">bloqueado todas las semanas</strong> y no podrá ser tomado por otros clientes online.
@@ -2289,6 +2300,7 @@ async function loadTenants(){
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="extenderTrial('${t.id}')">+30 días trial</button>`:''}
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
         <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
+        <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:var(--gld);border-color:rgba(201,168,76,.4)" onclick="accederComoTenant('${t.id}')">→ Acceder</button>
       </div>
     </div>`;
   }).join('');
@@ -2470,6 +2482,38 @@ async function toggleTenant(id, activo){
   if(!confirm(`¿${activo?'Desactivar':'Activar'} este cliente?`)) return;
   const { error } = await sb.from('tenants').update({ activo: !activo }).eq('id', id);
   if(!error) loadTenants();
+}
+
+async function accederComoTenant(id){
+  const { data: t, error } = await sb.from('tenants').select('*').eq('id', id).single();
+  if(error || !t){ alert('No se pudo cargar el tenant'); return; }
+
+  // Limpiar estado del tenant anterior completamente
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+
+  currentTenant = t;
+  currentRole = 'admin';
+
+  document.getElementById('superadminScreen').style.display = 'none';
+  const backBtn = document.getElementById('saBackBtn');
+  if(backBtn){ backBtn.style.display = 'flex'; }
+
+  setupApp();
+  await loadAll();
+  showToast('Viendo: ' + t.nombre);
+}
+
+function volverAlSuperadmin(){
+  // Limpiar estado del tenant visitado
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+  currentTenant = null;
+  currentRole = 'superadmin';
+
+  const backBtn = document.getElementById('saBackBtn');
+  if(backBtn) backBtn.style.display = 'none';
+
+  document.getElementById('superadminScreen').style.display = 'flex';
+  loadTenants();
 }
 
 async function loadSaStats(){
@@ -4988,6 +5032,11 @@ function openNuevoTurno(){
   if(document.getElementById('turnoPrecio')) document.getElementById('turnoPrecio').value = '';
   document.getElementById('turnoConflicto').style.display = 'none';
   document.getElementById('mTurnoTitle').textContent = 'Nuevo turno';
+  // Mostrar opción recurrente solo al crear (no al editar)
+  const fijoCheck = document.getElementById('turnoFijoCheck');
+  if(fijoCheck) fijoCheck.style.display = '';
+  const fijoBox = document.getElementById('turnoEsFijo');
+  if(fijoBox) fijoBox.checked = false;
   updateDuracionTurno();
   openM('mTurno', null);
 }
@@ -5213,9 +5262,42 @@ async function saveTurno(){
     }
   }
 
+  // Si el checkbox "recurrente" está marcado (solo disponible al crear), crear turno fijo
+  const esFijoCheck = !id && document.getElementById('turnoEsFijo')?.checked;
+  if(esFijoCheck){
+    const diaNum = new Date(fecha + 'T12:00:00').getDay(); // lunes=1..domingo=0
+    const fijoExistente = getTurnosFijos().find(f=>f.dia===diaNum && f.hora===hora && f.empleadoId==empleadoId);
+    if(!fijoExistente){
+      const nuevoFijo = {
+        id: 'rfijo_' + Date.now().toString(),
+        cliente: cli, tel, dia: diaNum, hora,
+        servicio: srv?.nombre||'Servicio',
+        duracion: srv?.duracion||60,
+        empleadoId, empleadoNombre: empleado?.nombre||'',
+        notas, activo: true,
+        creadoEn: new Date().toISOString()
+      };
+      const fijos = getTurnosFijos();
+      fijos.push(nuevoFijo);
+      saveTurnosFijosLocal(fijos);
+      // Marcar el turno ya creado como fijo
+      obj.esFijo = true;
+      obj.fijoId = nuevoFijo.id;
+      const allTurnos = getTurnos();
+      const idx2 = allTurnos.findIndex(t=>t.id===obj.id);
+      if(idx2>-1) allTurnos[idx2] = obj;
+      saveTurnosLocal(allTurnos);
+      // Generar para las próximas 4 semanas (excluyendo la fecha actual, ya fue creado)
+      generarTurnosDesdeFijos([nuevoFijo]);
+      showToast('✓ Turno agendado + turno fijo creado — se repetirá cada ' + DIAS_NOMBRES[diaNum]);
+    } else {
+      showToast('Turno agendado ✓ (ya existe un fijo similar para ese horario)');
+    }
+  }
+
   closeM('mTurno');
   rTurnos();
-  showToast(id ? 'Turno actualizado ✓' : 'Turno agendado ✓');
+  if(!esFijoCheck) showToast(id ? 'Turno actualizado ✓' : 'Turno agendado ✓');
 }
 
 function cancelarTurno(id){
@@ -5332,6 +5414,9 @@ function editarTurno(id){
   if(document.getElementById('turnoPrecio')) document.getElementById('turnoPrecio').value = t.precio||0;
   document.getElementById('mTurnoTitle').textContent = 'Editar turno';
   document.getElementById('turnoConflicto').style.display='none';
+  // Ocultar opción recurrente al editar (solo disponible al crear)
+  const fijoCheckEdit = document.getElementById('turnoFijoCheck');
+  if(fijoCheckEdit) fijoCheckEdit.style.display = 'none';
   // Fidelización: mostrar alerta si el cliente completó umbral de visitas
   const fidelAlert = document.getElementById('fidelTurnoAlert');
   const fidelMsg = document.getElementById('fidelTurnoMsg');
@@ -6278,11 +6363,17 @@ async function rTurnosOnline(){
     } catch(e){}
   }
 
-  if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
-  if(document.getElementById('onlineInsta')) document.getElementById('onlineInsta').value = cfg.insta||'';
-  if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
-  if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
-  
+  // Solo actualizar inputs si el usuario NO está escribiendo en alguno de ellos.
+  // silentRefresh() llama a esta función cada 30 seg — sin este check borra lo que el usuario está tipeando.
+  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel'];
+  const _editando = _cfgInputIds.includes(document.activeElement?.id);
+  if(!_editando){
+    if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
+    if(document.getElementById('onlineInsta')) document.getElementById('onlineInsta').value = cfg.insta||'';
+    if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
+    if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
+  }
+
   cargarSolicitudes();
 }
 
@@ -7721,7 +7812,9 @@ function saveTurnosFijosLocal(fijos){
 function openNuevoTurnoFijo(){
   const cfg = getTurnosCfg();
   const srvSel = document.getElementById('tfServicio');
-  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}">${s.nombre}</option>`).join('') || '<option>Sin servicios</option>';
+  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}">${esc(s.nombre)}</option>`).join('') || '<option>Sin servicios</option>';
+  const empSel = document.getElementById('tfEmpleado');
+  if(empSel) empSel.innerHTML = cfg.empleados.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join('') || '<option value="">Sin profesionales</option>';
   document.getElementById('turnoFijoId').value = '';
   document.getElementById('tfCli').value = '';
   document.getElementById('tfTel').value = '';
@@ -7740,6 +7833,7 @@ function guardarTurnoFijo(){
   const servicio = document.getElementById('tfServicio').value;
   const duracion = parseInt(document.getElementById('tfDuracion').value);
   const notas = document.getElementById('tfNotas').value;
+  const empleadoIdFijo = document.getElementById('tfEmpleado')?.value || '';
 
   if(!cli) return alert('Ingresá el nombre del cliente');
   if(!hora) return alert('Ingresá la hora');
@@ -7751,9 +7845,13 @@ function guardarTurnoFijo(){
     return alert(`⚠ Ya hay un turno fijo de ${conflicto.cliente} los ${DIAS_NOMBRES[dia]} a las ${hora}`);
   }
 
+  const cfg2 = getTurnosCfg();
+  const empFijo = cfg2.empleados.find(e=>String(e.id)===String(empleadoIdFijo)) || cfg2.empleados[0];
   const obj = {
     id: id || Date.now().toString(),
     cliente: cli, tel, dia, hora, servicio, duracion, notas,
+    empleadoId: empFijo?.id||'',
+    empleadoNombre: empFijo?.nombre||'',
     activo: true,
     creadoEn: new Date().toISOString()
   };
@@ -7797,7 +7895,8 @@ function generarTurnosDesdeFijos(fijos){
       if(yaExiste) continue;
 
       const srv = cfg.servicios.find(s=>s.nombre===fijo.servicio) || cfg.servicios[0];
-      const emp = cfg.empleados[0];
+      // Usar el empleado asignado al turno fijo; si no tiene, usar el primero
+      const emp = (fijo.empleadoId ? cfg.empleados.find(e=>String(e.id)===String(fijo.empleadoId)) : null) || cfg.empleados[0];
 
       nuevos.push({
         id: 'fijo_' + fijo.id + '_' + fechaStr,
@@ -7846,7 +7945,9 @@ function editarTurnoFijo(id){
   if(!fijo) return;
   const cfg = getTurnosCfg();
   const srvSel = document.getElementById('tfServicio');
-  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}" ${s.nombre===fijo.servicio?'selected':''}>${s.nombre}</option>`).join('');
+  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}" ${s.nombre===fijo.servicio?'selected':''}>${esc(s.nombre)}</option>`).join('');
+  const empSel = document.getElementById('tfEmpleado');
+  if(empSel) empSel.innerHTML = cfg.empleados.map(e=>`<option value="${e.id}" ${String(e.id)===String(fijo.empleadoId)?'selected':''}>${esc(e.nombre)}</option>`).join('');
   document.getElementById('turnoFijoId').value = fijo.id;
   document.getElementById('tfCli').value = fijo.cliente;
   document.getElementById('tfTel').value = fijo.tel||'';
