@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Remu Gestión — Sistema de gestión para barberías y talleres de celulares. Turnos online, caja, reparaciones y precios desde el celular. $8.000/mes.">
-<meta property="og:title" content="Remu Gestión — Sistema para barberías y talleres de celulares">
-<meta property="og:description" content="Turnos online, control de reparaciones, caja y precios. Todo desde el celular. Diseñado para Argentina.">
+<meta name="description" content="Remu Gestión — Sistema de gestión para barberías, salones de belleza y talleres de celulares. Turnos online, caja, reparaciones y precios desde el celular. Precio fundador $9.999/mes.">
+<meta property="og:title" content="Remu Gestión — Sistema para barberías, salones de belleza y talleres">
+<meta property="og:description" content="Turnos online, agenda, caja y precios. Todo desde el celular. Diseñado para Argentina. Precio fundador para los primeros 10 clientes.">
 <meta property="og:type" content="website">
-<title>Remu Gestión — Sistema de gestión para barberías y talleres</title>
+<title>Remu Gestión — Sistema de gestión para barberías, salones de belleza y talleres</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -148,6 +148,12 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
 .footer-links a:hover{color:var(--gld)}
 .footer-right{font-size:.75rem;color:var(--tx2);text-align:right}
 
+/* ── FOUNDER PRICING ─────────────────── */
+.pricing-regular{font-size:1rem;color:var(--mut);text-decoration:line-through;margin-bottom:4px;font-family:var(--fb)}
+.pricing-spots{display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);border-radius:20px;padding:5px 13px;font-size:.73rem;font-weight:700;color:var(--gld);margin-bottom:14px;letter-spacing:.3px}
+.pricing-spots::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--gld);display:inline-block;animation:blink 1.4s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
 /* ── STICKY WA BUTTON ────────────────── */
 .wa-float{position:fixed;bottom:24px;right:20px;z-index:99;background:#25d366;color:#fff;border:none;border-radius:50px;padding:13px 20px;font-family:var(--fb);font-size:.85rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(37,211,102,.35);transition:all .2s;text-decoration:none}
 .wa-float:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(37,211,102,.4)}
@@ -226,7 +232,7 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
 <section class="pain">
   <div class="container">
     <h2 class="pain-title">¿Te pasa alguna de estas?</h2>
-    <p class="pain-sub" style="margin:0 auto 44px;max-width:520px">Los negocios sin sistema pierden tiempo y plata todos los días sin darse cuenta.</p>
+    <p class="pain-sub" style="margin:0 auto 44px;max-width:520px">Las barberías, los salones de belleza y los talleres sin sistema pierden tiempo y plata todos los días sin darse cuenta.</p>
     <div class="pain-grid">
       <div class="pain-card">
         <div class="pain-icon">😩</div>
@@ -238,7 +244,7 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
       </div>
       <div class="pain-card">
         <div class="pain-icon">🔧</div>
-        <div class="pain-text"><strong>Los equipos del taller se confunden.</strong> ¿Cuál era el de María? ¿El iPhone estaba listo o todavía en proceso?</div>
+        <div class="pain-text"><strong>Los trabajos se mezclan y se olvidan.</strong> ¿Cuál era el equipo de María? ¿El tratamiento de Laura era hoy o mañana? ¿El iPhone estaba listo?</div>
       </div>
       <div class="pain-card">
         <div class="pain-icon">💸</div>
@@ -254,7 +260,7 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
     <div class="features-header">
       <div class="tag" style="margin-bottom:16px">Todo lo que necesitás</div>
       <h2 class="section-title">Un sistema. Todas las herramientas.</h2>
-      <p class="section-sub" style="margin:0 auto">No necesitás 5 apps distintas. Remu Gestión tiene todo integrado en un solo lugar, pensado para negocios como el tuyo.</p>
+      <p class="section-sub" style="margin:0 auto">No necesitás 5 apps distintas. Remu Gestión tiene todo integrado en un solo lugar, pensado para barberías, salones de belleza y talleres de celulares.</p>
     </div>
     <div class="feat-grid">
 
@@ -354,10 +360,12 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
     </div>
     <div class="pricing-card">
       <div class="pricing-top">
-        <div class="pricing-badge">Más popular</div>
+        <div class="pricing-badge">🔥 Precio fundador</div>
         <div class="pricing-plan">Plan Completo</div>
-        <div class="pricing-price">$8.000</div>
-        <div class="pricing-per">pesos argentinos por mes · IVA incluido</div>
+        <div class="pricing-spots">7 de 10 lugares disponibles</div>
+        <div class="pricing-regular">$19.999/mes</div>
+        <div class="pricing-price">$9.999</div>
+        <div class="pricing-per">pesos argentinos por mes · precio fundador para los primeros 10 clientes</div>
         <div class="pricing-trial">🎁 Primer mes completamente gratis — sin tarjeta</div>
       </div>
       <div class="pricing-body">
@@ -436,7 +444,7 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
   <div class="container">
     <div class="tag" style="margin-bottom:20px">Sin riesgos. Sin compromisos.</div>
     <h2>Empezá hoy.<br>El primer mes <span class="gold">es gratis.</span></h2>
-    <p>Creás tu cuenta en 2 minutos, cargás tu negocio y empezás a usar todo desde el celular. Sin contratos, sin tarjeta, sin letra chica.</p>
+    <p>Creás tu cuenta en 2 minutos, cargás tu barbería, salón o taller y empezás a usar todo desde el celular. Sin contratos, sin tarjeta, sin letra chica.</p>
     <div class="final-btns">
       <a href="index.html?registro=1" class="btn-primary" style="font-size:1rem;padding:16px 32px">
         Crear cuenta gratis →
@@ -462,7 +470,7 @@ footer{background:var(--sur);border-top:1px solid var(--bor);padding:40px 0}
     <div class="footer-inner">
       <div>
         <div class="footer-logo">Remu Gestión</div>
-        <div class="footer-tagline">Sistema de gestión para barberías y talleres · Argentina</div>
+        <div class="footer-tagline">Sistema de gestión para barberías, salones de belleza y talleres · Argentina</div>
       </div>
       <div class="footer-links">
         <a href="#features">Funciones</a>
