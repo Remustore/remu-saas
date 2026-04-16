@@ -3781,8 +3781,12 @@ function rDash(){
   const meta=S.meta||0,pct=meta>0?Math.min(100,Math.round(totalMesReal/meta*100)):0;
   document.getElementById('metaArc').style.strokeDashoffset=157-(157*pct/100);
   document.getElementById('mPct').textContent=pct+'%';document.getElementById('mVal').textContent=fmt(meta);document.getElementById('mVen').textContent=fmt(totalMesReal);
-  const mg=tV>0?Math.round((tV-tC)/tV*100):0;
-  const flujoIngs=tR>0?`<div class="fi2"><span>Ventas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Ingresos taller</span><span style="color:var(--ok);font-weight:600">${fmt(tR)}</span></div>`:`<div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>`;
+  // Para barberías: usar totalMesReal (que viene de getTurnos()) en lugar de tV (que incluye ventas de servicio de S.ventas)
+  const ingresoFlujo = esBarberiaD ? totalMesReal : tV;
+  const mg=ingresoFlujo>0?Math.round((ingresoFlujo-tC)/ingresoFlujo*100):0;
+  const flujoIngs=esBarberiaD
+    ?`<div class="fi2"><span>Turnos y ventas</span><span style="color:var(--ok);font-weight:600">${fmt(totalMesReal)}</span></div>`
+    :tR>0?`<div class="fi2"><span>Ventas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Ingresos taller</span><span style="color:var(--ok);font-weight:600">${fmt(tR)}</span></div>`:`<div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>`;
   document.getElementById('flujo').innerHTML=`${flujoIngs}<div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
   const cnt={};S.ventas.forEach(v=>{cnt[v.nombre]=(cnt[v.nombre]||0)+v.cantidad;});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
@@ -4160,7 +4164,8 @@ function rObjetivos(){
     const turnosSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado!=='cancelado').length : 0;
     const turnosTermSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado==='terminado').length : 0;
     const facturadoSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
-    const ventasSem = S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr).reduce((a,v)=>a+v.total,0);
+    // Excluir tipo='servicio' — esos ingresos ya están en facturadoSem (getTurnos), sumarlos sería doble conteo
+    const ventasSem = S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
     const metaTurnos = obj.repCant||20;
     const metaMontoTurnos = (obj.repCant||20)*(obj.repPre||5000);
     document.getElementById('objHoy').innerHTML =
@@ -5171,31 +5176,40 @@ async function saveTurno(){
   const yaEstabaTerminado = turnoOriginal && turnoOriginal.estado === 'terminado';
   console.log('[guardarTurno] estado:', estado, '| yaEstabaTerminado:', yaEstabaTerminado, '| precioCobrado:', precioCobrado);
   if(estado === 'terminado' && precioCobrado > 0 && !yaEstabaTerminado){
-    // Verificar que no exista ya una venta para este turno (idempotencia)
-    const turnoIdStr = String(obj.id);
-    const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
-    console.log('[guardarTurno] turnoId:', turnoIdStr, '| yaExisteVenta:', yaExisteVenta, '| S.ventas.length:', S.ventas.length);
-    if(!yaExisteVenta){
-      const venta = {
-        id: Date.now(),
-        turnoId: turnoIdStr,
-        tipo: 'servicio',
-        nombre: srv?.nombre || obj.servicioNombre || 'Servicio',
-        cantidad: 1,
-        precio: precioCobrado,
-        total: precioCobrado,
-        costo: 0,
-        metodo: obj.metodo || 'Efectivo',
-        fecha: fecha,
-        comPct: 0,
-        comision: 0
-      };
-      S.ventas.unshift(venta);
-      await dbUpsert('ventas', venta);
-      console.log('[guardarTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total);
-      showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
+    const rubTenantGT = (currentTenant?.rubro||'').toLowerCase();
+    const esSalonBarberGT = /barber|barbería|salon|belleza/i.test(rubTenantGT);
+    if(esSalonBarberGT){
+      // Para barberías/salones: el ingreso del turno vive SOLO en getTurnos() (localStorage).
+      // No crear venta en S.ventas — hacerlo causaría doble conteo con getTurnos() en todos los cálculos.
+      console.log('[guardarTurno] barbería/salon — ingreso vive en getTurnos(), no se crea venta en S.ventas');
+      showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado');
     } else {
-      console.log('[guardarTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
+      // Para talleres/otros rubros: registrar la venta en S.ventas normalmente
+      const turnoIdStr = String(obj.id);
+      const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
+      console.log('[guardarTurno] turnoId:', turnoIdStr, '| yaExisteVenta:', yaExisteVenta, '| S.ventas.length:', S.ventas.length);
+      if(!yaExisteVenta){
+        const venta = {
+          id: Date.now(),
+          turnoId: turnoIdStr,
+          tipo: 'servicio',
+          nombre: srv?.nombre || obj.servicioNombre || 'Servicio',
+          cantidad: 1,
+          precio: precioCobrado,
+          total: precioCobrado,
+          costo: 0,
+          metodo: obj.metodo || 'Efectivo',
+          fecha: fecha,
+          comPct: 0,
+          comision: 0
+        };
+        S.ventas.unshift(venta);
+        await dbUpsert('ventas', venta);
+        console.log('[guardarTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total);
+        showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
+      } else {
+        console.log('[guardarTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
+      }
     }
   }
 
@@ -5266,19 +5280,27 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
     const precio = (precioExtra != null) ? precioExtra : (parseFloat(t.precio)||0);
     const metodo = metodoExtra || t.metodo || 'Efectivo';
     if(precio > 0){
-      // Verificar que no exista ya una venta para este turno (idempotencia)
-      const turnoIdStr = String(id);
-      const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
-      console.log('[_doEstadoTurno] turnoId:', turnoIdStr, '| precio:', precio, '| yaExisteVenta:', yaExisteVenta, '| S.ventas tipo servicio:', S.ventas.filter(v=>v.tipo==='servicio').map(v=>'$'+v.total+'('+v.turnoId+')'));
-      if(!yaExisteVenta){
-        const venta = { id: Date.now(), turnoId: turnoIdStr, tipo:'servicio', nombre: t.servicioNombre||'Servicio', cantidad:1, precio, total:precio, costo:0, metodo, fecha:t.fecha, comPct:0, comision:0 };
-        S.ventas.unshift(venta);
-        await dbUpsert('ventas', venta);
-        console.log('[_doEstadoTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total, '| Total S.ventas hoy:', S.ventas.filter(v=>v.fecha===t.fecha).reduce((a,v)=>a+v.total,0));
+      const rubTenantDE = (currentTenant?.rubro||'').toLowerCase();
+      const esSalonBarberDE = /barber|barbería|salon|belleza/i.test(rubTenantDE);
+      if(esSalonBarberDE){
+        // Para barberías/salones: el ingreso vive SOLO en getTurnos() — no crear venta en S.ventas
+        console.log('[_doEstadoTurno] barbería/salon — ingreso en getTurnos(), no se crea venta en S.ventas');
         showToast('✓ Finalizado · '+fmt(precio)+' · '+metodo);
       } else {
-        console.log('[_doEstadoTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
-        showToast('✓ Turno finalizado');
+        // Para talleres/otros rubros: registrar la venta normalmente
+        const turnoIdStr = String(id);
+        const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
+        console.log('[_doEstadoTurno] turnoId:', turnoIdStr, '| precio:', precio, '| yaExisteVenta:', yaExisteVenta);
+        if(!yaExisteVenta){
+          const venta = { id: Date.now(), turnoId: turnoIdStr, tipo:'servicio', nombre: t.servicioNombre||'Servicio', cantidad:1, precio, total:precio, costo:0, metodo, fecha:t.fecha, comPct:0, comision:0 };
+          S.ventas.unshift(venta);
+          await dbUpsert('ventas', venta);
+          console.log('[_doEstadoTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total);
+          showToast('✓ Finalizado · '+fmt(precio)+' · '+metodo);
+        } else {
+          console.log('[_doEstadoTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
+          showToast('✓ Turno finalizado');
+        }
       }
       rCajas();
       rDash();
