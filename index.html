@@ -1208,13 +1208,13 @@ textarea{resize:vertical;min-height:70px;}
         <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
-      <!-- Solicitudes pendientes -->
+      <!-- Reservas online -->
       <div class="card">
         <div class="ch">
-          <h3>🔔 Solicitudes de turno</h3>
+          <h3>📅 Reservas online <span style="font-size:.7rem;color:var(--mut);font-weight:400">(últimos 7 días)</span></h3>
           <button class="btn bgh bsm" onclick="cargarSolicitudes()">↻ Actualizar</button>
         </div>
-        <div id="solicitudesLista"><div style="color:var(--mut);font-size:.82rem;padding:8px 0">Cargando solicitudes...</div></div>
+        <div id="solicitudesLista"><div style="color:var(--mut);font-size:.82rem;padding:8px 0">Cargando...</div></div>
       </div>
     </div>
 
@@ -7051,48 +7051,61 @@ async function rTurnosOnline(){
 async function cargarSolicitudes(){
   const el = document.getElementById('solicitudesLista');
   if(!el) return;
-  
+
   try {
+    // Últimos 7 días
+    const desde = new Date(); desde.setDate(desde.getDate()-7);
+    const desdeStr = desde.toISOString().slice(0,10);
+
     const { data, error } = await sb.from('turnos_solicitudes')
       .select('*')
       .eq('tenant_id', currentTenant?.id||'')
-      .order('created_at', {ascending: false})
-      .limit(50);
-    
+      .gte('fecha', desdeStr)
+      .not('estado', 'eq', 'cancelado')
+      .order('fecha', {ascending: false})
+      .order('hora', {ascending: false})
+      .limit(60);
+
     if(error) throw error;
-    
-    const pendientes = data.filter(s=>s.estado==='pendiente');
+
+    // Badge: reservas de hoy (confirmadas)
+    const hoy = new Date().toISOString().slice(0,10);
+    const hoyCount = (data||[]).filter(s=>s.fecha===hoy && s.estado==='confirmado').length;
     const badge = document.getElementById('solicitudesBadge');
     if(badge){
-      badge.textContent = pendientes.length;
-      badge.style.display = pendientes.length > 0 ? '' : 'none';
+      badge.textContent = hoyCount;
+      badge.style.display = hoyCount > 0 ? '' : 'none';
     }
-    
-    if(!data.length){
-      el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin solicitudes aún. Compartí tu link para empezar a recibir.</div>';
+
+    if(!data || !data.length){
+      el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin reservas en los últimos 7 días. Compartí tu link para empezar a recibir.</div>';
       return;
     }
 
-    const estados = {pendiente:'byw', confirmado:'bgr', cancelado:'brd'};
+    const estadoBx = {pendiente:'byw', confirmado:'bgr', cancelado:'brd'};
+    const estadoLabel = {pendiente:'⏳ pendiente', confirmado:'✅ confirmado', cancelado:'✕ cancelado'};
     el.innerHTML = data.map(s=>`
       <div style="padding:12px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
         <div>
-          <div style="font-weight:600;font-size:.88rem">${s.nombre} <span class="bx ${estados[s.estado]||'bgx'}" style="margin-left:6px">${s.estado}</span></div>
+          <div style="font-weight:600;font-size:.88rem">${esc(s.nombre)} <span class="bx ${estadoBx[s.estado]||'bgx'}" style="margin-left:6px">${estadoLabel[s.estado]||s.estado}</span></div>
           <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">
-            📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${s.hora||'—'} &nbsp;·&nbsp; 🔧 ${s.servicio_id||'—'}
+            📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${(s.hora||'—').substring(0,5)} &nbsp;·&nbsp; 🔧 ${esc(s.servicio_id||'—')}
           </div>
-          ${s.tel?`<div style="font-size:.75rem;color:var(--tx2)">📱 ${s.tel}</div>`:''}
+          ${s.tel?`<div style="font-size:.75rem;color:var(--tx2)">📱 ${esc(s.tel)}</div>`:''}
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           ${s.estado==='pendiente'?`
-            <button class="btn bg bsm" onclick="confirmarSolicitud('${s.id}','${s.nombre}','${s.tel||''}','${s.servicio_id||''}','${s.fecha||''}','${s.hora||''}')">✓ Confirmar</button>
-            <button class="btn bd bsm" onclick="rechazarSolicitud('${s.id}','${s.nombre}','${s.tel||''}')">✕ Rechazar</button>
+            <button class="btn bg bsm" onclick="confirmarSolicitud('${s.id}','${esc(s.nombre)}','${s.tel||''}','${esc(s.servicio_id||'')}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">✓ Confirmar</button>
+            <button class="btn bd bsm" onclick="rechazarSolicitud('${s.id}','${esc(s.nombre)}','${s.tel||''}')">✕ Rechazar</button>
           `:''}
-          ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${s.nombre}','${s.tel}','${s.estado}','${s.fecha||''}','${s.hora||''}')">📲 WA</button>`:''}
+          ${s.estado==='confirmado'?`
+            <button class="btn bd bsm" onclick="cancelarReservaOnline('${s.id}','${esc(s.nombre)}','${s.tel||''}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">✕ Cancelar</button>
+          `:''}
+          ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">📲 WA</button>`:''}
         </div>
       </div>`).join('');
   } catch(e){
-    if(el) el.innerHTML = '<div style="color:var(--bad);font-size:.82rem">Error al cargar solicitudes</div>';
+    if(el) el.innerHTML = '<div style="color:var(--bad);font-size:.82rem">Error al cargar reservas</div>';
   }
 }
 
@@ -7170,6 +7183,25 @@ async function rechazarSolicitud(id, nombre, tel){
       setTimeout(()=>{
         window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
       }, 500);
+    }
+  });
+}
+
+async function cancelarReservaOnline(id, nombre, tel, fecha, hora){
+  _confirmarModal(`¿Cancelar la reserva de ${nombre} el ${fecha} a las ${hora}?`, async () => {
+    const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id);
+    if(error){ showToast('Error al cancelar'); return; }
+    // También eliminar de localStorage si existe un turno con esos datos
+    const turnos = getTurnos();
+    const idx = turnos.findIndex(t=>t.fecha===fecha && t.hora===hora && t.cliente===nombre);
+    if(idx !== -1){ turnos.splice(idx,1); saveTurnosLocal(turnos); }
+    showToast('Reserva cancelada ✓');
+    cargarSolicitudes();
+    rTurnos && rTurnos();
+    if(tel){
+      const neg = currentTenant?.nombre||'el negocio';
+      const msg = `Hola ${nombre}, lamentablemente tuvimos que cancelar tu turno en *${neg}* del ${fecha} a las ${hora}. Disculpá las molestias, contactanos para reprogramarlo. 🙏`;
+      setTimeout(()=>{ window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank'); }, 500);
     }
   });
 }
@@ -7255,7 +7287,7 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
         <input type="hidden" id="onHora">
         
         <button onclick="enviarSolicitudTurno('${tenant.id}')" style="width:100%;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit';font-size:.9rem;font-weight:700;cursor:pointer">
-          Solicitar turno
+          Reservar turno
         </button>
         <div id="onMsg" style="margin-top:12px;text-align:center;font-size:.8rem;display:none"></div>
         ${cfg.insta?`<div style="text-align:center;margin-top:16px;font-size:.78rem;color:#a89880">📸 ${cfg.insta}</div>`:''}
@@ -7814,22 +7846,16 @@ async function enviarSolicitudTurno(tenantId){
     submitBtn.textContent = 'Enviando...';
   }
 
-  // Verificar si este cliente ya tiene una solicitud pendiente o confirmada para el mismo turno
+  // Verificar si el slot ya está confirmado o bloqueado
   const { data: existenteCliente } = await sb.from('turnos_solicitudes')
     .select('id,estado')
     .eq('tenant_id', tenantId)
     .eq('fecha', fecha)
     .eq('hora', hora)
-    .in('estado', ['pendiente','confirmado'])
-    .limit(5);
-  const yaExiste = (existenteCliente||[]).some(t => {
-    // Misma hora ya reservada por cualquiera → avisar
-    return true;
-  });
-  // Verificar duplicado EXACTO del mismo cliente (mismo nombre/tel/fecha/hora)
-  const duplicadoExacto = (existenteCliente||[]).length > 0;
-  if(duplicadoExacto){
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Solicitar turno'; }
+    .in('estado', ['confirmado','bloqueado'])
+    .limit(3);
+  if((existenteCliente||[]).length > 0){
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
     if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya está reservado. Por favor elegí otro horario disponible.';}
     if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
     return;
@@ -7850,41 +7876,40 @@ async function enviarSolicitudTurno(tenantId){
     } catch(e){}
   }
 
-  // Insertar inmediatamente con estado='pendiente'
+  // Insertar directamente como confirmado
   const tsInsert = new Date().toISOString();
   const { data: inserted, error: insertErr } = await sb.from('turnos_solicitudes').insert({
     tenant_id: tenantId,
     nombre, tel, servicio_id: servicioId||null,
     empleado_id: empleadoId ? (parseInt(empleadoId)||null) : null,
     fecha, hora,
-    estado: 'pendiente',
+    estado: 'confirmado',
     created_at: tsInsert
   }).select('id,created_at').single();
 
   if(insertErr){
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Solicitar turno'; }
-    if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Error al enviar. Intentá de nuevo.';}
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
+    if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Error al reservar. Intentá de nuevo.';}
     return;
   }
 
-  // Verificar conflicto: ¿hay otro registro (confirmado/bloqueado/pendiente anterior) para este slot?
+  // Detección de race condition: si en el mismo instante otro cliente reservó primero
   const { data: existentes } = await sb.from('turnos_solicitudes')
     .select('id,created_at,estado')
     .eq('tenant_id', tenantId)
     .eq('fecha', fecha)
     .eq('hora', hora)
-    .in('estado', ['confirmado','bloqueado','pendiente']);
+    .in('estado', ['confirmado','bloqueado']);
 
   const conflicto = (existentes||[]).some(t =>
-    t.id !== inserted.id && (t.estado === 'confirmado' || t.estado === 'bloqueado' ||
-    (t.estado === 'pendiente' && t.created_at < tsInsert))
+    t.id !== inserted.id && t.created_at <= tsInsert
   );
 
   if(conflicto){
-    // Alguien más llegó primero — eliminar nuestra solicitud
+    // Otro llegó primero — eliminar nuestra reserva
     await sb.from('turnos_solicitudes').delete().eq('id', inserted.id);
-    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya fue reservado. Por favor elegí otro.';}
-    // Recargar slots
+    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
+    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario acaba de ser reservado. Por favor elegí otro.';}
     if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
     return;
   }
@@ -7892,14 +7917,15 @@ async function enviarSolicitudTurno(tenantId){
   if(msg){
     msg.style.display='block';
     msg.style.color='#4caf7d';
-    msg.textContent='✓ Solicitud enviada. Te confirmaremos por WhatsApp.';
-    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='✓ Enviado'; }
+    msg.textContent='✅ ¡Turno reservado! Nos vemos el ' + fecha + ' a las ' + hora + '.';
+    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='✅ Reservado'; }
     setTimeout(()=>{
       document.getElementById('onNombre').value='';
       document.getElementById('onTel').value='';
       document.getElementById('onFecha').value='';
       document.getElementById('onHora').value='';
-      if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Solicitar turno'; }
+      if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
+      if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
     },3000);
   }
 }
@@ -8309,23 +8335,24 @@ function rTurnosTec(){
 async function checkNuevasSolicitudes(){
   if(!currentTenant?.id) return;
   try {
+    const hoy = new Date().toISOString().slice(0,10);
     const { data } = await sb.from('turnos_solicitudes')
       .select('id')
       .eq('tenant_id', currentTenant.id)
-      .eq('estado', 'pendiente');
-    
+      .eq('fecha', hoy)
+      .eq('estado', 'confirmado');
+
     const count = data?.length || 0;
     const badge = document.getElementById('solicitudesBadge');
     if(badge){
       badge.textContent = count;
       badge.style.display = count > 0 ? '' : 'none';
     }
-    
-    // Show alert in dashboard if there are pending solicitudes
+
+    // Notificar si llegó una nueva reserva online
     const lastCount = parseInt(localStorage.getItem('lastSolicCount_'+(currentTenant?.id||''))||'0');
-    if(count > lastCount && lastCount >= 0){
-      // New solicitudes arrived
-      showToast('🔔 ' + count + ' solicitud' + (count>1?'es':'') + ' de turno pendiente' + (count>1?'s':''));
+    if(count > lastCount){
+      showToast('🔔 Nueva reserva online para hoy');
     }
     localStorage.setItem('lastSolicCount_'+(currentTenant?.id||''), count);
   } catch(e){}
