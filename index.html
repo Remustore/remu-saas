@@ -695,6 +695,9 @@ textarea{resize:vertical;min-height:70px;}
           💡 <strong>URL de retorno</strong> que tenés que configurar en MP:<br>
           <code id="mpReturnUrl" style="color:var(--gld);word-break:break-all"></code>
         </div>
+
+        <label style="margin-top:14px;display:block">Video tutorial (YouTube URL) <span style="color:var(--mut);font-weight:400">— aparece en el onboarding y ayuda</span></label>
+        <input id="saInputVideoTutorial" type="url" placeholder="https://youtu.be/... o https://www.youtube.com/watch?v=...">
       </div>
 
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -2642,6 +2645,9 @@ async function guardarMpLink(){
     updated_at: new Date().toISOString()
   };
   if(token) cfgData.mp_access_token = token;
+  const video = (document.getElementById('saInputVideoTutorial')?.value||'').trim();
+  if(video) { cfgData.video_tutorial = video; localStorage.setItem('remu_video_tutorial', video); }
+  else { delete localStorage['remu_video_tutorial']; }
 
   try {
     await _ensureSystemTenant();
@@ -2675,15 +2681,18 @@ async function loadMpConfig(){
   const link  = cfg?.mp_link  || localStorage.getItem('remu_mp_link')  || '';
   const token = cfg?.mp_access_token || localStorage.getItem('remu_mp_token') || '';
   const precio = cfg?.mp_precio || parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
+  const video = cfg?.video_tutorial || localStorage.getItem('remu_video_tutorial') || '';
 
   if(document.getElementById('saInputMpLink'))   document.getElementById('saInputMpLink').value = link;
   if(document.getElementById('saInputMpToken'))  document.getElementById('saInputMpToken').value = token;
   if(document.getElementById('saInputMpPrecio')) document.getElementById('saInputMpPrecio').value = precio;
+  if(document.getElementById('saInputVideoTutorial')) document.getElementById('saInputVideoTutorial').value = video;
+  if(video) localStorage.setItem('remu_video_tutorial', video);
 
   // Actualizar precio en trial screen si está visible
   _actualizarPrecioTrial(parseInt(precio) || 8000);
 
-  return { link, token, precio: parseInt(precio) || 8000 };
+  return { link, token, precio: parseInt(precio) || 8000, video };
 }
 
 function _actualizarPrecioTrial(precio){
@@ -4364,6 +4373,16 @@ function mostrarAvisosDaily(){
         ${rowsEmp}
       </div>`);
     }
+  }
+
+  // Video tutorial card (first 3 days after onboarding, or always if video configured)
+  const vtUrl = localStorage.getItem('remu_video_tutorial');
+  const owDone = localStorage.getItem('onboarding_v1_' + (currentTenant?.id||''));
+  if(vtUrl && owDone){
+    avisos.unshift(`<div class="card" style="margin-bottom:8px;border-left:3px solid var(--gld);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="font-size:.82rem;color:var(--tx2)">▶ <strong style="color:var(--gld)">Video tutorial</strong> — Conocé todas las funciones de Remu</div>
+      <button onclick="window.open('${vtUrl.replace(/'/g,"\\'")}','_blank')" class="btn bg bsm" style="white-space:nowrap">Ver video →</button>
+    </div>`);
   }
 
   box.innerHTML = avisos.join('');
@@ -10289,7 +10308,7 @@ function showOnboardingWizard(){
     step: 0,
     info: { mensaje: oc.mensaje||'', direccion: oc.direccion||'', insta: oc.insta||'' },
     svcs: [], emps: [],
-    hrs: { apertura: tc.apertura||'09:00', cierre: tc.cierre||'20:00', dias: tc.dias||[1,2,3,4,5,6] }
+    hrs: { apertura: tc.apertura||'09:00', cierre: tc.cierre||'19:00', dias: tc.dias||[1,2,3,4,5,6] }
   };
   scr.style.display = 'block';
   _owR();
@@ -10445,7 +10464,8 @@ function _owS4(){
   const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   return `<div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Horarios de atención</div>
-    <div style="font-size:.82rem;color:#a89880;margin-bottom:24px">¿Cuándo atendés a tus clientes?</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:10px">¿Cuándo atendés a tus clientes?</div>
+    <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:.76rem;color:#a89880">✓ Ya configurado <strong style="color:#c9a84c">Lun–Sáb, 09:00–19:00</strong> como valores por defecto. Podés modificarlos o continuar así.</div>
     <label style="${_OBL}">Horario de apertura y cierre</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
       <div><div style="font-size:.72rem;color:#a89880;margin-bottom:5px">Apertura</div><input type="time" id="owAp" value="${h.apertura}" style="${_OB}"></div>
@@ -10467,7 +10487,7 @@ function _owS4(){
 
 function _owS4Save(){
   __ow.hrs.apertura = document.getElementById('owAp')?.value||'09:00';
-  __ow.hrs.cierre   = document.getElementById('owCi')?.value||'20:00';
+  __ow.hrs.cierre   = document.getElementById('owCi')?.value||'19:00';
   __ow.hrs.dias     = [...document.querySelectorAll('.owDia:checked')].map(c=>parseInt(c.value));
 }
 
@@ -10530,9 +10550,26 @@ function _owS5(){
       ${lCard('📅','Turnos online',tLink,'Los clientes reservan su turno sin llamar ni escribir.')}
       ${lCard('🏷','Lista de precios',pLink,'Compartí tus precios actualizados en tiempo real.')}
     </div>
-    <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:10px;padding:14px 16px;margin:20px 0;font-size:.78rem;color:#a89880;text-align:left;line-height:1.7">
-      💡 <strong style="color:#a89880">Tips:</strong> Pegá el link de turnos en tu bio de Instagram. Enviá el link de precios por WhatsApp antes de que el cliente llegue. Podés seguir editando todo desde el panel.
+    <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-radius:12px;padding:18px;margin:20px 0;text-align:left">
+      <div style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:14px">¿Y ahora qué hago?</div>
+      <div style="display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="min-width:26px;height:26px;border-radius:50%;background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.35);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#c9a84c">1</div>
+          <div style="font-size:.82rem;color:#f5f0e8;line-height:1.5">📸 <strong>Copiá tu link de turnos</strong> y pegalo en tu bio de Instagram para que los clientes puedan reservar.</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="min-width:26px;height:26px;border-radius:50%;background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.35);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#c9a84c">2</div>
+          <div style="font-size:.82rem;color:#f5f0e8;line-height:1.5">💬 <strong>Mandá el link por WhatsApp</strong> a tus clientes habituales para que agenden su próxima visita.</div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="min-width:26px;height:26px;border-radius:50%;background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.35);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#c9a84c">3</div>
+          <div style="font-size:.82rem;color:#f5f0e8;line-height:1.5">📅 <strong>Empezá a cargar tus turnos del día</strong> desde el panel. Tus clientes también pueden reservar solos.</div>
+        </div>
+      </div>
     </div>
+    ${localStorage.getItem('remu_video_tutorial')?`
+    <button onclick="window.open('${esc(localStorage.getItem('remu_video_tutorial'))}','_blank')" style="width:100%;margin-bottom:12px;padding:12px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.3);color:#c9a84c;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.88rem;cursor:pointer;font-weight:600">▶ Ver video tutorial →</button>
+    `:''}
     <button onclick="_owExit()" style="${_OBP}width:100%;padding:14px;font-size:.95rem">Ir al panel de gestión →</button>
   </div>`;
 }
