@@ -2328,7 +2328,7 @@ async function loadTenants(){
   const savedMpLink = localStorage.getItem('remu_mp_link');
   const mpInp = document.getElementById('saInputMpLink');
   if(mpInp && savedMpLink && !mpInp.value) mpInp.value = savedMpLink;
-  const { data, error } = await sb.from('tenants').select('*').order('created_at', { ascending:false });
+  const { data, error } = await sb.from('tenants').select('*').neq('id', MP_SYSTEM_TENANT_ID).order('created_at', { ascending:false });
   const el = document.getElementById('tenantsList');
   if(error || !data){ el.innerHTML='<div style="color:var(--bad);font-size:.8rem">Error al cargar</div>'; return; }
   if(!data.length){ el.innerHTML='<div style="color:var(--mut);font-size:.8rem">Sin clientes aún</div>'; return; }
@@ -2396,8 +2396,24 @@ async function extenderTrial(id){
 }
 
 // ── MERCADO PAGO CONFIG (Superadmin) ──────────────────────────────────
-// ID fijo para el row global en tabla precios. tenant_id se asigna al usuario superadmin.
-const MP_GLOBAL_ROW_ID = 7777777;
+// UUID fijo para el tenant de sistema (no aparece en la lista de clientes).
+// Se crea una vez en la tabla tenants para satisfacer el FK de precios.tenant_id.
+const MP_SYSTEM_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+const MP_GLOBAL_ROW_ID    = 7777777;
+
+async function _ensureSystemTenant(){
+  // Verificar si ya existe; si no, crearlo.
+  const { data } = await sb.from('tenants').select('id').eq('id', MP_SYSTEM_TENANT_ID).maybeSingle();
+  if(data) return; // ya existe
+  await sb.from('tenants').insert({
+    id:      MP_SYSTEM_TENANT_ID,
+    nombre:  '__system_config__',
+    rubro:   '__system__',
+    email:   'system@remu.internal',
+    activo:  false,
+    modulos: {}
+  });
+}
 
 async function guardarMpLink(){
   const btnEl = document.querySelector('[onclick="guardarMpLink()"]');
@@ -2414,7 +2430,9 @@ async function guardarMpLink(){
   localStorage.setItem('remu_mp_precio', String(precio));
   if(token) localStorage.setItem('remu_mp_token', token);
 
-  // 2. Guardar en Supabase con tenant_id = UUID del superadmin (columna es uuid, no text)
+  // 2. Guardar en Supabase:
+  //    - Primero garantizar que existe el tenant de sistema (FK constraint)
+  //    - Luego upsert el row de config en precios usando ese tenant UUID
   const cfgData = {
     __tipo: 'system_mp_config',
     mp_link: link,
@@ -2424,10 +2442,11 @@ async function guardarMpLink(){
   if(token) cfgData.mp_access_token = token;
 
   try {
+    await _ensureSystemTenant();
     const { error } = await sb.from('precios').upsert({
-      id: MP_GLOBAL_ROW_ID,
-      tenant_id: currentUser.id,
-      data: cfgData
+      id:        MP_GLOBAL_ROW_ID,
+      tenant_id: MP_SYSTEM_TENANT_ID,
+      data:      cfgData
     }, { onConflict: 'id' });
     if(error) throw error;
     showSaMsg('✓ Configuración de Mercado Pago guardada','ok');
