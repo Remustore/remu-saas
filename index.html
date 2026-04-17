@@ -2396,41 +2396,46 @@ async function extenderTrial(id){
 }
 
 // ── MERCADO PAGO CONFIG (Superadmin) ──────────────────────────────────
-const MP_GLOBAL_ROW_ID = 7777777; // ID fijo para el row global de config en Supabase
+// ID fijo para el row global en tabla precios. tenant_id se asigna al usuario superadmin.
+const MP_GLOBAL_ROW_ID = 7777777;
 
 async function guardarMpLink(){
+  const btnEl = document.querySelector('[onclick="guardarMpLink()"]');
   const link  = (document.getElementById('saInputMpLink')?.value||'').trim();
   const token = (document.getElementById('saInputMpToken')?.value||'').trim();
   const precio = parseInt(document.getElementById('saInputMpPrecio')?.value||'8000')||8000;
-  if(!link){ alert('Ingresá el link de pago de Mercado Pago'); return; }
 
-  // 1. Guardar en localStorage (fallback offline)
+  if(!link){ showSaMsg('Ingresá el link de pago de Mercado Pago','err'); return; }
+
+  if(btnEl){ btnEl.disabled=true; btnEl.textContent='Guardando…'; }
+
+  // 1. Guardar en localStorage (disponible inmediatamente en este dispositivo)
   localStorage.setItem('remu_mp_link', link);
   localStorage.setItem('remu_mp_precio', String(precio));
   if(token) localStorage.setItem('remu_mp_token', token);
 
-  // 2. Guardar en Supabase (accesible por todos los tenants)
-  const cfgData = { mp_link: link, mp_precio: precio, updated_at: new Date().toISOString() };
-  if(token) cfgData.mp_access_token = token;
-  const showMsg = (txt, ok=true) => {
-    const el = document.getElementById('saMpMsg');
-    if(!el) return;
-    el.textContent = txt;
-    el.style.color = ok ? 'var(--ok)' : 'var(--wrn)';
-    el.style.display = 'block';
-    setTimeout(() => el.style.display = 'none', 4000);
+  // 2. Guardar en Supabase con tenant_id = UUID del superadmin (columna es uuid, no text)
+  const cfgData = {
+    __tipo: 'system_mp_config',
+    mp_link: link,
+    mp_precio: precio,
+    updated_at: new Date().toISOString()
   };
+  if(token) cfgData.mp_access_token = token;
+
   try {
     const { error } = await sb.from('precios').upsert({
       id: MP_GLOBAL_ROW_ID,
-      tenant_id: '__remu_system__',
+      tenant_id: currentUser.id,
       data: cfgData
     }, { onConflict: 'id' });
     if(error) throw error;
-    showMsg('✓ Configuración guardada en Supabase — disponible para todos los tenants');
+    showSaMsg('✓ Configuración de Mercado Pago guardada','ok');
   } catch(e) {
-    console.warn('MP config save error:', e);
-    showMsg('⚠ Guardado solo localmente (Supabase: ' + (e?.message||'error') + ')');
+    console.error('MP config save error:', e);
+    showSaMsg('Error al guardar: ' + (e?.message || JSON.stringify(e)), 'err');
+  } finally {
+    if(btnEl){ btnEl.disabled=false; btnEl.textContent='💾 Guardar configuración'; }
   }
 }
 
@@ -2439,16 +2444,16 @@ async function loadMpConfig(){
   const retUrl = document.getElementById('mpReturnUrl');
   if(retUrl) retUrl.textContent = window.location.origin + window.location.pathname + '?mp_ok=1';
 
-  // Prioridad: Supabase → localStorage
+  // Leer por ID fijo (no necesita filtrar por tenant_id)
   let cfg = null;
   try {
-    const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
-    cfg = data?.[0]?.data || null;
+    const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
+    cfg = data?.data || null;
   } catch(e){}
 
   const link  = cfg?.mp_link  || localStorage.getItem('remu_mp_link')  || '';
   const token = cfg?.mp_access_token || localStorage.getItem('remu_mp_token') || '';
-  const precio = cfg?.mp_precio || localStorage.getItem('remu_mp_precio') || '8000';
+  const precio = cfg?.mp_precio || parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
 
   if(document.getElementById('saInputMpLink'))   document.getElementById('saInputMpLink').value = link;
   if(document.getElementById('saInputMpToken'))  document.getElementById('saInputMpToken').value = token;
@@ -2472,8 +2477,8 @@ async function showTrialScreen(){
   document.getElementById('trialScreen').style.display='flex';
   // Cargar precio dinámico
   try {
-    const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
-    const cfg = data?.[0]?.data;
+    const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
+    const cfg = data?.data;
     if(cfg?.mp_precio) _actualizarPrecioTrial(parseInt(cfg.mp_precio) || 8000);
     if(cfg?.mp_link)   localStorage.setItem('remu_mp_link', cfg.mp_link);
   } catch(e){}
@@ -2485,8 +2490,8 @@ async function iniciarPagoMP(){
   let mpLink = currentTenant?.modulos?.mp_link || localStorage.getItem('remu_mp_link') || '';
   if(!mpLink){
     try {
-      const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
-      mpLink = data?.[0]?.data?.mp_link || '';
+      const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
+      mpLink = data?.data?.mp_link || '';
       if(mpLink) localStorage.setItem('remu_mp_link', mpLink); // cachear
     } catch(e){}
   }
@@ -2510,10 +2515,10 @@ async function iniciarPagoMP(){
 // Activa el tenant por 30 días tras confirmación manual del usuario
 async function confirmarPagoMP(){
   // Obtener precio actual desde global config
-  let precio = localStorage.getItem('remu_mp_precio') || '8.000';
+  let precio = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
   try {
-    const { data } = await sb.from('precios').select('data').eq('tenant_id','__remu_system__');
-    if(data?.[0]?.data?.mp_precio) precio = data[0].data.mp_precio.toLocaleString('es-AR');
+    const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
+    if(data?.data?.mp_precio) precio = data.data.mp_precio;
   } catch(e){}
   if(!confirm(`¿Confirmar que realizaste el pago de $${precio} ARS?\n\nSe activará tu suscripción por 30 días.`)) return;
   await activarSuscripcionTenant('manual');
