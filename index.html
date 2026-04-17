@@ -732,6 +732,47 @@ textarea{resize:vertical;min-height:70px;}
       <h3>📊 Estadísticas del sistema</h3>
       <div id="saStats" style="color:var(--mut);font-size:.8rem;margin-top:8px">Cargando estadísticas...</div>
     </div>
+
+    <!-- ── DIAGNÓSTICO ADMIN EXTERNO ─────────────────────────────────────── -->
+    <div class="sa-card" style="margin-top:20px;border-color:rgba(138,92,201,.35)">
+      <h3 style="color:#b08ad4">🔍 Diagnóstico — Admin Externo Multi-Tenant</h3>
+
+      <!-- SQL requerido -->
+      <div style="background:#0a0a0a;border:1px solid rgba(138,92,201,.25);border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="font-size:.68rem;color:#b08ad4;text-transform:uppercase;letter-spacing:.7px;font-weight:700;margin-bottom:8px">⚙ PASO ÚNICO — Ejecutar una vez en Supabase SQL Editor</div>
+        <div style="font-size:.7rem;color:var(--tx2);margin-bottom:10px">Esta función bypasea el RLS y permite que el login detecte todos los negocios de un admin externo:</div>
+        <pre id="saRpcSql" style="font-size:.7rem;color:#a8d0a0;background:#060606;padding:12px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;line-height:1.5;border:1px solid #1a1a1a">CREATE OR REPLACE FUNCTION get_admin_externo_tenants(user_email TEXT)
+RETURNS SETOF tenants
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT t.* FROM tenants t
+  WHERE t.activo = true
+  AND EXISTS (
+    SELECT 1 FROM jsonb_array_elements(t.modulos->'adminExternos') ae
+    WHERE lower(ae->>'email') = lower(user_email)
+    AND (ae->>'activo' IS NULL OR (ae->>'activo')::boolean = true)
+  );
+$$;</pre>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('saRpcSql').textContent).then(()=>showToast('SQL copiado','ok'))"
+          style="margin-top:8px;padding:6px 14px;background:rgba(138,92,201,.2);border:1px solid rgba(138,92,201,.4);color:#b08ad4;border-radius:6px;font-size:.72rem;cursor:pointer;font-family:var(--fb)">
+          📋 Copiar SQL
+        </button>
+      </div>
+
+      <!-- Verificar asignaciones -->
+      <div style="font-size:.72rem;color:var(--tx2);margin-bottom:8px">Verificar qué negocios tiene asignados un admin externo (busca en todos los tenants):</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input id="saDiagEmail" type="email" placeholder="email@admin.com"
+          style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.84rem;outline:none;font-family:var(--fb)">
+        <button onclick="saDiagnosticarAdminExterno()"
+          style="padding:9px 16px;background:rgba(138,92,201,.2);border:1px solid rgba(138,92,201,.4);color:#b08ad4;border-radius:7px;font-size:.84rem;cursor:pointer;font-family:var(--fb);white-space:nowrap">
+          🔍 Verificar
+        </button>
+      </div>
+      <div id="saDiagResult" style="font-size:.78rem;display:none;padding:10px 12px;border-radius:7px;line-height:1.6"></div>
+    </div>
   </div>
 </div>
 
@@ -2035,27 +2076,30 @@ async function _iniciarSesionAdminExterno(user){
   const email = (user.email||'').toLowerCase();
   let tenants = [];
 
-  // Estrategia 1: lista de tenants guardada en metadata JWT (sin consulta DB, sin RLS)
-  // Formato: admin_externo_tenants: [{id, nombre, rubro}]
-  const metaTenants = (user.user_metadata?.admin_externo_tenants || [])
-    .filter(t => t && t.id);
+  // Estrategia 1: RPC con SECURITY DEFINER — bypasa RLS, busca en todos los tenants
+  // Requiere que exista la función en Supabase (ver SQL en panel SA → Diagnóstico)
+  try {
+    const { data: rpcData, error: rpcErr } = await sb.rpc('get_admin_externo_tenants', { user_email: email });
+    if(!rpcErr && rpcData && rpcData.length > 0){
+      tenants = rpcData;
+    }
+  } catch(_){}
 
-  if(metaTenants.length > 0){
-    // Intentar obtener datos completos de DB para los IDs conocidos
-    try {
-      const ids = metaTenants.map(t => t.id);
-      const { data } = await sb.from('tenants').select('*').in('id', ids).eq('activo', true);
-      if(data && data.length > 0) tenants = data;
-    } catch(_){}
-
-    // Si la DB no devolvió resultados (RLS u otro error), usar metadata como fuente
-    // Ordenar para que coincidan con el orden de metaTenants
-    if(tenants.length === 0){
-      tenants = metaTenants; // objetos mínimos {id, nombre, rubro} — suficiente para el selector
+  // Estrategia 2: metadata JWT (si fue guardada via admin API — requiere service_role key)
+  if(tenants.length === 0){
+    const metaTenants = (user.user_metadata?.admin_externo_tenants || []).filter(t => t && t.id);
+    if(metaTenants.length > 0){
+      try {
+        const ids = metaTenants.map(t => t.id);
+        const { data } = await sb.from('tenants').select('*').in('id', ids).eq('activo', true);
+        if(data && data.length > 0) tenants = data;
+      } catch(_){}
+      // Si DB falla (RLS), usar objetos mínimos de metadata para el selector
+      if(tenants.length === 0) tenants = metaTenants;
     }
   }
 
-  // Estrategia 2: búsqueda textual en JSONB (fallback para cuentas sin metadata actualizada)
+  // Estrategia 3: búsqueda JSONB directa (puede verse limitada por RLS de tenant_id)
   if(tenants.length === 0){
     const { data } = await sb.from('tenants').select('*').eq('activo', true)
       .filter('modulos::text', 'ilike', `%${email}%`);
@@ -2071,17 +2115,8 @@ async function _iniciarSesionAdminExterno(user){
   window.__adminExternoTenants = tenants;
 
   if(tenants.length === 1){
-    // Verificar si hay más tenants en metadata que no cargaron por RLS
-    const metaCount = metaTenants.length;
-    if(metaCount > 1){
-      // Hay más tenants según metadata — mostrar selector de todos modos
-      document.getElementById('loginScreen').style.display='none';
-      _mostrarSelectorTenant(tenants.length >= metaCount ? tenants : metaTenants);
-    } else {
-      _cargarTenantExterno(tenants[0]);
-    }
+    _cargarTenantExterno(tenants[0]);
   } else {
-    // Múltiples tenants — siempre mostrar selector
     document.getElementById('loginScreen').style.display='none';
     _mostrarSelectorTenant(tenants);
   }
@@ -3233,6 +3268,71 @@ function volverAlSuperadmin(){
 
   document.getElementById('superadminScreen').style.display = 'flex';
   loadTenants();
+}
+
+// ── Diagnóstico: buscar asignaciones de un admin externo en todos los tenants ──
+async function saDiagnosticarAdminExterno(){
+  const email = (document.getElementById('saDiagEmail')?.value||'').trim().toLowerCase();
+  const resEl = document.getElementById('saDiagResult');
+  if(!email || !resEl) return;
+
+  resEl.style.display = 'block';
+  resEl.style.background = 'rgba(138,92,201,.07)';
+  resEl.style.border = '1px solid rgba(138,92,201,.2)';
+  resEl.style.color = 'var(--tx2)';
+  resEl.innerHTML = 'Buscando...';
+
+  try {
+    // El SA tiene acceso a todos los tenants — busca el email en JSONB de todos
+    const { data: allTenants, error } = await sb.from('tenants').select('id, nombre, rubro, activo, modulos');
+    if(error) throw error;
+
+    const matches = (allTenants||[]).filter(t => {
+      const ae = t.modulos?.adminExternos || [];
+      return ae.some(e => (e.email||'').toLowerCase() === email);
+    });
+
+    // También intentar el RPC para ver si la función existe
+    const { data: rpcData, error: rpcErr } = await sb.rpc('get_admin_externo_tenants', { user_email: email });
+    const rpcOk = !rpcErr && Array.isArray(rpcData);
+
+    if(matches.length === 0){
+      resEl.innerHTML = `<span style="color:var(--bad)">⚠ No se encontró "${email}" en ningún tenant.</span><br><span style="font-size:.72rem;color:var(--mut)">Verificá que fue agregado correctamente en el panel de cada negocio.</span>`;
+      return;
+    }
+
+    const rpcStatus = rpcOk
+      ? `<span style="color:var(--ok)">✓ Función RPC activa</span> — devuelve ${rpcData.length} tenant(s)`
+      : `<span style="color:var(--bad)">✗ Función RPC no existe</span> — <strong>ejecutá el SQL de arriba en Supabase para activar el login multi-tenant</strong>`;
+
+    const rows = matches.map(t => {
+      const ae = (t.modulos?.adminExternos||[]).find(e => (e.email||'').toLowerCase() === email);
+      const activo = ae?.activo !== false;
+      return `<tr>
+        <td style="padding:4px 8px;color:var(--tx)">${esc(t.nombre)}</td>
+        <td style="padding:4px 8px;color:var(--tx2)">${esc(t.rubro||'—')}</td>
+        <td style="padding:4px 8px">${activo ? '<span style="color:var(--ok)">✓ Activo</span>' : '<span style="color:var(--bad)">✗ Inactivo</span>'}</td>
+        <td style="padding:4px 8px;font-size:.65rem;color:var(--mut)">${t.id.slice(0,8)}...</td>
+      </tr>`;
+    }).join('');
+
+    resEl.innerHTML = `
+      <div style="margin-bottom:8px"><strong style="color:#b08ad4">"${esc(email)}"</strong> aparece en <strong>${matches.length}</strong> negocio(s):</div>
+      <table style="width:100%;font-size:.75rem;border-collapse:collapse">
+        <thead><tr style="font-size:.65rem;color:var(--mut);text-transform:uppercase">
+          <th style="text-align:left;padding:4px 8px">Negocio</th>
+          <th style="text-align:left;padding:4px 8px">Rubro</th>
+          <th style="text-align:left;padding:4px 8px">Estado</th>
+          <th style="text-align:left;padding:4px 8px">ID</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(138,92,201,.15);font-size:.72rem">
+        🔌 <strong>Login RPC:</strong> ${rpcStatus}
+      </div>`;
+  } catch(e) {
+    resEl.innerHTML = `<span style="color:var(--bad)">Error: ${esc(e?.message||'desconocido')}</span>`;
+  }
 }
 
 async function loadSaStats(){
