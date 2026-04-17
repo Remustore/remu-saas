@@ -468,6 +468,18 @@ textarea{resize:vertical;min-height:70px;}
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- Botón flotante "Reportar problema" — visible solo dentro de la app -->
+<button id="btnReportarBug" onclick="reportarProblema()" title="Reportar un problema"
+  style="display:none;position:fixed;bottom:18px;left:16px;z-index:8000;
+    background:rgba(20,20,20,.88);border:1px solid #2e2e2e;color:#a89880;
+    border-radius:20px;padding:6px 12px 6px 9px;font-size:.72rem;font-family:'Outfit',sans-serif;
+    cursor:pointer;display:none;align-items:center;gap:5px;
+    backdrop-filter:blur(6px);transition:all .2s ease;white-space:nowrap"
+  onmouseover="this.style.borderColor='#c9a84c';this.style.color='#c9a84c'"
+  onmouseout="this.style.borderColor='#2e2e2e';this.style.color='#a89880'">
+  🐛 <span>Reportar problema</span>
+</button>
+
 <!-- ONBOARDING WIZARD -->
 <div id="onboardingScreen" style="position:fixed;inset:0;background:#080808;z-index:9000;display:none;overflow-y:auto;font-family:'Outfit',sans-serif"></div>
 
@@ -698,6 +710,9 @@ textarea{resize:vertical;min-height:70px;}
 
         <label style="margin-top:14px;display:block">Video tutorial (YouTube URL) <span style="color:var(--mut);font-weight:400">— aparece en el onboarding y ayuda</span></label>
         <input id="saInputVideoTutorial" type="url" placeholder="https://youtu.be/... o https://www.youtube.com/watch?v=...">
+
+        <label style="margin-top:14px;display:block">WhatsApp de soporte <span style="color:var(--mut);font-weight:400">— número para el botón "Reportar problema" (ej: 5493472628087)</span></label>
+        <input id="saInputSoporteTel" type="tel" placeholder="5493472628087">
       </div>
 
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -2086,6 +2101,9 @@ function _seleccionarTenantExterno(idx){
 
 function setupApp(){
   initTheme();
+  // Mostrar botón de reporte de problemas
+  const bugBtn = document.getElementById('btnReportarBug');
+  if(bugBtn) bugBtn.style.display = 'flex';
   // Aplicar nombre del negocio
   const n = currentTenant.nombre || 'Mi Negocio';
   const r = currentTenant.rubro || 'Sistema de Gestión';
@@ -2169,6 +2187,8 @@ function setupApp(){
   // Poll for new solicitudes every 2 minutes
   setTimeout(checkNuevasSolicitudes, 5000);
   setInterval(checkNuevasSolicitudes, 120000);
+  // Cargar número de soporte desde config global (para botón "Reportar problema")
+  _cargarSoporteTel();
   // Resumen semanal los lunes
   const diaSemana = new Date().getDay();
   if(diaSemana === 1) setTimeout(mostrarResumenSemanal, 1500);
@@ -2219,12 +2239,16 @@ async function doLogout(){
   if(currentRole === 'admin') descargarBackup();
   await sb.auth.signOut();
   currentUser = null; currentTenant = null; currentRole = null;
+  window._currentSection = null;
+  window.__adminExternoTenants = null;
   S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
   document.getElementById('sb').style.display='none';
   document.getElementById('mn').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
   document.getElementById('loginUser').value='';
   document.getElementById('loginPass').value='';
+  const bugBtn = document.getElementById('btnReportarBug');
+  if(bugBtn) bugBtn.style.display = 'none';
 }
 
 function doSuperLogout(){
@@ -2875,6 +2899,9 @@ async function guardarMpLink(){
   const video = (document.getElementById('saInputVideoTutorial')?.value||'').trim();
   if(video) { cfgData.video_tutorial = video; localStorage.setItem('remu_video_tutorial', video); }
   else { delete localStorage['remu_video_tutorial']; }
+  const soporteTel = (document.getElementById('saInputSoporteTel')?.value||'').trim().replace(/\D/g,'');
+  if(soporteTel){ cfgData.soporte_tel = soporteTel; localStorage.setItem('remu_soporte_tel', soporteTel); }
+  else { delete localStorage['remu_soporte_tel']; }
 
   try {
     await _ensureSystemTenant();
@@ -2909,17 +2936,30 @@ async function loadMpConfig(){
   const token = cfg?.mp_access_token || localStorage.getItem('remu_mp_token') || '';
   const precio = cfg?.mp_precio || parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
   const video = cfg?.video_tutorial || localStorage.getItem('remu_video_tutorial') || '';
+  const soporteTel = cfg?.soporte_tel || localStorage.getItem('remu_soporte_tel') || '';
 
   if(document.getElementById('saInputMpLink'))   document.getElementById('saInputMpLink').value = link;
   if(document.getElementById('saInputMpToken'))  document.getElementById('saInputMpToken').value = token;
   if(document.getElementById('saInputMpPrecio')) document.getElementById('saInputMpPrecio').value = precio;
   if(document.getElementById('saInputVideoTutorial')) document.getElementById('saInputVideoTutorial').value = video;
+  if(document.getElementById('saInputSoporteTel')) document.getElementById('saInputSoporteTel').value = soporteTel;
   if(video) localStorage.setItem('remu_video_tutorial', video);
+  if(soporteTel) localStorage.setItem('remu_soporte_tel', soporteTel);
 
   // Actualizar precio en trial screen si está visible
   _actualizarPrecioTrial(parseInt(precio) || 8000);
 
   return { link, token, precio: parseInt(precio) || 8000, video };
+}
+
+async function _cargarSoporteTel(){
+  // Solo busca en Supabase si no está en localStorage o si está vacío
+  if(localStorage.getItem('remu_soporte_tel')) return;
+  try {
+    const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
+    const tel = data?.data?.soporte_tel || '';
+    if(tel) localStorage.setItem('remu_soporte_tel', tel);
+  } catch(e){}
 }
 
 function _actualizarPrecioTrial(precio){
@@ -3342,6 +3382,7 @@ async function doUndo(){
 const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración de turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas' };
 
 function go(id){
+  window._currentSection = id;
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
   const sec = document.getElementById('sec-'+id);
@@ -3351,6 +3392,25 @@ function go(id){
   const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
+}
+
+function reportarProblema(){
+  const tel = localStorage.getItem('remu_soporte_tel') || '5493472628087';
+  const negocio = currentTenant?.nombre || 'desconocido';
+  const secId = window._currentSection || 'inicio';
+  const modulo = SN[secId] || secId;
+  const now = new Date();
+  const fecha = now.toLocaleDateString('es-AR', {weekday:'long', day:'numeric', month:'long'});
+  const hora  = now.toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'});
+  const msg = `🐛 *Reporte de problema — Remu Gestión*
+
+📍 *Negocio:* ${negocio}
+📂 *Módulo:* ${modulo}
+📅 *Fecha y hora:* ${fecha}, ${hora}
+
+*Descripción del problema:*
+(escribí acá qué pasó)`;
+  window.open('https://wa.me/' + tel + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 function toggleSB(){
