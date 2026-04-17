@@ -470,15 +470,20 @@ textarea{resize:vertical;min-height:70px;}
 
 <!-- Botón flotante "Reportar problema" — visible solo dentro de la app -->
 <button id="btnReportarBug" onclick="reportarProblema()" title="Reportar un problema"
-  style="display:none;position:fixed;bottom:18px;left:16px;z-index:8000;
+  style="display:none;position:fixed;bottom:14px;left:223px;z-index:190;
     background:rgba(20,20,20,.88);border:1px solid #2e2e2e;color:#a89880;
-    border-radius:20px;padding:6px 12px 6px 9px;font-size:.72rem;font-family:'Outfit',sans-serif;
-    cursor:pointer;display:none;align-items:center;gap:5px;
+    border-radius:20px;padding:5px 12px 5px 9px;font-size:.7rem;font-family:'Outfit',sans-serif;
+    cursor:pointer;align-items:center;gap:5px;
     backdrop-filter:blur(6px);transition:all .2s ease;white-space:nowrap"
   onmouseover="this.style.borderColor='#c9a84c';this.style.color='#c9a84c'"
   onmouseout="this.style.borderColor='#2e2e2e';this.style.color='#a89880'">
   🐛 <span>Reportar problema</span>
 </button>
+<style>
+  @media(max-width:768px){
+    #btnReportarBug{ left:8px !important; bottom:10px !important; }
+  }
+</style>
 
 <!-- ONBOARDING WIZARD -->
 <div id="onboardingScreen" style="position:fixed;inset:0;background:#080808;z-index:9000;display:none;overflow-y:auto;font-family:'Outfit',sans-serif"></div>
