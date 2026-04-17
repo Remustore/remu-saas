@@ -2035,14 +2035,27 @@ async function _iniciarSesionAdminExterno(user){
   const email = (user.email||'').toLowerCase();
   let tenants = [];
 
-  // Estrategia 1: IDs guardados en metadata (más rápido y preciso)
-  const metaIds = user.user_metadata?.admin_externo_tenants || [];
-  if(metaIds.length > 0){
-    const { data } = await sb.from('tenants').select('*').in('id', metaIds).eq('activo', true);
-    tenants = data || [];
+  // Estrategia 1: lista de tenants guardada en metadata JWT (sin consulta DB, sin RLS)
+  // Formato: admin_externo_tenants: [{id, nombre, rubro}]
+  const metaTenants = (user.user_metadata?.admin_externo_tenants || [])
+    .filter(t => t && t.id);
+
+  if(metaTenants.length > 0){
+    // Intentar obtener datos completos de DB para los IDs conocidos
+    try {
+      const ids = metaTenants.map(t => t.id);
+      const { data } = await sb.from('tenants').select('*').in('id', ids).eq('activo', true);
+      if(data && data.length > 0) tenants = data;
+    } catch(_){}
+
+    // Si la DB no devolvió resultados (RLS u otro error), usar metadata como fuente
+    // Ordenar para que coincidan con el orden de metaTenants
+    if(tenants.length === 0){
+      tenants = metaTenants; // objetos mínimos {id, nombre, rubro} — suficiente para el selector
+    }
   }
 
-  // Estrategia 2: búsqueda textual en JSONB (fallback cuando metadata no tiene los IDs)
+  // Estrategia 2: búsqueda textual en JSONB (fallback para cuentas sin metadata actualizada)
   if(tenants.length === 0){
     const { data } = await sb.from('tenants').select('*').eq('activo', true)
       .filter('modulos::text', 'ilike', `%${email}%`);
@@ -2058,9 +2071,17 @@ async function _iniciarSesionAdminExterno(user){
   window.__adminExternoTenants = tenants;
 
   if(tenants.length === 1){
-    _cargarTenantExterno(tenants[0]);
+    // Verificar si hay más tenants en metadata que no cargaron por RLS
+    const metaCount = metaTenants.length;
+    if(metaCount > 1){
+      // Hay más tenants según metadata — mostrar selector de todos modos
+      document.getElementById('loginScreen').style.display='none';
+      _mostrarSelectorTenant(tenants.length >= metaCount ? tenants : metaTenants);
+    } else {
+      _cargarTenantExterno(tenants[0]);
+    }
   } else {
-    // Ocultar pantalla de login y mostrar selector
+    // Múltiples tenants — siempre mostrar selector
     document.getElementById('loginScreen').style.display='none';
     _mostrarSelectorTenant(tenants);
   }
@@ -2097,10 +2118,18 @@ function _mostrarSelectorTenant(tenants){
   document.body.appendChild(ov);
 }
 
-function _seleccionarTenantExterno(idx){
+async function _seleccionarTenantExterno(idx){
   const t = (window.__adminExternoTenants||[])[idx];
   if(!t) return;
   document.getElementById('tenantSelectorOv')?.remove();
+
+  // Si el objeto es mínimo (solo tiene id/nombre/rubro desde metadata), buscar datos completos
+  if(!t.modulos && !t.config){
+    try {
+      const { data: full } = await sb.from('tenants').select('*').eq('id', t.id).single();
+      if(full){ _cargarTenantExterno(full); return; }
+    } catch(_){}
+  }
   _cargarTenantExterno(t);
 }
 
@@ -2757,8 +2786,10 @@ async function agregarAdminExterno(tenantId){
 
   try {
     // 1. Agregar a modulos.adminExternos del tenant
-    const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+    const { data: t } = await sb.from('tenants').select('id, nombre, rubro, modulos').eq('id', tenantId).single();
     const mods = t?.modulos || {};
+    const tNombre = t?.nombre || 'Negocio';
+    const tRubro  = t?.rubro  || '';
     const existentes = mods.adminExternos || [];
     if(existentes.find(ae => ae.email === email)){
       showAeMsg('Ya existe un admin externo con ese email en este negocio', false);
@@ -2766,27 +2797,30 @@ async function agregarAdminExterno(tenantId){
     }
     const nuevosAE = [...existentes, { nombre, email, activo: true, created_at: new Date().toISOString() }];
 
-    // 2. Intentar crear/actualizar usuario en Supabase Auth con rol='admin_externo'
-    //    Si ya existe, solo actualizamos el modulos del tenant
+    // 2. Crear/actualizar usuario en Supabase Auth con rol='admin_externo'
+    //    Y también actualizar admin_externo_tenants en metadata (para login multi-tenant sin RLS)
     const meta = { rol: 'admin_externo', nombre_empleado: nombre };
     let authMsg = '';
+    let authUserId = null;
+    let authUserMeta = {};
     try {
       if(pass && pass.length >= 6){
-        // Crear usuario nuevo
-        const { error: ae } = await sb.auth.admin.createUser({
+        // Intentar crear usuario nuevo
+        const { data: uc, error: ae } = await sb.auth.admin.createUser({
           email, password: pass, user_metadata: meta, email_confirm: true
         });
         if(ae){
-          // Puede que ya exista — intentar actualizar metadata con listUsers
-          try {
-            const { data: lista } = await sb.auth.admin.listUsers();
-            const existing = lista?.users?.find(u => u.email === email);
-            if(existing){
-              await sb.auth.admin.updateUserById(existing.id, { password: pass, user_metadata: { ...existing.user_metadata, ...meta } });
-              authMsg = ' (cuenta existente actualizada)';
-            }
-          } catch(_){}
+          // Ya existe — actualizar
+          const { data: lista } = await sb.auth.admin.listUsers();
+          const existing = lista?.users?.find(u => u.email === email);
+          if(existing){
+            authUserId   = existing.id;
+            authUserMeta = existing.user_metadata || {};
+            await sb.auth.admin.updateUserById(existing.id, { password: pass, user_metadata: { ...authUserMeta, ...meta } });
+            authMsg = ' (cuenta existente actualizada)';
+          }
         } else {
+          authUserId = uc?.user?.id;
           authMsg = ' (cuenta creada)';
         }
       } else {
@@ -2794,11 +2828,25 @@ async function agregarAdminExterno(tenantId){
         const { data: lista } = await sb.auth.admin.listUsers();
         const existing = lista?.users?.find(u => u.email === email);
         if(existing){
-          await sb.auth.admin.updateUserById(existing.id, { user_metadata: { ...existing.user_metadata, ...meta } });
+          authUserId   = existing.id;
+          authUserMeta = existing.user_metadata || {};
+          await sb.auth.admin.updateUserById(existing.id, { user_metadata: { ...authUserMeta, ...meta } });
           authMsg = ' (metadata actualizada)';
         } else {
           authMsg = ' ⚠ Cuenta no encontrada. Ingresá una contraseña para crearla.';
         }
+      }
+
+      // Actualizar admin_externo_tenants en metadata para detección multi-tenant al login
+      if(authUserId){
+        const baseMeta = Object.keys(authUserMeta).length ? authUserMeta : meta;
+        const prevTenants = (baseMeta.admin_externo_tenants || []).filter(et => et.id !== tenantId);
+        await sb.auth.admin.updateUserById(authUserId, {
+          user_metadata: {
+            ...baseMeta, ...meta,
+            admin_externo_tenants: [...prevTenants, { id: tenantId, nombre: tNombre, rubro: tRubro }]
+          }
+        });
       }
     } catch(_){ authMsg = ' (sin acceso a admin API — asegurate de crear la cuenta manualmente)'; }
 
