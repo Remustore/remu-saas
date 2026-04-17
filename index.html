@@ -7642,12 +7642,13 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
     return;
   }
 
-  // Get occupied slots from Supabase solicitudes (confirmed + manual blocks)
+  // Get occupied slots from Supabase solicitudes (confirmed + manual blocks only)
+  // Pendiente NO bloquea — el admin debe confirmar primero
   const { data: solicitudes } = await sb.from('turnos_solicitudes')
     .select('hora,empleado_id,estado')
     .eq('tenant_id', tenantId)
     .eq('fecha', fecha)
-    .in('estado', ['confirmado','bloqueado','pendiente']);
+    .in('estado', ['confirmado','bloqueado']);
 
   const ocupados = new Set((solicitudes||[]).map(s=>(s.hora||'').substring(0,5)));
   const bloqueadosDueno = new Set(); // slots bloqueados por el dueño (NO por clientes)
