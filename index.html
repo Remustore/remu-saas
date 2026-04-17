@@ -733,6 +733,7 @@ textarea{resize:vertical;min-height:70px;}
   <div class="ni" onclick="go('gastos')" id="nav-gastos" style="display:none"><span class="nico">💵</span>Caja y Gastos</div>
   <div class="ni" onclick="go('analisis')" id="nav-analisis" style="display:none"><span class="nico">📊</span>Análisis</div>
   <div class="ni" onclick="go('precios')" id="nav-precios" style="display:none"><span class="nico">🏷</span>Mis precios</div>
+  <div class="ni" onclick="go('pedidos')" id="nav-pedidos" style="display:none"><span class="nico">📋</span>Pedidos<span id="pedidosBadge" class="nav-badge" style="display:none">0</span></div>
   <!-- INTERNOS (siempre ocultos en sidebar) -->
   <div class="ni" onclick="go('equipos')" id="nav-equipos" style="display:none"><span class="nico">▤</span>Equipos</div>
   <div class="ni" onclick="go('auditoria')" id="nav-auditoria" style="display:none"><span class="nico">📋</span>Control Stock</div>
@@ -1316,6 +1317,22 @@ textarea{resize:vertical;min-height:70px;}
       <div class="tw"><table><thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th></th></tr></thead><tbody id="tbG"></tbody></table></div></div>
     </div>
 
+    <!-- PEDIDOS (Taller) -->
+    <div class="sec" id="sec-pedidos">
+      <div class="pt">Pedidos</div>
+      <div class="ps">Pedidos de clientes — seguimiento y aviso por WhatsApp</div>
+      <div class="ch">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="tab active" id="tabPedTodos" onclick="setPedFiltro('todos',this)">Todos</button>
+          <button class="tab" id="tabPedPend" onclick="setPedFiltro('pendiente',this)">⏳ Pendientes</button>
+          <button class="tab" id="tabPedLlego" onclick="setPedFiltro('llego',this)">📦 Llegaron</button>
+          <button class="tab" id="tabPedEntr" onclick="setPedFiltro('entregado',this)">✅ Entregados</button>
+        </div>
+        <button class="btn bg" onclick="abrirNuevoPedido()">+ Nuevo pedido</button>
+      </div>
+      <div id="pedidosList" style="margin-top:12px"></div>
+    </div>
+
     <!-- ANÁLISIS -->
     <div class="sec" id="sec-analisis">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:2px">
@@ -1706,6 +1723,29 @@ textarea{resize:vertical;min-height:70px;}
   </div>
   <button class="btn bg" style="width:100%;margin-top:14px" onclick="guardarBloqueo()">+ Agregar bloqueo</button>
   <div id="bloqueosList" style="margin-top:16px;border-top:1px solid var(--bor);padding-top:12px"></div>
+</div>
+</div></div>
+
+<!-- Modal Pedido -->
+<div class="mb" id="mPedido"><div class="md"><div class="mh"><div class="mt2" id="mPedidoTitle">📋 Nuevo pedido</div><button class="xbtn" onclick="closeM('mPedido')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="pedId">
+  <div class="fr">
+    <div><label>Nombre del cliente</label><input id="pedNombre" placeholder="Ej: Juan Pérez"></div>
+    <div><label>WhatsApp (sin 0, sin 15)</label><input id="pedTel" type="tel" placeholder="Ej: 3472628087"></div>
+  </div>
+  <div class="fr full">
+    <div><label>Producto pedido</label><input id="pedProducto" placeholder="Ej: Funda iPhone 14, cable USB-C..."></div>
+  </div>
+  <div class="fr">
+    <div><label>Precio estimado ($)</label><input type="number" id="pedPrecio" placeholder="0" min="0"></div>
+    <div><label>Fecha del pedido</label><input type="date" id="pedFecha"></div>
+  </div>
+  <div><label>Notas (opcional)</label><input id="pedNotas" placeholder="Proveedor, color, modelo específico..."></div>
+</div>
+<div class="mf">
+  <button class="btn" onclick="closeM('mPedido')">Cancelar</button>
+  <button class="btn bg" onclick="guardarPedido()">Guardar pedido</button>
 </div>
 </div></div>
 
@@ -3063,7 +3103,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración de turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', cuotas:'Cuotas', metasPareja:'Metas' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración de turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas' };
 
 function go(id){
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
@@ -3072,7 +3112,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -3777,6 +3817,192 @@ function rTaller(){
       </div>`;
     }).join(''):`<div style="color:var(--mut);font-size:.74rem;padding:7px 0">Sin órdenes</div>`}</div>`;
   }).join('');
+}
+
+// ═══ PEDIDOS (Taller) ═══
+const PEDIDOS_KEY = 'pedidos_';
+let _pedFiltro = 'todos';
+
+function getPedidos(){
+  return JSON.parse(localStorage.getItem(PEDIDOS_KEY + (currentTenant?.id||'')) || '[]');
+}
+function _savePedidos(arr){
+  localStorage.setItem(PEDIDOS_KEY + (currentTenant?.id||''), JSON.stringify(arr));
+}
+
+function rPedidos(){
+  const todos = getPedidos();
+  const filtered = _pedFiltro === 'todos' ? todos : todos.filter(p => p.estado === _pedFiltro);
+
+  // Sort: pendiente → llego → entregado; dentro de cada grupo por fecha desc
+  const ORD = { pendiente:0, llego:1, entregado:2 };
+  filtered.sort((a,b) => {
+    const d = (ORD[a.estado]||0) - (ORD[b.estado]||0);
+    return d !== 0 ? d : (b.fecha||'').localeCompare(a.fecha||'');
+  });
+
+  // Badge con pedidos activos (pendiente + llego)
+  const activos = todos.filter(p => p.estado !== 'entregado').length;
+  const badge = document.getElementById('pedidosBadge');
+  if(badge){ badge.textContent = activos; badge.style.display = activos ? '' : 'none'; }
+
+  const el = document.getElementById('pedidosList');
+  if(!el) return;
+
+  if(!filtered.length){
+    el.innerHTML = `<div class="card">${emp('📋', _pedFiltro === 'todos' ? 'No hay pedidos aún. Creá el primero.' : 'No hay pedidos en este estado.')}</div>`;
+    return;
+  }
+
+  const EI = {
+    pendiente: { label:'⏳ Pendiente', bg:'rgba(201,148,76,.12)', color:'var(--wrn)', bdr:'rgba(201,148,76,.3)' },
+    llego:     { label:'📦 Llegó',      bg:'rgba(76,142,201,.12)', color:'var(--inf)', bdr:'rgba(76,142,201,.3)' },
+    entregado: { label:'✅ Entregado',  bg:'rgba(76,175,125,.1)',  color:'var(--ok)',  bdr:'rgba(76,175,125,.25)' }
+  };
+
+  el.innerHTML = filtered.map(p => {
+    const ei = EI[p.estado] || EI.pendiente;
+    const waHref = p.tel ? `<a href="https://wa.me/${p.tel}" target="_blank" style="color:var(--ok);text-decoration:none">📱 ${esc(p.tel)}</a>` : '';
+    const btns = p.estado === 'pendiente'
+      ? `<button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="marcarPedidoLlego('${p.id}')">📦 Llegó</button>
+         <button class="btn be bsm" onclick="editarPedido('${p.id}')">✎</button>
+         <button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`
+      : p.estado === 'llego'
+      ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="marcarPedidoEntregado('${p.id}')">✅ Entregado</button>
+         <button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`
+      : `<button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`;
+
+    return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${ei.bdr}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+            <span style="font-weight:700;font-size:.95rem">${esc(p.nombre)}</span>
+            <span style="padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;background:${ei.bg};color:${ei.color};border:1px solid ${ei.bdr}">${ei.label}</span>
+          </div>
+          <div style="font-size:.88rem;color:var(--tx);margin-bottom:5px">📦 ${esc(p.producto)}</div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.78rem;color:var(--tx2)">
+            ${waHref ? `<span>${waHref}</span>` : ''}
+            <span>📅 ${fD(p.fecha)}</span>
+            ${p.precio > 0 ? `<span style="color:var(--gld);font-weight:600">${fmt(p.precio)}</span>` : ''}
+            ${p.notas ? `<span style="color:var(--mut)">💬 ${esc(p.notas)}</span>` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;align-items:center">${btns}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setPedFiltro(filtro, btn){
+  _pedFiltro = filtro;
+  document.querySelectorAll('#sec-pedidos .tab').forEach(t => t.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  rPedidos();
+}
+
+function abrirNuevoPedido(){
+  document.getElementById('pedId').value       = '';
+  document.getElementById('pedNombre').value   = '';
+  document.getElementById('pedTel').value      = '';
+  document.getElementById('pedProducto').value = '';
+  document.getElementById('pedPrecio').value   = '';
+  document.getElementById('pedFecha').value    = tod();
+  document.getElementById('pedNotas').value    = '';
+  document.getElementById('mPedidoTitle').textContent = '📋 Nuevo pedido';
+  openM('mPedido');
+}
+
+function guardarPedido(){
+  const id       = document.getElementById('pedId').value;
+  const nombre   = (document.getElementById('pedNombre').value||'').trim();
+  const telRaw   = (document.getElementById('pedTel').value||'').replace(/\D/g,'');
+  // Formatear tel: agregar código Argentina 54 si no tiene prefijo internacional
+  const tel      = telRaw ? (telRaw.startsWith('54') ? telRaw : telRaw.startsWith('0') ? '54' + telRaw.slice(1) : '54' + telRaw) : '';
+  const producto = (document.getElementById('pedProducto').value||'').trim();
+  const precio   = parseFloat(document.getElementById('pedPrecio').value||'0')||0;
+  const fecha    = document.getElementById('pedFecha').value || tod();
+  const notas    = (document.getElementById('pedNotas').value||'').trim();
+
+  if(!nombre)  { showToast('Ingresá el nombre del cliente'); return; }
+  if(!producto){ showToast('Ingresá el producto pedido'); return; }
+
+  const pedidos = getPedidos();
+  if(id){
+    const idx = pedidos.findIndex(p => p.id === id);
+    if(idx >= 0) pedidos[idx] = { ...pedidos[idx], nombre, tel, producto, precio, fecha, notas };
+  } else {
+    pedidos.unshift({ id: Date.now().toString(), nombre, tel, producto, precio, fecha, notas, estado:'pendiente', created_at: new Date().toISOString() });
+  }
+  _savePedidos(pedidos);
+  closeM('mPedido');
+  rPedidos();
+  showToast(id ? 'Pedido actualizado ✓' : 'Pedido creado ✓');
+}
+
+function editarPedido(id){
+  const p = getPedidos().find(x => x.id === id);
+  if(!p) return;
+  document.getElementById('pedId').value       = p.id;
+  document.getElementById('pedNombre').value   = p.nombre||'';
+  document.getElementById('pedTel').value      = p.tel||'';
+  document.getElementById('pedProducto').value = p.producto||'';
+  document.getElementById('pedPrecio').value   = p.precio||'';
+  document.getElementById('pedFecha').value    = p.fecha||tod();
+  document.getElementById('pedNotas').value    = p.notas||'';
+  document.getElementById('mPedidoTitle').textContent = '✎ Editar pedido';
+  openM('mPedido');
+}
+
+function marcarPedidoLlego(id){
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === id);
+  if(!p) return;
+  p.estado = 'llego';
+  p.fechaLlego = tod();
+  _savePedidos(pedidos);
+  rPedidos();
+
+  // Abrir WhatsApp con aviso al cliente
+  if(p.tel){
+    const negocio = currentTenant?.nombre || 'la tienda';
+    const msg = `Hola ${p.nombre}! Te avisamos que tu pedido de ${p.producto} llegó a ${negocio}. Pasá cuando quieras a retirarlo! 📦`;
+    setTimeout(() => window.open(`https://wa.me/${p.tel}?text=${encodeURIComponent(msg)}`, '_blank'), 400);
+    showToast('¡Llegó! Abriendo WhatsApp…');
+  } else {
+    showToast('Pedido marcado como llegado ✓');
+  }
+}
+
+async function marcarPedidoEntregado(id){
+  const pedidos = getPedidos();
+  const p = pedidos.find(x => x.id === id);
+  if(!p) return;
+  p.estado = 'entregado';
+  p.fechaEntregado = tod();
+  _savePedidos(pedidos);
+  rPedidos();
+  showToast('Pedido entregado ✓');
+
+  // Sumar a la caja del día automáticamente
+  if(p.precio > 0){
+    if(!S.movCaja) S.movCaja = [];
+    S.movCaja.push({
+      id: Date.now(),
+      caja: 'accesorios',
+      tipo: 'ingreso',
+      monto: p.precio,
+      fecha: tod(),
+      concepto: `Pedido entregado: ${p.producto} — ${p.nombre}`
+    });
+    try { await dbSetConfig('movCaja', S.movCaja); } catch(e){}
+  }
+}
+
+function eliminarPedido(id){
+  if(!confirm('¿Eliminar este pedido?')) return;
+  _savePedidos(getPedidos().filter(p => p.id !== id));
+  rPedidos();
+  showToast('Pedido eliminado ✓');
 }
 
 // ═══ GASTOS ═══
@@ -9794,7 +10020,7 @@ function aplicarModulosPorRubro(rubro){
 
   if(esTaller){
     // 🔧 TALLER DE CELULARES
-    showNav('nav-taller','nav-stock','nav-ventas','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-taller','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
   } else if(esBarberia){
     // ✂️ BARBERÍA
     showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios');
