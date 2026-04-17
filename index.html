@@ -2076,38 +2076,49 @@ async function _iniciarSesionAdminExterno(user){
   const email = (user.email||'').toLowerCase();
   let tenants = [];
 
-  // Estrategia 1: RPC con SECURITY DEFINER — bypasa RLS, busca en todos los tenants
-  // Requiere que exista la función en Supabase (ver SQL en panel SA → Diagnóstico)
-  try {
-    const { data: rpcData, error: rpcErr } = await sb.rpc('get_admin_externo_tenants', { user_email: email });
-    if(!rpcErr && rpcData && rpcData.length > 0){
-      tenants = rpcData;
-    }
-  } catch(_){}
+  console.log('[AE-LOGIN] Iniciando para:', email);
+  console.log('[AE-LOGIN] user_metadata:', JSON.stringify(user.user_metadata));
 
-  // Estrategia 2: metadata JWT (si fue guardada via admin API — requiere service_role key)
+  // Estrategia 1: RPC con SECURITY DEFINER — bypasa RLS, busca en todos los tenants
+  const { data: rpcData, error: rpcErr } = await sb.rpc('get_admin_externo_tenants', { user_email: email });
+  console.log('[AE-LOGIN] RPC result → data:', rpcData, '| error:', rpcErr);
+
+  if(rpcErr){
+    console.warn('[AE-LOGIN] RPC falló:', rpcErr.message, rpcErr.code);
+  }
+  if(!rpcErr && Array.isArray(rpcData)){
+    console.log('[AE-LOGIN] RPC devolvió', rpcData.length, 'tenant(s):', rpcData.map(t=>t.nombre));
+    if(rpcData.length > 0) tenants = rpcData;
+  }
+
+  // Estrategia 2: metadata JWT
   if(tenants.length === 0){
     const metaTenants = (user.user_metadata?.admin_externo_tenants || []).filter(t => t && t.id);
+    console.log('[AE-LOGIN] Estrategia 2 — metaTenants:', metaTenants.length, metaTenants);
     if(metaTenants.length > 0){
       try {
         const ids = metaTenants.map(t => t.id);
         const { data } = await sb.from('tenants').select('*').in('id', ids).eq('activo', true);
+        console.log('[AE-LOGIN] DB por IDs:', data?.length, data?.map(t=>t.nombre));
         if(data && data.length > 0) tenants = data;
-      } catch(_){}
-      // Si DB falla (RLS), usar objetos mínimos de metadata para el selector
+      } catch(e){ console.warn('[AE-LOGIN] DB por IDs falló:', e); }
       if(tenants.length === 0) tenants = metaTenants;
     }
   }
 
-  // Estrategia 3: búsqueda JSONB directa (puede verse limitada por RLS de tenant_id)
+  // Estrategia 3: búsqueda JSONB directa (limitada por RLS)
   if(tenants.length === 0){
-    const { data } = await sb.from('tenants').select('*').eq('activo', true)
+    const { data, error: e3 } = await sb.from('tenants').select('*').eq('activo', true)
       .filter('modulos::text', 'ilike', `%${email}%`);
+    console.log('[AE-LOGIN] Estrategia 3 JSONB → rows:', data?.length, '| error:', e3, '| matches:',
+      (data||[]).filter(t=>(t.modulos?.adminExternos||[]).some(e=>(e.email||'').toLowerCase()===email)).map(t=>t.nombre));
     tenants = (data||[]).filter(t=>{
       const ae = t.modulos?.adminExternos || [];
       return ae.some(e=>(e.email||'').toLowerCase()===email && e.activo!==false);
     });
   }
+
+  console.log('[AE-LOGIN] TOTAL tenants encontrados:', tenants.length, tenants.map(t=>t.nombre));
 
   if(!tenants.length) throw new Error('No tenés acceso a ningún negocio. Contactá al administrador.');
 
@@ -2115,8 +2126,10 @@ async function _iniciarSesionAdminExterno(user){
   window.__adminExternoTenants = tenants;
 
   if(tenants.length === 1){
+    console.log('[AE-LOGIN] 1 tenant → login directo a:', tenants[0].nombre);
     _cargarTenantExterno(tenants[0]);
   } else {
+    console.log('[AE-LOGIN] Múltiples tenants → mostrando selector');
     document.getElementById('loginScreen').style.display='none';
     _mostrarSelectorTenant(tenants);
   }
