@@ -1918,6 +1918,15 @@ async function doLogin(){
     if(te || !td) throw new Error('Tenant no encontrado. Contactá al administrador.');
     if(!td.activo) throw new Error('Cuenta desactivada. Contactá al administrador.');
 
+    // Verificar si el usuario individual está activo (multi-usuario por tenant)
+    const usuarios = td.modulos?.usuarios;
+    if(usuarios && usuarios.length > 0){
+      const uEntry = usuarios.find(u => u.email === data.user.email);
+      if(uEntry && uEntry.activo === false){
+        throw new Error('Tu usuario fue desactivado. Contactá al administrador del negocio.');
+      }
+    }
+
     currentTenant = td;
     const nombreEmpleado = data.user.user_metadata?.nombre_empleado || '';
     currentRole = rol;
@@ -2196,7 +2205,14 @@ async function crearTenant(){
 
     // Precargar servicios según rubro
     await precargarServiciosTenant(tenant.id, rubro, nombre);
-    
+
+    // Registrar administrador inicial en la lista de usuarios del tenant
+    const modConUsuarios = {
+      ...modulos,
+      usuarios: [{ nombre: nombre, email: email, rol: 'admin', activo: true, created_at: new Date().toISOString() }]
+    };
+    await sb.from('tenants').update({ modulos: modConUsuarios }).eq('id', tenant.id);
+
     showSaMsg(`✓ Cliente "${nombre}" creado. Email: ${email}`, 'ok');
     document.getElementById('saName').value='';
     document.getElementById('saRubro').value='';
@@ -2364,12 +2380,158 @@ async function loadTenants(){
         ${trialLabel}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="activarPago('${t.id}')">✓ Marcar pagado</button>`:'<button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="desactivarPago(\''+t.id+'\')">Cancelar pago</button>'}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="extenderTrial('${t.id}')">+30 días trial</button>`:''}
+        <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="gestionarUsuarios('${t.id}')">👥 ${(mods.usuarios||[]).length||1} usuario${((mods.usuarios||[]).length||1)!==1?'s':''}</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
         <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:var(--gld);border-color:rgba(201,168,76,.4)" onclick="accederComoTenant('${t.id}')">→ Acceder</button>
       </div>
     </div>`;
   }).join('');
+}
+
+// ── MULTI-USUARIOS POR TENANT ──────────────────────────────────────────
+
+async function gestionarUsuarios(tenantId){
+  const { data: t } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+  if(!t) return;
+  // Crear overlay si no existe
+  let overlay = document.getElementById('usersOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'usersOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+    overlay.onclick = e => { if(e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+  _renderUsersModal(t);
+}
+
+function _renderUsersModal(t){
+  const overlay = document.getElementById('usersOverlay');
+  if(!overlay) return;
+  const mods = t.modulos || {};
+  const usuarios = mods.usuarios || [];
+
+  const usersHTML = usuarios.length
+    ? usuarios.map(u => `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bor)">
+        <div style="width:32px;height:32px;border-radius:50%;background:${u.rol==='admin'?'rgba(201,168,76,.2)':'rgba(76,142,201,.2)'};display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0">${u.rol==='admin'?'👑':'👤'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:600">${esc(u.nombre||u.email)}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">${esc(u.email)}</div>
+        </div>
+        <span style="padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:600;flex-shrink:0;${u.rol==='admin'?'background:rgba(201,168,76,.15);color:var(--gld)':'background:rgba(76,142,201,.12);color:var(--inf)'}">${u.rol==='admin'?'Administrador':'Empleado'}</span>
+        ${u.activo===false?'<span style="padding:2px 8px;border-radius:12px;font-size:.68rem;background:rgba(201,82,76,.12);color:var(--bad);flex-shrink:0">Inactivo</span>':''}
+        <button onclick="toggleUsuarioActivo('${esc(t.id)}','${esc(u.email)}',${u.activo!==false})" style="background:none;border:1px solid var(--bor2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:${u.activo===false?'var(--ok)':'var(--bad)'};cursor:pointer;flex-shrink:0">${u.activo===false?'Activar':'Desactivar'}</button>
+      </div>`).join('')
+    : '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin usuarios registrados. Agregá el primero.</div>';
+
+  overlay.innerHTML = `
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-family:var(--fh);font-size:1rem;font-weight:700">👥 Usuarios — ${esc(t.nombre)}</div>
+        <button onclick="document.getElementById('usersOverlay')?.remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:18px 20px">
+        <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">USUARIOS ACTUALES</div>
+        <div id="usersListContent">${usersHTML}</div>
+
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bor)">
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:12px">+ AGREGAR USUARIO</div>
+          <input type="hidden" id="uaTenantId" value="${esc(t.id)}">
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre</label>
+          <input id="uaNombre" placeholder="Ej: María González" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Email</label>
+          <input id="uaEmail" type="email" placeholder="usuario@negocio.com" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Contraseña</label>
+          <input id="uaPass" type="password" placeholder="Mínimo 6 caracteres" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Rol</label>
+          <select id="uaRol" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:14px;font-family:var(--fb)">
+            <option value="admin">👑 Administrador — acceso completo</option>
+            <option value="empleado">👤 Empleado — solo sus turnos del día</option>
+          </select>
+          <div id="uaMsg" style="font-size:.78rem;margin-bottom:8px;display:none;padding:8px 10px;border-radius:7px"></div>
+          <button id="uaSubmitBtn" onclick="agregarUsuarioATenant()" style="width:100%;padding:11px;background:var(--gld);color:#000;border:none;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:var(--fb)">+ Crear usuario</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function agregarUsuarioATenant(){
+  const tenantId = document.getElementById('uaTenantId')?.value;
+  const nombre   = (document.getElementById('uaNombre')?.value||'').trim();
+  const email    = (document.getElementById('uaEmail')?.value||'').trim().toLowerCase();
+  const pass     = (document.getElementById('uaPass')?.value||'').trim();
+  const rol      = document.getElementById('uaRol')?.value || 'empleado';
+
+  const msgEl = document.getElementById('uaMsg');
+  const showUaMsg = (txt, ok=true) => {
+    if(!msgEl) return;
+    msgEl.textContent = txt;
+    msgEl.style.display = 'block';
+    msgEl.style.background = ok ? 'rgba(76,175,125,.1)' : 'rgba(201,82,76,.1)';
+    msgEl.style.color = ok ? 'var(--ok)' : 'var(--bad)';
+  };
+
+  if(!nombre){ showUaMsg('Ingresá el nombre del usuario', false); return; }
+  if(!email)  { showUaMsg('Ingresá el email', false); return; }
+  if(!pass || pass.length < 6){ showUaMsg('La contraseña debe tener al menos 6 caracteres', false); return; }
+
+  const btn = document.getElementById('uaSubmitBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Creando…'; }
+
+  try {
+    // 1. Crear usuario en Supabase Auth
+    const meta = { tenant_id: tenantId, rol, nombre_empleado: nombre };
+    let authOk = false;
+    try {
+      const { error: ae } = await sb.auth.admin.createUser({
+        email, password: pass, user_metadata: meta, email_confirm: true
+      });
+      if(!ae) authOk = true;
+    } catch(_){}
+    if(!authOk){
+      const { error: se } = await sb.auth.signUp({ email, password: pass, options: { data: meta } });
+      if(se) throw se;
+    }
+
+    // 2. Agregar a modulos.usuarios del tenant
+    const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+    const mods = t?.modulos || {};
+    const existentes = mods.usuarios || [];
+    if(existentes.find(u => u.email === email)){
+      showUaMsg('Ya existe un usuario con ese email en este tenant', false); return;
+    }
+    const nuevosUsuarios = [...existentes, { nombre, email, rol, activo: true, created_at: new Date().toISOString() }];
+    await sb.from('tenants').update({ modulos: { ...mods, usuarios: nuevosUsuarios } }).eq('id', tenantId);
+
+    showUaMsg(`✓ Usuario "${nombre}" creado correctamente`);
+    document.getElementById('uaNombre').value = '';
+    document.getElementById('uaEmail').value  = '';
+    document.getElementById('uaPass').value   = '';
+
+    // Re-render modal con datos frescos
+    const { data: tFresh } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+    if(tFresh) _renderUsersModal(tFresh);
+
+  } catch(e){
+    showUaMsg('Error: ' + (e?.message || JSON.stringify(e)), false);
+  } finally {
+    const btn2 = document.getElementById('uaSubmitBtn');
+    if(btn2){ btn2.disabled=false; btn2.textContent='+ Crear usuario'; }
+  }
+}
+
+async function toggleUsuarioActivo(tenantId, email, currentlyActivo){
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+  if(!t) return;
+  const mods = t.modulos || {};
+  const usuarios = (mods.usuarios || []).map(u =>
+    u.email === email ? { ...u, activo: !currentlyActivo } : u
+  );
+  await sb.from('tenants').update({ modulos: { ...mods, usuarios } }).eq('id', tenantId);
+  const { data: tFresh } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+  if(tFresh) _renderUsersModal(tFresh);
 }
 
 async function activarPago(id){
