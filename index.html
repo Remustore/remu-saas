@@ -1921,6 +1921,24 @@ function showToast(msg, type='ok'){
 }
 
 
+// Modal de confirmación seguro (window.confirm() falla en PWA standalone)
+function _confirmarModal(msg, onOk, onCancel){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `<div style="background:#141414;border:1px solid #2e2e2e;border-radius:14px;padding:24px;max-width:340px;width:100%;font-family:'Outfit',sans-serif">
+    <div style="font-size:.9rem;color:#f5f0e8;line-height:1.5;margin-bottom:20px;white-space:pre-line">${msg}</div>
+    <div style="display:flex;gap:10px">
+      <button id="_cmOk" style="flex:1;padding:11px;background:rgba(201,168,76,.2);border:1px solid rgba(201,168,76,.4);color:#c9a84c;border-radius:9px;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer">Confirmar</button>
+      <button id="_cmCan" style="flex:1;padding:11px;background:transparent;border:1px solid #2e2e2e;color:#a89880;border-radius:9px;font-family:'Outfit',sans-serif;font-size:.88rem;cursor:pointer">Cancelar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = () => document.body.removeChild(ov);
+  ov.querySelector('#_cmOk').onclick  = () => { close(); onOk && onOk(); };
+  ov.querySelector('#_cmCan').onclick = () => { close(); onCancel && onCancel(); };
+  ov.addEventListener('click', e => { if(e.target===ov){ close(); onCancel && onCancel(); } });
+}
+
 // ═══ AUTH ═══
 async function doLogin(){
   const email = document.getElementById('loginUser').value.trim().toLowerCase();
@@ -7100,13 +7118,9 @@ async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
     return inicioNuevo < tFin && finNuevo > tInicio;
   });
 
+  // Conflicto informativo — el admin decidió confirmar explícitamente, siempre se procede
   if(conflicto){
-    const msg = `⚠ Conflicto de horario
-
-Ya hay un turno a las ${conflicto.hora} con ${conflicto.cliente} (${conflicto.servicioNombre}).
-
-¿Querés confirmar igual o rechazar esta solicitud?`;
-    if(!confirm(msg)) return;
+    showToast(`⚠ Hay un turno solapado a las ${conflicto.hora} (${conflicto.cliente})`, 'warn');
   }
 
   const turno = {
@@ -7145,20 +7159,19 @@ Tu turno en *${neg}* fue *confirmado* ✅
 }
 
 async function rechazarSolicitud(id, nombre, tel){
-  if(!confirm('¿Rechazar la solicitud de ' + nombre + '?')) return;
-  // Delete from Supabase completely
-  const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id);
-  if(error){ showToast('Error al rechazar'); return; }
-  showToast('Solicitud rechazada ✓');
-  await cargarSolicitudes();
-  // Open WA after updating UI
-  if(tel){
-    const neg = currentTenant?.nombre||'el negocio';
-    const msg = `Hola ${nombre}, lamentablemente no podemos confirmar tu turno en *${neg}* para ese horario. Contactanos para coordinar otro. 🙏`;
-    setTimeout(()=>{
-      window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
-    }, 500);
-  }
+  _confirmarModal(`¿Rechazar la solicitud de ${nombre}?`, async () => {
+    const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id);
+    if(error){ showToast('Error al rechazar'); return; }
+    showToast('Solicitud rechazada ✓');
+    await cargarSolicitudes();
+    if(tel){
+      const neg = currentTenant?.nombre||'el negocio';
+      const msg = `Hola ${nombre}, lamentablemente no podemos confirmar tu turno en *${neg}* para ese horario. Contactanos para coordinar otro. 🙏`;
+      setTimeout(()=>{
+        window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
+      }, 500);
+    }
+  });
 }
 
 function waRespuestaSolicitud(nombre, tel, estado, fecha, hora){
