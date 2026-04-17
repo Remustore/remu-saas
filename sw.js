@@ -1,7 +1,7 @@
 // Remu Gestión — Service Worker v2
 // Estrategia: Cache-first para el shell, network-only para Supabase
 
-const CACHE_NAME = 'remu-v6';
+const CACHE_NAME = 'remu-v7';
 const SHELL = [
   './',
   './index.html',

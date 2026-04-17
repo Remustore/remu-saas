@@ -751,6 +751,7 @@ textarea{resize:vertical;min-height:70px;}
     <div style="color:var(--tx2);font-size:.62rem;margin-bottom:8px" id="sbUndoInfo">Último cambio revertible</div>
     <span onclick="doUndo()" style="color:var(--gld);cursor:pointer;font-size:.73rem">↩ Deshacer</span>
   </div>
+  <div id="btnCambiarNegocio" onclick="_mostrarSelectorTenant(window.__adminExternoTenants||[])" style="display:none;align-items:center;gap:8px;padding:9px 16px;margin:0 8px 6px;border-radius:8px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:#c9a84c;cursor:pointer;font-size:.78rem;font-weight:600;font-family:var(--fb)">⇄ Cambiar negocio</div>
   <div class="logout-btn" onclick="doLogout()">⎋ Cerrar sesión</div>
   <div class="logout-btn" style="color:var(--bad);margin-top:4px;font-size:.72rem" onclick="borrarTodosMisDatos()">🗑 Borrar todos mis datos</div>
 </div>
@@ -1970,6 +1971,12 @@ async function doLogin(){
       return;
     }
 
+    // Admin externo: acceso a múltiples tenants sin tenant_id fijo
+    if(rol === 'admin_externo'){
+      await _iniciarSesionAdminExterno(data.user);
+      return;
+    }
+
     // Usuarios regulares (admin, empleado)
     const { data: td, error: te } = await sb.from('tenants')
       .select('*')
@@ -2001,6 +2008,80 @@ async function doLogin(){
   } finally {
     btn.disabled=false; lod.style.display='none';
   }
+}
+
+// ── Admin Externo: login multi-tenant ─────────────────────────────────────────
+async function _iniciarSesionAdminExterno(user){
+  const email = (user.email||'').toLowerCase();
+  let tenants = [];
+
+  // Estrategia 1: IDs guardados en metadata (más rápido y preciso)
+  const metaIds = user.user_metadata?.admin_externo_tenants || [];
+  if(metaIds.length > 0){
+    const { data } = await sb.from('tenants').select('*').in('id', metaIds).eq('activo', true);
+    tenants = data || [];
+  }
+
+  // Estrategia 2: búsqueda textual en JSONB (fallback cuando metadata no tiene los IDs)
+  if(tenants.length === 0){
+    const { data } = await sb.from('tenants').select('*').eq('activo', true)
+      .filter('modulos::text', 'ilike', `%${email}%`);
+    tenants = (data||[]).filter(t=>{
+      const ae = t.modulos?.adminExternos || [];
+      return ae.some(e=>(e.email||'').toLowerCase()===email && e.activo!==false);
+    });
+  }
+
+  if(!tenants.length) throw new Error('No tenés acceso a ningún negocio. Contactá al administrador.');
+
+  currentRole = 'admin';
+  window.__adminExternoTenants = tenants;
+
+  if(tenants.length === 1){
+    _cargarTenantExterno(tenants[0]);
+  } else {
+    // Ocultar pantalla de login y mostrar selector
+    document.getElementById('loginScreen').style.display='none';
+    _mostrarSelectorTenant(tenants);
+  }
+}
+
+function _cargarTenantExterno(t){
+  currentTenant = t;
+  currentRole = 'admin';
+  document.getElementById('loginScreen').style.display='none';
+  // Mostrar botón "Cambiar negocio" si hay más de un tenant disponible
+  const btn = document.getElementById('btnCambiarNegocio');
+  if(btn) btn.style.display = (window.__adminExternoTenants||[]).length > 1 ? 'flex' : 'none';
+  setupApp();
+  loadAll();
+}
+
+function _mostrarSelectorTenant(tenants){
+  let ov = document.getElementById('tenantSelectorOv');
+  if(ov) ov.remove();
+  ov = document.createElement('div');
+  ov.id = 'tenantSelectorOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `
+    <div style="background:#141414;border:1px solid #2e2e2e;border-radius:16px;width:100%;max-width:380px;padding:28px">
+      <div style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:#c9a84c;margin-bottom:6px;text-align:center">¿A qué negocio entrás?</div>
+      <div style="font-size:.8rem;color:#a89880;margin-bottom:22px;text-align:center">Tu cuenta tiene acceso a varios negocios</div>
+      ${tenants.map((t,i)=>`
+        <button onclick="_seleccionarTenantExterno(${i})" style="width:100%;text-align:left;padding:14px 16px;background:#0f0f0f;border:1px solid #2e2e2e;border-radius:10px;color:#f5f0e8;cursor:pointer;margin-bottom:8px;font-family:'Outfit',sans-serif;transition:border-color .15s"
+          onmouseover="this.style.borderColor='#c9a84c'" onmouseout="this.style.borderColor='#2e2e2e'">
+          <div style="font-weight:600;font-size:.92rem">${esc(t.nombre)}</div>
+          <div style="font-size:.72rem;color:#a89880;margin-top:3px">${esc(t.rubro||'Negocio')}</div>
+        </button>`).join('')}
+    </div>`;
+  document.body.appendChild(ov);
+}
+
+function _seleccionarTenantExterno(idx){
+  const t = (window.__adminExternoTenants||[])[idx];
+  if(!t) return;
+  document.getElementById('tenantSelectorOv')?.remove();
+  _cargarTenantExterno(t);
 }
 
 function setupApp(){
@@ -2472,6 +2553,7 @@ function _renderUsersModal(t){
   if(!overlay) return;
   const mods = t.modulos || {};
   const usuarios = mods.usuarios || [];
+  const adminExternos = mods.adminExternos || [];
 
   const usersHTML = usuarios.length
     ? usuarios.map(u => `
@@ -2487,6 +2569,19 @@ function _renderUsersModal(t){
       </div>`).join('')
     : '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin usuarios registrados. Agregá el primero.</div>';
 
+  const adminExtHTML = adminExternos.length
+    ? adminExternos.map(ae => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bor)">
+        <div style="width:30px;height:30px;border-radius:50%;background:rgba(138,92,201,.2);display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0">🌐</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.85rem;font-weight:600">${esc(ae.nombre||ae.email)}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">${esc(ae.email)}</div>
+        </div>
+        <span style="padding:2px 8px;border-radius:12px;font-size:.68rem;font-weight:600;background:rgba(138,92,201,.15);color:#b08ad4;flex-shrink:0">Admin externo</span>
+        <button onclick="eliminarAdminExterno('${esc(t.id)}','${esc(ae.email)}')" style="background:none;border:1px solid var(--bor2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:var(--bad);cursor:pointer;flex-shrink:0">✕</button>
+      </div>`).join('')
+    : '<div style="color:var(--mut);font-size:.78rem;padding:6px 0">Sin administradores externos.</div>';
+
   overlay.innerHTML = `
     <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:16px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto">
       <div style="padding:18px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
@@ -2494,10 +2589,10 @@ function _renderUsersModal(t){
         <button onclick="document.getElementById('usersOverlay')?.remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
       </div>
       <div style="padding:18px 20px">
-        <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">USUARIOS ACTUALES</div>
+        <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">USUARIOS DEL NEGOCIO</div>
         <div id="usersListContent">${usersHTML}</div>
 
-        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--bor)">
+        <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--bor)">
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:12px">+ AGREGAR USUARIO</div>
           <input type="hidden" id="uaTenantId" value="${esc(t.id)}">
           <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre</label>
@@ -2513,6 +2608,23 @@ function _renderUsersModal(t){
           </select>
           <div id="uaMsg" style="font-size:.78rem;margin-bottom:8px;display:none;padding:8px 10px;border-radius:7px"></div>
           <button id="uaSubmitBtn" onclick="agregarUsuarioATenant()" style="width:100%;padding:11px;background:var(--gld);color:#000;border:none;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:var(--fb)">+ Crear usuario</button>
+        </div>
+
+        <!-- ── ADMIN EXTERNOS ─────────────────────────────── -->
+        <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--bor)">
+          <div style="font-size:.68rem;color:#b08ad4;text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:4px">🌐 ADMINISTRADORES EXTERNOS</div>
+          <div style="font-size:.72rem;color:var(--tx2);margin-bottom:12px">Acceden con su propio email a este negocio. Pueden tener acceso a varios negocios a la vez.</div>
+          <div id="adminExternosListContent">${adminExtHTML}</div>
+          <div style="margin-top:14px">
+            <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre</label>
+            <input id="aeNombre" placeholder="Ej: Luna Rocaspana" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
+            <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Email</label>
+            <input id="aeEmail" type="email" placeholder="admin@ejemplo.com" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
+            <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Contraseña <span style="color:var(--mut);font-weight:400">(si el usuario ya existe, dejá en blanco)</span></label>
+            <input id="aePass" type="password" placeholder="Mínimo 6 caracteres (opcional si ya tiene cuenta)" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:12px;font-family:var(--fb)">
+            <div id="aeMsg" style="font-size:.78rem;margin-bottom:8px;display:none;padding:8px 10px;border-radius:7px"></div>
+            <button id="aeSubmitBtn" onclick="agregarAdminExterno('${esc(t.id)}')" style="width:100%;padding:11px;background:rgba(138,92,201,.2);border:1px solid rgba(138,92,201,.4);color:#b08ad4;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:var(--fb)">🌐 Agregar admin externo</button>
+          </div>
         </div>
       </div>
     </div>`;
@@ -2593,6 +2705,103 @@ async function toggleUsuarioActivo(tenantId, email, currentlyActivo){
   await sb.from('tenants').update({ modulos: { ...mods, usuarios } }).eq('id', tenantId);
   const { data: tFresh } = await sb.from('tenants').select('*').eq('id', tenantId).single();
   if(tFresh) _renderUsersModal(tFresh);
+}
+
+async function agregarAdminExterno(tenantId){
+  const nombre = (document.getElementById('aeNombre')?.value||'').trim();
+  const email  = (document.getElementById('aeEmail')?.value||'').trim().toLowerCase();
+  const pass   = (document.getElementById('aePass')?.value||'').trim();
+
+  const msgEl = document.getElementById('aeMsg');
+  const showAeMsg = (txt, ok=true) => {
+    if(!msgEl) return;
+    msgEl.textContent = txt;
+    msgEl.style.display = 'block';
+    msgEl.style.background = ok ? 'rgba(76,175,125,.1)' : 'rgba(201,82,76,.1)';
+    msgEl.style.color = ok ? 'var(--ok)' : 'var(--bad)';
+  };
+  if(!nombre){ showAeMsg('Ingresá el nombre', false); return; }
+  if(!email)  { showAeMsg('Ingresá el email', false); return; }
+
+  const btn = document.getElementById('aeSubmitBtn');
+  if(btn){ btn.disabled=true; btn.textContent='Procesando…'; }
+
+  try {
+    // 1. Agregar a modulos.adminExternos del tenant
+    const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+    const mods = t?.modulos || {};
+    const existentes = mods.adminExternos || [];
+    if(existentes.find(ae => ae.email === email)){
+      showAeMsg('Ya existe un admin externo con ese email en este negocio', false);
+      return;
+    }
+    const nuevosAE = [...existentes, { nombre, email, activo: true, created_at: new Date().toISOString() }];
+
+    // 2. Intentar crear/actualizar usuario en Supabase Auth con rol='admin_externo'
+    //    Si ya existe, solo actualizamos el modulos del tenant
+    const meta = { rol: 'admin_externo', nombre_empleado: nombre };
+    let authMsg = '';
+    try {
+      if(pass && pass.length >= 6){
+        // Crear usuario nuevo
+        const { error: ae } = await sb.auth.admin.createUser({
+          email, password: pass, user_metadata: meta, email_confirm: true
+        });
+        if(ae){
+          // Puede que ya exista — intentar actualizar metadata con listUsers
+          try {
+            const { data: lista } = await sb.auth.admin.listUsers();
+            const existing = lista?.users?.find(u => u.email === email);
+            if(existing){
+              await sb.auth.admin.updateUserById(existing.id, { password: pass, user_metadata: { ...existing.user_metadata, ...meta } });
+              authMsg = ' (cuenta existente actualizada)';
+            }
+          } catch(_){}
+        } else {
+          authMsg = ' (cuenta creada)';
+        }
+      } else {
+        // Sin contraseña: solo actualizar metadata si ya existe
+        const { data: lista } = await sb.auth.admin.listUsers();
+        const existing = lista?.users?.find(u => u.email === email);
+        if(existing){
+          await sb.auth.admin.updateUserById(existing.id, { user_metadata: { ...existing.user_metadata, ...meta } });
+          authMsg = ' (metadata actualizada)';
+        } else {
+          authMsg = ' ⚠ Cuenta no encontrada. Ingresá una contraseña para crearla.';
+        }
+      }
+    } catch(_){ authMsg = ' (sin acceso a admin API — asegurate de crear la cuenta manualmente)'; }
+
+    // 3. Guardar en tenant
+    await sb.from('tenants').update({ modulos: { ...mods, adminExternos: nuevosAE } }).eq('id', tenantId);
+
+    showAeMsg(`✓ "${nombre}" agregado como admin externo${authMsg}`);
+    if(document.getElementById('aeNombre')) document.getElementById('aeNombre').value='';
+    if(document.getElementById('aeEmail')) document.getElementById('aeEmail').value='';
+    if(document.getElementById('aePass'))  document.getElementById('aePass').value='';
+
+    const { data: tFresh } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+    if(tFresh) _renderUsersModal(tFresh);
+
+  } catch(e){
+    showAeMsg('Error: ' + (e?.message || JSON.stringify(e)), false);
+  } finally {
+    const btn2 = document.getElementById('aeSubmitBtn');
+    if(btn2){ btn2.disabled=false; btn2.textContent='🌐 Agregar admin externo'; }
+  }
+}
+
+async function eliminarAdminExterno(tenantId, email){
+  _confirmarModal(`¿Quitar a ${email} como admin externo de este negocio?`, async () => {
+    const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+    if(!t) return;
+    const mods = t.modulos || {};
+    const adminExternos = (mods.adminExternos || []).filter(ae => ae.email !== email);
+    await sb.from('tenants').update({ modulos: { ...mods, adminExternos } }).eq('id', tenantId);
+    const { data: tFresh } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+    if(tFresh) _renderUsersModal(tFresh);
+  });
 }
 
 async function activarPago(id){
