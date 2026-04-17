@@ -2573,14 +2573,15 @@ async function editarTenant(id){
   
   const mods = t.modulos || {};
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:400;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
+  overlay.id = 'editTenantOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;overflow-y:auto';
   overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
-  
+
   overlay.innerHTML = `
     <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:16px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto">
       <div style="padding:18px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
         <div style="font-family:var(--fh);font-size:1rem;font-weight:700">✎ Editar — ${t.nombre}</div>
-        <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
+        <button onclick="document.getElementById('editTenantOverlay')?.remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
       </div>
       <div style="padding:18px 20px">
         
@@ -2633,7 +2634,7 @@ async function editarTenant(id){
         </div>
       </div>
       <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;gap:10px;justify-content:flex-end">
-        <button class="sa-btn outline" style="margin:0" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+        <button class="sa-btn outline" style="margin:0" onclick="document.getElementById('editTenantOverlay')?.remove()">Cancelar</button>
         <button class="sa-btn" style="margin:0" onclick="guardarEdicionTenant('${id}')">Guardar cambios</button>
       </div>
     </div>
@@ -2660,7 +2661,7 @@ async function guardarEdicionTenant(id){
   const { error } = await sb.from('tenants').update({ nombre, rubro, modulos: mods }).eq('id', id);
   if(error){ alert('Error al guardar: ' + error.message); return; }
   
-  document.querySelector('[style*=fixed]')?.remove();
+  document.getElementById('editTenantOverlay')?.remove();
   loadTenants();
   showSaMsg('Cliente actualizado correctamente', 'ok');
 }
@@ -5772,10 +5773,11 @@ function rTurnos(){
     if(turnosFiltroEmpleado!=='todos'&&!turnosFiltroEmpleado.startsWith('auto_')&&String(turnosFiltroEmpleado)!==String(e.id)) return '';
     return `<div style="margin-bottom:8px;padding:10px 14px;border-radius:10px;border-left:3px solid var(--bad);background:rgba(201,82,76,.07);display:flex;align-items:center;gap:10px">
       <span style="font-size:1.2rem;flex-shrink:0">🚫</span>
-      <div>
+      <div style="flex:1;min-width:0">
         <div style="font-size:.83rem;font-weight:700;color:var(--bad)">No disponible: ${esc(e.nombre)}</div>
         <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${desc} · ${horario}${blq.motivo?` · <em>${esc(blq.motivo)}</em>`:''}</div>
       </div>
+      <button onclick="eliminarBloqueo('${e.id}','${blq.id}')" style="background:none;border:1px solid rgba(201,82,76,.4);color:var(--bad);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Eliminar bloqueo">✕</button>
     </div>`;
   }).join('');
 
