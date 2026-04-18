@@ -1965,7 +1965,7 @@ function esc(v){
 let currentUser = null;    // usuario Supabase Auth
 let currentTenant = null;  // objeto tenant { id, nombre, rubro, modulos }
 let currentRole = null;    // 'admin' | 'superadmin'
-let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
 let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 
 // ═══ SYNC UI ═══
@@ -3436,11 +3436,12 @@ async function loadAll(){
   localStorage.setItem('activeTenant', thisTenant);
   document.getElementById('loadingScreen').style.display='flex';
   try{
-    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja] = await Promise.all([
+    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
-      dbGetConfig('objetivos'), dbGetConfig('movCaja')
+      dbGetConfig('objetivos'), dbGetConfig('movCaja'),
+      dbLoad('pedidos')
     ]);
     S.stock=stock; S.equipos=equipos;
     // Deduplicar ventas por turnoId: si hay múltiples ventas del mismo turno (bug anterior),
@@ -3484,6 +3485,7 @@ async function loadAll(){
     S.inversores=inversores; S.movimientos_inv=movimientos_inv;
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
+    S.pedidos=pedidos||[];
     // Auto-precargar servicios para tenants nuevos (primer login tras confirmar email)
     if(currentRole === 'admin' && !S.precios.length && !S.reparaciones.length && !S.ventas.length && currentTenant?.rubro){
       const _pcKey = 'precargado_' + (currentTenant?.id||'');
@@ -4285,18 +4287,10 @@ function rTaller(){
 }
 
 // ═══ PEDIDOS (Taller) ═══
-const PEDIDOS_KEY = 'pedidos_';
 let _pedFiltro = 'todos';
 
-function getPedidos(){
-  return JSON.parse(localStorage.getItem(PEDIDOS_KEY + (currentTenant?.id||'')) || '[]');
-}
-function _savePedidos(arr){
-  localStorage.setItem(PEDIDOS_KEY + (currentTenant?.id||''), JSON.stringify(arr));
-}
-
 function rPedidos(){
-  const todos = getPedidos();
+  const todos = S.pedidos;
   const filtered = _pedFiltro === 'todos' ? todos : todos.filter(p => p.estado === _pedFiltro);
 
   // Sort: pendiente → llego → entregado; dentro de cada grupo por fecha desc
@@ -4377,11 +4371,10 @@ function abrirNuevoPedido(){
   openM('mPedido');
 }
 
-function guardarPedido(){
+async function guardarPedido(){
   const id       = document.getElementById('pedId').value;
   const nombre   = (document.getElementById('pedNombre').value||'').trim();
   const telRaw   = (document.getElementById('pedTel').value||'').replace(/\D/g,'');
-  // Formatear tel: agregar código Argentina 54 si no tiene prefijo internacional
   const tel      = telRaw ? (telRaw.startsWith('54') ? telRaw : telRaw.startsWith('0') ? '54' + telRaw.slice(1) : '54' + telRaw) : '';
   const producto = (document.getElementById('pedProducto').value||'').trim();
   const precio   = parseFloat(document.getElementById('pedPrecio').value||'0')||0;
@@ -4391,21 +4384,24 @@ function guardarPedido(){
   if(!nombre)  { showToast('Ingresá el nombre del cliente'); return; }
   if(!producto){ showToast('Ingresá el producto pedido'); return; }
 
-  const pedidos = getPedidos();
   if(id){
-    const idx = pedidos.findIndex(p => p.id === id);
-    if(idx >= 0) pedidos[idx] = { ...pedidos[idx], nombre, tel, producto, precio, fecha, notas };
+    const idx = S.pedidos.findIndex(p => String(p.id) === String(id));
+    if(idx >= 0){
+      S.pedidos[idx] = { ...S.pedidos[idx], nombre, tel, producto, precio, fecha, notas };
+      await dbUpsert('pedidos', S.pedidos[idx]);
+    }
   } else {
-    pedidos.unshift({ id: Date.now().toString(), nombre, tel, producto, precio, fecha, notas, estado:'pendiente', created_at: new Date().toISOString() });
+    const item = { id: Date.now(), nombre, tel, producto, precio, fecha, notas, estado:'pendiente', created_at: new Date().toISOString() };
+    S.pedidos.unshift(item);
+    await dbUpsert('pedidos', item);
   }
-  _savePedidos(pedidos);
   closeM('mPedido');
   rPedidos();
   showToast(id ? 'Pedido actualizado ✓' : 'Pedido creado ✓');
 }
 
 function editarPedido(id){
-  const p = getPedidos().find(x => x.id === id);
+  const p = S.pedidos.find(x => String(x.id) === String(id));
   if(!p) return;
   document.getElementById('pedId').value       = p.id;
   document.getElementById('pedNombre').value   = p.nombre||'';
@@ -4418,16 +4414,14 @@ function editarPedido(id){
   openM('mPedido');
 }
 
-function marcarPedidoLlego(id){
-  const pedidos = getPedidos();
-  const p = pedidos.find(x => x.id === id);
+async function marcarPedidoLlego(id){
+  const p = S.pedidos.find(x => String(x.id) === String(id));
   if(!p) return;
   p.estado = 'llego';
   p.fechaLlego = tod();
-  _savePedidos(pedidos);
+  await dbUpsert('pedidos', p);
   rPedidos();
 
-  // Abrir WhatsApp con aviso al cliente
   if(p.tel){
     const negocio = currentTenant?.nombre || 'la tienda';
     const msg = `Hola ${p.nombre}! Te avisamos que tu pedido de ${p.producto} llegó a ${negocio}. Pasá cuando quieras a retirarlo! 📦`;
@@ -4439,12 +4433,11 @@ function marcarPedidoLlego(id){
 }
 
 async function marcarPedidoEntregado(id){
-  const pedidos = getPedidos();
-  const p = pedidos.find(x => x.id === id);
+  const p = S.pedidos.find(x => String(x.id) === String(id));
   if(!p) return;
   p.estado = 'entregado';
   p.fechaEntregado = tod();
-  _savePedidos(pedidos);
+  await dbUpsert('pedidos', p);
   rPedidos();
   showToast('Pedido entregado ✓');
 
@@ -4464,10 +4457,12 @@ async function marcarPedidoEntregado(id){
 }
 
 function eliminarPedido(id){
-  if(!confirm('¿Eliminar este pedido?')) return;
-  _savePedidos(getPedidos().filter(p => p.id !== id));
-  rPedidos();
-  showToast('Pedido eliminado ✓');
+  _confirmarModal('¿Eliminar este pedido?', async () => {
+    S.pedidos = S.pedidos.filter(p => String(p.id) !== String(id));
+    await dbDelete('pedidos', id);
+    rPedidos();
+    showToast('Pedido eliminado ✓');
+  });
 }
 
 // ═══ GASTOS ═══
