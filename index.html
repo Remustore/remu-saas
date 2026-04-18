@@ -3921,6 +3921,18 @@ function _ventaRow(v){ return `<tr>
     <td><span class="bx bg2">${esc(v.metodo)}</span></td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mVenta',${v.id})">✎</button><button class="btn bd bsm" onclick="delVenta(${v.id})">✕</button></td>
   </tr>`; }
+function _mostrarVentasAntiguas(){
+  const row = document.getElementById('trVerMasVentas');
+  if(!row) return;
+  const frag = document.createDocumentFragment();
+  (window._ventasAntiguas||[]).forEach(v=>{
+    const tmp = document.createElement('tbody');
+    tmp.innerHTML = _ventaRow(v);
+    frag.appendChild(tmp.firstElementChild);
+  });
+  row.parentNode.insertBefore(frag, row);
+  row.remove();
+}
 function rVentas(){
   const tb = document.getElementById('tbV');
   if(!S.ventas.length){ tb.innerHTML=`<tr><td colspan="7">${emp('💰','Sin ventas')}</td></tr>`; return; }
@@ -3928,11 +3940,11 @@ function rVentas(){
   const corte = new Date(); corte.setDate(corte.getDate()-7); corte.setHours(0,0,0,0);
   const recientes = sorted.filter(v=>!v.fecha||new Date(v.fecha+'T00:00:00')>=corte);
   const antiguas  = sorted.filter(v=>v.fecha && new Date(v.fecha+'T00:00:00')<corte);
+  window._ventasAntiguas = antiguas;
   let html = recientes.map(_ventaRow).join('');
   if(antiguas.length){
-    const hidden = antiguas.map(_ventaRow).join('');
     html += `<tr id="trVerMasVentas"><td colspan="7" style="text-align:center;padding:8px 0">
-      <button class="btn bg2 bsm" onclick="(function(){document.getElementById('trVerMasVentas').remove();var tmp=document.createElement('tbody');tmp.innerHTML=${JSON.stringify(hidden)};var tb=document.getElementById('tbV');while(tmp.firstChild)tb.appendChild(tmp.firstChild);})()">Ver ${antiguas.length} venta${antiguas.length!==1?'s':''} anterior${antiguas.length!==1?'es':''} ▼</button>
+      <button class="btn bg2 bsm" onclick="_mostrarVentasAntiguas()">Ver ${antiguas.length} venta${antiguas.length!==1?'s':''} anterior${antiguas.length!==1?'es':''} ▼</button>
     </td></tr>`;
   }
   tb.innerHTML = html;
