@@ -11242,10 +11242,22 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => {
-        // Check for updates every 60 min
+        // Verificar actualizaciones cada 60 min
         setInterval(() => reg.update(), 60 * 60 * 1000);
+        // También verificar al volver a la pestaña
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update();
+        });
       })
       .catch(e => console.warn('[SW] Registration failed:', e));
+
+    // Cuando el SW nuevo activa, recargar la página para tomar el código nuevo
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data && e.data.type === 'SW_UPDATED') {
+        console.log('[SW] Nueva versión activa:', e.data.version, '— recargando...');
+        window.location.reload();
+      }
+    });
   });
 }
 

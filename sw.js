@@ -1,7 +1,7 @@
 // Remu Gestión — Service Worker v2
 // Estrategia: Cache-first para el shell, network-only para Supabase
 
-const CACHE_NAME = 'remu-v13';
+const CACHE_NAME = 'remu-v14';
 const SHELL = [
   './',
   './index.html',
@@ -31,14 +31,14 @@ self.addEventListener('install', event => {
   );
 });
 
-// ── ACTIVATE: limpiar caches viejas ───────────────────────────────────
+// ── ACTIVATE: limpiar caches viejas y notificar a clientes ────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
-      )
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => clients.forEach(c => c.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME })))
   );
 });
 
