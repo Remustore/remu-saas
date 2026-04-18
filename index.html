@@ -2320,13 +2320,25 @@ async function borrarTodosMisDatos(){
   }
 }
 
+// Limpia todo el localStorage EXCEPTO config global del SA que no es por-tenant
+function _clearTenantCache(){
+  const GLOBAL_KEYS = new Set(['remu_soporte_tel', 'remu_video_tutorial']);
+  const toRemove = [];
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && !GLOBAL_KEYS.has(k)) toRemove.push(k);
+  }
+  toRemove.forEach(k => localStorage.removeItem(k));
+}
+
 async function doLogout(){
   if(currentRole === 'admin') descargarBackup();
   await sb.auth.signOut();
+  _clearTenantCache();
   currentUser = null; currentTenant = null; currentRole = null;
   window._currentSection = null;
   window.__adminExternoTenants = null;
-  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
   document.getElementById('sb').style.display='none';
   document.getElementById('mn').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -3418,20 +3430,11 @@ async function dbGetConfig(key){
 
 // ═══ LOAD ALL ═══
 async function loadAll(){
-  // Clear ALL cached data when switching tenants
+  // Al cambiar de tenant, limpiar TODO el localStorage para evitar mezcla de datos
   const prevTenant = localStorage.getItem('activeTenant');
   const thisTenant = currentTenant?.id || '';
   if(prevTenant && prevTenant !== thisTenant){
-    // Different tenant - clear ALL tenant-specific caches
-    const keysToRemove = [];
-    for(let i=0; i<localStorage.length; i++){
-      const k = localStorage.key(i);
-      if(k && (k.includes(prevTenant) || k.startsWith('auditoria_') || k.startsWith('turnos_') || k.startsWith('turnosCfg_') || k.startsWith('fichasClientes_'))){
-        keysToRemove.push(k);
-      }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-    console.log('Cleared', keysToRemove.length, 'cache keys for tenant switch');
+    _clearTenantCache();
   }
   localStorage.setItem('activeTenant', thisTenant);
   document.getElementById('loadingScreen').style.display='flex';
@@ -11277,26 +11280,32 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 
 <script>
 // ── PWA: Service Worker ─────────────────────────────────────────────
+// index.html se sirve siempre con network-first en el SW, por lo que
+// cada recarga normal toma la versión más nueva automáticamente.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => {
-        // Verificar actualizaciones cada 60 min
-        setInterval(() => reg.update(), 60 * 60 * 1000);
-        // También verificar al volver a la pestaña
+        // Verificar actualizaciones cada 30 min
+        setInterval(() => reg.update(), 30 * 60 * 1000);
+        // Verificar al volver a la pestaña (detecta cambios rápido)
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') reg.update();
         });
+        // Si hay un nuevo SW esperando, activarlo inmediatamente
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          if (!newSW) return;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              // Nuevo SW instalado — activarlo ya (skipWaiting está en el SW)
+              newSW.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
       })
       .catch(e => console.warn('[SW] Registration failed:', e));
-
-    // Cuando el SW nuevo activa, recargar la página para tomar el código nuevo
-    navigator.serviceWorker.addEventListener('message', e => {
-      if (e.data && e.data.type === 'SW_UPDATED') {
-        console.log('[SW] Nueva versión activa:', e.data.version, '— recargando...');
-        window.location.reload();
-      }
-    });
   });
 }
 
