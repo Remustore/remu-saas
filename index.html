@@ -2020,6 +2020,7 @@ async function doLogin(){
 
     currentUser = data.user;
     const rol = data.user.user_metadata?.rol || 'admin';
+    console.log('[LOGIN] email:', email, '| rol detectado:', rol, '| metadata:', JSON.stringify(data.user.user_metadata));
 
     // Superadmin: usuario creado en Supabase Auth con user_metadata.rol = 'superadmin'
     if(rol === 'superadmin'){
@@ -2034,6 +2035,7 @@ async function doLogin(){
 
     // Admin externo: acceso a múltiples tenants sin tenant_id fijo
     if(rol === 'admin_externo'){
+      console.log('[LOGIN] → llamando _iniciarSesionAdminExterno');
       await _iniciarSesionAdminExterno(data.user);
       return;
     }
@@ -2073,6 +2075,7 @@ async function doLogin(){
 
 // ── Admin Externo: login multi-tenant ─────────────────────────────────────────
 async function _iniciarSesionAdminExterno(user){
+  console.log('[AE-LOGIN] inicio');
   const email = (user.email||'').toLowerCase();
   let tenants = [];
 
