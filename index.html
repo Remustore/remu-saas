@@ -4256,6 +4256,31 @@ function rEstadoLink(){
   </div>`;
 }
 
+// Calcula y devuelve el chip HTML de garantía para una reparación
+function _garantiaChip(r){
+  if(!r.garantiaDias || r.garantiaDias === 0) return '';
+  const fechaBase = r.fecha; // fecha de ingreso
+  if(!fechaBase) return '';
+  const vence = new Date(fechaBase + 'T00:00:00');
+  vence.setDate(vence.getDate() + r.garantiaDias);
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const diasRestantes = Math.floor((vence - hoy) / 86400000);
+  const fechaStr = fD(vence.toISOString().slice(0,10));
+  if(diasRestantes < 0){
+    return `<div style="font-size:.68rem;margin-top:3px;padding:2px 7px;border-radius:4px;background:rgba(201,82,76,.13);color:var(--bad);border:1px solid rgba(201,82,76,.28);font-weight:600">
+      🛡 Garantía vencida — ${fechaStr}
+    </div>`;
+  } else if(diasRestantes <= 7){
+    return `<div style="font-size:.68rem;margin-top:3px;padding:2px 7px;border-radius:4px;background:rgba(201,148,76,.13);color:var(--wrn);border:1px solid rgba(201,148,76,.3);font-weight:600">
+      🛡 Vence en ${diasRestantes}d — ${fechaStr}
+    </div>`;
+  } else {
+    return `<div style="font-size:.68rem;margin-top:3px;padding:2px 7px;border-radius:4px;background:rgba(76,175,125,.08);color:var(--ok);border:1px solid rgba(76,175,125,.2)">
+      🛡 Garantía hasta ${fechaStr}
+    </div>`;
+  }
+}
+
 function rTaller(){
   rEstadoLink();
   document.getElementById('kan').innerHTML=ESTS.map(est=>{
@@ -4274,6 +4299,7 @@ function rTaller(){
       ${r.ganancia!=null&&r.presupuesto?`<div style="font-size:.7rem;margin-top:3px;padding:3px 6px;border-radius:4px;background:${r.margen>=50?'rgba(74,222,128,.12)':r.margen>=30?'rgba(250,204,21,.12)':'rgba(248,113,113,.12)'};color:${r.margen>=50?'var(--ok)':r.margen>=30?'var(--wrn)':'var(--bad)'};font-weight:600">
         Gan: ${fmt(r.ganancia)} · ${r.margen}% ${r.margen>=50?'✓':r.margen>=30?'⚠':'✕'}
       </div>`:''}
+      ${_garantiaChip(r)}
       <div class="ka">
         <button class="btn bgh bsm" onclick="openAv(${r.id})">Avanzar</button>
         <button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>
@@ -9404,14 +9430,32 @@ function rPanelDinero(){
 // ═══ GARANTÍAS ═══
 function updateGarantiaVence(){
   const dias = parseInt(document.getElementById('tGarantia')?.value||0);
-  const estado = document.getElementById('tEst')?.value;
   const el = document.getElementById('tGarantiaVence');
   if(!el) return;
-  if(dias === 0 || estado !== 'entregado'){ el.textContent = '—'; return; }
-  const vence = new Date();
+  if(dias === 0){ el.textContent = '—'; el.style.color = 'var(--tx2)'; return; }
+
+  // Usar fecha de ingreso del registro existente, o hoy para registros nuevos
+  const repId = parseInt(document.getElementById('tId')?.value||0);
+  const rep = repId ? S.reparaciones.find(r => r.id === repId) : null;
+  const fechaBase = rep?.fecha || tod();
+
+  const vence = new Date(fechaBase + 'T00:00:00');
   vence.setDate(vence.getDate() + dias);
-  el.textContent = fD(vence.toISOString().slice(0,10));
-  el.style.color = 'var(--ok)';
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const diasRestantes = Math.floor((vence - hoy) / 86400000);
+  const fechaStr = fD(vence.toISOString().slice(0,10));
+
+  el.textContent = fechaStr;
+  if(diasRestantes < 0){
+    el.style.color = 'var(--bad)';
+    el.title = 'Garantía vencida';
+  } else if(diasRestantes <= 7){
+    el.style.color = 'var(--wrn)';
+    el.title = `Vence en ${diasRestantes} día${diasRestantes !== 1 ? 's' : ''}`;
+  } else {
+    el.style.color = 'var(--ok)';
+    el.title = `${diasRestantes} días restantes`;
+  }
 }
 
 function rGarantias(){
