@@ -3913,17 +3913,29 @@ async function delVenta(id){
   rVentas(); rStock();
 }
 
-function rVentas(){
-  const tb = document.getElementById('tbV');
-  if(!S.ventas.length){ tb.innerHTML=`<tr><td colspan="7">${emp('💰','Sin ventas')}</td></tr>`; return; }
-  tb.innerHTML = S.ventas.map(v=>`<tr>
+function _ventaRow(v){ return `<tr>
     <td>${fD(v.fecha)}</td>
     <td>${esc(v.nombre)}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}</td>
     <td>${v.cantidad}</td><td>${fmt(v.precio)}</td>
     <td><strong style="color:var(--gld)">${fmt(v.tipo==='equipo'&&v.comision?v.comision:v.total)}</strong></td>
     <td><span class="bx bg2">${esc(v.metodo)}</span></td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mVenta',${v.id})">✎</button><button class="btn bd bsm" onclick="delVenta(${v.id})">✕</button></td>
-  </tr>`).join('');
+  </tr>`; }
+function rVentas(){
+  const tb = document.getElementById('tbV');
+  if(!S.ventas.length){ tb.innerHTML=`<tr><td colspan="7">${emp('💰','Sin ventas')}</td></tr>`; return; }
+  const sorted = [...S.ventas].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const corte = new Date(); corte.setDate(corte.getDate()-7); corte.setHours(0,0,0,0);
+  const recientes = sorted.filter(v=>!v.fecha||new Date(v.fecha+'T00:00:00')>=corte);
+  const antiguas  = sorted.filter(v=>v.fecha && new Date(v.fecha+'T00:00:00')<corte);
+  let html = recientes.map(_ventaRow).join('');
+  if(antiguas.length){
+    const hidden = antiguas.map(_ventaRow).join('');
+    html += `<tr id="trVerMasVentas"><td colspan="7" style="text-align:center;padding:8px 0">
+      <button class="btn bg2 bsm" onclick="(function(){document.getElementById('trVerMasVentas').remove();var tmp=document.createElement('tbody');tmp.innerHTML=${JSON.stringify(hidden)};var tb=document.getElementById('tbV');while(tmp.firstChild)tb.appendChild(tmp.firstChild);})()">Ver ${antiguas.length} venta${antiguas.length!==1?'s':''} anterior${antiguas.length!==1?'es':''} ▼</button>
+    </td></tr>`;
+  }
+  tb.innerHTML = html;
 }
 
 // ═══ TALLER ═══
@@ -10773,14 +10785,16 @@ function updateBigNumbers(){
     if(btl) btl.textContent = turnosFilt;
     if(bsb) bsb.textContent = terminadosFilt;
   } else {
-    const ventasHoy = S.ventas.filter(v=>v.fecha===hoy);
-    const totalHoy = ventasHoy.reduce((a,v)=>a+v.total,0);
+    const filtLabel = getDFiltLabel();
+    const ventasFilt = filtrarDash(S.ventas, 'fecha');
+    const repEntregadasFilt = filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado'), 'fecha');
+    const totalFilt = ventasFilt.reduce((a,v)=>a+v.total,0) + repEntregadasFilt.reduce((a,r)=>a+(r.presupuesto||0),0);
     const trabajosListos = S.reparaciones.filter(r=>r.estado==='listo').length;
     const stockBajo = S.stock.filter(s=>s.cantidad<=s.minimo).length;
-    if(lHoy) lHoy.textContent = '💰 Vendido hoy';
+    if(lHoy) lHoy.textContent = '💰 ' + filtLabel;
     if(lTrab) lTrab.textContent = '🔧 Listos p/ entregar';
     if(lStock) lStock.textContent = '📦 Stock bajo mínimo';
-    if(bvh) bvh.textContent = fmt(totalHoy);
+    if(bvh) bvh.textContent = fmt(totalFilt);
     if(btl) btl.textContent = trabajosListos;
     if(bsb) bsb.textContent = stockBajo;
   }
