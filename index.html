@@ -7796,13 +7796,12 @@ async function cargarSolicitudes(){
 
     if(error) throw error;
 
-    // Badge: reservas de hoy (confirmadas)
-    const hoy = new Date().toISOString().slice(0,10);
-    const hoyCount = (data||[]).filter(s=>s.fecha===hoy && s.estado==='confirmado').length;
+    // Badge: solicitudes PENDIENTES (sin revisar) — el admin necesita saberlo
+    const pendienteCount = (data||[]).filter(s=>s.estado==='pendiente').length;
     const badge = document.getElementById('solicitudesBadge');
     if(badge){
-      badge.textContent = hoyCount;
-      badge.style.display = hoyCount > 0 ? '' : 'none';
+      badge.textContent = pendienteCount;
+      badge.style.display = pendienteCount > 0 ? '' : 'none';
     }
 
     if(!data || !data.length){
@@ -7835,6 +7834,22 @@ async function cargarSolicitudes(){
   } catch(e){
     if(el) el.innerHTML = '<div style="color:var(--bad);font-size:.82rem">Error al cargar reservas</div>';
   }
+}
+
+// Actualiza solo el badge de pendientes sin cargar la lista completa
+async function refreshBadgeSolicitudes(){
+  if(!sb||!currentTenant?.id) return;
+  try {
+    const { count } = await sb.from('turnos_solicitudes')
+      .select('id', {count:'exact', head:true})
+      .eq('tenant_id', currentTenant.id)
+      .eq('estado', 'pendiente');
+    const badge = document.getElementById('solicitudesBadge');
+    if(badge){
+      badge.textContent = count||0;
+      badge.style.display = (count||0) > 0 ? '' : 'none';
+    }
+  } catch(e){}
 }
 
 async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
@@ -11076,6 +11091,8 @@ async function silentRefresh(){
     const active=document.querySelector('.sec.active');
     if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
+    // Siempre actualizar badge de reservas pendientes (independiente de qué sección está activa)
+    refreshBadgeSolicitudes();
   }catch(e){}
 }
 setInterval(silentRefresh, 30000);
