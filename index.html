@@ -8080,112 +8080,275 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
 }
 
 // ═══════════════════════════════════════════════════
-// PÁGINA PÚBLICA: AUTO-REGISTRO  (?registro=1)
+// WIZARD DE REGISTRO — NUEVO TENANT  (?registro=1)
+// 4 pasos: negocio → servicios → horarios → cuenta
 // ═══════════════════════════════════════════════════
+let __rw = {};
+
 function mostrarPaginaRegistro(){
-  const STY = `
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:#080808;color:#f5f0e8;font-family:'Outfit',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-    .rbox{background:#0f0f0f;border:1px solid #242424;border-radius:16px;padding:36px 32px;width:100%;max-width:420px}
-    .rlogo{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:800;color:#c9a84c;letter-spacing:2px;text-align:center;margin-bottom:4px}
-    .rsub{text-align:center;font-size:.72rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-bottom:28px}
-    label{display:block;font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;margin-top:14px}
-    input,select{width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:12px 14px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.9rem;outline:none;transition:border .15s}
-    input:focus,select:focus{border-color:#c9a84c}
-    select option{background:#080808}
-    .rbtn{margin-top:22px;width:100%;padding:13px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;transition:all .15s}
-    .rbtn:hover{background:#e8c96a}
-    .rbtn:disabled{opacity:.5;cursor:not-allowed}
-    .rerr{color:#c9524c;font-size:.78rem;margin-top:10px;display:none;text-align:center}
-    .rok{color:#4caf7d;font-size:.85rem;margin-top:12px;display:none;text-align:center;line-height:1.6}
-    .rlink{text-align:center;margin-top:16px;font-size:.78rem;color:#a89880}
-    .rlink a{color:#c9a84c;text-decoration:none}
-    .rtrial{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:12px;margin-bottom:20px;text-align:center;font-size:.8rem;color:#c9a84c}
-    @media(max-width:480px){.rbox{padding:24px 18px}}
-  `;
-  document.head.innerHTML = `<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crear cuenta — Remu Gestión</title><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet"><style>${STY}</style>`;
-  document.body.innerHTML = `
-    <div class="rbox">
-      <div class="rlogo">Remu Gestión</div>
-      <div class="rsub">Sistema de gestión</div>
-      <div class="rtrial">🎁 Primer mes gratis · Sin tarjeta · Cancelás cuando querés</div>
-      <label>Nombre de tu negocio</label>
-      <input id="rNombre" placeholder="Ej: Barbería El Punto, Tech Mobile..." autocomplete="off">
-      <label>Rubro</label>
-      <select id="rRubro">
-        <option value="">— Elegí tu rubro —</option>
-        <option value="Barbería">✂ Barbería</option>
-        <option value="Salón de belleza">💅 Salón de belleza / Peluquería</option>
-        <option value="Taller de celulares">📱 Taller de celulares / Servicio técnico</option>
-        <option value="Otro">🏠 Otro</option>
-      </select>
-      <label>Email</label>
-      <input id="rEmail" type="email" placeholder="tu@email.com" autocomplete="off">
-      <label>Contraseña</label>
-      <input id="rPass" type="password" placeholder="Mínimo 6 caracteres">
-      <label>Confirmá la contraseña</label>
-      <input id="rPass2" type="password" placeholder="Repetí la contraseña">
-      <button class="rbtn" id="rBtn" onclick="doRegistro()">Crear cuenta gratis</button>
-      <div class="rerr" id="rErr"></div>
-      <div class="rok" id="rOk"></div>
-      <div class="rlink">¿Ya tenés cuenta? <a href="index.html">Iniciar sesión →</a></div>
-    </div>
-  `;
+  document.getElementById('loadingScreen').style.display = 'none';
+  const scr = document.getElementById('onboardingScreen');
+  if(!scr) return;
+  __rw = { step:1, nombre:'', rubro:'', svcs:[], hrs:{ apertura:'09:00', cierre:'19:00', dias:[1,2,3,4,5,6] }, email:'', pass:'' };
+  scr.style.display = 'block';
+  _rwR();
 }
 
-async function doRegistro(){
-  const nombre = document.getElementById('rNombre').value.trim();
-  const rubro  = document.getElementById('rRubro').value;
-  const email  = document.getElementById('rEmail').value.trim().toLowerCase();
-  const pass   = document.getElementById('rPass').value;
-  const pass2  = document.getElementById('rPass2').value;
-  const btn = document.getElementById('rBtn');
-  const err = document.getElementById('rErr');
-  const ok  = document.getElementById('rOk');
-  err.style.display='none'; ok.style.display='none';
-  if(!nombre){ err.textContent='Ingresá el nombre de tu negocio.'; err.style.display='block'; return; }
-  if(!rubro){  err.textContent='Elegí tu rubro.'; err.style.display='block'; return; }
-  if(!email){  err.textContent='Ingresá tu email.'; err.style.display='block'; return; }
-  if(pass.length < 6){ err.textContent='La contraseña debe tener al menos 6 caracteres.'; err.style.display='block'; return; }
-  if(pass !== pass2){  err.textContent='Las contraseñas no coinciden.'; err.style.display='block'; return; }
-  btn.disabled=true; btn.textContent='Creando cuenta...';
+function _rwR(){
+  const scr = document.getElementById('onboardingScreen');
+  if(!scr) return;
+  const s = __rw.step;
+  const pct = Math.min(s * 25, 100);
+  const label = s <= 4 ? `Paso ${s} de 4` : '';
+  const body = s===1?_rwS1():s===2?_rwS2():s===3?_rwS3():s===4?_rwS4():_rwS5();
+  scr.innerHTML = `
+    <div style="min-height:100vh;color:#f5f0e8;display:flex;flex-direction:column;font-family:'Outfit',sans-serif">
+      ${s<=4?`
+        <div style="height:3px;background:#1a1a1a"><div style="height:3px;background:linear-gradient(90deg,#c9a84c,#e8c96a);width:${pct}%;transition:width .4s ease"></div></div>
+        <div style="background:#0a0a0a;border-bottom:1px solid #1e1e1e;padding:13px 20px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-family:'Playfair Display',serif;font-size:.9rem;font-weight:700;color:#c9a84c;letter-spacing:1px">Remu Gestión</span>
+          <span style="font-size:.72rem;color:#a89880">${label}</span>
+        </div>`:''}
+      <div style="flex:1;display:flex;align-items:${s===5?'center':'flex-start'};justify-content:center;padding:${s===5?'20px':'32px 16px 56px'}">
+        <div style="width:100%;max-width:460px">${body}</div>
+      </div>
+    </div>`;
+}
+
+// ── Paso 1: Nombre del negocio + tipo ────────────────────────────────────
+function _rwS1(){
+  const rubros = [
+    {v:'Barbería',          icon:'✂',  desc:'Cortes, barba, coloración'},
+    {v:'Salón de belleza',  icon:'💅', desc:'Peluquería, manicuria, estética'},
+    {v:'Taller de celulares',icon:'📱',desc:'Reparaciones, diagnóstico, repuestos'},
+    {v:'Otro',              icon:'🏠', desc:'Otro tipo de negocio'},
+  ];
+  return `<div>
+    <div style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">¡Bienvenido a Remu Gestión!</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Tu negocio</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:22px">Contanos cómo se llama y qué tipo de negocio tenés.</div>
+    <label style="${_OBL}">Nombre de tu negocio</label>
+    <input id="rwNombre" value="${esc(__rw.nombre)}" placeholder="Ej: Barbería El Punto, Studio Glam..." style="${_OB}margin-bottom:22px" autofocus>
+    <label style="${_OBL}">Tipo de negocio</label>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:32px">
+      ${rubros.map(r=>`
+        <div onclick="__rw.rubro='${r.v}';document.querySelectorAll('.rwRubroCard').forEach(c=>c.style.borderColor='#2a2a2a');this.style.borderColor='#c9a84c'"
+             class="rwRubroCard"
+             style="background:#0f0f0f;border:2px solid ${__rw.rubro===r.v?'#c9a84c':'#2a2a2a'};border-radius:12px;padding:14px 16px;cursor:pointer;display:flex;align-items:center;gap:14px">
+          <span style="font-size:1.6rem;flex-shrink:0">${r.icon}</span>
+          <div>
+            <div style="font-size:.88rem;font-weight:600">${r.v}</div>
+            <div style="font-size:.73rem;color:#a89880;margin-top:2px">${r.desc}</div>
+          </div>
+        </div>`).join('')}
+    </div>
+    <button onclick="_rwS1Next()" style="${_OBP}width:100%;padding:14px">Continuar →</button>
+    <div style="text-align:center;margin-top:14px;font-size:.73rem;color:#a89880">¿Ya tenés cuenta? <a href="index.html" style="color:#c9a84c;text-decoration:none">Iniciar sesión →</a></div>
+  </div>`;
+}
+function _rwS1Next(){
+  const n = document.getElementById('rwNombre')?.value.trim();
+  if(!n){ _rwToast('Ingresá el nombre de tu negocio'); return; }
+  if(!__rw.rubro){ _rwToast('Elegí el tipo de negocio'); return; }
+  __rw.nombre = n;
+  if(!__rw.svcs.length) __rw.svcs = _rwSvcsSugeridos(__rw.rubro);
+  __rw.step = 2; _rwR();
+}
+function _rwSvcsSugeridos(rubro){
+  if(/barber/i.test(rubro)) return [{n:'Corte de pelo',p:0},{n:'Arreglo de barba',p:0},{n:'Corte + barba',p:0},{n:'Degradé',p:0}];
+  if(/salon|belleza|peluq|manicur/i.test(rubro)) return [{n:'Corte de pelo',p:0},{n:'Tintura',p:0},{n:'Manicuria',p:0},{n:'Peinado',p:0}];
+  if(/taller|celular/i.test(rubro)) return [{n:'Cambio de pantalla',p:0},{n:'Cambio de batería',p:0},{n:'Desbloqueo',p:0}];
+  return [];
+}
+
+// ── Paso 2: Servicios y precios ───────────────────────────────────────────
+function _rwS2(){
+  const r = __rw.rubro;
+  const chips = /barber/i.test(r)
+    ? ['Corte de pelo','Arreglo de barba','Corte + barba','Degradé','Afeitado completo','Coloración','Cejas']
+    : /salon|belleza|peluq|manicur/i.test(r)
+    ? ['Corte de pelo','Tintura','Mechas','Peinado','Manicuria','Pedicura','Lifting','Depilación','Maquillaje']
+    : /taller|celular/i.test(r)
+    ? ['Cambio de pantalla','Cambio de batería','Cambio de tapa','Desbloqueo','Conector de carga','Diagnóstico']
+    : [];
+  const lista = __rw.svcs.map((s,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#111;border:1px solid #1e1e1e;border-radius:8px">
+      <span style="flex:1;font-size:.85rem;font-weight:500">${esc(s.n)}</span>
+      <span style="font-size:.85rem;color:#c9a84c;font-weight:600;flex-shrink:0">${s.p>0?'$'+Number(s.p).toLocaleString('es-AR'):'Sin precio'}</span>
+      <button onclick="__rw.svcs.splice(${i},1);_rwR()" style="background:rgba(201,82,76,.15);border:1px solid rgba(201,82,76,.2);color:#c9524c;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:.8rem;flex-shrink:0">✕</button>
+    </div>`).join('');
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Servicios y precios</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:16px">¿Qué ofrecés? Podés editar los precios y agregar más después.</div>
+    ${chips.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+      ${chips.map(c=>`<button onclick="if(!__rw.svcs.find(s=>s.n===${JSON.stringify(c)})){__rw.svcs.push({n:${JSON.stringify(c)},p:0});_rwR();}" style="padding:5px 12px;border:1px solid #2e2e2e;background:transparent;color:#a89880;border-radius:20px;font-family:'Outfit',sans-serif;font-size:.73rem;cursor:pointer">${esc(c)}</button>`).join('')}
+    </div>`:''}
+    <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <div style="flex:2"><label style="${_OBL}">Servicio</label><input id="rwSN" placeholder="Nombre" style="${_OB}margin-bottom:0" onkeydown="if(event.key==='Enter')_rwAddSvc()"></div>
+        <div style="flex:1"><label style="${_OBL}">Precio $</label><input id="rwSP" type="number" min="0" placeholder="0" style="${_OB}margin-bottom:0"></div>
+        <button onclick="_rwAddSvc()" style="${_OBP}padding:11px 14px">+ Add</button>
+      </div>
+    </div>
+    ${lista?`<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:16px">${lista}</div>`:`<div style="text-align:center;font-size:.78rem;color:#a89880;padding:12px">Usá los chips de arriba o escribí un servicio personalizado.</div>`}
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button onclick="__rw.step=1;_rwR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button onclick="__rw.step=3;_rwR()" style="${_OBP}flex:1">Continuar →</button>
+    </div>
+    <div style="text-align:center;margin-top:10px"><button onclick="__rw.step=3;_rwR()" style="background:none;border:none;color:#a89880;font-family:'Outfit',sans-serif;font-size:.72rem;cursor:pointer;text-decoration:underline">Saltar este paso →</button></div>
+  </div>`;
+}
+function _rwAddSvc(){
+  const n = document.getElementById('rwSN')?.value.trim();
+  if(!n) return;
+  __rw.svcs.push({n, p:parseFloat(document.getElementById('rwSP')?.value)||0});
+  _rwR();
+}
+
+// ── Paso 3: Horarios de atención ──────────────────────────────────────────
+function _rwS3(){
+  const h = __rw.hrs;
+  const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Horarios de atención</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">¿Cuándo abrís? Podés ajustarlo en cualquier momento desde Configuración.</div>
+    <label style="${_OBL}">Apertura y cierre</label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px">
+      <div><div style="font-size:.72rem;color:#a89880;margin-bottom:5px">Apertura</div><input type="time" id="rwAp" value="${h.apertura}" style="${_OB}"></div>
+      <div><div style="font-size:.72rem;color:#a89880;margin-bottom:5px">Cierre</div><input type="time" id="rwCi" value="${h.cierre}" style="${_OB}"></div>
+    </div>
+    <label style="${_OBL}">Días que abrís</label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px;margin-top:8px">
+      ${DIAS.map((d,i)=>`<label style="display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+        <div style="font-size:.72rem;color:#a89880;font-weight:500">${d}</div>
+        <input type="checkbox" class="rwDia" value="${i}" ${h.dias.includes(i)?'checked':''} style="width:22px;height:22px;accent-color:#c9a84c;cursor:pointer">
+      </label>`).join('')}
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="_rwS3Back()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button onclick="_rwS3Next()" style="${_OBP}flex:1">Continuar →</button>
+    </div>
+  </div>`;
+}
+function _rwS3Back(){
+  __rw.hrs.apertura = document.getElementById('rwAp')?.value||'09:00';
+  __rw.hrs.cierre   = document.getElementById('rwCi')?.value||'19:00';
+  __rw.hrs.dias     = [...document.querySelectorAll('.rwDia:checked')].map(c=>parseInt(c.value));
+  __rw.step=2; _rwR();
+}
+function _rwS3Next(){
+  __rw.hrs.apertura = document.getElementById('rwAp')?.value||'09:00';
+  __rw.hrs.cierre   = document.getElementById('rwCi')?.value||'19:00';
+  __rw.hrs.dias     = [...document.querySelectorAll('.rwDia:checked')].map(c=>parseInt(c.value));
+  if(!__rw.hrs.dias.length){ _rwToast('Elegí al menos un día de atención'); return; }
+  __rw.step=4; _rwR();
+}
+
+// ── Paso 4: Email y contraseña del dueño ─────────────────────────────────
+function _rwS4(){
+  return `<div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Tu cuenta</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Con estos datos vas a acceder a tu panel de gestión.</div>
+    <div style="background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:.8rem;color:#c9a84c;line-height:1.5">
+      🎁 <strong>Primer mes gratis.</strong> Sin tarjeta. Cancelás cuando querés.
+    </div>
+    <label style="${_OBL}">Email</label>
+    <input id="rwEmail" type="email" value="${esc(__rw.email)}" placeholder="tu@email.com" style="${_OB}margin-bottom:14px" autocomplete="email">
+    <label style="${_OBL}">Contraseña</label>
+    <input id="rwPass" type="password" value="${esc(__rw.pass)}" placeholder="Mínimo 6 caracteres" style="${_OB}margin-bottom:14px" autocomplete="new-password">
+    <label style="${_OBL}">Confirmá la contraseña</label>
+    <input id="rwPass2" type="password" placeholder="Repetí la contraseña" style="${_OB}margin-bottom:10px" autocomplete="new-password" onkeydown="if(event.key==='Enter')document.getElementById('rwFinBtn')?.click()">
+    <div id="rwErr" style="color:#c9524c;font-size:.78rem;margin-bottom:12px;min-height:18px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="_rwS4Back()" style="${_OBO}flex:0 0 auto">← Atrás</button>
+      <button id="rwFinBtn" onclick="_rwFinish(this)" style="${_OBP}flex:1">Crear mi negocio →</button>
+    </div>
+    <div style="text-align:center;margin-top:14px;font-size:.73rem;color:#a89880">¿Ya tenés cuenta? <a href="index.html" style="color:#c9a84c;text-decoration:none">Iniciar sesión →</a></div>
+  </div>`;
+}
+function _rwS4Back(){
+  __rw.email = document.getElementById('rwEmail')?.value||'';
+  __rw.pass  = document.getElementById('rwPass')?.value||'';
+  __rw.step=3; _rwR();
+}
+
+async function _rwFinish(btn){
+  const email = (document.getElementById('rwEmail')?.value||'').trim().toLowerCase();
+  const pass  = document.getElementById('rwPass')?.value||'';
+  const pass2 = document.getElementById('rwPass2')?.value||'';
+  const errEl = document.getElementById('rwErr');
+  const showErr = msg => { if(errEl) errEl.textContent=msg; };
+  showErr('');
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ showErr('Email inválido.'); return; }
+  if(pass.length<6){ showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if(pass!==pass2){ showErr('Las contraseñas no coinciden.'); return; }
+  __rw.email=email; __rw.pass=pass;
+  btn.disabled=true; btn.textContent='Creando tu negocio...';
   try {
-    // 1. Generar ID del tenant en el cliente (evita el problema de SELECT después de INSERT con RLS anon)
+    // 1. Crear tenant en Supabase (ID generado en cliente — evita SELECT con RLS anon)
     const tenantId = crypto.randomUUID();
-    const trialHasta = new Date(Date.now() + 30*24*60*60*1000).toISOString();
-    const { error: te } = await sb.from('tenants').insert({
-      id: tenantId,
-      nombre, rubro,
-      modulos: { trial_hasta: trialHasta, pago_activo: false, auto_registro: true },
-      activo: true,
-      created_at: new Date().toISOString()
+    const trialHasta = new Date(Date.now()+30*24*60*60*1000).toISOString();
+    const {error:te} = await sb.from('tenants').insert({
+      id: tenantId, nombre: __rw.nombre, rubro: __rw.rubro,
+      modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true},
+      activo: true, created_at: new Date().toISOString()
     });
-    if(te) throw new Error('Error al crear cuenta: ' + (te.message||JSON.stringify(te)));
-    // 2. Registrar usuario en Supabase Auth
-    const { data: usr, error: ue } = await sb.auth.signUp({
+    if(te) throw new Error('Error al crear el negocio: '+(te.message||JSON.stringify(te)));
+    // 2. Guardar config de servicios y horarios en localStorage
+    const tc = {
+      apertura: __rw.hrs.apertura, cierre: __rw.hrs.cierre,
+      dias: __rw.hrs.dias.length?__rw.hrs.dias:[1,2,3,4,5,6],
+      empleados: [],
+      servicios: __rw.svcs.map((s,i)=>({id:Date.now()+i,nombre:s.n,sector:'General',duracion:30,precio:s.p||0}))
+    };
+    localStorage.setItem(TURNOS_CFG_KEY+'_'+tenantId, JSON.stringify(tc));
+    // 3. Crear usuario en Supabase Auth
+    btn.textContent='Configurando tu sistema...';
+    const {error:ue} = await sb.auth.signUp({
       email, password: pass,
-      options: { data: { tenant_id: tenantId, rol: 'admin', nombre_negocio: nombre } }
+      options:{data:{tenant_id:tenantId, rol:'admin', nombre_negocio:__rw.nombre}}
     });
     if(ue) throw new Error(ue.message);
-    // 3. Intentar login automático (funciona si email confirm está desactivado en Supabase)
-    btn.textContent='Configurando tu sistema...';
-    const { data: loginData, error: le } = await sb.auth.signInWithPassword({ email, password: pass });
+    // 4. Login automático (si Supabase no requiere confirmación de email)
+    const {data:loginData, error:le} = await sb.auth.signInWithPassword({email, password:pass});
     if(!le && loginData?.session){
-      // Login exitoso — precargar servicios según rubro y redirigir directo al sistema
-      await precargarServiciosTenant(tenantId, rubro, nombre);
-      window.location.href = 'index.html';
+      await precargarServiciosTenant(tenantId, __rw.rubro, __rw.nombre);
+      localStorage.setItem('onboarding_v1_'+tenantId, '1'); // marcar wizard como hecho
+      btn.textContent='¡Todo listo! Entrando...';
+      setTimeout(()=>{ window.location.href='index.html'; }, 800);
       return;
     }
-    // Si requiere confirmación de email: mostrar mensaje y redirigir al login
-    ok.innerHTML = '✓ ¡Cuenta creada!<br><span style="font-size:.78rem;color:#a89880">Revisá tu email para confirmar tu cuenta y luego ingresá con tu email y contraseña.</span>';
-    ok.style.display='block';
-    btn.textContent='¡Listo!';
-    setTimeout(()=>{ window.location.href='index.html'; }, 4000);
+    // Sin auto-login → mostrar pantalla de confirmación de email
+    __rw.step=5; _rwR();
   } catch(e){
-    err.textContent = e.message || 'Ocurrió un error. Intentá de nuevo.';
-    err.style.display='block';
-    btn.disabled=false; btn.textContent='Crear cuenta gratis';
+    showErr(e.message||'Ocurrió un error. Intentá de nuevo.');
+    btn.disabled=false; btn.textContent='Crear mi negocio →';
   }
+}
+
+// ── Paso 5: Éxito / confirmación por email ───────────────────────────────
+function _rwS5(){
+  return `<div style="text-align:center">
+    <div style="font-size:3.5rem;margin-bottom:16px">✉️</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:800;color:#c9a84c;margin-bottom:8px">¡Cuenta creada!</div>
+    <div style="font-size:.88rem;color:#a89880;margin-bottom:24px;line-height:1.7">Revisá tu email <strong style="color:#f5f0e8">${esc(__rw.email)}</strong><br>para confirmar tu cuenta.</div>
+    <div style="background:#0f0f0f;border:1px solid #1e1e1e;border-radius:12px;padding:18px;margin-bottom:24px;text-align:left">
+      <div style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">¿Qué sigue?</div>
+      <div style="display:flex;flex-direction:column;gap:12px;font-size:.83rem;color:#f5f0e8">
+        <div>1. ✉️ Revisá tu casilla de correo</div>
+        <div>2. ✅ Hacé click en el link de confirmación</div>
+        <div>3. 🚀 Volvé acá e iniciá sesión con tu email y contraseña</div>
+      </div>
+    </div>
+    <a href="index.html" style="${_OBP}display:block;text-align:center;text-decoration:none;padding:14px">Ir al inicio de sesión →</a>
+  </div>`;
+}
+
+function _rwToast(msg){
+  let t=document.getElementById('_rwToastEl');
+  if(!t){t=document.createElement('div');t.id='_rwToastEl';t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e1e1e;border:1px solid #c9a84c;color:#f5f0e8;padding:10px 18px;border-radius:8px;font-size:.82rem;z-index:99999;font-family:Outfit,sans-serif;transition:opacity .3s';document.body.appendChild(t);}
+  t.textContent=msg;t.style.opacity='1';
+  clearTimeout(t._tid);t._tid=setTimeout(()=>t.style.opacity='0',2500);
 }
 
 // ═══════════════════════════════════════════════════
