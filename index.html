@@ -1846,10 +1846,10 @@ $$;</pre>
 </div></div></div>
 
 <!-- Gasto -->
-<div class="mb" id="mGasto"><div class="md"><div class="mh"><div class="mt2">Registrar Gasto</div><button class="xbtn" onclick="closeM('mGasto')">✕</button></div>
+<div class="mb" id="mGasto"><div class="md"><div class="mh"><div class="mt2" id="mGastoTitulo">Registrar Gasto</div><button class="xbtn" onclick="closeM('mGasto')">✕</button></div>
 <div class="mc"><input type="hidden" id="gId">
 <div class="fr full"><div><label>Concepto</label><input id="gCon" placeholder="Ej: Alquiler, luz..."></div></div>
-<div class="fr"><div><label>Tipo</label><select id="gTip">
+<div class="fr"><div><label>Tipo</label><select id="gTip" onchange="_onGastoTipoChange()">
   <option value="fijo">🏠 Alquiler</option>
   <option value="servicios">💡 Servicios (luz, internet, etc.)</option>
   <option value="personal">👤 Personal / Sueldos</option>
@@ -1861,7 +1861,14 @@ $$;</pre>
   <option value="variable">📋 Otros gastos</option>
 </select></div><div><label>Monto ($)</label><input type="number" id="gMon" placeholder="0"></div></div>
 <div class="fr"><div><label>Fecha</label><input type="date" id="gFec"></div></div>
+<div id="gFijosExtra" style="display:none">
+  <div class="fr"><div><label>Próxima revisión (en meses)</label><input type="number" id="gRevision" placeholder="Ej: 3 (opcional)" min="1" max="24"></div></div>
+</div>
 <div class="fr full"><div><label>Notas</label><textarea id="gNot" placeholder="Opcional..."></textarea></div></div>
+<div id="gHistorialBox" style="display:none;margin-top:8px;padding:8px;background:var(--bg2);border-radius:8px;font-size:.75rem;color:var(--mut)">
+  <div style="font-weight:600;margin-bottom:4px;color:var(--tx)">Historial de cambios</div>
+  <div id="gHistorialLista"></div>
+</div>
 </div><div class="mf"><button class="btn" onclick="closeM('mGasto')">Cancelar</button><button class="btn bg" onclick="saveGasto()">Guardar</button></div></div></div>
 
 <!-- Precio -->
@@ -3643,7 +3650,41 @@ function fillModalEdit(modal, id){
     if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
     updateGarantiaVence();calcGanTaller();}
   if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
-  if(modal==='mGasto'){const g=S.gastos.find(x=>x.id===id);if(!g)return;document.getElementById('gId').value=id;document.getElementById('gCon').value=g.concepto;document.getElementById('gTip').value=g.tipo;document.getElementById('gMon').value=g.monto;document.getElementById('gFec').value=g.fecha;document.getElementById('gNot').value=g.notas||'';}
+  if(modal==='mGasto'){
+    const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
+    if(!id){
+      // Nuevo gasto
+      document.getElementById('gId').value='';
+      document.getElementById('gCon').value='';
+      document.getElementById('gTip').value='fijo';
+      document.getElementById('gMon').value='';
+      document.getElementById('gFec').value=tod();
+      document.getElementById('gNot').value='';
+      document.getElementById('gRevision').value='';
+      document.getElementById('mGastoTitulo').textContent='Registrar Gasto';
+      document.getElementById('gFijosExtra').style.display='block';
+      document.getElementById('gHistorialBox').style.display='none';
+      return;
+    }
+    const g=S.gastos.find(x=>x.id===id);if(!g)return;
+    document.getElementById('gId').value=id;
+    document.getElementById('gCon').value=g.concepto;
+    document.getElementById('gTip').value=g.tipo;
+    document.getElementById('gMon').value=g.monto;
+    document.getElementById('gFec').value=g.fecha;
+    document.getElementById('gNot').value=g.notas||'';
+    document.getElementById('gRevision').value=g.revision||'';
+    const esFijo = FIJO_TIPOS_M.has(g.tipo);
+    document.getElementById('gFijosExtra').style.display = esFijo ? 'block' : 'none';
+    document.getElementById('mGastoTitulo').textContent = esFijo ? 'Editar Gasto Fijo' : 'Editar Gasto';
+    const hist = g.historial||[];
+    if(hist.length){
+      document.getElementById('gHistorialBox').style.display='block';
+      document.getElementById('gHistorialLista').innerHTML = hist.slice().reverse().map(h=>`<div style="padding:2px 0;border-bottom:1px solid var(--brd)">Antes: <strong>${fmt(h.monto)}</strong> — ${fD(h.fecha)}</div>`).join('');
+    } else {
+      document.getElementById('gHistorialBox').style.display='none';
+    }
+  }
   if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id)||S.precios.find(x=>String(x.id)===String(id));if(!p)return;document.getElementById('mPrecio').querySelector('.mt2').textContent='Editar Servicio';initPrCatSelect(p.categoria||'');document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDisp').value=p.disponibilidad||'disponible';document.getElementById('prCat').value=p.categoria||'';document.getElementById('prNot').value=p.notas||'';}
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';}
 }
@@ -4555,54 +4596,116 @@ function eliminarPedido(id){
 }
 
 // ═══ GASTOS ═══
+function _onGastoTipoChange(){
+  const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
+  const tipo = document.getElementById('gTip').value;
+  document.getElementById('gFijosExtra').style.display = FIJO_TIPOS_M.has(tipo) ? 'block' : 'none';
+}
+
 async function saveGasto(){
+  const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
   const id=document.getElementById('gId').value;
   const c=document.getElementById('gCon').value.trim();if(!c)return alert('Ingresá el concepto');
   const snap=JSON.parse(JSON.stringify(S.gastos));
-  const obj={concepto:c,tipo:document.getElementById('gTip').value,monto:parseFloat(document.getElementById('gMon').value)||0,fecha:document.getElementById('gFec').value||tod(),notas:document.getElementById('gNot').value};
+  const tipo=document.getElementById('gTip').value;
+  const nuevoMonto=parseFloat(document.getElementById('gMon').value)||0;
+  const revision=parseInt(document.getElementById('gRevision').value)||null;
+  let revisionFecha=null;
+  if(revision){
+    const d=new Date();d.setMonth(d.getMonth()+revision);
+    revisionFecha=d.toISOString().slice(0,10);
+  }
+  const obj={concepto:c,tipo,monto:nuevoMonto,fecha:document.getElementById('gFec').value||tod(),notas:document.getElementById('gNot').value,revision:revision||null,revisionFecha};
   if(id){
     const i=S.gastos.findIndex(g=>g.id===parseInt(id));
-    if(i>-1){S.gastos[i]={...S.gastos[i],...obj};await dbUpsert('gastos',S.gastos[i]);pushUndo('Editar gasto','gastos',snap);}
+    if(i>-1){
+      const anterior=S.gastos[i];
+      // Si cambió el monto de un fijo → guardar historial
+      if(FIJO_TIPOS_M.has(tipo)&&anterior.monto!==nuevoMonto&&anterior.monto>0){
+        const hist=anterior.historial||[];
+        hist.push({monto:anterior.monto,fecha:tod()});
+        obj.historial=hist;
+      } else {
+        obj.historial=anterior.historial||[];
+      }
+      S.gastos[i]={...anterior,...obj};
+      await dbUpsert('gastos',S.gastos[i]);pushUndo('Editar gasto','gastos',snap);
+    }
   }else{
-    const item={id:Date.now(),...obj};S.gastos.unshift(item);await dbUpsert('gastos',item);pushUndo('Nuevo gasto','gastos',snap);
+    const item={id:Date.now(),...obj,historial:[]};S.gastos.unshift(item);await dbUpsert('gastos',item);pushUndo('Nuevo gasto','gastos',snap);
   }
-  closeM('mGasto'); rGastos(); showToast('Gasto registrado ✓');
+  closeM('mGasto'); rGastos(); showToast('Gasto guardado ✓');
 }
 
 async function delGasto(id){
-  if(!confirm('¿Eliminar gasto?')) return;
-  const snap=JSON.parse(JSON.stringify(S.gastos));
-  S.gastos=S.gastos.filter(g=>g.id!==id);await dbDelete('gastos',id);pushUndo('Eliminar gasto','gastos',snap);rGastos();
+  _confirmarModal('¿Eliminar este gasto?', async()=>{
+    const snap=JSON.parse(JSON.stringify(S.gastos));
+    S.gastos=S.gastos.filter(g=>g.id!==id);await dbDelete('gastos',id);pushUndo('Eliminar gasto','gastos',snap);rGastos();
+  });
 }
 
 function rGastos(){
   rGastosCoverage();
-  const m=mes();const gm=S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
+  const m=mes();
+  const hoy=tod();
+  const en30=new Date();en30.setDate(en30.getDate()+30);const en30s=en30.toISOString().slice(0,10);
   const FIJO_TIPOS = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
+  // Fijos: todos (sin filtro fecha) — son recurrentes mensuales
   const fijos    = S.gastos.filter(g=>FIJO_TIPOS.has(g.tipo));
-  const variables= S.gastos.filter(g=>g.tipo==='variable');
-  const stocks   = S.gastos.filter(g=>g.tipo==='stock');
-  const tM = gm.reduce((a,g)=>a+g.monto,0);
-  const tF = gm.filter(g=>FIJO_TIPOS.has(g.tipo)).reduce((a,g)=>a+g.monto,0);
-  const tV = gm.filter(g=>g.tipo==='variable').reduce((a,g)=>a+g.monto,0);
-  const tS = gm.filter(g=>g.tipo==='stock').reduce((a,g)=>a+g.monto,0);
+  // Variables y stock: solo este mes
+  const gm       = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
+  const variables= gm.filter(g=>g.tipo==='variable');
+  const stocks   = gm.filter(g=>g.tipo==='stock');
+  // Stats: fijos = suma de todos los activos (sin filtro mes); variables/stock = solo mes actual
+  const tF = fijos.reduce((a,g)=>a+g.monto,0);
+  const tV = variables.reduce((a,g)=>a+g.monto,0);
+  const tS = stocks.reduce((a,g)=>a+g.monto,0);
+  const tM = tF + tV + tS;
   document.getElementById('gStats').innerHTML=`
-    <div class="stat"><div class="sl">Total este mes</div><div class="sv" style="color:var(--bad)">${fmt(tM)}</div></div>
-    <div class="stat"><div class="sl">Fijos este mes</div><div class="sv">${fmt(tF)}</div></div>
+    <div class="stat"><div class="sl">Total estimado mes</div><div class="sv" style="color:var(--bad)">${fmt(tM)}</div></div>
+    <div class="stat"><div class="sl">Fijos activos</div><div class="sv">${fmt(tF)}</div><div class="ss">Se repiten cada mes</div></div>
     <div class="stat"><div class="sl">Variables este mes</div><div class="sv">${fmt(tV)}</div></div>
     <div class="stat"><div class="sl">Stock / Compras</div><div class="sv">${fmt(tS)}</div></div>`;
   const tc={fijo:'brd',variable:'byw',stock:'bbl',servicios:'brd',personal:'brd',herramientas:'brd',marketing:'brd',mejoras:'brd',inversion:'brd'};
+
+  // Avisos de revisión próxima
+  const proximos = fijos.filter(g=>g.revisionFecha && g.revisionFecha<=en30s);
+  let avisoHtml='';
+  if(proximos.length){
+    avisoHtml=`<div style="background:rgba(201,168,76,.12);border:1px solid var(--gold);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.85rem">
+      ⏰ <strong>Revisión próxima:</strong> ${proximos.map(g=>`<strong>${esc(g.concepto)}</strong> (${fD(g.revisionFecha)})`).join(', ')}
+    </div>`;
+  }
+
+  function _filaFijo(g){
+    const rev=g.revisionFecha?`<br><span style="font-size:.68rem;color:${g.revisionFecha<=en30s?'var(--gold)':'var(--mut)'}">Revisión: ${fD(g.revisionFecha)}</span>`:'';
+    const hist=g.historial&&g.historial.length?`<br><span style="font-size:.68rem;color:var(--mut)">${g.historial.length} cambio${g.historial.length!==1?'s':''}</span>`:'';
+    return `<tr><td><strong>${esc(g.concepto)}</strong>${rev}${hist}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td style="color:var(--mut);font-size:.75rem">Mensual</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`;
+  }
   function _filaG(g){
     return `<tr><td><strong>${esc(g.concepto)}</strong>${g.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(g.notas)}</span>`:''}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td>${fD(g.fecha)}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`;
   }
-  function _seccionG(titulo, emoji, items, subtotal){
-    const filas = items.length
-      ? items.map(_filaG).join('')
-      : `<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:10px 0">Sin registros</td></tr>`;
+  function _seccionFijos(items){
+    const subtotal=items.reduce((a,g)=>a+g.monto,0);
+    const filas=items.length?items.map(_filaFijo).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:10px 0">Sin gastos fijos registrados</td></tr>`;
     return `<div class="card" style="margin-bottom:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-        <div><span style="font-size:1rem;font-weight:600">${emoji} ${titulo}</span></div>
-        <span style="font-size:.85rem;color:var(--mut)">Total: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
+        <div><span style="font-size:1rem;font-weight:600">🔒 Gastos Fijos</span><br><span style="font-size:.75rem;color:var(--mut)">Se repiten automáticamente cada mes</span></div>
+        <span style="font-size:.85rem;color:var(--mut)">Total mensual: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
+      </div>
+      <div style="overflow-x:auto"><table class="tbl" style="width:100%">
+        <thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Período</th><th></th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+  function _seccionG(titulo, emoji, subtitulo, items){
+    const subtotal=items.reduce((a,g)=>a+g.monto,0);
+    const filas=items.length?items.map(_filaG).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:10px 0">Sin registros este mes</td></tr>`;
+    return `<div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div><span style="font-size:1rem;font-weight:600">${emoji} ${titulo}</span><br><span style="font-size:.75rem;color:var(--mut)">${subtitulo}</span></div>
+        <span style="font-size:.85rem;color:var(--mut)">Este mes: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
       </div>
       <div style="overflow-x:auto"><table class="tbl" style="width:100%">
         <thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th></th></tr></thead>
@@ -4610,13 +4713,11 @@ function rGastos(){
       </table></div>
     </div>`;
   }
-  const totFijos = fijos.reduce((a,g)=>a+g.monto,0);
-  const totVars  = variables.reduce((a,g)=>a+g.monto,0);
-  const totStock = stocks.reduce((a,g)=>a+g.monto,0);
   document.getElementById('gastosContainer').innerHTML =
-    _seccionG('Gastos Fijos','🔒', fijos, totFijos) +
-    _seccionG('Gastos Variables','📊', variables, totVars) +
-    _seccionG('Stock / Compras','📦', stocks, totStock);
+    avisoHtml +
+    _seccionFijos(fijos) +
+    _seccionG('Gastos Variables','📊','Comisiones, extras y otros del mes', variables) +
+    _seccionG('Stock / Compras','📦','Reposición de mercadería y materiales', stocks);
 }
 
 // ═══ PRECIOS ═══
