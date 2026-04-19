@@ -6936,8 +6936,8 @@ function rTurnos(){
   const listaEl = document.getElementById('turnosLista');
   if(!turnos.length){
     listaEl.innerHTML = bloqueosBanners + `<div class="card">${emp('📅','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurno()">+ Agendar turno</button></div></div>`;
-    return;
-  }
+    // NO return — dejar que el calendario y otras vistas se rendericen igualmente
+  } else {
 
   const sectorColors = {'Peluquería':'bbl','Manicuria':'bgr','Maquillaje':'byw','Estética':'brd'};
 
@@ -6981,7 +6981,9 @@ function rTurnos(){
     </div>`;
   }).join('');
 
-  // Render other views too
+  } // fin else (hay turnos)
+
+  // Render other views — SIEMPRE, aunque el día no tenga turnos
   if(turnosVista==='horario') rTurnosHorario();
   if(turnosVista==='semana') rTurnosSemana();
   if(turnosVista==='calendario') rTurnosCalendario();
