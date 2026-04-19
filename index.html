@@ -1688,6 +1688,7 @@ $$;</pre>
     <option value="en_proceso">🔄 En proceso</option>
     <option value="terminado">✓ Terminado</option>
     <option value="no_vino">❌ No vino</option>
+    <option value="cancelado">✕ Cancelado</option>
   </select></div><div><label>Precio cobrado ($)</label><input type="number" id="turnoPrecio" placeholder="0"></div></div>
   <div class="fr full"><div><label>Notas</label><input id="turnoNotas" placeholder="Observaciones..."></div></div>
   <div id="turnoFijoCheck" style="margin-top:10px;display:none">
@@ -2321,12 +2322,15 @@ async function borrarTodosMisDatos(){
 }
 
 // Limpia todo el localStorage EXCEPTO config global del SA que no es por-tenant
-function _clearTenantCache(){
+function _clearTenantCache(keepTenantId){
   const GLOBAL_KEYS = new Set(['remu_soporte_tel', 'remu_video_tutorial']);
   const toRemove = [];
   for(let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
-    if(k && !GLOBAL_KEYS.has(k)) toRemove.push(k);
+    if(!k || GLOBAL_KEYS.has(k)) continue;
+    // Si se pasa keepTenantId, preservar claves que pertenecen a ese tenant
+    if(keepTenantId && k.includes('_' + keepTenantId)) continue;
+    toRemove.push(k);
   }
   toRemove.forEach(k => localStorage.removeItem(k));
 }
@@ -2334,7 +2338,7 @@ function _clearTenantCache(){
 async function doLogout(){
   if(currentRole === 'admin') descargarBackup();
   await sb.auth.signOut();
-  _clearTenantCache();
+  _clearTenantCache(currentTenant?.id); // preserva datos del tenant actual para el próximo login
   currentUser = null; currentTenant = null; currentRole = null;
   window._currentSection = null;
   window.__adminExternoTenants = null;
@@ -3434,7 +3438,7 @@ async function loadAll(){
   const prevTenant = localStorage.getItem('activeTenant');
   const thisTenant = currentTenant?.id || '';
   if(prevTenant && prevTenant !== thisTenant){
-    _clearTenantCache();
+    _clearTenantCache(thisTenant); // limpia datos del tenant anterior, preserva los del nuevo
   }
   localStorage.setItem('activeTenant', thisTenant);
   document.getElementById('loadingScreen').style.display='flex';
@@ -6312,15 +6316,7 @@ async function saveTurno(){
   if(!fecha||!hora) return alert('Ingresá fecha y hora');
   if(!empleadoId) return alert('Seleccioná un empleado');
 
-  // Verificar conflicto antes de guardar
-  const conflictoEl = document.getElementById('turnoConflicto');
-  if(conflictoEl.style.display !== 'none') {
-    // Delfi puede superponer turnos (tinturas largas con cortes intermedios)
-    const esDelfi = window.currentEmpleadoNombre === 'Delfi';
-    if(!esDelfi){
-      if(!confirm('Hay un conflicto de horario. ¿Querés guardarlo igual?')) return;
-    }
-  }
+  // El aviso de conflicto ya se muestra inline en el formulario — no se bloquea el guardado
 
   const cfg = getTurnosCfg();
   const srv = cfg.servicios.find(s=>s.id===servicioId);
@@ -6451,13 +6447,14 @@ async function saveTurno(){
 }
 
 function cancelarTurno(id){
-  if(!confirm('¿Eliminar este turno?')) return;
+  _confirmarModal('¿Eliminar este turno?', ()=>{
   const turno = getTurnos().find(x=>String(x.id)===String(id));
   const turnos = getTurnos().filter(x=>String(x.id)!==String(id));
   saveTurnosLocal(turnos);
   if(turno) liberarSlotSupabase(turno);
   rTurnos();
   showToast('Turno eliminado ✓');
+  });
 }
 
 async function cambiarEstadoTurno(id, nuevoEstado){
