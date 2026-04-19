@@ -909,7 +909,7 @@ $$;</pre>
         <div class="ch"><h3>🛒 Objetivos de compra</h3><button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Agregar</button></div>
         <div id="objetivosCompraList"></div>
       </div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openM('mMovCaja',null)">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div></div>
+      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div><div id="movCajaLista" style="margin-top:10px"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card">
           <div class="ch"><h3>Meta mensual</h3></div>
@@ -1901,8 +1901,9 @@ $$;</pre>
 </div></div></div>
 
 <!-- Mov Caja -->
-<div class="mb" id="mMovCaja"><div class="md"><div class="mh"><div class="mt2">💵 Otro ingreso / egreso</div><button class="xbtn" onclick="closeM('mMovCaja')">✕</button></div>
+<div class="mb" id="mMovCaja"><div class="md"><div class="mh"><div class="mt2" id="mMovCajaTitulo">💵 Otro ingreso / egreso</div><button class="xbtn" onclick="closeM('mMovCaja')">✕</button></div>
 <div class="mc">
+<input type="hidden" id="mcId">
 <div class="fr"><div><label>Tipo</label><select id="mcTipo"><option value="ingreso">⬆ Ingreso</option><option value="egreso">⬇ Egreso</option></select></div><div><label>Caja</label><select id="mcCaja"><option value="general">💼 General</option><option value="servicio">✂ Servicios</option><option value="accesorios">📦 Productos</option><option value="equipos">📱 Equipos</option></select></div></div>
 <div class="fr"><div><label>Monto ($)</label><input type="number" id="mcMonto" placeholder="0"></div><div><label>Fecha</label><input type="date" id="mcFec"></div></div>
 <div class="fr full"><div><label>Concepto</label><input id="mcConc" placeholder="Ej: Retiro para gastos, venta extra..."></div></div>
@@ -4148,6 +4149,8 @@ async function saveTaller(){
     estFisico:document.getElementById('tEstFisico')?.value||'excelente',
     accesorios:document.getElementById('tAccesorios')?.value||''
   };
+  // Auto-registrar fecha de entrega si se marca como entregado sin fecha
+  if(obj.estado==='entregado'&&!obj.fechaEnt) obj.fechaEnt=tod();
   if(id){
     const i=S.reparaciones.findIndex(r=>r.id===parseInt(id));
     if(i>-1){S.reparaciones[i]={...S.reparaciones[i],...obj};await dbUpsert('reparaciones',S.reparaciones[i]);pushUndo('Editar trabajo','reparaciones',snap);}
@@ -4181,6 +4184,7 @@ async function confAv(){
   const snap=JSON.parse(JSON.stringify(S.reparaciones));
   const ns=document.getElementById('avEst').value;
   r.estado=ns;r.historial=r.historial||[];r.historial.push({estado:ns,nota:document.getElementById('avNot').value,fecha:tod()});
+  if(ns==='entregado'&&!r.fechaEnt) r.fechaEnt=tod(); // registrar fecha de entrega para la caja
   await dbUpsert('reparaciones',r);pushUndo('Avance taller','reparaciones',snap);
   closeM('mAv');rTaller();if(ns==='listo')showWA(r);
 }
@@ -5280,17 +5284,85 @@ function rCajas(){
     ? [{k:'servicio',l:'✂ Servicios',obj:0},{k:'accesorios',l:'🛍 Productos',obj:0},{k:'general',l:'💼 General',obj:0}]
     : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
   document.getElementById('cajasGrid').innerHTML=items.map(i=>`<div class="stat"><div class="sl">${i.l}</div><div class="sv" style="color:${c[i.k]>=0?'var(--ok)':'var(--bad)'}">${fmt(c[i.k])}</div>${i.obj>0?`<div style="margin-top:6px"><div class="pb"><div class="pf" style="width:${Math.min(100,Math.round(c[i.k]/i.obj*100))}%"></div></div><div style="font-size:.68rem;color:var(--mut);margin-top:3px">Meta día: ${fmt(i.obj)}</div></div>`:''}</div>`).join('');
+  rMovCaja();
+}
+
+function openNuevoMovCaja(){
+  document.getElementById('mcId').value = '';
+  document.getElementById('mcTipo').value = 'ingreso';
+  document.getElementById('mcCaja').value = 'general';
+  document.getElementById('mcMonto').value = '';
+  document.getElementById('mcFec').value = tod();
+  document.getElementById('mcConc').value = '';
+  const t = document.getElementById('mMovCajaTitulo');
+  if(t) t.textContent = '💵 Otro ingreso / egreso';
+  document.getElementById('mMovCaja').classList.add('open');
+}
+
+function editMovCaja(id){
+  const m = (S.movCaja||[]).find(x=>x.id===id);
+  if(!m) return;
+  document.getElementById('mcId').value = m.id;
+  document.getElementById('mcTipo').value = m.tipo||'ingreso';
+  document.getElementById('mcCaja').value = m.caja||'general';
+  document.getElementById('mcMonto').value = m.monto||'';
+  document.getElementById('mcFec').value = m.fecha||tod();
+  document.getElementById('mcConc').value = m.concepto||'';
+  const t = document.getElementById('mMovCajaTitulo');
+  if(t) t.textContent = '✏ Editar movimiento';
+  document.getElementById('mMovCaja').classList.add('open');
+}
+
+function delMovCaja(id){
+  _confirmarModal('¿Eliminar este movimiento?', async ()=>{
+    S.movCaja = (S.movCaja||[]).filter(x=>x.id!==id);
+    await dbSetConfig('movCaja', S.movCaja);
+    rCajas(); rMovCaja(); rDash();
+    showToast('Movimiento eliminado ✓');
+  });
+}
+
+function rMovCaja(){
+  const el = document.getElementById('movCajaLista');
+  if(!el) return;
+  const hoy = tod();
+  const movs = (S.movCaja||[]).filter(m=>!m.fecha||m.fecha===hoy).sort((a,b)=>(b.id||0)-(a.id||0));
+  if(!movs.length){ el.innerHTML=''; return; }
+  el.innerHTML = `<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;padding-top:8px;border-top:1px solid var(--bor)">Movimientos de hoy</div>` +
+    movs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600">${esc(m.concepto||'—')}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${esc(m.caja)} · ${m.tipo==='ingreso'?'⬆ Ingreso':'⬇ Egreso'}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span style="font-weight:700;color:${m.tipo==='ingreso'?'var(--ok)':'var(--bad)'}">${m.tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</span>
+        <button class="btn be bsm" onclick="editMovCaja(${m.id})">✎</button>
+        <button class="btn bd bsm" onclick="delMovCaja(${m.id})">✕</button>
+      </div>
+    </div>`).join('');
 }
 
 async function saveMovCaja(){
-  const obj={id:Date.now(),caja:document.getElementById('mcCaja').value,tipo:document.getElementById('mcTipo').value,monto:parseFloat(document.getElementById('mcMonto').value)||0,fecha:document.getElementById('mcFec').value||tod(),concepto:document.getElementById('mcConc').value};
+  const idStr = document.getElementById('mcId')?.value;
+  const existingId = idStr ? parseInt(idStr) : null;
+  const obj={id:existingId||Date.now(),caja:document.getElementById('mcCaja').value,tipo:document.getElementById('mcTipo').value,monto:parseFloat(document.getElementById('mcMonto').value)||0,fecha:document.getElementById('mcFec').value||tod(),concepto:document.getElementById('mcConc').value};
   const rubroC = (currentTenant?.rubro||'').toLowerCase();
   if(rubroC.includes('personal')||rubroC.includes('pareja')){
     const cajasGrid = document.getElementById('cajasGrid');
     if(cajasGrid) cajasGrid.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:8px">Usá el módulo de Gastos para registrar tus gastos</div>';
     return;
   }
-  if(!S.movCaja)S.movCaja=[];S.movCaja.push(obj);await dbSetConfig('movCaja',S.movCaja);closeM('mMovCaja');showToast('Movimiento registrado ✓');rCajas();rDash();
+  if(!S.movCaja) S.movCaja=[];
+  if(existingId){
+    const idx = S.movCaja.findIndex(x=>x.id===existingId);
+    if(idx>-1) S.movCaja[idx]=obj; else S.movCaja.push(obj);
+  } else {
+    S.movCaja.push(obj);
+  }
+  await dbSetConfig('movCaja',S.movCaja);
+  closeM('mMovCaja');
+  showToast(existingId?'Movimiento actualizado ✓':'Movimiento registrado ✓');
+  rCajas(); rMovCaja(); rDash();
 }
 
 // ═══ CIERRE DE CAJA ═══
@@ -5301,10 +5373,19 @@ function cierreDiario(){
 
   // Resumen por forma de pago desde ventas de hoy
   const metodos = {};
+  const rubCierre = (currentTenant?.rubro||'').toLowerCase();
+  const esSalonCierre = /barber|barbería|salon|belleza/i.test(rubCierre);
   S.ventas.filter(v=>v.fecha===hoy).forEach(v=>{
     const m = v.metodo||'Efectivo';
     metodos[m] = (metodos[m]||0) + (v.total||0);
   });
+  // Para taller: sumar reparaciones entregadas hoy que no están en S.ventas
+  if(!esSalonCierre){
+    S.reparaciones.filter(r=>r.estado==='entregado'&&(r.fechaEnt||r.fecha)===hoy).forEach(r=>{
+      const m = r.metodo||'Efectivo';
+      metodos[m] = (metodos[m]||0) + (r.presupuesto||0);
+    });
+  }
   // Los turnos de salón/barbería se registran como ventas en _doEstadoTurno(),
   // ya están en S.ventas. No sumarlos nuevamente para evitar duplicación.
 
