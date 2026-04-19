@@ -1376,10 +1376,12 @@ $$;</pre>
 
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
-      <div class="pt">Gastos</div><div class="ps">Fijos y variables del local</div>
+      <div class="pt">Gastos</div><div class="ps">Fijos, variables y stock del local</div>
       <div class="g2" id="gStats" style="margin-bottom:14px"></div>
-      <div class="card"><div class="ch"><h3></h3><button class="btn bg" onclick="openM('mGasto',null)">+ Registrar gasto</button></div>
-      <div class="tw"><table><thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th></th></tr></thead><tbody id="tbG"></tbody></table></div></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn bg" onclick="openM('mGasto',null)">+ Registrar gasto</button>
+      </div>
+      <div id="gastosContainer"></div>
     </div>
 
     <!-- PEDIDOS (Taller) -->
@@ -4576,12 +4578,45 @@ async function delGasto(id){
 function rGastos(){
   rGastosCoverage();
   const m=mes();const gm=S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
-  const tM=gm.reduce((a,g)=>a+g.monto,0);const tF=S.gastos.filter(g=>g.tipo==='fijo').reduce((a,g)=>a+g.monto,0);
-  const tV=gm.filter(g=>g.tipo==='variable').reduce((a,g)=>a+g.monto,0);
-  document.getElementById('gStats').innerHTML=`<div class="stat"><div class="sl">Total este mes</div><div class="sv" style="color:var(--bad)">${fmt(tM)}</div></div><div class="stat"><div class="sl">Fijos mensuales</div><div class="sv">${fmt(tF)}</div><div class="ss">Variable este mes: ${fmt(tV)}</div></div>`;
-  const tb=document.getElementById('tbG');const tc={fijo:'brd',variable:'byw',proveedor:'bbl'};
-  if(!S.gastos.length){tb.innerHTML=`<tr><td colspan="5">${emp('🧾','Sin gastos')}</td></tr>`;return;}
-  tb.innerHTML=S.gastos.map(g=>`<tr><td><strong>${esc(g.concepto)}</strong>${g.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(g.notas)}</span>`:''}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td>${fD(g.fecha)}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`).join('');
+  const FIJO_TIPOS = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
+  const fijos    = S.gastos.filter(g=>FIJO_TIPOS.has(g.tipo));
+  const variables= S.gastos.filter(g=>g.tipo==='variable');
+  const stocks   = S.gastos.filter(g=>g.tipo==='stock');
+  const tM = gm.reduce((a,g)=>a+g.monto,0);
+  const tF = gm.filter(g=>FIJO_TIPOS.has(g.tipo)).reduce((a,g)=>a+g.monto,0);
+  const tV = gm.filter(g=>g.tipo==='variable').reduce((a,g)=>a+g.monto,0);
+  const tS = gm.filter(g=>g.tipo==='stock').reduce((a,g)=>a+g.monto,0);
+  document.getElementById('gStats').innerHTML=`
+    <div class="stat"><div class="sl">Total este mes</div><div class="sv" style="color:var(--bad)">${fmt(tM)}</div></div>
+    <div class="stat"><div class="sl">Fijos este mes</div><div class="sv">${fmt(tF)}</div></div>
+    <div class="stat"><div class="sl">Variables este mes</div><div class="sv">${fmt(tV)}</div></div>
+    <div class="stat"><div class="sl">Stock / Compras</div><div class="sv">${fmt(tS)}</div></div>`;
+  const tc={fijo:'brd',variable:'byw',stock:'bbl',servicios:'brd',personal:'brd',herramientas:'brd',marketing:'brd',mejoras:'brd',inversion:'brd'};
+  function _filaG(g){
+    return `<tr><td><strong>${esc(g.concepto)}</strong>${g.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(g.notas)}</span>`:''}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td>${fD(g.fecha)}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`;
+  }
+  function _seccionG(titulo, emoji, items, subtotal){
+    const filas = items.length
+      ? items.map(_filaG).join('')
+      : `<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:10px 0">Sin registros</td></tr>`;
+    return `<div class="card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div><span style="font-size:1rem;font-weight:600">${emoji} ${titulo}</span></div>
+        <span style="font-size:.85rem;color:var(--mut)">Total: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
+      </div>
+      <div style="overflow-x:auto"><table class="tbl" style="width:100%">
+        <thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Fecha</th><th></th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table></div>
+    </div>`;
+  }
+  const totFijos = fijos.reduce((a,g)=>a+g.monto,0);
+  const totVars  = variables.reduce((a,g)=>a+g.monto,0);
+  const totStock = stocks.reduce((a,g)=>a+g.monto,0);
+  document.getElementById('gastosContainer').innerHTML =
+    _seccionG('Gastos Fijos','🔒', fijos, totFijos) +
+    _seccionG('Gastos Variables','📊', variables, totVars) +
+    _seccionG('Stock / Compras','📦', stocks, totStock);
 }
 
 // ═══ PRECIOS ═══
