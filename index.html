@@ -995,7 +995,7 @@ $$;</pre>
           <div class="tabs" id="stabs" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px"></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rStock()" id="sQ"></div>
-            <button class="btn bg" onclick="openM('mStock',null)">+ Agregar producto</button>
+            <button class="btn bg" onclick="openNuevoStock()">+ Agregar producto</button>
           </div>
         </div>
         <div class="tw"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio venta</th><th>Margen</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
@@ -3681,6 +3681,32 @@ function descargarBackup(){
 }
 
 // ═══ STOCK ═══
+function openNuevoStock(){
+  const el = document.getElementById('mStock');
+  if(!el) return;
+  // Título
+  const titulo = el.querySelector('.mt2');
+  if(titulo) titulo.textContent = 'Agregar Producto';
+  // Limpiar campos explícitamente
+  document.getElementById('sId').value = '';
+  document.getElementById('sNom').value = '';
+  document.getElementById('sCant').value = '';
+  document.getElementById('sMin').value = '';
+  document.getElementById('sPre').value = '';
+  document.getElementById('sCos').value = '';
+  document.getElementById('sNot').value = '';
+  // Si la categoría no tiene opciones (ej. primer uso) volver a poblarla
+  const sCat = document.getElementById('sCat');
+  if(sCat){
+    if(sCat.options.length === 0) setupCategoriasStock();
+    sCat.selectedIndex = 0;
+  }
+  // Abrir modal
+  el.classList.add('open');
+  // Foco al primer campo
+  setTimeout(()=>{ document.getElementById('sNom')?.focus(); }, 80);
+}
+
 async function saveStock(){
   const id = document.getElementById('sId').value;
   const n = document.getElementById('sNom').value.trim(); if(!n) return alert('Ingresá el nombre');
