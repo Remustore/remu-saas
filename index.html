@@ -6545,7 +6545,7 @@ async function verificarConflicto(){
   }
 }
 
-async function saveTurno(){
+async function saveTurno(_override){
   const id = document.getElementById('turnoId').value;
   const cli = document.getElementById('turnoCli').value.trim();
   const tel = document.getElementById('turnoTel').value.trim();
@@ -6559,13 +6559,36 @@ async function saveTurno(){
   if(!fecha||!hora) return alert('Ingresá fecha y hora');
   if(!empleadoId) return alert('Seleccioná un empleado');
 
-  // El aviso de conflicto ya se muestra inline en el formulario — no se bloquea el guardado
-
   const cfg = getTurnosCfg();
   const srv = cfg.servicios.find(s=>s.id===servicioId);
   const empleado = cfg.empleados.find(e=>e.id==empleadoId);
 
   const turnos = getTurnos();
+
+  // Validación de duplicados — solo al crear o cambiar hora/empleado, nunca con _override=true
+  if(!_override){
+    const durN = srv?.duracion||60;
+    const [h,m] = hora.split(':').map(Number);
+    const inicioN = h*60+m;
+    const finN = inicioN+durN;
+    const conflicto = turnos.find(t=>{
+      if(t.fecha!==fecha||['cancelado','no_vino'].includes(t.estado)) return false;
+      if(String(t.empleadoId)!==String(empleadoId)) return false;
+      if(String(t.id)===String(id)) return false; // mismo turno editándose
+      const srvT=cfg.servicios.find(s=>s.id==t.servicioId);
+      const durT=srvT?.duracion||60;
+      const [th,tm]=(t.hora||'00:00').split(':').map(Number);
+      const tI=th*60+tm; const tF=tI+durT;
+      return inicioN<tF&&finN>tI;
+    });
+    if(conflicto){
+      _confirmarModal(
+        `⚠ Horario ocupado: ${conflicto.cliente} ya tiene turno a las ${conflicto.hora} con ${conflicto.empleadoNombre}.\n¿Guardar igual?`,
+        ()=>saveTurno(true)
+      );
+      return;
+    }
+  }
   const estado = document.getElementById('turnoEstado')?.value || 'confirmado';
   const precioCobrado = parseFloat(document.getElementById('turnoPrecio')?.value || srv?.precio || 0);
   // Preserve original data when editing
