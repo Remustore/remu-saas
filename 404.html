@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Remu Gestión</title>
+<style>
+  body{margin:0;background:#080808;color:#f5f0e8;font-family:'Outfit',sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<script>
+// GitHub Pages SPA routing — captura paths que no existen como archivo
+// Si la ruta es /b/slug, redirige a /b/?s=slug para que b/index.html lo procese
+(function(){
+  var path = window.location.pathname;
+  var search = window.location.search;
+  var hash = window.location.hash;
+
+  // /b/slug → /b/?s=slug
+  var bMatch = path.match(/^\/b\/([^/]+)\/?$/);
+  if(bMatch){
+    var slug = decodeURIComponent(bMatch[1]);
+    var dest = '/b/?s=' + encodeURIComponent(slug) + (search?'&'+search.slice(1):'') + hash;
+    window.location.replace(dest);
+    return;
+  }
+
+  // Cualquier otra ruta desconocida → mostrar 404 genérico
+  document.body.innerHTML = '<div style="text-align:center;padding:40px"><div style="font-size:3rem;margin-bottom:16px">🔍</div><div style="font-size:1.4rem;font-weight:700;color:#c9a84c;margin-bottom:8px">Página no encontrada</div><div style="font-size:.9rem;color:#a89880;margin-bottom:24px">La dirección que ingresaste no existe.</div><a href="/" style="padding:12px 24px;background:#c9a84c;color:#080808;text-decoration:none;border-radius:8px;font-weight:700;font-size:.9rem">Ir al inicio →</a></div>';
+})();
+</script>
+</body>
+</html>

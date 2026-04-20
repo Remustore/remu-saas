@@ -7766,7 +7766,8 @@ async function persistCfgToSupabase(){
 
 async function rTurnosOnline(){
   const tenantId = currentTenant?.id||'';
-  const link = window.location.origin + window.location.pathname + '?turno=' + tenantId;
+  const _slug = tenantSlug(currentTenant?.nombre||'');
+  const link = window.location.origin + '/b/' + _slug;
   const el = document.getElementById('turnosOnlineLink');
   if(el) el.textContent = link;
 
@@ -8451,7 +8452,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
   const rubroLC = rubro.toLowerCase();
   const esBarber = /barber/i.test(rubroLC);
   const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
-  const turnoLink = window.location.origin + window.location.pathname + '?turno=' + tenantId;
+  const turnoLink = window.location.origin + '/b/' + tenantSlug(currentTenant?.nombre||'');
 
   const cats = esBarber
     ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'barba',l:'🪒 Barba'},{k:'coloracion',l:'🎨 Coloración'},{k:'tratamiento',l:'✨ Tratamientos'},{k:'otro',l:'🔧 Otros'}]
@@ -11520,9 +11521,10 @@ async function _owFinish(btn){
 
 function _owS5(){
   const tid  = currentTenant?.id||'';
-  const base = window.location.origin + window.location.pathname;
-  const tLink = base + '?turno='   + tid;
-  const pLink = base + '?precios=' + tid;
+  const _owSlug = tenantSlug(currentTenant?.nombre||'');
+  const base = window.location.origin;
+  const tLink = base + '/b/' + _owSlug;
+  const pLink = window.location.origin + window.location.pathname + '?precios=' + _owSlug;
   const nb = esc(currentTenant?.nombre||'Tu negocio');
   const lCard = (icon, label, link, desc) => `
     <div style="background:#0d0d0d;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:10px">
