@@ -191,9 +191,10 @@ function parseRows(rows){
 
 // ── Render principal ──────────────────────────────────────────────────────
 function renderBooking(){
-  const {turnosCfg:cfg, onlineCfg:online, tenantNombre, tenantRubro} = G;
+  const cfg    = G.cfg    || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
+  const online = G.online || {mensaje:'',insta:'',direccion:'',tel:''};
   const tenant = G.tenant;
-  const nombre = tenant?.nombre || tenantNombre || 'Negocio';
+  const nombre = tenant?.nombre || G.tenantNombre || 'Negocio';
   document.getElementById('hdrNeg').textContent = nombre;
   document.title = 'Reservar turno — ' + nombre;
 

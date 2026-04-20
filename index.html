@@ -8057,7 +8057,11 @@ Hacé click acá: ${link}`;
 }
 
 function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
-  const cfg = onlineCfgParam || JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}');
+  let cfg = onlineCfgParam;
+  if(!cfg || typeof cfg !== 'object'){
+    try { cfg = JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}'); } catch(e){ cfg = {}; }
+    if(!cfg || typeof cfg !== 'object') cfg = {};
+  }
   const turnosCfg = turnosCfgParam || (()=>{const r=localStorage.getItem('turnosCfg_'+tenant.id);return r?JSON.parse(r):{servicios:[],empleados:[]};})();
   
   document.body.innerHTML = `
