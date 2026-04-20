@@ -2072,6 +2072,7 @@ async function doLogin(){
     if(nombreEmpleado) window.currentEmpleadoNombre = nombreEmpleado;
     setupApp();
     await loadAll();
+    setTimeout(()=>{ if(typeof pedirPermisoNotificaciones==='function') pedirPermisoNotificaciones().then(()=>checkNotifGastosFijos()); }, 3000);
   } catch(e) {
     err.textContent = e.message || 'Email o contraseña incorrectos';
     err.style.display='block';
@@ -7816,11 +7817,16 @@ async function cargarSolicitudes(){
     if(error) throw error;
 
     // Badge: solicitudes PENDIENTES (sin revisar) — el admin necesita saberlo
-    const pendienteCount = (data||[]).filter(s=>s.estado==='pendiente').length;
+    const pendientes = (data||[]).filter(s=>s.estado==='pendiente');
+    const pendienteCount = pendientes.length;
     const badge = document.getElementById('solicitudesBadge');
     if(badge){
       badge.textContent = pendienteCount;
       badge.style.display = pendienteCount > 0 ? '' : 'none';
+    }
+    // Inicializar set de vistas para que silentRefresh no notifique las ya conocidas
+    if(_solicitudesNotifVistas === null){
+      _solicitudesNotifVistas = new Set(pendientes.map(s=>String(s.id)));
     }
 
     if(!data || !data.length){
@@ -7859,14 +7865,27 @@ async function cargarSolicitudes(){
 async function refreshBadgeSolicitudes(){
   if(!sb||!currentTenant?.id) return;
   try {
-    const { count } = await sb.from('turnos_solicitudes')
-      .select('id', {count:'exact', head:true})
+    const { data: rows } = await sb.from('turnos_solicitudes')
+      .select('id, nombre, servicio_id')
       .eq('tenant_id', currentTenant.id)
       .eq('estado', 'pendiente');
+    const count = (rows||[]).length;
     const badge = document.getElementById('solicitudesBadge');
     if(badge){
       badge.textContent = count||0;
-      badge.style.display = (count||0) > 0 ? '' : 'none';
+      badge.style.display = count > 0 ? '' : 'none';
+    }
+    // Detectar nuevas solicitudes y notificar
+    if(_solicitudesNotifVistas === null){
+      // Primera llamada: inicializar sin notificar
+      _solicitudesNotifVistas = new Set((rows||[]).map(r=>String(r.id)));
+    } else {
+      for(const row of (rows||[])){
+        if(!_solicitudesNotifVistas.has(String(row.id))){
+          _solicitudesNotifVistas.add(String(row.id));
+          _notifLocal('📅 Nueva reserva online', `${row.nombre||'Cliente'} — ${row.servicio_id||''}`, 'turnosOnline');
+        }
+      }
     }
   } catch(e){}
 }
@@ -11724,6 +11743,8 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
       }
       setupApp();
       await loadAll();
+      // Pedir permiso de notificaciones (solo admins, la primera vez)
+      setTimeout(()=>{ if(typeof pedirPermisoNotificaciones==='function') pedirPermisoNotificaciones().then(()=>checkNotifGastosFijos()); }, 3000);
     } else {
       document.getElementById('loadingScreen').style.display='none';
       document.getElementById('loginScreen').style.display='flex';
@@ -11818,6 +11839,60 @@ if (_pwaGo) {
   window.addEventListener('DOMContentLoaded', () => {
     if (typeof go === 'function') setTimeout(() => go(_pwaGo), 1500);
   });
+}
+
+// ── NOTIFICACIONES LOCALES (Notification API) ────────────────────────
+let _notifPermiso = false;
+// null = primera carga, no notificar; Set = IDs ya vistos
+let _solicitudesNotifVistas = null;
+
+async function pedirPermisoNotificaciones(){
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'granted'){ _notifPermiso = true; return; }
+  if(Notification.permission === 'denied') return;
+  if(currentRole !== 'admin') return;
+  const p = await Notification.requestPermission();
+  _notifPermiso = p === 'granted';
+}
+
+function _notifLocal(titulo, cuerpo, seccion){
+  if(!_notifPermiso || Notification.permission !== 'granted') return;
+  try {
+    const n = new Notification(titulo, {
+      body: cuerpo,
+      icon: '/icon.svg',
+      badge: '/icon.svg',
+      tag: seccion + '_' + Date.now(),
+    });
+    n.onclick = () => {
+      window.focus();
+      if(seccion && typeof go === 'function') go(seccion);
+      n.close();
+    };
+  } catch(e){}
+}
+
+// Llama a checkNotifGastosFijos() después de cargar S.gastos
+function checkNotifGastosFijos(){
+  if(!_notifPermiso || !S.gastos?.length) return;
+  const hoys = new Date().toISOString().slice(0,10);
+  const en7 = new Date(); en7.setDate(en7.getDate()+7);
+  const en7s = en7.toISOString().slice(0,10);
+  const FIJO_TIPOS = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
+  const storageKey = 'notif_gastos_' + hoys;
+  const vistoSet = new Set(JSON.parse(localStorage.getItem(storageKey)||'[]'));
+  const proximos = S.gastos.filter(g=>
+    FIJO_TIPOS.has(g.tipo) &&
+    g.revisionFecha &&
+    g.revisionFecha >= hoys &&
+    g.revisionFecha <= en7s &&
+    !vistoSet.has(String(g.id))
+  );
+  proximos.forEach(g=>{
+    vistoSet.add(String(g.id));
+    _notifLocal('⏰ Revisión de gasto próxima', `${g.concepto}: revisión el ${g.revisionFecha}`, 'gastos');
+  });
+  if(proximos.length) localStorage.setItem(storageKey, JSON.stringify([...vistoSet]));
 }
 </script>
 </body>
