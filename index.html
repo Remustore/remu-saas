@@ -1944,6 +1944,20 @@ $$;</pre>
 </div><div class="mf"><button class="btn" onclick="closeM('mMovInv')">Cancelar</button><button class="btn bg" onclick="saveMovInv()">Guardar</button></div></div></div>
 
 <script>
+// ── Error handler global: captura la ubicación exacta de errores de runtime ─
+window.onerror = function(msg, src, line, col, err){
+  const loc = (src||'').replace(/.*\//,'') + ':' + line + ':' + col;
+  const txt = (msg||'') + ' @ ' + loc;
+  console.error('[REMU ERROR]', txt, err);
+  // Mostrar en UI solo si el error menciona propiedades de undefined/null
+  if(typeof showToast==='function' && /Cannot read prop/i.test(msg)){
+    showToast('Error: ' + txt.slice(0,120), 'err');
+  }
+  return false; // no suprimir — sigue en consola
+};
+window.addEventListener('unhandledrejection', e=>{
+  console.error('[REMU PROMISE]', e.reason);
+});
 // ═══════════════════════════════════════════════
 // CONFIGURACIÓN — valores de producción inlinados en el <head> + override opcional vía config.js (local dev)
 // ═══════════════════════════════════════════════
@@ -7788,9 +7802,10 @@ async function rTurnosOnline(){
     try {
       const { data } = await sb.from('precios').select('data').eq('tenant_id', tenantId);
       if(data){
-        const row = data.find(p=>p.data?.__onlineCfg);
+        const row = data.find(p=>p.data?.__onlineCfg && typeof p.data.__onlineCfg === 'object');
         if(row?.data.__onlineCfg){
-          cfg = row.data.__onlineCfg;
+          const _oc = row.data.__onlineCfg;
+          cfg = {mensaje:'',insta:'',direccion:'',tel:'',..._oc};
           localStorage.setItem(ONLINE_CFG_KEY + '_' + tenantId, JSON.stringify(cfg));
         }
       }
@@ -11383,16 +11398,16 @@ function _owS0(){
 }
 
 function _owS1(){
-  const i = __ow.info;
+  const i = __ow.info || {};
   return `<div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Información pública</div>
     <div style="font-size:.82rem;color:#a89880;margin-bottom:26px">Esto verán tus clientes al entrar a tu página de turnos.</div>
     <label style="${_OBL}">Mensaje de bienvenida</label>
-    <input id="owMsg" value="${esc(i.mensaje)}" placeholder="Ej: ¡Gracias por elegirnos! Atendemos con turno previo." style="${_OB}margin-bottom:16px">
+    <input id="owMsg" value="${esc(i.mensaje||'')}" placeholder="Ej: ¡Gracias por elegirnos! Atendemos con turno previo." style="${_OB}margin-bottom:16px">
     <label style="${_OBL}">Dirección del local</label>
-    <input id="owDir" value="${esc(i.direccion)}" placeholder="Ej: Av. Rivadavia 1234, Buenos Aires" style="${_OB}margin-bottom:16px">
+    <input id="owDir" value="${esc(i.direccion||'')}" placeholder="Ej: Av. Rivadavia 1234, Buenos Aires" style="${_OB}margin-bottom:16px">
     <label style="${_OBL}">Instagram (opcional)</label>
-    <input id="owInsta" value="${esc(i.insta)}" placeholder="tunegocio" style="${_OB}margin-bottom:32px">
+    <input id="owInsta" value="${esc(i.insta||'')}" placeholder="tunegocio" style="${_OB}margin-bottom:32px">
     <div style="display:flex;gap:10px">
       <button onclick="__ow.step=0;_owR()" style="${_OBO}flex:0 0 auto">← Atrás</button>
       <button onclick="_owS1Save();__ow.step=2;_owR()" style="${_OBP}flex:1">Continuar →</button>
@@ -11517,7 +11532,7 @@ async function _owFinish(btn){
   if(btn){ btn.disabled=true; btn.textContent='Guardando...'; }
   const tid = currentTenant.id;
   // 1. Online config
-  const oc = {mensaje:__ow.info.mensaje, insta:__ow.info.insta, direccion:__ow.info.direccion};
+  const oc = {mensaje:(__ow.info?.mensaje||''), insta:(__ow.info?.insta||''), direccion:(__ow.info?.direccion||'')};
   localStorage.setItem(ONLINE_CFG_KEY + '_' + tid, JSON.stringify(oc));
   // 2. Turnos config
   const tc = getTurnosCfg();
@@ -11676,8 +11691,8 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     if(preciosData){
       const cfgRow = preciosData.find(p=>p.data?.__tipo==='cfg' || p.data?.__turnosCfg);
       if(cfgRow){
-        if(cfgRow.data.__turnosCfg) turnosCfg = cfgRow.data.__turnosCfg;
-        if(cfgRow.data.__onlineCfg)  onlineCfg  = cfgRow.data.__onlineCfg;
+        if(cfgRow.data.__turnosCfg && typeof cfgRow.data.__turnosCfg === 'object') turnosCfg = cfgRow.data.__turnosCfg;
+        if(cfgRow.data.__onlineCfg && typeof cfgRow.data.__onlineCfg === 'object') onlineCfg = {mensaje:'',insta:'',direccion:'',...cfgRow.data.__onlineCfg};
         if(cfgRow.data.__tenantName)  tenantNombre = cfgRow.data.__tenantName;
         if(cfgRow.data.__rubro)       tenantRubro  = cfgRow.data.__rubro;
       }
