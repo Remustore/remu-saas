@@ -16,7 +16,8 @@
       "Bash(git pull:*)",
       "Bash(git stash:*)",
       "Bash(git -C \"C:/Users/flroc/remu-saas\" remote -v)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(cat \"C:/Users/flroc/remu-saas/supabase/migrations/\"*.sql)"
     ]
   }
 }

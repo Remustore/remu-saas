@@ -83,6 +83,8 @@ function fmt(n){ return '$' + Number(n||0).toLocaleString('es-AR'); }
 function tod(){ return new Date().toISOString().slice(0,10); }
 function minToHH(min){ return String(Math.floor(min/60)).padStart(2,'0')+':'+String(min%60).padStart(2,'0'); }
 function hhToMin(hh){ const [h,m]=(hh||'00:00').split(':').map(Number); return h*60+m; }
+function tenantSlug(nombre){ return (nombre||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'')||'mi-negocio'; }
+function tryParseData(r){ const d=r?.data; if(!d) return null; if(typeof d==='string'){try{return JSON.parse(d);}catch(e){return null;}} return typeof d==='object'?d:null; }
 
 function esBloqueado(bloqueos, fecha, hora){
   if(!bloqueos||!bloqueos.length) return false;
@@ -110,21 +112,50 @@ function esBloqueado(bloqueos, fecha, hora){
 
 // ── Resolución de slug → tenant ───────────────────────────────────────────
 async function resolveSlug(slug){
-  // 1. Intentar como UUID directo
+  // Estrategia 1: UUID directo en tenant_id
   if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(slug)){
     const {data} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', slug).limit(30);
-    if(data&&data.length){ return { tenantId: slug, rows: data }; }
+    if(data&&data.length) return { tenantId: slug, rows: data };
   }
-  // 2. Buscar por __slug en fila de configuración
-  const {data: cfgRows} = await sb.from('precios')
-    .select('tenant_id,data')
-    .contains('data', {__slug: slug})
-    .limit(1);
-  if(cfgRows&&cfgRows.length){
-    const tid = cfgRows[0].tenant_id;
-    const {data: all} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', tid).limit(50);
-    return { tenantId: tid, rows: all||[] };
+
+  // Estrategia 2: JSONB contains — rápido, funciona si la columna es jsonb
+  try {
+    const {data: cfgRows, error} = await sb.from('precios')
+      .select('tenant_id,data')
+      .contains('data', {__slug: slug})
+      .limit(5);
+    if(!error && cfgRows && cfgRows.length){
+      const tid = cfgRows[0].tenant_id;
+      const {data: all} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', tid).limit(50);
+      return { tenantId: tid, rows: all||[] };
+    }
+  } catch(e){}
+
+  // Estrategia 3: Fallback JS — busca en todas las filas de config y compara slug
+  // Funciona independientemente del tipo de columna (json, jsonb, text)
+  const {data: allRows} = await sb.from('precios').select('tenant_id,data').limit(500);
+  if(allRows && allRows.length){
+    // Solo filas que parecen config (tienen __tenantName o __turnosCfg o __slug)
+    const cfgCandidates = allRows.filter(r=>{
+      const d = tryParseData(r);
+      return d && (d.__tenantName || d.__turnosCfg || d.__slug);
+    });
+    const found = cfgCandidates.find(r=>{
+      const d = tryParseData(r);
+      if(!d) return false;
+      // Comparar por __slug explícito
+      if(d.__slug && d.__slug === slug) return true;
+      // Comparar computando slug del nombre guardado
+      if(d.__tenantName && tenantSlug(d.__tenantName) === slug) return true;
+      return false;
+    });
+    if(found){
+      const tid = found.tenant_id;
+      const rows = allRows.filter(r=>r.tenant_id===tid);
+      return { tenantId: tid, rows };
+    }
   }
+
   return null;
 }
 
@@ -132,19 +163,20 @@ function parseRows(rows){
   let turnosCfg = {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
   let onlineCfg = {mensaje:'',insta:'',direccion:'',tel:''};
   let tenantNombre = '', tenantRubro = '';
-  const cfgRow = rows.find(r=>r.data&&(r.data.__tipo==='cfg'||r.data.__turnosCfg));
+  const cfgRow = rows.map(r=>({...r, _d: tryParseData(r)})).find(r=>r._d&&(r._d.__tipo==='cfg'||r._d.__turnosCfg));
   if(cfgRow){
-    if(cfgRow.data.__turnosCfg) turnosCfg = {...turnosCfg, ...cfgRow.data.__turnosCfg};
-    if(cfgRow.data.__onlineCfg)  onlineCfg  = {...onlineCfg, ...cfgRow.data.__onlineCfg};
-    if(cfgRow.data.__tenantName)  tenantNombre = cfgRow.data.__tenantName;
-    if(cfgRow.data.__rubro)       tenantRubro  = cfgRow.data.__rubro;
+    const d = cfgRow._d;
+    if(d.__turnosCfg) turnosCfg = {...turnosCfg, ...d.__turnosCfg};
+    if(d.__onlineCfg) onlineCfg = {...onlineCfg, ...d.__onlineCfg};
+    if(d.__tenantName) tenantNombre = d.__tenantName;
+    if(d.__rubro)      tenantRubro  = d.__rubro;
   }
   // Servicios del catálogo de precios (overwrites turnosCfg servicios si hay)
   const durMap = {};
   (turnosCfg.servicios||[]).forEach(s=>{ durMap[(s.nombre||'').toLowerCase()] = s.duracion||30; });
   const itemsPrecios = rows
-    .filter(r=>r.data&&!r.data.__tipo&&!r.data.__turnosCfg&&r.data.nombre)
-    .map(r=>r.data)
+    .map(r=>tryParseData(r))
+    .filter(d=>d&&!d.__tipo&&!d.__turnosCfg&&d.nombre)
     .filter(p=>(p.disponibilidad||'disponible')!=='no_disponible');
   if(itemsPrecios.length){
     turnosCfg.servicios = itemsPrecios.map(p=>({
