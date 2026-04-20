@@ -4940,7 +4940,7 @@ function rPrecios(){
     persistCfgToSupabase().catch(()=>{});
   }
   const q=(document.getElementById('prQ')||{value:''}).value.toLowerCase();
-  const norm = s => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const prCatKw = {
     'corte':       /corte|degradado|degradé|capado|navaja|pelo|cabello|fade/i,
     'barba':       /barba|afeitado|contorno|bigote|perfil/i,
