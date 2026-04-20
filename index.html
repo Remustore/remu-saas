@@ -2072,7 +2072,7 @@ async function doLogin(){
     if(nombreEmpleado) window.currentEmpleadoNombre = nombreEmpleado;
     setupApp();
     await loadAll();
-    setTimeout(()=>{ if(typeof pedirPermisoNotificaciones==='function') pedirPermisoNotificaciones().then(()=>checkNotifGastosFijos()); }, 3000);
+    pedirPermisoNotificaciones();
   } catch(e) {
     err.textContent = e.message || 'Email o contraseña incorrectos';
     err.style.display='block';
@@ -2596,12 +2596,21 @@ async function precargarServiciosTenant(tenantId, rubro, nombre){
     dias: [1,2,3,4,5,6]
   };
   
-  // Store in a special config row
-  await sb.from('precios').insert({
-    id: base + 9999,
-    data: {id: base+9999, __turnosCfg: turnosCfg, __tipo: 'turnosCfg'},
+  // Store config row — __tipo:'cfg' y __slug para que resolveSlug() lo encuentre
+  const cfgId = parseInt((tenantId||'').replace(/-/g,'').substring(0,8),16) % 1000000 + 9999;
+  await sb.from('precios').upsert({
+    id: cfgId,
+    data: {
+      id: cfgId,
+      __turnosCfg: turnosCfg,
+      __onlineCfg: {mensaje:'', insta:'', direccion:'', tel:''},
+      __tipo: 'cfg',
+      __tenantName: nombre,
+      __rubro: rubro,
+      __slug: tenantSlug(nombre)
+    },
     tenant_id: tenantId
-  });
+  }, { onConflict: 'id' });
 
   console.log('Servicios precargados para', nombre, '-', tipo);
 }
@@ -6220,7 +6229,7 @@ const SERVICIOS_DEFAULT = [
 
 function getTurnosCfg(){
   const raw = localStorage.getItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''));
-  if(raw) return JSON.parse(raw);
+  if(raw){ try{ const p=JSON.parse(raw); if(p&&typeof p==='object') return p; }catch(e){} }
   // Solo usar servicios default para salones
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon')||rubro.includes('salón')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur')||rubro.includes('estética')||rubro.includes('estetica');
@@ -7735,7 +7744,8 @@ const ONLINE_CFG_KEY = 'turnosOnlineCfg';
 
 function getOnlineCfg(){
   const raw = localStorage.getItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''));
-  return raw ? JSON.parse(raw) : {mensaje:'', insta:'', direccion:'', tel:''};
+  if(raw){ try{ const p=JSON.parse(raw); if(p&&typeof p==='object') return p; }catch(e){} }
+  return {mensaje:'', insta:'', direccion:'', tel:''};
 }
 
 // Calcula el ID del row de configuración en Supabase (determinístico por tenant)
@@ -11743,8 +11753,7 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
       }
       setupApp();
       await loadAll();
-      // Pedir permiso de notificaciones (solo admins, la primera vez)
-      setTimeout(()=>{ if(typeof pedirPermisoNotificaciones==='function') pedirPermisoNotificaciones().then(()=>checkNotifGastosFijos()); }, 3000);
+      pedirPermisoNotificaciones();
     } else {
       document.getElementById('loadingScreen').style.display='none';
       document.getElementById('loginScreen').style.display='flex';
@@ -11755,6 +11764,17 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
   }
 })();
 </script>
+
+<!-- ── Notificaciones: banner de opt-in ── -->
+<div id="notifOptInBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#141414;border-bottom:2px solid rgba(201,168,76,.35);padding:12px 16px;z-index:9901;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.6);font-family:'Outfit',sans-serif">
+  <span style="font-size:1.3rem;flex-shrink:0">🔔</span>
+  <div style="flex:1;min-width:0">
+    <div style="font-weight:600;font-size:.88rem;color:#f5f0e8">Activá las alertas</div>
+    <div style="font-size:.74rem;color:#a89880;margin-top:1px">Recibí una notificación cuando llegue una reserva nueva o un gasto requiera revisión.</div>
+  </div>
+  <button onclick="activarNotificaciones()" style="background:#c9a84c;color:#080808;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:.8rem;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;flex-shrink:0">Activar</button>
+  <button onclick="descartarBannerNotif()" style="background:none;border:none;color:#a89880;font-size:1.3rem;cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1">✕</button>
+</div>
 
 <!-- ── PWA: Banner de instalación ── -->
 <div id="pwaInstallBanner" style="display:none;position:fixed;bottom:0;left:0;right:0;background:#141414;border-top:2px solid rgba(201,168,76,.35);padding:14px 16px;z-index:9900;align-items:center;gap:12px;box-shadow:0 -4px 20px rgba(0,0,0,.6);font-family:'Outfit',sans-serif">
@@ -11846,13 +11866,35 @@ let _notifPermiso = false;
 // null = primera carga, no notificar; Set = IDs ya vistos
 let _solicitudesNotifVistas = null;
 
-async function pedirPermisoNotificaciones(){
+function pedirPermisoNotificaciones(){
+  // Los navegadores requieren gesto del usuario — mostramos banner primero
   if(!('Notification' in window)) return;
-  if(Notification.permission === 'granted'){ _notifPermiso = true; return; }
+  if(Notification.permission === 'granted'){ _notifPermiso = true; checkNotifGastosFijos(); return; }
   if(Notification.permission === 'denied') return;
   if(currentRole !== 'admin') return;
+  // Mostrar banner de opt-in (no pedir el permiso del sistema sin gesto)
+  const ya = localStorage.getItem('notif_banner_visto');
+  if(ya) return;
+  setTimeout(()=>{
+    const b = document.getElementById('notifOptInBanner');
+    if(b) b.style.display = 'flex';
+  }, 4000);
+}
+
+async function activarNotificaciones(){
+  const b = document.getElementById('notifOptInBanner');
+  if(b) b.style.display = 'none';
+  localStorage.setItem('notif_banner_visto', '1');
+  if(!('Notification' in window)) return;
   const p = await Notification.requestPermission();
   _notifPermiso = p === 'granted';
+  if(_notifPermiso) checkNotifGastosFijos();
+}
+
+function descartarBannerNotif(){
+  const b = document.getElementById('notifOptInBanner');
+  if(b) b.style.display = 'none';
+  localStorage.setItem('notif_banner_visto', '1');
 }
 
 function _notifLocal(titulo, cuerpo, seccion){
