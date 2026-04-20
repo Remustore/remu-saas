@@ -2,7 +2,7 @@
 // index.html: network-first (siempre toma la versión más nueva)
 // CDN / assets: cache-first (sin cambios frecuentes)
 
-const CACHE_NAME = 'remu-v29';
+const CACHE_NAME = 'remu-v30';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon.svg',
@@ -75,6 +75,12 @@ self.addEventListener('fetch', event => {
         });
       })
     );
+    return;
+  }
+
+  // /b/slug paths: NO interceptar — dejar que GitHub Pages 404.html los redirija a /b/?s=slug
+  // Si el SW los interceptara, el 404 de GitHub Pages no llegaría al navegador y la redirección fallaría.
+  if (url.pathname.startsWith('/b/') && !url.pathname.match(/\/b\/(index\.html)?$/)) {
     return;
   }
 
