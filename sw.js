@@ -2,7 +2,7 @@
 // index.html: network-first (siempre toma la versión más nueva)
 // CDN / assets: cache-first (sin cambios frecuentes)
 
-const CACHE_NAME = 'remu-v24';
+const CACHE_NAME = 'remu-v25';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon.svg',

@@ -496,7 +496,7 @@ textarea{resize:vertical;min-height:70px;}
     <div style="color:#a89880;font-size:.95rem;line-height:1.7;margin-bottom:28px">Los 30 días gratuitos finalizaron. Para seguir usando el sistema y no perder tus datos, activá tu suscripción.</div>
     <div style="background:#141414;border:1px solid #242424;border-radius:14px;padding:24px;margin-bottom:20px;text-align:left">
       <div style="font-size:.7rem;color:#e0d5c5;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px">Tu plan</div>
-      <div id="trialPrecioDisplay" style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c">$8.000 <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span></div>
+      <div id="trialPrecioDisplay" style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c">… <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span></div>
       <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Todos tus datos guardados</div>
         <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones incluidas</div>
@@ -699,9 +699,6 @@ textarea{resize:vertical;min-height:70px;}
       </p>
 
       <div class="sa-form">
-        <label>Access Token de Mercado Pago <span style="color:var(--mut);font-weight:400">(se guarda cifrado)</span></label>
-        <input id="saInputMpToken" type="password" placeholder="APP_USR-..." autocomplete="off">
-
         <label>Link de pago (Checkout Pro / mpago.la)</label>
         <input id="saInputMpLink" type="url" placeholder="https://mpago.la/tu-link-de-cobro">
 
@@ -3004,7 +3001,6 @@ async function _ensureSystemTenant(){
 async function guardarMpLink(){
   const btnEl = document.querySelector('[onclick="guardarMpLink()"]');
   const link  = (document.getElementById('saInputMpLink')?.value||'').trim();
-  const token = (document.getElementById('saInputMpToken')?.value||'').trim();
   const precio = parseInt(document.getElementById('saInputMpPrecio')?.value||'8000')||8000;
 
   if(!link){ showSaMsg('Ingresá el link de pago de Mercado Pago','err'); return; }
@@ -3014,7 +3010,6 @@ async function guardarMpLink(){
   // 1. Guardar en localStorage (disponible inmediatamente en este dispositivo)
   localStorage.setItem('remu_mp_link', link);
   localStorage.setItem('remu_mp_precio', String(precio));
-  if(token) localStorage.setItem('remu_mp_token', token);
 
   // 2. Guardar en Supabase:
   //    - Primero garantizar que existe el tenant de sistema (FK constraint)
@@ -3025,7 +3020,6 @@ async function guardarMpLink(){
     mp_precio: precio,
     updated_at: new Date().toISOString()
   };
-  if(token) cfgData.mp_access_token = token;
   const video = (document.getElementById('saInputVideoTutorial')?.value||'').trim();
   if(video) { cfgData.video_tutorial = video; localStorage.setItem('remu_video_tutorial', video); }
   else { delete localStorage['remu_video_tutorial']; }
@@ -3063,13 +3057,11 @@ async function loadMpConfig(){
   } catch(e){}
 
   const link  = cfg?.mp_link  || localStorage.getItem('remu_mp_link')  || '';
-  const token = cfg?.mp_access_token || localStorage.getItem('remu_mp_token') || '';
   const precio = cfg?.mp_precio || parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
   const video = cfg?.video_tutorial || localStorage.getItem('remu_video_tutorial') || '';
   const soporteTel = cfg?.soporte_tel || localStorage.getItem('remu_soporte_tel') || '';
 
   if(document.getElementById('saInputMpLink'))   document.getElementById('saInputMpLink').value = link;
-  if(document.getElementById('saInputMpToken'))  document.getElementById('saInputMpToken').value = token;
   if(document.getElementById('saInputMpPrecio')) document.getElementById('saInputMpPrecio').value = precio;
   if(document.getElementById('saInputVideoTutorial')) document.getElementById('saInputVideoTutorial').value = video;
   if(document.getElementById('saInputSoporteTel')) document.getElementById('saInputSoporteTel').value = soporteTel;
@@ -3102,11 +3094,14 @@ function _actualizarPrecioTrial(precio){
 async function showTrialScreen(){
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('trialScreen').style.display='flex';
-  // Cargar precio dinámico
+  // Mostrar precio desde localStorage inmediatamente (sin esperar red)
+  const precioLocal = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
+  _actualizarPrecioTrial(precioLocal);
+  // Luego actualizar desde Supabase
   try {
     const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
     const cfg = data?.data;
-    if(cfg?.mp_precio) _actualizarPrecioTrial(parseInt(cfg.mp_precio) || 8000);
+    if(cfg?.mp_precio){ const p=parseInt(cfg.mp_precio)||8000; localStorage.setItem('remu_mp_precio',String(p)); _actualizarPrecioTrial(p); }
     if(cfg?.mp_link)   localStorage.setItem('remu_mp_link', cfg.mp_link);
   } catch(e){}
 }
@@ -3123,7 +3118,7 @@ async function iniciarPagoMP(){
     } catch(e){}
   }
   if(!mpLink){
-    alert('El link de pago no está configurado. Contactá soporte por WhatsApp.');
+    showToast('El link de pago no está configurado. Contactá soporte por WhatsApp.','err');
     return;
   }
 
@@ -3141,14 +3136,14 @@ async function iniciarPagoMP(){
 
 // Activa el tenant por 30 días tras confirmación manual del usuario
 async function confirmarPagoMP(){
-  // Obtener precio actual desde global config
-  let precio = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
-  try {
-    const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
-    if(data?.data?.mp_precio) precio = data.data.mp_precio;
-  } catch(e){}
-  if(!confirm(`¿Confirmar que realizaste el pago de $${precio} ARS?\n\nSe activará tu suscripción por 30 días.`)) return;
-  await activarSuscripcionTenant('manual');
+  const precio = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
+  const fmt = precio.toLocaleString('es-AR');
+  _confirmarModal(`¿Confirmar pago de $${fmt} ARS? Se activará tu suscripción por 30 días.`, async ()=>{
+    const btn = document.getElementById('btnYaPague');
+    if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
+    await activarSuscripcionTenant('manual');
+    if(btn){ btn.disabled=false; btn.textContent='✓ Ya pagué → Activar ahora'; }
+  });
 }
 
 // Activa la suscripción del tenant actual por 30 días
@@ -3165,7 +3160,7 @@ async function activarSuscripcionTenant(origen = 'mp_ok'){
   };
   const { error } = await sb.from('tenants').update({ modulos: mods }).eq('id', currentTenant.id);
   if(error){
-    alert('Error al activar. Contactá soporte por WhatsApp.');
+    showToast('Error al activar. Contactá soporte por WhatsApp.','err');
     return;
   }
   currentTenant = {...currentTenant, modulos: mods};
