@@ -11780,14 +11780,207 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
       pedirPermisoNotificaciones();
     } else {
       document.getElementById('loadingScreen').style.display='none';
-      document.getElementById('loginScreen').style.display='flex';
+      document.getElementById('landingPage').style.display='block';
     }
   } else {
     document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('loginScreen').style.display='flex';
+    document.getElementById('landingPage').style.display='block';
   }
 })();
 </script>
+
+<!-- ══════════════════════════════════════════════════════════════
+     LANDING PAGE — solo visible cuando no hay sesión activa
+     ══════════════════════════════════════════════════════════════ -->
+<div id="landingPage" style="display:none;font-family:'Outfit',sans-serif;background:#080808;color:#f5f0e8;min-height:100vh">
+<style>
+#landingPage *{box-sizing:border-box}
+#landingPage a{color:inherit;text-decoration:none}
+.lp-btn-gold{display:inline-block;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#080808;font-weight:800;font-size:1rem;padding:16px 32px;border-radius:12px;border:none;cursor:pointer;font-family:'Outfit',sans-serif;letter-spacing:.3px;transition:opacity .2s,transform .12s;width:100%;text-align:center}
+.lp-btn-gold:hover{opacity:.9;transform:translateY(-1px)}
+.lp-btn-ghost{display:inline-block;background:transparent;color:#f5f0e8;font-weight:600;font-size:.95rem;padding:14px 32px;border-radius:12px;border:1px solid rgba(245,240,232,.18);cursor:pointer;font-family:'Outfit',sans-serif;transition:border-color .2s,background .2s;width:100%;text-align:center;margin-top:12px}
+.lp-btn-ghost:hover{border-color:rgba(201,168,76,.6);background:rgba(201,168,76,.06)}
+.lp-section{padding:64px 20px;max-width:680px;margin:0 auto}
+.lp-section-wide{padding:64px 20px;max-width:900px;margin:0 auto}
+.lp-tag{font-size:.67rem;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#c9a84c;margin-bottom:14px}
+.lp-h2{font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;line-height:1.2;color:#f5f0e8;margin:0 0 16px}
+.lp-lead{font-size:.95rem;color:#a89880;line-height:1.7;margin:0 0 32px}
+.lp-card{background:#111;border:1px solid #1e1e1e;border-radius:16px;padding:24px;flex:1;min-width:0}
+.lp-card-icon{font-size:2rem;margin-bottom:12px}
+.lp-card-title{font-weight:700;font-size:1rem;color:#f5f0e8;margin-bottom:8px}
+.lp-card-body{font-size:.83rem;color:#a89880;line-height:1.6}
+.lp-grid-3{display:flex;flex-direction:column;gap:14px}
+.lp-grid-4{display:flex;flex-direction:column;gap:14px}
+.lp-mod{background:#0f0f0f;border:1px solid #1a1a1a;border-radius:14px;padding:22px 20px;display:flex;align-items:flex-start;gap:16px}
+.lp-mod-icon{font-size:1.8rem;flex-shrink:0;margin-top:2px}
+.lp-mod-title{font-weight:700;font-size:.95rem;color:#f5f0e8;margin-bottom:4px}
+.lp-mod-body{font-size:.8rem;color:#a89880;line-height:1.55}
+.lp-rubro{background:#111;border:1px solid #1e1e1e;border-radius:14px;padding:20px 18px;display:flex;align-items:center;gap:14px}
+.lp-rubro-icon{font-size:1.6rem;flex-shrink:0}
+.lp-rubro-name{font-weight:700;font-size:.9rem;color:#f5f0e8}
+.lp-divider{height:1px;background:linear-gradient(90deg,transparent,#1e1e1e 20%,#1e1e1e 80%,transparent);margin:0 20px}
+.lp-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:#c9a84c;font-size:.72rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 12px;border-radius:20px;margin-bottom:20px}
+.lp-precio-box{background:#111;border:1px solid #1e1e1e;border-radius:20px;padding:32px 24px;text-align:center;max-width:440px;margin:0 auto}
+@media(min-width:640px){
+  .lp-grid-3{flex-direction:row}
+  .lp-grid-4{flex-direction:row;flex-wrap:wrap}
+  .lp-grid-4 .lp-mod{width:calc(50% - 7px)}
+  .lp-btn-gold,.lp-btn-ghost{width:auto}
+  .lp-hero-btns{display:flex;gap:12px;align-items:center}
+  .lp-hero-btns .lp-btn-ghost{margin-top:0}
+}
+</style>
+
+<!-- NAV -->
+<nav style="position:sticky;top:0;z-index:100;background:rgba(8,8,8,.92);backdrop-filter:blur(12px);border-bottom:1px solid #141414;padding:14px 20px;display:flex;align-items:center;justify-content:space-between">
+  <span style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:800;color:#c9a84c;letter-spacing:1px">Remu</span>
+  <button onclick="document.getElementById('landingPage').style.display='none';document.getElementById('loginScreen').style.display='flex'" style="background:transparent;border:1px solid rgba(201,168,76,.35);color:#c9a84c;font-family:'Outfit',sans-serif;font-weight:600;font-size:.78rem;padding:7px 16px;border-radius:8px;cursor:pointer">Ingresar</button>
+</nav>
+
+<!-- ① HERO -->
+<div style="padding:72px 20px 64px;max-width:680px;margin:0 auto;text-align:center">
+  <div class="lp-badge">✦ Sistema de gestión para negocios de servicios</div>
+  <h1 style="font-family:'Playfair Display',serif;font-size:clamp(2rem,7vw,3rem);font-weight:800;line-height:1.15;color:#f5f0e8;margin:0 0 20px">Dejá de perder plata<br>por no tener control</h1>
+  <p style="font-size:1rem;color:#a89880;line-height:1.75;margin:0 0 36px;max-width:520px;margin-left:auto;margin-right:auto">Remu es el sistema de gestión para barberías, peluquerías, salones de uñas y talleres de celulares. Turnos, caja, stock y taller en un solo lugar.</p>
+  <div class="lp-hero-btns" style="justify-content:center">
+    <a href="?registro=1" class="lp-btn-gold" style="width:auto;padding:16px 36px;font-size:1.05rem">Probalo gratis 30 días →</a>
+    <button onclick="document.getElementById('landingPage').style.display='none';document.getElementById('loginScreen').style.display='flex'" class="lp-btn-ghost" style="width:auto;margin-top:0">Ya tengo cuenta → Ingresar</button>
+  </div>
+  <p style="font-size:.72rem;color:#5a5040;margin-top:16px">Sin tarjeta de crédito. Sin compromiso. Cancelás cuando querés.</p>
+</div>
+
+<!-- ② PROBLEMA -->
+<div class="lp-divider"></div>
+<div class="lp-section">
+  <div class="lp-tag">El problema</div>
+  <h2 class="lp-h2">¿Tu negocio te controla a vos?</h2>
+  <p class="lp-lead">La mayoría de los negocios de servicios trabajan con libretas, WhatsApps y memoria. Eso cuesta plata.</p>
+  <div class="lp-grid-3">
+    <div class="lp-card">
+      <div class="lp-card-icon">💸</div>
+      <div class="lp-card-title">¿Sabés cuánto ganás por corte?</div>
+      <div class="lp-card-body">Sin registrar cada servicio, no sabés qué es rentable y qué no. Seguís trabajando a ciegas.</div>
+    </div>
+    <div class="lp-card">
+      <div class="lp-card-icon">📅</div>
+      <div class="lp-card-title">¿Cuántos turnos perdiste este mes?</div>
+      <div class="lp-card-body">Los clientes mandan WhatsApp y si no contestás en el momento, buscan otro. Los turnos online los capturan solos.</div>
+    </div>
+    <div class="lp-card">
+      <div class="lp-card-icon">📦</div>
+      <div class="lp-card-title">¿Tu stock te controla a vos?</div>
+      <div class="lp-card-body">Sin control de insumos, comprás de más o te quedás sin lo que necesitás justo cuando más lo necesitás.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ③ SOLUCIÓN -->
+<div class="lp-divider"></div>
+<div class="lp-section-wide">
+  <div style="max-width:680px;margin:0 auto 36px">
+    <div class="lp-tag">La solución</div>
+    <h2 class="lp-h2">Todo en un solo lugar</h2>
+    <p class="lp-lead">Remu centraliza todo lo que pasa en tu negocio. Nada se te escapa.</p>
+  </div>
+  <div class="lp-grid-4" style="max-width:680px;margin:0 auto">
+    <div class="lp-mod">
+      <div class="lp-mod-icon">📅</div>
+      <div>
+        <div class="lp-mod-title">Turnos online</div>
+        <div class="lp-mod-body">Página pública para que tus clientes reserven solos, las 24hs. Vos solo confirmás.</div>
+      </div>
+    </div>
+    <div class="lp-mod">
+      <div class="lp-mod-icon">💰</div>
+      <div>
+        <div class="lp-mod-title">Caja diaria</div>
+        <div class="lp-mod-body">Registrá ingresos y egresos. Sabés al instante cuánto ganaste hoy y por qué concepto.</div>
+      </div>
+    </div>
+    <div class="lp-mod">
+      <div class="lp-mod-icon">📦</div>
+      <div>
+        <div class="lp-mod-title">Stock</div>
+        <div class="lp-mod-body">Controlá productos e insumos. Alertas cuando el stock baja del mínimo que vos definís.</div>
+      </div>
+    </div>
+    <div class="lp-mod">
+      <div class="lp-mod-icon">🔧</div>
+      <div>
+        <div class="lp-mod-title">Taller de reparaciones</div>
+        <div class="lp-mod-body">Órdenes de trabajo, estados de reparación y página pública para que el cliente consulte su equipo.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ④ PARA QUIÉN -->
+<div class="lp-divider"></div>
+<div class="lp-section">
+  <div class="lp-tag">Para quién es</div>
+  <h2 class="lp-h2">Hecho para tu rubro</h2>
+  <p class="lp-lead">Remu se adapta al tipo de negocio. Los módulos, los reportes y los precios se muestran según lo que hacés.</p>
+  <div class="lp-grid-4" style="flex-direction:column;flex-wrap:nowrap;gap:10px">
+    <div class="lp-rubro">
+      <div class="lp-rubro-icon">💈</div>
+      <div>
+        <div class="lp-rubro-name">Barbería</div>
+        <div style="font-size:.78rem;color:#a89880;margin-top:2px">Turnos, caja por corte/barba, comisiones de barberos</div>
+      </div>
+    </div>
+    <div class="lp-rubro">
+      <div class="lp-rubro-icon">💇‍♀️</div>
+      <div>
+        <div class="lp-rubro-name">Peluquería / Salón de belleza</div>
+        <div style="font-size:.78rem;color:#a89880;margin-top:2px">Agenda online, lista de precios pública, gestión de empleadas</div>
+      </div>
+    </div>
+    <div class="lp-rubro">
+      <div class="lp-rubro-icon">💅</div>
+      <div>
+        <div class="lp-rubro-name">Salón de uñas</div>
+        <div style="font-size:.78rem;color:#a89880;margin-top:2px">Turnos por servicio y duración, caja integrada, stock de insumos</div>
+      </div>
+    </div>
+    <div class="lp-rubro">
+      <div class="lp-rubro-icon">📱</div>
+      <div>
+        <div class="lp-rubro-name">Taller de celulares</div>
+        <div style="font-size:.78rem;color:#a89880;margin-top:2px">Órdenes de reparación, estados, presupuestos y página de consulta para clientes</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ⑤ PRECIO -->
+<div class="lp-divider"></div>
+<div class="lp-section" style="text-align:center">
+  <div class="lp-tag">Precio</div>
+  <h2 class="lp-h2">Simple y sin sorpresas</h2>
+  <div class="lp-precio-box">
+    <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:8px 16px;font-size:.72rem;font-weight:700;color:#c9a84c;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;display:inline-block">⚡ Precio fundador — primeros 10 lugares</div>
+    <div style="font-size:.8rem;color:#5a5040;text-decoration:line-through;margin-bottom:4px">$19.999 / mes</div>
+    <div style="font-family:'Playfair Display',serif;font-size:3.2rem;font-weight:800;color:#c9a84c;line-height:1">$9.999</div>
+    <div style="font-size:.8rem;color:#a89880;margin-bottom:24px">por mes · facturado mensual</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px;text-align:left">
+      <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>30 días gratis, sin tarjeta</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>Todos los módulos incluidos</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>Soporte por WhatsApp</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>Sin permanencia — cancelás cuando querés</div>
+    </div>
+    <a href="?registro=1" class="lp-btn-gold" style="display:block;font-size:1rem">Empezar gratis ahora →</a>
+    <p style="font-size:.7rem;color:#5a5040;margin:12px 0 0">Completás el registro en 2 minutos</p>
+  </div>
+</div>
+
+<!-- ⑥ FOOTER -->
+<div class="lp-divider"></div>
+<footer style="padding:40px 20px;text-align:center">
+  <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:800;color:#c9a84c;letter-spacing:1px;margin-bottom:6px">Remu</div>
+  <div style="font-size:.75rem;color:#5a5040;margin-bottom:16px">remugestion.ar</div>
+  <button onclick="document.getElementById('landingPage').style.display='none';document.getElementById('loginScreen').style.display='flex'" style="background:none;border:none;color:#a89880;font-family:'Outfit',sans-serif;font-size:.8rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Ingresar a mi cuenta</button>
+</footer>
+</div>
 
 <!-- ── Notificaciones: banner de opt-in ── -->
 <div id="notifOptInBanner" style="display:none;position:fixed;top:0;left:0;right:0;background:#141414;border-bottom:2px solid rgba(201,168,76,.35);padding:12px 16px;z-index:9901;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,.6);font-family:'Outfit',sans-serif">
