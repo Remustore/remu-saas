@@ -11291,6 +11291,7 @@ function aplicarModulosPorRubro(rubro){
   const esTaller   = r.includes('taller')||r.includes('celular')||r.includes('reparac')||r.includes('tecnico')||r.includes('técnico');
   const esBarberia = r.includes('barberia')||r.includes('barbería');
   const esSalon    = r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('pestañ');
+  const mods = currentTenant?.modulos || {};
 
   const showNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
 
@@ -11299,7 +11300,7 @@ function aplicarModulosPorRubro(rubro){
 
   if(esTaller){
     // 🔧 TALLER DE CELULARES
-    showNav('nav-taller','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
   } else if(esBarberia){
     // ✂️ BARBERÍA
     showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios');
@@ -11311,6 +11312,9 @@ function aplicarModulosPorRubro(rubro){
     showNav('nav-taller','nav-stock','nav-ventas','nav-turnos','nav-turnosOnline',
             'nav-clientes','nav-gastos','nav-analisis','nav-precios');
   }
+
+  // Módulos habilitados explícitamente en la BD (independiente del rubro)
+  if(mods.equipos) showNav('nav-equipos');
 
   // Ocultar tab "Servicios" en Análisis para barberías/salones (no aplica reparaciones)
   const tabRep = document.getElementById('tabRep');
