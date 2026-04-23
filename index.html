@@ -992,6 +992,7 @@ $$;</pre>
           <div class="tabs" id="stabs" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px"></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rStock()" id="sQ"></div>
+            <button class="btn bgh" onclick="openRegistrarCompra(null)">📦 Registrar compra</button>
             <button class="btn bg" onclick="openNuevoStock()">+ Agregar producto</button>
           </div>
         </div>
@@ -1264,6 +1265,9 @@ $$;</pre>
         <label>Número de WhatsApp del negocio</label>
         <input id="onlineTel" type="tel" placeholder="Ej: 5493472628087" style="margin-bottom:4px">
         <div style="font-size:.72rem;color:var(--mut)">Ingresá tu número con código de país, ej: <strong>5493472628087</strong> (54 = Argentina, 9 = celular, luego el número sin 0 ni 15). Se usa en el botón "💬 Hablar con un asesor" de la página pública, recordatorios a clientes y avisos al equipo.</div>
+        <label style="margin-top:14px">Nota sobre precios (visible en lista pública)</label>
+        <input id="onlineNotaPrecios" placeholder="Los precios pueden variar según..." style="margin-bottom:4px">
+        <div style="font-size:.72rem;color:var(--mut)">Este texto aparece en la parte superior de tu lista de precios pública. Dejalo vacío para usar el texto por defecto.</div>
         <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
@@ -1868,6 +1872,15 @@ $$;</pre>
 </div>
 </div><div class="mf"><button class="btn" onclick="closeM('mGasto')">Cancelar</button><button class="btn bg" onclick="saveGasto()">Guardar</button></div></div></div>
 
+<!-- Compra de Stock -->
+<div class="mb" id="mCompra"><div class="md"><div class="mh"><div class="mt2">📦 Registrar Compra</div><button class="xbtn" onclick="closeM('mCompra')">✕</button></div>
+<div class="mc">
+<div class="fr full"><div><label>Producto</label><select id="compProd" onchange="autoFillCostoCompra()"></select></div></div>
+<div class="fr"><div><label>Cantidad comprada</label><input type="number" id="compCant" placeholder="1" value="1" min="1"></div><div><label>Precio costo unitario ($)</label><input type="number" id="compPrecio" placeholder="0"></div></div>
+<div class="fr"><div><label>Fecha</label><input type="date" id="compFecha"></div></div>
+<div class="fr full"><div><label>Proveedor / Notas</label><input id="compNotas" placeholder="Opcional..."></div></div>
+</div><div class="mf"><button class="btn" onclick="closeM('mCompra')">Cancelar</button><button class="btn bg" onclick="saveCompra()">Registrar compra</button></div></div></div>
+
 <!-- Precio -->
 <div class="mb" id="mPrecio"><div class="md"><div class="mh"><div class="mt2">Agregar Servicio</div><button class="xbtn" onclick="closeM('mPrecio')">✕</button></div>
 <div class="mc"><input type="hidden" id="prId">
@@ -1993,7 +2006,7 @@ let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 // ═══ SYNC UI ═══
 function setSyncing(){ document.getElementById('syncDot').className='sync-dot syncing'; document.getElementById('syncTxt').textContent='Guardando...'; }
 function setSynced(msg){ document.getElementById('syncDot').className='sync-dot'; document.getElementById('syncTxt').textContent='Conectado'; if(msg) showToast(msg,'ok'); }
-function setSyncErr(){ document.getElementById('syncDot').style.background='var(--bad)'; document.getElementById('syncTxt').textContent='Error'; showToast('Error al guardar','err'); }
+function setSyncErr(detalle){ document.getElementById('syncDot').style.background='var(--bad)'; document.getElementById('syncTxt').textContent='Error'; showToast('Error al guardar' + (detalle ? ': ' + detalle : ''), 'err'); }
 
 let toastTimer;
 function showToast(msg, type='ok'){
@@ -3433,7 +3446,7 @@ async function dbUpsert(table, item){
     }, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
-  }catch(e){ console.error('Upsert error', e); setSyncErr(); return false; }
+  }catch(e){ console.error('Upsert error', e); setSyncErr(e?.message||''); return false; }
 }
 
 async function dbDelete(table, id){
@@ -3794,6 +3807,18 @@ async function saveStock(){
   closeM('mStock'); rStock(); updateStockNotif(); showToast('Producto guardado ✓');
 }
 
+function abrirVentaDesdeProd(prodId){
+  // Pre-llenar modal de venta con el producto de stock seleccionado
+  openM('mVenta', null);
+  const vTipo = document.getElementById('vTipo');
+  if(vTipo){ vTipo.value = 'producto'; uVUI(); }
+  // Esperar que popVSels() llene el select, luego seleccionar el producto
+  setTimeout(()=>{
+    const vProd = document.getElementById('vProd');
+    if(vProd){ vProd.value = String(prodId); autoFillPrecio(); }
+  }, 80);
+}
+
 async function delStock(id){
   if(!confirm('¿Eliminar producto?')) return;
   const snap = JSON.parse(JSON.stringify(S.stock));
@@ -3802,6 +3827,53 @@ async function delStock(id){
 }
 
 function setSF(f,i){ sFilt=f; document.querySelectorAll('#stabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j)); rStock(); }
+
+function openRegistrarCompra(prodId){
+  const sel = document.getElementById('compProd');
+  if(sel){
+    sel.innerHTML = S.stock.map(s=>`<option value="${s.id}">${esc(s.nombre)} (stock: ${s.cantidad})</option>`).join('') || '<option value="">Sin productos registrados</option>';
+    if(prodId) sel.value = String(prodId);
+  }
+  document.getElementById('compCant').value = '1';
+  document.getElementById('compPrecio').value = '';
+  document.getElementById('compFecha').value = tod();
+  document.getElementById('compNotas').value = '';
+  autoFillCostoCompra();
+  openM('mCompra', null);
+}
+
+function autoFillCostoCompra(){
+  const sel = document.getElementById('compProd');
+  const prodId = parseInt(sel?.value);
+  const prod = S.stock.find(s=>s.id===prodId);
+  if(prod && prod.costo){ document.getElementById('compPrecio').value = prod.costo; }
+}
+
+async function saveCompra(){
+  const prodId = parseInt(document.getElementById('compProd').value);
+  const cant = parseInt(document.getElementById('compCant').value)||1;
+  const precio = parseFloat(document.getElementById('compPrecio').value)||0;
+  const fecha = document.getElementById('compFecha').value||tod();
+  const notas = document.getElementById('compNotas').value.trim();
+  const prod = S.stock.find(s=>s.id===prodId);
+  if(!prod) return alert('Seleccioná un producto');
+  if(cant<1) return alert('La cantidad debe ser mayor a 0');
+  const snapStock = JSON.parse(JSON.stringify(S.stock));
+  prod.cantidad += cant;
+  await dbUpsert('stock', prod);
+  registrarMovStock(prod.id, prod.nombre, cant, 'compra', notas||'Compra registrada');
+  pushUndo('Registrar compra','stock',snapStock);
+  if(precio>0){
+    const snapGastos = JSON.parse(JSON.stringify(S.gastos));
+    const gasto = { id: Date.now(), concepto: 'Compra: '+prod.nombre, tipo:'stock', monto:precio*cant, fecha, notas };
+    S.gastos.unshift(gasto);
+    await dbUpsert('gastos', gasto);
+    pushUndo('Gasto compra','gastos',snapGastos);
+  }
+  closeM('mCompra');
+  rStock();
+  showToast(`Compra registrada ✓ (+${cant} ${prod.nombre})`);
+}
 
 function updateStockNotif(){
   const bajos = [...new Map(S.stock.filter(s=>s.cantidad<=s.minimo).map(s=>[s.nombre,s])).values()];
@@ -3839,7 +3911,7 @@ function rStock(){
     <td>${fmt(s.precio)}</td>
     <td>${mg!==null?`<span style="color:${mg>50?'var(--ok)':mg>30?'var(--wrn)':'var(--bad)'};font-weight:600">${mg}%</span>`:'—'}</td>
     <td>${s.cantidad<=s.minimo?`<span class="bx brd">Bajo</span>`:`<span class="bx bgr">OK</span>`}</td>
-    <td style="display:flex;gap:4px"><button class="btn be bsm" onclick="openM('mStock',${s.id})">✎</button><button class="btn bd bsm" onclick="delStock(${s.id})">✕</button></td></tr>`;
+    <td style="display:flex;gap:4px">${s.cantidad>0?`<button class="btn bs bsm" onclick="abrirVentaDesdeProd(${s.id})" title="Registrar venta">💸</button>`:''}<button class="btn bgh bsm" onclick="openRegistrarCompra(${s.id})" title="Registrar compra">📦</button><button class="btn be bsm" onclick="openM('mStock',${s.id})">✎</button><button class="btn bd bsm" onclick="delStock(${s.id})">✕</button></td></tr>`;
   }).join('');
 }
 
@@ -4620,6 +4692,12 @@ function eliminarPedido(id){
 }
 
 // ═══ GASTOS ═══
+function abrirNuevoGastoFijo(){
+  openM('mGasto', null);
+  const tipSel = document.getElementById('gTip');
+  if(tipSel){ tipSel.value = 'fijo'; _onGastoTipoChange(); }
+}
+
 function _onGastoTipoChange(){
   const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
   const tipo = document.getElementById('gTip').value;
@@ -4713,9 +4791,12 @@ function rGastos(){
     const subtotal=items.reduce((a,g)=>a+g.monto,0);
     const filas=items.length?items.map(_filaFijo).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:10px 0">Sin gastos fijos registrados</td></tr>`;
     return `<div class="card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
         <div><span style="font-size:1rem;font-weight:600">🔒 Gastos Fijos</span><br><span style="font-size:.75rem;color:var(--mut)">Se repiten automáticamente cada mes</span></div>
-        <span style="font-size:.85rem;color:var(--mut)">Total mensual: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:.85rem;color:var(--mut)">Total mensual: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
+          <button class="btn bg bsm" onclick="abrirNuevoGastoFijo()">+ Registrar</button>
+        </div>
       </div>
       <div style="overflow-x:auto"><table class="tbl" style="width:100%">
         <thead><tr><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Período</th><th></th></tr></thead>
@@ -7053,23 +7134,41 @@ function rTurnosHorario(){
     todos = todos.filter(t=>t.empleadoNombre===nombre);
   }
 
+  // Determinar empleados para revisar bloqueos
+  let empsBlq;
+  if(turnosFiltroEmpleado !== 'todos' && !turnosFiltroEmpleado.startsWith('auto_')){
+    empsBlq = cfg.empleados.filter(e=>String(e.id)===String(turnosFiltroEmpleado));
+  } else {
+    empsBlq = cfg.empleados;
+  }
+
   const estadoBg = {confirmado:'rgba(76,142,201,.25)',llego:'rgba(76,175,125,.25)',en_proceso:'rgba(201,148,76,.25)',terminado:'rgba(88,80,68,.3)',no_vino:'rgba(201,82,76,.2)'};
   const estadoColor = {confirmado:'var(--inf)',llego:'var(--ok)',en_proceso:'var(--wrn)',terminado:'var(--mut)',no_vino:'var(--bad)'};
 
-  const totalMin = (ch*60+cm) - (ah*60+am);
-  const SLOT = 30; // 30 min por fila
+  const SLOT = 30;
   const horas = [];
   for(let m = ah*60+am; m < ch*60+cm; m += SLOT) horas.push(m);
 
   const el = document.getElementById('turnosLista');
 
   if(!todos.length){
-    el.innerHTML = `<div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    // Mostrar vista horario igual, pero con slots bloqueados marcados
+    const slotsHtml = horas.map(minAbs=>{
+      const h = Math.floor(minAbs/60).toString().padStart(2,'0');
+      const mn = (minAbs%60).toString().padStart(2,'0');
+      const hora = h+':'+mn;
+      const bloqueado = empsBlq.length && empsBlq.every(e=>esBloqueadoEnFecha(e.bloqueos||[], fecha, hora));
+      return `<div style="display:flex;gap:10px;min-height:44px;border-bottom:1px solid var(--bor);padding:4px 0;align-items:center${bloqueado?';background:rgba(201,82,76,.05)':''}">
+        <div style="width:42px;flex-shrink:0;font-size:.72rem;font-weight:600;color:${bloqueado?'var(--bad)':'var(--mut)'};padding-top:2px">${hora}</div>
+        <div style="flex:1">${bloqueado?`<span style="font-size:.7rem;color:var(--bad)">🚫 Bloqueado</span>`:`<span style="font-size:.7rem;color:var(--mut);font-style:italic">Libre</span>`}</div>
+      </div>`;
+    }).join('');
+    el.innerHTML = `<div class="card" style="padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <strong style="font-size:.85rem">🕐 Vista horario — ${fD(fecha)}</strong>
-        <span style="font-size:.75rem;color:var(--tx2)">${apertura} a ${cierre}</span>
+        <button class="btn bg bsm" onclick="openNuevoTurno()">+ Agendar turno</button>
       </div>
-      ${emp('📅','Sin turnos para este día')}<div style="text-align:center;margin-top:8px"><button class="btn bg" onclick="openNuevoTurno()">+ Agendar turno</button></div></div>`;
+      <div>${slotsHtml}</div></div>`;
     return;
   }
 
@@ -7083,20 +7182,21 @@ function rTurnosHorario(){
         const h = Math.floor(minAbs/60).toString().padStart(2,'0');
         const m = (minAbs%60).toString().padStart(2,'0');
         const hora = h+':'+m;
-        const turnos = todos.filter(t=>t.hora===hora || (()=>{
+        const bloqueado = empsBlq.length && empsBlq.every(e=>esBloqueadoEnFecha(e.bloqueos||[], fecha, hora));
+        const turnosHora = todos.filter(t=>t.hora===hora || (()=>{
           const [th,tm] = t.hora.split(':').map(Number);
           const ini = th*60+tm;
           return minAbs >= ini && minAbs < ini+(t.duracion||60);
         })());
-        return `<div style="display:flex;gap:10px;min-height:52px;border-bottom:1px solid var(--bor);padding:6px 0;align-items:flex-start">
-          <div style="width:42px;flex-shrink:0;font-size:.72rem;font-weight:600;color:${todos.some(t=>t.hora===hora)?'var(--gld)':'var(--mut)'};padding-top:4px">${hora}</div>
+        return `<div style="display:flex;gap:10px;min-height:52px;border-bottom:1px solid var(--bor);padding:6px 0;align-items:flex-start${bloqueado&&!turnosHora.length?';background:rgba(201,82,76,.05)':''}">
+          <div style="width:42px;flex-shrink:0;font-size:.72rem;font-weight:600;color:${todos.some(t=>t.hora===hora)?'var(--gld)':bloqueado?'var(--bad)':'var(--mut)'};padding-top:4px">${hora}</div>
           <div style="flex:1;display:flex;flex-wrap:wrap;gap:6px">
             ${todos.filter(t=>t.hora===hora).map(t=>`<div style="background:${estadoBg[t.estado]||'rgba(76,142,201,.2)'};border-left:3px solid ${estadoColor[t.estado]||'var(--inf)'};border-radius:6px;padding:6px 10px;min-width:160px;flex:1;cursor:pointer" onclick="editarTurno('${t.id}')">
               <div style="font-weight:600;font-size:.82rem">${esc(t.cliente)}</div>
               <div style="font-size:.72rem;color:var(--tx2)">✂ ${esc(t.servicioNombre||'')} · ${t.duracion||60}min</div>
               <div style="font-size:.7rem;color:var(--mut);margin-top:2px">👤 ${esc(t.empleadoNombre||'')}${t.precio>0?' · '+fmt(t.precio):''}</div>
             </div>`).join('')}
-            ${todos.filter(t=>t.hora===hora).length===0?'<div style="font-size:.72rem;color:var(--mut);padding:4px 0;font-style:italic">Libre</div>':''}
+            ${todos.filter(t=>t.hora===hora).length===0?(bloqueado?`<span style="font-size:.7rem;color:var(--bad)">🚫 Bloqueado</span>`:`<div style="font-size:.72rem;color:var(--mut);padding:4px 0;font-style:italic">Libre</div>`):''}
           </div>
         </div>`;
       }).join('')}
@@ -7814,13 +7914,14 @@ async function rTurnosOnline(){
 
   // Solo actualizar inputs si el usuario NO está escribiendo en alguno de ellos.
   // silentRefresh() llama a esta función cada 30 seg — sin este check borra lo que el usuario está tipeando.
-  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel'];
+  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel','onlineNotaPrecios'];
   const _editando = _cfgInputIds.includes(document.activeElement?.id);
   if(!_editando){
     if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
     if(document.getElementById('onlineInsta')) document.getElementById('onlineInsta').value = cfg.insta||'';
     if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
     if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
+    if(document.getElementById('onlineNotaPrecios')) document.getElementById('onlineNotaPrecios').value = cfg.notaPrecios||'';
   }
 
   cargarSolicitudes();
@@ -8035,7 +8136,8 @@ function saveOnlineConfig(){
     mensaje: document.getElementById('onlineMensaje')?.value||'',
     insta: document.getElementById('onlineInsta')?.value||'',
     direccion: document.getElementById('onlineDireccion')?.value||'',
-    tel: (document.getElementById('onlineTel')?.value||'').replace(/\D/g,'')
+    tel: (document.getElementById('onlineTel')?.value||'').replace(/\D/g,''),
+    notaPrecios: document.getElementById('onlineNotaPrecios')?.value||''
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
@@ -8500,7 +8602,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
   const rubroLC = rubro.toLowerCase();
   const esBarber = /barber/i.test(rubroLC);
   const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
-  const turnoLink = window.location.origin + '/b/' + tenantSlug(currentTenant?.nombre||'');
+  const turnoLink = window.location.origin + '/b/' + (tenantId || tenantSlug(cfg.__tenantName||''));
 
   const cats = esBarber
     ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'barba',l:'🪒 Barba'},{k:'coloracion',l:'🎨 Coloración'},{k:'tratamiento',l:'✨ Tratamientos'},{k:'otro',l:'🔧 Otros'}]
@@ -8509,9 +8611,10 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
     : [{k:'',l:'Todos'},{k:'pantalla',l:'📱 Pantallas'},{k:'tapa',l:'🔲 Tapas'},{k:'bateria',l:'🔋 Baterías'},{k:'conector',l:'🔌 Conectores'},{k:'camara',l:'📸 Cámaras'},{k:'otro',l:'🔧 Otros'}];
 
   const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
+  const textoNota = oc.notaPrecios || ((esBarber || esSalon) ? 'Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.' : 'Trabajamos con transplante de IC y Flex para que tu equipo NO MARQUE CARTELES. ⏰ Tiempo: 2–3 días hábiles · 🔋 Baterías: con restablecimiento de fábrica.');
   const notice = (esBarber || esSalon)
-    ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">${rubroIcon} Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.</div>`
-    : `<div style="background:rgba(201,82,76,.07);border-left:3px solid #c9524c;border-radius:8px;padding:14px 16px;font-size:.78rem;color:#a89880;line-height:1.7;margin-bottom:20px">⚠️ <strong style="color:#f5f0e8">Importante</strong> — Trabajamos con <strong>transplante de IC y Flex</strong> para que tu equipo <strong>NO MARQUE CARTELES</strong>.<br>⏰ <strong>Tiempo:</strong> 2–3 días hábiles &nbsp;·&nbsp; 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica.</div>`;
+    ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">${rubroIcon} ${esc(textoNota)}</div>`
+    : `<div style="background:rgba(201,82,76,.07);border-left:3px solid #c9524c;border-radius:8px;padding:14px 16px;font-size:.78rem;color:#a89880;line-height:1.7;margin-bottom:20px">⚠️ ${esc(textoNota)}</div>`;
 
   // Pre-filtrar items por rubro para evitar mezcla de servicios
   const phoneKw = /pantalla|tapa|bater[ií]a|conector|c[aá]mara|placa|puerto|flex|chip/i;
@@ -9506,7 +9609,13 @@ function saveTurnosFijosLocal(fijos){
 function openNuevoTurnoFijo(){
   const cfg = getTurnosCfg();
   const srvSel = document.getElementById('tfServicio');
-  if(srvSel) srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.nombre}">${esc(s.nombre)}</option>`).join('') || '<option>Sin servicios</option>';
+  if(srvSel){
+    const svcs = [...(cfg.servicios||[])];
+    (S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible').forEach(p=>{
+      if(!svcs.some(s=>s.nombre===p.nombre)) svcs.push({nombre:p.nombre, precio:p.precio});
+    });
+    srvSel.innerHTML = svcs.map(s=>`<option value="${esc(s.nombre)}">${esc(s.nombre)}${s.precio?` (${fmt(s.precio)})`:''}</option>`).join('') || '<option>Sin servicios</option>';
+  }
   const empSel = document.getElementById('tfEmpleado');
   if(empSel) empSel.innerHTML = cfg.empleados.map(e=>`<option value="${e.id}">${esc(e.nombre)}</option>`).join('') || '<option value="">Sin profesionales</option>';
   document.getElementById('turnoFijoId').value = '';
