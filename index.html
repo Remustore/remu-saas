@@ -1029,7 +1029,7 @@ $$;</pre>
             <button class="btn bg" onclick="openM('mEquipo',null)">+ Registrar equipo</button>
           </div>
         </div>
-        <div class="tw"><table><thead><tr><th>Modelo</th><th>IMEI</th><th>Mem.</th><th>Color</th><th>Bat.</th><th>Físico</th><th>Precio</th><th>Tipo</th><th></th></tr></thead><tbody id="tbE"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Modelo</th><th>IMEI</th><th>Estado</th><th>Precio reventa</th><th>Garantía</th><th>Proveedor</th><th></th></tr></thead><tbody id="tbE"></tbody></table></div>
       </div>
     </div>
 
@@ -1545,11 +1545,13 @@ $$;</pre>
 <!-- Equipo -->
 <div class="mb" id="mEquipo"><div class="md"><div class="mh"><div class="mt2" id="mEquipoTitle">Registrar Equipo</div><button class="xbtn" onclick="closeM('mEquipo')">✕</button></div>
 <div class="mc"><input type="hidden" id="eId">
-<div class="fr"><div><label>Tipo</label><select id="eTipo"><option value="usado">Usado</option><option value="nuevo">Nuevo</option></select></div><div><label>Modelo</label><input id="eMod" placeholder="Ej: iPhone 14 Pro"></div></div>
-<div class="fr"><div><label>Memoria</label><select id="eMem"><option>128 GB</option><option>256 GB</option><option>512 GB</option><option>1 TB</option></select></div><div><label>Color</label><input id="eCol" placeholder="Negro, Blanco..."></div></div>
-<div class="fr"><div><label>IMEI (15 dígitos)</label><input id="eIme" maxlength="15" placeholder="000000000000000"></div><div><label>Batería (%)</label><input type="number" id="eBat" min="0" max="100" placeholder="85"></div></div>
-<div class="fr"><div><label>Estado físico</label><select id="eFis"><option>Excelente</option><option>Muy bueno</option><option>Bueno</option><option>Regular</option></select></div><div><label>Precio venta ($)</label><input type="number" id="ePre" placeholder="0"></div></div>
-<div class="fr"><div><label>Precio costo ($)</label><input type="number" id="eCos" placeholder="0"></div></div>
+<div class="fr"><div><label>Estado</label><select id="eTipo"><option value="nuevo">🆕 Nuevo</option><option value="usado">📱 Usado</option></select></div><div><label>Modelo</label><input id="eMod" placeholder="Ej: iPhone 14 Pro"></div></div>
+<div class="fr"><div><label>Memoria</label><select id="eMem"><option>64 GB</option><option>128 GB</option><option>256 GB</option><option>512 GB</option><option>1 TB</option></select></div><div><label>Color</label><input id="eCol" placeholder="Negro, Blanco..."></div></div>
+<div class="fr"><div><label>IMEI (15 dígitos)</label><input id="eIme" maxlength="15" placeholder="000000000000000" oninput="this.value=this.value.replace(/\D/g,'')"></div><div><label>Batería (%)</label><input type="number" id="eBat" min="0" max="100" placeholder="85"></div></div>
+<div class="fr"><div><label>Estado físico</label><select id="eFis"><option>Excelente</option><option>Muy bueno</option><option>Bueno</option><option>Regular</option></select></div><div><label>Precio de reventa ($)</label><input type="number" id="ePre" placeholder="0"></div></div>
+<div class="fr"><div><label>Costo de compra ($)</label><input type="number" id="eCos" placeholder="0"></div><div><label>Margen estimado</label><input id="eMargen" readonly style="background:var(--car2);color:var(--ok)" placeholder="—"></div></div>
+<div class="fr"><div><label>Garantía (días)</label><input type="number" id="eGarDias" placeholder="Ej: 90" min="0" oninput="calcGarantiaEquipo()"></div><div><label>Vence el</label><input type="date" id="eGarVence" readonly style="background:var(--car2)"></div></div>
+<div class="fr"><div><label>Proveedor / Vendedor</label><input id="eProvNombre" placeholder="Nombre del proveedor"></div><div><label>Tel. proveedor</label><input id="eProvTel" type="tel" placeholder="11 2345 6789"></div></div>
 <div class="fr full"><div><label>Observaciones</label><textarea id="eNot" placeholder="Opcional..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mEquipo')">Cancelar</button><button class="btn bg" onclick="saveEquipo()">Guardar</button></div></div></div>
 
@@ -3687,7 +3689,7 @@ function fillModalEdit(modal, id){
     if(document.getElementById('tEstFisico'))document.getElementById('tEstFisico').value=t.estFisico||'excelente';
     if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
     updateGarantiaVence();calcGanTaller();}
-  if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo;document.getElementById('eMod').value=e.modelo;document.getElementById('eMem').value=e.memoria;document.getElementById('eCol').value=e.color;document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico;document.getElementById('ePre').value=e.precio;document.getElementById('eCos').value=e.costo;document.getElementById('eNot').value=e.notas||'';}
+  if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo||'';document.getElementById('eMod').value=e.modelo||'';document.getElementById('eMem').value=e.memoria||'';document.getElementById('eCol').value=e.color||'';document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico||'Excelente';document.getElementById('ePre').value=e.precio||0;document.getElementById('eCos').value=e.costo||0;document.getElementById('eGarDias').value=e.garantiaDias||'';document.getElementById('eGarVence').value=e.garantiaVence||'';document.getElementById('eProvNombre').value=e.provNombre||'';document.getElementById('eProvTel').value=e.provTel||'';document.getElementById('eNot').value=e.notas||'';calcGarantiaEquipo();}
   if(modal==='mGasto'){
     const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
     if(!id){
@@ -3917,12 +3919,56 @@ function rStock(){
 }
 
 // ═══ EQUIPOS ═══
+function calcGarantiaEquipo(){
+  const dias = parseInt(document.getElementById('eGarDias')?.value)||0;
+  const venceEl = document.getElementById('eGarVence');
+  const margenEl = document.getElementById('eMargen');
+  if(venceEl){
+    if(dias > 0){
+      const d = new Date(); d.setDate(d.getDate() + dias);
+      venceEl.value = d.toISOString().slice(0,10);
+    } else {
+      venceEl.value = '';
+    }
+  }
+  if(margenEl){
+    const pre = parseFloat(document.getElementById('ePre')?.value)||0;
+    const cos = parseFloat(document.getElementById('eCos')?.value)||0;
+    if(pre > 0 && cos > 0){
+      const pct = Math.round((pre - cos) / pre * 100);
+      margenEl.value = pct + '% — ' + fmt(pre - cos);
+      margenEl.style.color = pct > 20 ? 'var(--ok)' : pct > 0 ? 'var(--wrn)' : 'var(--bad)';
+    } else {
+      margenEl.value = '';
+    }
+  }
+}
+
 async function saveEquipo(){
   const id = document.getElementById('eId').value;
   const imei = document.getElementById('eIme').value.trim();
-  if(imei&&imei.length!==15) return alert('El IMEI debe tener 15 dígitos');
+  if(imei && imei.length !== 15) return alert('El IMEI debe tener 15 dígitos');
+  const modelo = document.getElementById('eMod').value.trim();
+  if(!modelo) return alert('Ingresá el modelo del equipo');
   const snap = JSON.parse(JSON.stringify(S.equipos));
-  const obj = { tipo:document.getElementById('eTipo').value, modelo:document.getElementById('eMod').value, memoria:document.getElementById('eMem').value, color:document.getElementById('eCol').value, imei, bateria:parseInt(document.getElementById('eBat').value)||null, estadoFisico:document.getElementById('eFis').value, precio:parseFloat(document.getElementById('ePre').value)||0, costo:parseFloat(document.getElementById('eCos').value)||0, notas:document.getElementById('eNot').value };
+  const garDias = parseInt(document.getElementById('eGarDias').value)||0;
+  const garVence = document.getElementById('eGarVence').value || '';
+  const obj = {
+    tipo: document.getElementById('eTipo').value,
+    modelo,
+    memoria: document.getElementById('eMem').value,
+    color: document.getElementById('eCol').value,
+    imei,
+    bateria: parseInt(document.getElementById('eBat').value)||null,
+    estadoFisico: document.getElementById('eFis').value,
+    precio: parseFloat(document.getElementById('ePre').value)||0,
+    costo: parseFloat(document.getElementById('eCos').value)||0,
+    garantiaDias: garDias,
+    garantiaVence: garVence,
+    provNombre: document.getElementById('eProvNombre').value.trim(),
+    provTel: document.getElementById('eProvTel').value.trim(),
+    notas: document.getElementById('eNot').value
+  };
   if(id){
     const i = S.equipos.findIndex(e=>e.id===parseInt(id));
     if(i>-1){ S.equipos[i]={...S.equipos[i],...obj}; await dbUpsert('equipos',S.equipos[i]); pushUndo('Editar equipo','equipos',snap); }
@@ -3940,27 +3986,94 @@ async function delEquipo(id){
   await dbDelete('equipos',id); pushUndo('Eliminar equipo','equipos',snap); rEquipos();
 }
 
-async function mVendido(id){
-  const snap = JSON.parse(JSON.stringify(S.equipos));
-  const e = S.equipos.find(e=>e.id===id);
-  if(e){ e.estado='vendido'; await dbUpsert('equipos',e); pushUndo('Marcar vendido','equipos',snap); rEquipos(); }
+function abrirVentaEquipo(id){
+  const e = S.equipos.find(eq=>eq.id===id);
+  if(!e) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick=ev=>{if(ev.target===overlay)overlay.remove();};
+  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:400px;padding:24px">
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:4px">💸 Vender equipo</div>
+    <div style="font-size:.82rem;color:var(--tx2);margin-bottom:16px">${esc(e.modelo)} ${esc(e.memoria||'')} ${e.tipo==='nuevo'?'· Nuevo':'· Usado'}</div>
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Precio de venta ($)</label>
+    <input id="_veqPre" type="number" value="${e.precio||0}" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:12px">
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Método de pago</label>
+    <select id="_veqMet" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;margin-bottom:16px">
+      <option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta débito</option><option>Tarjeta crédito</option>
+    </select>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="btn bg" style="flex:1" onclick="confirmarVentaEquipo(${id},this)">Confirmar venta</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function confirmarVentaEquipo(id, btn){
+  const e = S.equipos.find(eq=>eq.id===id);
+  if(!e) return;
+  const precio = parseFloat(document.getElementById('_veqPre')?.value)||e.precio||0;
+  const metodo = document.getElementById('_veqMet')?.value||'Efectivo';
+  btn.disabled=true; btn.textContent='Guardando...';
+  // Marcar equipo como vendido
+  const snapEq = JSON.parse(JSON.stringify(S.equipos));
+  e.estado='vendido'; e.fechaVenta=tod(); e.precioVenta=precio;
+  await dbUpsert('equipos',e);
+  pushUndo('Vender equipo','equipos',snapEq);
+  // Registrar en ventas
+  const snapV = JSON.parse(JSON.stringify(S.ventas));
+  const venta = {
+    id: Date.now(), tipo:'equipo',
+    nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':''),
+    cantidad: 1, precio, total: precio,
+    costo: e.costo||0, metodo, fecha: tod(),
+    comPct: 0, comision: 0
+  };
+  S.ventas.unshift(venta);
+  await dbUpsert('ventas', venta);
+  pushUndo('Venta equipo','ventas',snapV);
+  btn.closest('[style*=fixed]').remove();
+  rEquipos();
+  showToast('Venta registrada ✓ — ' + esc(e.modelo));
 }
 
 function setEF(f,i){ eFilt=f; document.querySelectorAll('#etabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j)); rEquipos(); }
 
+function _diasGarantiaRestantes(vence){
+  if(!vence) return null;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const v = new Date(vence+'T00:00:00'); v.setHours(0,0,0,0);
+  return Math.ceil((v - hoy) / 86400000);
+}
+
 function rEquipos(){
   const q = (document.getElementById('eQ').value||'').toLowerCase();
-  const items = S.equipos.filter(e=>(eFilt==='todos'||e.tipo===eFilt||e.estado===eFilt)&&(!q||e.modelo.toLowerCase().includes(q)||(e.imei||'').includes(q)));
+  const items = S.equipos.filter(e=>(eFilt==='todos'||e.tipo===eFilt||e.estado===eFilt)&&(!q||( (e.modelo||'').toLowerCase().includes(q)||(e.imei||'').includes(q)||(e.provNombre||'').toLowerCase().includes(q))));
   const tb = document.getElementById('tbE');
-  if(!items.length){ tb.innerHTML=`<tr><td colspan="9">${emp('📱','Sin equipos')}</td></tr>`; return; }
+  if(!items.length){ tb.innerHTML=`<tr><td colspan="7">${emp('📱','Sin equipos')}</td></tr>`; return; }
   tb.innerHTML = items.map(e=>{
-    const bc = !e.bateria?'mut':e.bateria>80?'ok':e.bateria>50?'wrn':'bad';
-    return `<tr><td><strong>${esc(e.modelo)}</strong>${e.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(e.notas)}</span>`:''}</td>
-    <td style="font-size:.71rem;color:var(--mut)">${esc(e.imei||'—')}</td><td>${esc(e.memoria)}</td><td>${esc(e.color||'—')}</td>
-    <td style="color:var(--${bc})">${e.bateria?e.bateria+'%':'—'}</td><td>${esc(e.estadoFisico||'—')}</td><td>${fmt(e.precio)}</td>
-    <td>${e.tipo==='nuevo'?`<span class="bx bbl">Nuevo</span>`:`<span class="bx byw">Usado</span>`}</td>
+    const diasRest = _diasGarantiaRestantes(e.garantiaVence);
+    const garHtml = diasRest === null
+      ? '<span style="color:var(--mut);font-size:.75rem">—</span>'
+      : diasRest < 0
+      ? '<span class="bx brd" style="font-size:.65rem">Vencida</span>'
+      : diasRest <= 7
+      ? `<span class="bx brd" style="font-size:.65rem">⚠ ${diasRest}d</span>`
+      : `<span style="font-size:.75rem;color:var(--ok)">${diasRest}d</span>`;
+    const tipoChip = e.tipo==='nuevo'
+      ? '<span class="bx bbl" style="font-size:.65rem">🆕 Nuevo</span>'
+      : '<span class="bx byw" style="font-size:.65rem">📱 Usado</span>';
+    const vendidoChip = e.estado==='vendido' ? '<br><span class="bx bgx" style="font-size:.62rem">Vendido</span>' : '';
+    const margen = e.precio&&e.costo ? Math.round((e.precio-e.costo)/e.precio*100) : null;
+    return `<tr>
+    <td><strong>${esc(e.modelo)}</strong><br><span style="font-size:.7rem;color:var(--mut)">${esc(e.memoria||'')}${e.color?' · '+esc(e.color):''}</span>${e.notas?`<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.notas)}</span>`:''}${vendidoChip}</td>
+    <td style="font-size:.72rem;font-family:monospace;color:var(--mut)">${esc(e.imei||'—')}</td>
+    <td>${tipoChip}<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.estadoFisico||'')}</span></td>
+    <td><strong>${fmt(e.precio)}</strong>${margen!==null?`<br><span style="font-size:.68rem;color:${margen>20?'var(--ok)':'var(--wrn)'}">${margen}%</span>`:''}</td>
+    <td>${garHtml}${e.garantiaVence?`<br><span style="font-size:.65rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`:''}</td>
+    <td style="font-size:.75rem">${e.provNombre?esc(e.provNombre):'<span style="color:var(--mut)">—</span>'}${e.provTel?`<br><span style="color:var(--mut);font-size:.68rem">${esc(e.provTel)}</span>`:''}</td>
     <td style="display:flex;gap:3px;flex-wrap:wrap">
-      ${e.estado!=='vendido'?`<button class="btn bs bsm" onclick="mVendido(${e.id})">✓</button>`:`<span class="bx bgx">Vendido</span>`}
+      ${e.estado!=='vendido'?`<button class="btn bs bsm" onclick="abrirVentaEquipo(${e.id})" title="Registrar venta">💸 Vender</button>`:''}
       <button class="btn be bsm" onclick="openM('mEquipo',${e.id})">✎</button>
       <button class="btn bd bsm" onclick="delEquipo(${e.id})">✕</button>
     </td></tr>`;
