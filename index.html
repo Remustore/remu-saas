@@ -304,13 +304,17 @@ textarea{resize:vertical;min-height:70px;}
 
 /* RESPONSIVE */
 @media(max-width:768px){
+  /* Evitar scroll horizontal global */
+  body,#mn{overflow-x:hidden;max-width:100vw;}
+
   /* Sidebar */
   #sb{transform:translateX(-100%);width:240px;}
   #sb.open{transform:translateX(0);box-shadow:4px 0 20px rgba(0,0,0,.5);}
   #mn{margin-left:0;}
   #hbg{display:block !important;}
-  .cnt{padding:12px;}
-  
+  .cnt{padding:12px;width:100%;box-sizing:border-box;}
+  .card{box-sizing:border-box;width:100%;}
+
   /* Overlay when sidebar open */
   #sbOverlay{display:block;}
   
@@ -325,9 +329,8 @@ textarea{resize:vertical;min-height:70px;}
   /* Cards */
   .card{padding:14px;}
   
-  /* Tablas → scroll horizontal */
+  /* Tablas → scroll horizontal cuando no hay card layout */
   .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  table{min-width:360px;}
   th,td{padding:8px 8px;font-size:.75rem;}
   
   /* Botones más grandes para touch */
@@ -462,18 +465,44 @@ textarea{resize:vertical;min-height:70px;}
   .md[style*="max-width"]{max-width:calc(100vw - 0px) !important;}
 }
 
-/* ── TABLAS RESPONSIVE MOBILE ── */
+/* ── TABLAS RESPONSIVE MOBILE: layout de tarjetas ── */
 @media(max-width:480px){
-  /* Columna de acciones: siempre visible sin scroll horizontal */
-  .tw td:last-child,.tw th:last-child{
-    position:sticky;right:0;z-index:2;
-    background:var(--sur);
-    box-shadow:-3px 0 8px rgba(0,0,0,.3);
+  /* Sin scroll horizontal — tabla se convierte en lista de tarjetas */
+  .tw{overflow-x:visible !important;}
+  .tw table{display:block;width:100%;min-width:0 !important;}
+  .tw thead{display:none;}
+  .tw tbody{display:block;}
+  .tw tr{
+    display:block;
+    background:var(--car);
+    border:1px solid var(--bor);
+    border-radius:10px;
+    margin-bottom:10px;
+    padding:10px 12px;
+    box-sizing:border-box;
+    width:100%;
   }
-  /* Reducir min-width para que quepan más datos */
-  .tw table{min-width:280px;}
-  /* Ocultar columnas menos críticas en pantallas muy chicas */
-  .tw .col-hide{display:none;}
+  .tw td{
+    display:flex !important;
+    align-items:center;
+    justify-content:space-between;
+    padding:5px 0;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    font-size:.8rem;
+    min-height:28px;
+    box-sizing:border-box;
+    width:100%;
+  }
+  /* Fila de acciones al fondo de cada tarjeta */
+  .tw td:last-child{
+    border-bottom:none;
+    padding-top:10px;
+    justify-content:flex-end !important;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  /* col-hide: mostrar todo en tarjetas (hay espacio vertical) */
+  .tw .col-hide{display:flex !important;}
 }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
