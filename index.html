@@ -8316,14 +8316,14 @@ async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
   turnos.push(turno);
   saveTurnosLocal(turnos);
 
-  // Update solicitud status
+  // Update solicitud status in Supabase (non-blocking: turno ya guardado en localStorage)
   const { error: updErr } = await sb.from('turnos_solicitudes')
     .update({ estado: 'confirmado' })
     .eq('id', id)
     .eq('tenant_id', currentTenant.id);
-  if(updErr){ console.error('[confirmarSolicitud] update error:', updErr); showToast('Error al confirmar: ' + (updErr.message||'revisar permisos'), 'err'); return; }
+  if(updErr) console.error('[confirmarSolicitud] update error:', updErr.message);
   showToast('Turno confirmado ✓');
-  await cargarSolicitudes();
+  cargarSolicitudes();
   rTurnos();
 
   // Open WA to notify client
