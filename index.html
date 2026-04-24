@@ -8317,10 +8317,14 @@ async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
   saveTurnosLocal(turnos);
 
   // Update solicitud status
-  await sb.from('turnos_solicitudes').update({estado:'confirmado'}).eq('id', id);
+  const { error: updErr } = await sb.from('turnos_solicitudes')
+    .update({ estado: 'confirmado' })
+    .eq('id', id)
+    .eq('tenant_id', currentTenant.id);
+  if(updErr){ console.error('[confirmarSolicitud] update error:', updErr); showToast('Error al confirmar: ' + (updErr.message||'revisar permisos'), 'err'); return; }
   showToast('Turno confirmado ✓');
-  cargarSolicitudes();
-  rTurnos(); // Refresh day agenda so the new confirmed slot appears immediately
+  await cargarSolicitudes();
+  rTurnos();
 
   // Open WA to notify client
   if(tel){

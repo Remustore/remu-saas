@@ -302,12 +302,13 @@ async function cargarSlots(){
   wrap.className = 'msg-info';
   wrap.innerHTML = 'Cargando horarios...';
 
-  // Slots ocupados de Supabase (confirmados + bloqueados)
+  // Slots ocupados de Supabase (confirmados + bloqueados + pendientes)
+  // 'pendiente' bloquea el slot inmediatamente para evitar doble reserva
   const {data: ocuData} = await sb.from('turnos_solicitudes')
     .select('hora,estado')
     .eq('tenant_id', G.tenantId)
     .eq('fecha', fecha)
-    .in('estado',['confirmado','bloqueado']);
+    .in('estado',['confirmado','bloqueado','pendiente']);
 
   const ocupados = new Set((ocuData||[]).map(s=>(s.hora||'').substring(0,5)));
   const bloqueos = new Set();
