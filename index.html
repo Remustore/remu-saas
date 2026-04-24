@@ -461,6 +461,20 @@ textarea{resize:vertical;min-height:70px;}
   /* Modales con max-width inline: que no se salgan en mobile */
   .md[style*="max-width"]{max-width:calc(100vw - 0px) !important;}
 }
+
+/* ── TABLAS RESPONSIVE MOBILE ── */
+@media(max-width:480px){
+  /* Columna de acciones: siempre visible sin scroll horizontal */
+  .tw td:last-child,.tw th:last-child{
+    position:sticky;right:0;z-index:2;
+    background:var(--sur);
+    box-shadow:-3px 0 8px rgba(0,0,0,.3);
+  }
+  /* Reducir min-width para que quepan más datos */
+  .tw table{min-width:280px;}
+  /* Ocultar columnas menos críticas en pantallas muy chicas */
+  .tw .col-hide{display:none;}
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -981,7 +995,7 @@ $$;</pre>
     <div class="sec" id="sec-ventas">
       <div class="pt">Ventas</div><div class="ps">Registro de operaciones</div>
       <div class="card"><div class="ch"><h3></h3><button class="btn bg" onclick="openM('mVenta',null)">+ Registrar venta</button></div>
-      <div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th><th></th></tr></thead><tbody id="tbV"></tbody></table></div></div>
+      <div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th class="col-hide">Cant.</th><th class="col-hide">Precio</th><th>Total</th><th class="col-hide">Pago</th><th></th></tr></thead><tbody id="tbV"></tbody></table></div></div>
     </div>
 
     <!-- STOCK -->
@@ -997,7 +1011,7 @@ $$;</pre>
             <button class="btn bg" onclick="openNuevoStock()">+ Agregar producto</button>
           </div>
         </div>
-        <div class="tw"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio venta</th><th>Margen</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Producto</th><th class="col-hide">Categoría</th><th>Stock</th><th>Precio venta</th><th class="col-hide">Margen</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
       </div>
       <!-- HISTORIAL STOCK -->
       <div class="card" id="stockMovCard" style="margin-top:14px">
@@ -1029,7 +1043,7 @@ $$;</pre>
             <button class="btn bg" onclick="openM('mEquipo',null)">+ Registrar equipo</button>
           </div>
         </div>
-        <div class="tw"><table><thead><tr><th>Modelo</th><th>IMEI</th><th>Estado</th><th>Precio reventa</th><th>Garantía</th><th>Proveedor</th><th></th></tr></thead><tbody id="tbE"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Modelo</th><th class="col-hide">IMEI</th><th>Estado</th><th>Precio reventa</th><th class="col-hide">Garantía</th><th class="col-hide">Proveedor</th><th></th></tr></thead><tbody id="tbE"></tbody></table></div>
       </div>
     </div>
 
@@ -1492,7 +1506,7 @@ $$;</pre>
           <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rPrecios()" id="prQ"></div>
           <button class="btn bg" onclick="openM('mPrecio',null)">+ Agregar servicio</button>
         </div>
-        <div class="tw"><table><thead><tr><th>Servicio</th><th>Modelo</th><th>Precio</th><th>Estado</th><th>Notas</th><th></th></tr></thead><tbody id="tbPr"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Servicio</th><th class="col-hide">Modelo</th><th>Precio</th><th>Estado</th><th class="col-hide">Notas</th><th></th></tr></thead><tbody id="tbPr"></tbody></table></div>
       </div>
     </div>
 
@@ -1891,6 +1905,7 @@ $$;</pre>
 <div class="fr"><div><label id="prModLabel">Sector / Descripción</label><input id="prMod" placeholder="Ej: Peluquería, iPhone 14, todo tipo..."></div><div><label>Precio ($)</label><input type="number" id="prPre" placeholder="0"></div></div>
 <div class="fr"><div><label>Categoría (para filtros)</label><select id="prCat"><option value="">— Sin categoría</option></select></div><div><label>Disponibilidad</label><select id="prDisp"><option value="disponible">Disponible</option><option value="consultar">Consultar</option><option value="no disponible">No disponible</option></select></div></div>
 <div class="fr full"><div><label>Notas / aclaraciones</label><input id="prNot" placeholder="Opcional..."></div></div>
+<div class="fr"><div><label>Duración estimada</label><select id="prDur"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option><option value="90">90 min</option><option value="120">120 min</option></select></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mPrecio')">Cancelar</button><button class="btn bg" onclick="savePrecio()">Guardar</button></div></div></div>
 
 <!-- Objetivos -->
@@ -3691,7 +3706,7 @@ function openM(id, editId){
     el.querySelectorAll('input:not([type=checkbox]):not([type=color])').forEach(i=>{ if(i.id!=='vFec') i.value=''; });
     el.querySelectorAll('select').forEach(s=>s.selectedIndex=0);
     el.querySelectorAll('textarea').forEach(t=>t.value='');
-    if(id==='mPrecio'){ el.querySelector('.mt2').textContent='Agregar Servicio'; initPrCatSelect(''); }
+    if(id==='mPrecio'){ el.querySelector('.mt2').textContent='Agregar Servicio'; initPrCatSelect(''); const _pd=document.getElementById('prDur'); if(_pd) _pd.value='30'; }
   }
   el.classList.add('open');
   if(editId) fillModalEdit(id, editId);
@@ -3761,7 +3776,7 @@ function fillModalEdit(modal, id){
       document.getElementById('gHistorialBox').style.display='none';
     }
   }
-  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id)||S.precios.find(x=>String(x.id)===String(id));if(!p)return;document.getElementById('mPrecio').querySelector('.mt2').textContent='Editar Servicio';initPrCatSelect(p.categoria||'');document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDisp').value=p.disponibilidad||'disponible';document.getElementById('prCat').value=p.categoria||'';document.getElementById('prNot').value=p.notas||'';}
+  if(modal==='mPrecio'){const p=S.precios.find(x=>x.id===id)||S.precios.find(x=>String(x.id)===String(id));if(!p)return;document.getElementById('mPrecio').querySelector('.mt2').textContent='Editar Servicio';initPrCatSelect(p.categoria||'');document.getElementById('prId').value=id;document.getElementById('prNom').value=p.nombre;document.getElementById('prMod').value=p.modelo||'';document.getElementById('prPre').value=p.precio;document.getElementById('prDisp').value=p.disponibilidad||'disponible';document.getElementById('prCat').value=p.categoria||'';document.getElementById('prNot').value=p.notas||'';const _pd2=document.getElementById('prDur');if(_pd2)_pd2.value=p.duracion||30;}
   if(modal==='mInversor'){const inv=S.inversores.find(x=>x.id===id);if(!inv)return;document.getElementById('mInversorTitle').textContent='Editar Inversor';document.getElementById('invId').value=id;document.getElementById('invNom').value=inv.nombre;document.getElementById('invCap').value=inv.capital;document.getElementById('invPct').value=inv.pct||10;document.getElementById('invFec').value=inv.fecha||'';document.getElementById('invTel').value=inv.tel||'';document.getElementById('invMod').value=inv.modalidad||'reinvertir';document.getElementById('invNot').value=inv.notas||'';}
 }
 function closeM(id){ document.getElementById(id).classList.remove('open'); }
@@ -3951,10 +3966,10 @@ function rStock(){
   tb.innerHTML = items.map(s=>{
     const mg = s.precio&&s.costo ? Math.round((s.precio-s.costo)/s.precio*100) : null;
     return `<tr><td><strong>${esc(s.nombre)}</strong>${s.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(s.notas)}</span>`:''}</td>
-    <td><span class="bx bg2">${esc(s.categoria)}</span></td>
+    <td class="col-hide"><span class="bx bg2">${esc(s.categoria)}</span></td>
     <td><strong>${s.cantidad}</strong> <span style="color:var(--mut);font-size:.69rem">mín ${s.minimo}</span></td>
     <td>${fmt(s.precio)}</td>
-    <td>${mg!==null?`<span style="color:${mg>50?'var(--ok)':mg>30?'var(--wrn)':'var(--bad)'};font-weight:600">${mg}%</span>`:'—'}</td>
+    <td class="col-hide">${mg!==null?`<span style="color:${mg>50?'var(--ok)':mg>30?'var(--wrn)':'var(--bad)'};font-weight:600">${mg}%</span>`:'—'}</td>
     <td>${s.cantidad<=s.minimo?`<span class="bx brd">Bajo</span>`:`<span class="bx bgr">OK</span>`}</td>
     <td style="display:flex;gap:4px">${s.cantidad>0?`<button class="btn bs bsm" onclick="abrirVentaDesdeProd(${s.id})" title="Registrar venta">💸</button>`:''}<button class="btn bgh bsm" onclick="openRegistrarCompra(${s.id})" title="Registrar compra">📦</button><button class="btn be bsm" onclick="openM('mStock',${s.id})">✎</button><button class="btn bd bsm" onclick="delStock(${s.id})">✕</button></td></tr>`;
   }).join('');
@@ -4109,11 +4124,11 @@ function rEquipos(){
     const margen = e.precio&&e.costo ? Math.round((e.precio-e.costo)/e.precio*100) : null;
     return `<tr>
     <td><strong>${esc(e.modelo)}</strong><br><span style="font-size:.7rem;color:var(--mut)">${esc(e.memoria||'')}${e.color?' · '+esc(e.color):''}</span>${e.notas?`<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.notas)}</span>`:''}${vendidoChip}</td>
-    <td style="font-size:.72rem;font-family:monospace;color:var(--mut)">${esc(e.imei||'—')}</td>
+    <td class="col-hide" style="font-size:.72rem;font-family:monospace;color:var(--mut)">${esc(e.imei||'—')}</td>
     <td>${tipoChip}<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.estadoFisico||'')}</span></td>
     <td><strong>${fmt(e.precio)}</strong>${margen!==null?`<br><span style="font-size:.68rem;color:${margen>20?'var(--ok)':'var(--wrn)'}">${margen}%</span>`:''}</td>
-    <td>${garHtml}${e.garantiaVence?`<br><span style="font-size:.65rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`:''}</td>
-    <td style="font-size:.75rem">${e.provNombre?esc(e.provNombre):'<span style="color:var(--mut)">—</span>'}${e.provTel?`<br><span style="color:var(--mut);font-size:.68rem">${esc(e.provTel)}</span>`:''}</td>
+    <td class="col-hide">${garHtml}${e.garantiaVence?`<br><span style="font-size:.65rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`:''}</td>
+    <td class="col-hide" style="font-size:.75rem">${e.provNombre?esc(e.provNombre):'<span style="color:var(--mut)">—</span>'}${e.provTel?`<br><span style="color:var(--mut);font-size:.68rem">${esc(e.provTel)}</span>`:''}</td>
     <td style="display:flex;gap:3px;flex-wrap:wrap">
       ${e.estado!=='vendido'?`<button class="btn bs bsm" onclick="abrirVentaEquipo(${e.id})" title="Registrar venta">💸 Vender</button>`:''}
       <button class="btn be bsm" onclick="openM('mEquipo',${e.id})">✎</button>
@@ -4242,9 +4257,9 @@ async function delVenta(id){
 function _ventaRow(v){ return `<tr>
     <td>${fD(v.fecha)}</td>
     <td>${esc(v.nombre)}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}</td>
-    <td>${v.cantidad}</td><td>${fmt(v.precio)}</td>
+    <td class="col-hide">${v.cantidad}</td><td class="col-hide">${fmt(v.precio)}</td>
     <td><strong style="color:var(--gld)">${fmt(v.tipo==='equipo'&&v.comision?v.comision:v.total)}</strong></td>
-    <td><span class="bx bg2">${esc(v.metodo)}</span></td>
+    <td class="col-hide"><span class="bx bg2">${esc(v.metodo)}</span></td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mVenta',${v.id})">✎</button><button class="btn bd bsm" onclick="delVenta(${v.id})">✕</button></td>
   </tr>`; }
 function _mostrarVentasAntiguas(){
@@ -4982,6 +4997,23 @@ function rGastos(){
 }
 
 // ═══ PRECIOS ═══
+function editPrecio(id){
+  const el=document.getElementById('mPrecio');
+  if(!el)return;
+  const p=S.precios.find(x=>String(x.id)===String(id));
+  if(!p){console.warn('[editPrecio] no encontrado id=',id);return;}
+  el.querySelector('.mt2').textContent='Editar Servicio';
+  initPrCatSelect(p.categoria||'');
+  document.getElementById('prId').value=id;
+  document.getElementById('prNom').value=p.nombre||'';
+  document.getElementById('prMod').value=p.modelo||'';
+  document.getElementById('prPre').value=p.precio||0;
+  document.getElementById('prDisp').value=p.disponibilidad||'disponible';
+  document.getElementById('prCat').value=p.categoria||'';
+  document.getElementById('prNot').value=p.notas||'';
+  const pd=document.getElementById('prDur');if(pd)pd.value=p.duracion||30;
+  el.classList.add('open');
+}
 function initPrCatSelect(valorActual){
   const sel = document.getElementById('prCat');
   if(!sel) return;
@@ -5002,9 +5034,9 @@ async function savePrecio(){
   const id=document.getElementById('prId').value;
   const n=document.getElementById('prNom').value.trim();if(!n)return alert('Ingresá el nombre del servicio');
   const snap=JSON.parse(JSON.stringify(S.precios));
-  const obj={nombre:n,modelo:document.getElementById('prMod').value,categoria:document.getElementById('prCat').value,precio:parseFloat(document.getElementById('prPre').value)||0,disponibilidad:document.getElementById('prDisp').value,notas:document.getElementById('prNot').value};
+  const obj={nombre:n,modelo:document.getElementById('prMod').value,categoria:document.getElementById('prCat').value,precio:parseFloat(document.getElementById('prPre').value)||0,disponibilidad:document.getElementById('prDisp').value,notas:document.getElementById('prNot').value,duracion:parseInt(document.getElementById('prDur')?.value)||30};
   if(id){
-    const i=S.precios.findIndex(p=>p.id===parseInt(id));
+    const i=S.precios.findIndex(p=>String(p.id)===String(id));
     if(i>-1){S.precios[i]={...S.precios[i],...obj};await dbUpsert('precios',S.precios[i]);pushUndo('Editar precio','precios',snap);}
   }else{
     const item={id:Date.now(),...obj};S.precios.push(item);await dbUpsert('precios',item);pushUndo('Nuevo precio','precios',snap);
@@ -5228,12 +5260,12 @@ function rPrecios(){
   const dc={disponible:'bgr',consultar:'byw','no disponible':'brd'};
   if(!items.length){tb.innerHTML=`<tr><td colspan="6">${emp('🔧','Sin servicios — usá + Agregar servicio para crear tu lista de precios pública')}</td></tr>`;return;}
   tb.innerHTML=items.map(p=>`<tr>
-    <td><strong>${esc(p.nombre)}</strong></td>
-    <td style="font-size:.78rem;color:var(--tx2)">${esc(p.modelo||'—')}</td>
+    <td><strong>${esc(p.nombre)}</strong>${p.duracion&&p.duracion!==30?`<br><span style="font-size:.68rem;color:var(--mut)">${p.duracion} min</span>`:''}</td>
+    <td class="col-hide" style="font-size:.78rem;color:var(--tx2)">${esc(p.modelo||'—')}</td>
     <td><strong style="color:var(--gld);font-size:.95rem">${fmt(p.precio)}</strong></td>
     <td><span class="bx ${dc[p.disponibilidad]||'bgx'}">${esc(p.disponibilidad)}</span></td>
-    <td style="font-size:.75rem;color:var(--mut)">${esc(p.notas||'—')}</td>
-    <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mPrecio',${p.id})">✎</button><button class="btn bd bsm" onclick="delPrecio(${p.id})">✕</button></td>
+    <td class="col-hide" style="font-size:.75rem;color:var(--mut)">${esc(p.notas||'—')}</td>
+    <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="editPrecio(${p.id})">✎</button><button class="btn bd bsm" onclick="delPrecio(${p.id})">✕</button></td>
   </tr>`).join('');
 }
 

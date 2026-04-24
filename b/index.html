@@ -339,9 +339,15 @@ async function cargarSlots(){
   const ap = hhToMin(cfg.apertura||'09:00');
   const ci = hhToMin(cfg.cierre||'20:00') - duracion;
   const slots = [];
+  const slotsNeeded = Math.ceil(duracion/30);
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    slots.push({hora, blq:bloqueos.has(hora), ocu:ocupados.has(hora)});
+    // Verificar que todos los slots necesarios (según duración) estén libres
+    let isOcu = false;
+    for(let k=0; k<slotsNeeded; k++){
+      if(ocupados.has(minToHH(m+k*30))){ isOcu=true; break; }
+    }
+    slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
   }
 
   if(!slots.length){
@@ -408,10 +414,15 @@ async function enviar(){
   btn.disabled=true; btn.textContent='Enviando...';
 
   try {
-    // Verificar que el slot sigue disponible
+    // Verificar que todos los slots necesarios siguen disponibles
+    const _srvId0 = document.getElementById('bServicio')?.value||null;
+    const _srv0 = (G.cfg.servicios||[]).find(s=>String(s.id)===String(_srvId0))||(G.cfg.servicios||[])[0]||{};
+    const _dur0 = _srv0.duracion||30;
+    const _sN = Math.ceil(_dur0/30);
+    const _horasN = Array.from({length:_sN},(_,k)=>minToHH(hhToMin(hora)+k*30));
     const {data: previo} = await sb.from('turnos_solicitudes')
-      .select('id,estado').eq('tenant_id',G.tenantId).eq('fecha',fecha).eq('hora',hora)
-      .in('estado',['confirmado','bloqueado']).limit(1);
+      .select('id,estado').eq('tenant_id',G.tenantId).eq('fecha',fecha)
+      .in('hora',_horasN).in('estado',['confirmado','bloqueado']).limit(1);
     if(previo&&previo.length){
       showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
       btn.disabled=false; btn.textContent='Reservar turno';
@@ -432,6 +443,17 @@ async function enviar(){
     }).select('id').single();
 
     if(insErr) throw new Error(insErr.message||'Error al reservar');
+
+    // Bloquear slots adicionales si el servicio dura más de 30 min
+    if(_sN > 1){
+      const extras = [];
+      for(let k=1; k<_sN; k++){
+        extras.push({tenant_id:G.tenantId, nombre:'__extra__:'+(ins?.id||''), tel,
+          servicio_id:srvId||null, empleado_id:empId?(parseInt(empId)||null):null,
+          fecha, hora:minToHH(hhToMin(hora)+k*30), estado:'bloqueado', created_at:ts});
+      }
+      if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
+    }
 
     // Verificar race condition (otro cliente al mismo instante)
     const {data: todos} = await sb.from('turnos_solicitudes')
