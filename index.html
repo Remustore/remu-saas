@@ -3441,15 +3441,13 @@ async function dbLoad(table){
 
 async function dbUpsert(table, item){
   setSyncing();
+  const payload = { id: item.id, data: item, tenant_id: currentTenant.id };
+  console.log('[dbUpsert]', table, JSON.stringify(payload));
   try{
-    const { error } = await sb.from(table).upsert({
-      id: item.id,
-      data: item,
-      tenant_id: currentTenant.id
-    }, { onConflict: 'id' });
-    if(error) throw error;
+    const { error } = await sb.from(table).upsert(payload, { onConflict: 'id' });
+    if(error){ console.error('[dbUpsert] Supabase error:', JSON.stringify(error)); throw error; }
     setSynced(); return true;
-  }catch(e){ console.error('Upsert error', e); setSyncErr(e?.message||''); return false; }
+  }catch(e){ console.error('[dbUpsert] catch:', e?.message, e?.details, e?.hint, e?.code); setSyncErr(e?.message||''); return false; }
 }
 
 async function dbDelete(table, id){
