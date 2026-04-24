@@ -3441,13 +3441,51 @@ async function dbLoad(table){
 
 async function dbUpsert(table, item){
   setSyncing();
-  const payload = { id: item.id, data: item, tenant_id: currentTenant.id };
-  console.log('[dbUpsert]', table, JSON.stringify(payload));
   try{
-    const { error } = await sb.from(table).upsert(payload, { onConflict: 'id' });
-    if(error){ console.error('[dbUpsert] Supabase error:', JSON.stringify(error)); throw error; }
+    const { error } = await sb.from(table).upsert({ id: item.id, data: item, tenant_id: currentTenant.id }, { onConflict: 'id' });
+    if(error) throw error;
     setSynced(); return true;
-  }catch(e){ console.error('[dbUpsert] catch:', e?.message, e?.details, e?.hint, e?.code); setSyncErr(e?.message||''); return false; }
+  }catch(e){ console.error('Upsert error', e); setSyncErr(e?.message||''); return false; }
+}
+
+async function dbLoadPedidos(){
+  try{
+    let q = sb.from('pedidos').select('*');
+    if(currentTenant) q = q.eq('tenant_id', currentTenant.id);
+    const { data, error } = await q;
+    if(error) throw error;
+    return (data||[]).map(r => ({
+      id: r.id, nombre: r.nombre||'', tel: r.tel||'',
+      producto: r.producto||'', precio: r.precio||0,
+      fecha: r.fecha||tod(), notas: r.notas||'',
+      estado: r.estado||'pendiente',
+      fechaLlego: r.fechaLlego||r.fecha_llego||'',
+      fechaEntregado: r.fechaEntregado||r.fecha_entregado||'',
+      created_at: r.created_at||''
+    }));
+  }catch(e){ console.error('Load error pedidos', e); return []; }
+}
+
+async function dbUpsertPedido(p){
+  setSyncing();
+  const row = {
+    id: p.id,
+    nombre: p.nombre||'',
+    tel: p.tel||'',
+    producto: p.producto||'',
+    precio: p.precio||0,
+    fecha: p.fecha||tod(),
+    notas: p.notas||'',
+    estado: p.estado||'pendiente',
+    tenant_id: currentTenant.id
+  };
+  if(p.fechaLlego) row.fechaLlego = p.fechaLlego;
+  if(p.fechaEntregado) row.fechaEntregado = p.fechaEntregado;
+  try{
+    const { error } = await sb.from('pedidos').upsert(row, { onConflict: 'id' });
+    if(error){ console.error('[pedidos] upsert error:', JSON.stringify(error)); throw error; }
+    setSynced(); return true;
+  }catch(e){ console.error('[pedidos] catch:', e?.message); setSyncErr(e?.message||''); return false; }
 }
 
 async function dbDelete(table, id){
@@ -3491,7 +3529,7 @@ async function loadAll(){
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbGetConfig('movCaja'),
-      dbLoad('pedidos')
+      dbLoadPedidos()
     ]);
     S.stock=stock; S.equipos=equipos;
     // Deduplicar ventas por turnoId: si hay múltiples ventas del mismo turno (bug anterior),
@@ -4726,12 +4764,12 @@ async function guardarPedido(){
     const idx = S.pedidos.findIndex(p => String(p.id) === String(id));
     if(idx >= 0){
       S.pedidos[idx] = { ...S.pedidos[idx], nombre, tel, producto, precio, fecha, notas };
-      await dbUpsert('pedidos', S.pedidos[idx]);
+      await dbUpsertPedido(S.pedidos[idx]);
     }
   } else {
     const item = { id: Date.now(), nombre, tel, producto, precio, fecha, notas, estado:'pendiente', created_at: new Date().toISOString() };
     S.pedidos.unshift(item);
-    await dbUpsert('pedidos', item);
+    await dbUpsertPedido(item);
   }
   closeM('mPedido');
   rPedidos();
@@ -4757,7 +4795,7 @@ async function marcarPedidoLlego(id){
   if(!p) return;
   p.estado = 'llego';
   p.fechaLlego = tod();
-  await dbUpsert('pedidos', p);
+  await dbUpsertPedido(p);
   rPedidos();
 
   if(p.tel){
@@ -4775,7 +4813,7 @@ async function marcarPedidoEntregado(id){
   if(!p) return;
   p.estado = 'entregado';
   p.fechaEntregado = tod();
-  await dbUpsert('pedidos', p);
+  await dbUpsertPedido(p);
   rPedidos();
   showToast('Pedido entregado ✓');
 
