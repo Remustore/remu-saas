@@ -7218,9 +7218,9 @@ function avisarHorarioEmpleado(empId){
 
 function enviarRecordatorioWA(id){
   const turnos = getTurnos();
-  const t = turnos.find(x=>x.id===id);
+  const sid = String(id);
+  const t = turnos.find(x=>String(x.id)===sid);
   if(!t||!t.tel) return alert('Este cliente no tiene teléfono registrado');
-  // Si ya fue avisado, pedir confirmación antes de reenviar
   if(t.avisado){
     let hace = '';
     if(t.avisadoAt){
@@ -7242,14 +7242,13 @@ Te recordamos tu turno en *${negocio}*:
 ¡Te esperamos! Si no podés asistir avisanos con anticipación. 🙏`;
   const tel = t.tel.replace(/\D/g,'');
   window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`,'_blank');
-  // Marcar como avisado en localStorage
-  const idx = turnos.findIndex(x=>x.id===id);
+  const idx = turnos.findIndex(x=>String(x.id)===sid);
   if(idx>=0){
     turnos[idx] = {...turnos[idx], avisado:true, avisadoAt:new Date().toISOString()};
     saveTurnosLocal(turnos);
-    rTurnos();
-    mostrarAvisosDaily();
   }
+  rTurnos();
+  mostrarAvisosDaily();
 }
 
 function rTurnos(){
