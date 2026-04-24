@@ -6794,12 +6794,13 @@ function openNuevoTurno(){
   empSel.innerHTML = cfg.empleados.length
     ? cfg.empleados.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')
     : '<option value="">Sin empleados — configurar primero</option>';
-  // Fill servicios select
+  // Fill servicios select — usar S.precios como fallback si cfg.servicios está vacío
   const srvSel = document.getElementById('turnoServicio');
-  if(!cfg.servicios.length){
+  const _svcs = cfg.servicios.length > 0 ? cfg.servicios : (S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible').map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}));
+  if(!_svcs.length){
     srvSel.innerHTML = '<option value="">Sin servicios — configurá primero en ⚙</option>';
   } else {
-    srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}">${s.sector}: ${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
+    srvSel.innerHTML = _svcs.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}">${s.sector?s.sector+': ':''}${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
   }
   // Set date
   const fechaEl = document.getElementById('turnoFecha');
@@ -7204,7 +7205,8 @@ function editarTurno(id){
   const empSel = document.getElementById('turnoEmpleado');
   empSel.innerHTML = cfg.empleados.map(e=>`<option value="${e.id}" ${e.id==t.empleadoId?'selected':''}>${e.nombre}</option>`).join('');
   const srvSel = document.getElementById('turnoServicio');
-  srvSel.innerHTML = cfg.servicios.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}" ${s.id===t.servicioId?'selected':''}>${s.sector}: ${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
+  const _svcs2 = cfg.servicios.length > 0 ? cfg.servicios : (S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible').map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}));
+  srvSel.innerHTML = _svcs2.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}" ${String(s.id)===String(t.servicioId)?'selected':''}>${s.sector?s.sector+': ':''}${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
   document.getElementById('turnoId').value = t.id;
   document.getElementById('turnoCli').value = t.cliente;
   document.getElementById('turnoTel').value = t.tel||'';
@@ -7865,6 +7867,29 @@ function guardarBloqueo(){
   emp.bloqueos.push(bloqueo);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
+  // Para dia_unico: sincronizar slots bloqueados en turnos_solicitudes (visible en página pública)
+  // y auto-cancelar turnos manuales que caigan en ese horario
+  let _toastMsg = 'Bloqueo agregado ✓';
+  if(bloqueo.tipo==='dia_unico'){
+    const _c2=getTurnosCfg();
+    const [_ah,_am]=(_c2.apertura||'09:00').split(':').map(Number);
+    const [_ch,_cm]=(_c2.cierre||'20:00').split(':').map(Number);
+    const _hm=h=>{const[a,b]=h.split(':').map(Number);return a*60+b;};
+    const _mh=m=>Math.floor(m/60).toString().padStart(2,'0')+':'+(m%60).toString().padStart(2,'0');
+    const _ini=bloqueo.horaInicio?_hm(bloqueo.horaInicio):_ah*60+_am;
+    const _fin=bloqueo.horaFin?_hm(bloqueo.horaFin):_ch*60+_cm;
+    const _all=getTurnos(); let _chg=false;
+    for(let _m=_ah*60+_am;_m<_ch*60+_cm;_m+=30){
+      if(_m>=_ini&&_m<_fin){
+        const _h=_mh(_m);
+        const _i=_all.findIndex(t=>t.fecha===bloqueo.fecha&&String(t.empleadoId)===String(empId)&&t.hora===_h&&t.estado!=='cancelado'&&t.estado!=='no_vino');
+        if(_i>=0){_all[_i].estado='cancelado';_chg=true;}
+        sincronizarBloqueoManual({fecha:bloqueo.fecha,hora:_h,empleadoId:empId,cliente:'🚫 '+(motivo||emp.nombre)},'crear');
+      }
+    }
+    if(_chg) saveTurnosLocal(_all);
+    _toastMsg = _chg ? 'Bloqueo agregado — se cancelaron los turnos en ese horario ✓' : 'Bloqueo agregado ✓';
+  }
   document.getElementById('bloqueoFecha').value='';
   document.getElementById('bloqueoFechaIni').value='';
   document.getElementById('bloqueoFechaFin').value='';
@@ -7874,7 +7899,7 @@ function guardarBloqueo(){
   rBloqueosList(empId);
   rTurnosConfig();
   rTurnos(); // Actualizar agenda y vista semanal/mensual de inmediato
-  showToast('Bloqueo agregado ✓');
+  showToast(_toastMsg);
 }
 
 function eliminarBloqueo(empId, bloqueoId){
@@ -7882,9 +7907,22 @@ function eliminarBloqueo(empId, bloqueoId){
   const cfg = getTurnosCfg();
   const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
   if(!emp) return;
+  const _blqObj=(emp.bloqueos||[]).find(b=>String(b.id)===String(bloqueoId));
   emp.bloqueos=(emp.bloqueos||[]).filter(b=>String(b.id)!==String(bloqueoId));
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
+  // Para dia_unico: liberar slots en turnos_solicitudes
+  if(_blqObj?.tipo==='dia_unico'){
+    const [_ah,_am]=(cfg.apertura||'09:00').split(':').map(Number);
+    const [_ch,_cm]=(cfg.cierre||'20:00').split(':').map(Number);
+    const _hm=h=>{const[a,b]=h.split(':').map(Number);return a*60+b;};
+    const _mh=m=>Math.floor(m/60).toString().padStart(2,'0')+':'+(m%60).toString().padStart(2,'0');
+    const _ini=_blqObj.horaInicio?_hm(_blqObj.horaInicio):_ah*60+_am;
+    const _fin=_blqObj.horaFin?_hm(_blqObj.horaFin):_ch*60+_cm;
+    for(let _m=_ah*60+_am;_m<_ch*60+_cm;_m+=30){
+      if(_m>=_ini&&_m<_fin) sincronizarBloqueoManual({fecha:_blqObj.fecha,hora:_mh(_m),empleadoId:empId},'borrar');
+    }
+  }
   rBloqueosList(empId);
   rTurnosConfig();
   rTurnos();
