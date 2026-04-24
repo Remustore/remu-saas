@@ -5260,14 +5260,18 @@ function mostrarAvisosDaily(){
   const conTel = turnosMañana.filter(t=>t.tel);
   if(conTel.length){
     const rows = conTel.map(t=>{
-      const tel = t.tel.replace(/\D/g,'');
-      const msg = encodeURIComponent(`Hola ${t.cliente} 👋\n\nTe recordamos tu turno en *${negocio}*:\n\n📅 *Fecha:* ${fD(t.fecha)}\n🕐 *Hora:* ${t.hora}\n✂ *Servicio:* ${t.servicioNombre}\n👤 *Con:* ${t.empleadoNombre}\n\n¡Te esperamos! Si no podés asistir avisanos. 🙏`);
+      const accionBtn = t.avisado
+        ? `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+             <span style="font-size:.75rem;font-weight:700;color:var(--ok);background:rgba(76,175,125,.15);padding:2px 9px;border-radius:10px;white-space:nowrap">✅ Avisado</span>
+             <button class="btn bsm" style="font-size:.7rem;padding:2px 7px" onclick="enviarRecordatorioWA('${t.id}')" title="Re-enviar recordatorio">↩</button>
+           </div>`
+        : `<button class="btn bs bsm" onclick="enviarRecordatorioWA('${t.id}')" style="white-space:nowrap">📲 Recordar</button>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bor);gap:8px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <span style="font-weight:600;font-size:.82rem">${esc(t.cliente)}</span>
           <span style="font-size:.77rem;color:var(--tx2);margin-left:8px">🕐 ${t.hora} · ${esc(t.servicioNombre||'')} · ${esc(t.empleadoNombre||'')}</span>
         </div>
-        <a href="https://wa.me/549${tel}?text=${msg}" target="_blank" class="btn bs bsm" style="text-decoration:none;white-space:nowrap">📲 Recordar</a>
+        ${accionBtn}
       </div>`;
     }).join('');
     avisos.push(`<div class="card" style="margin-bottom:8px;border-left:3px solid var(--inf)">
@@ -5287,14 +5291,18 @@ function mostrarAvisosDaily(){
     const dia = turnosMañana.length ? mañanaStr : hoyStr;
     const turnosDia = dia === mañanaStr ? turnosMañana : turnosHoy;
     const etiqueta = dia === mañanaStr ? 'mañana' : 'hoy';
+    const empNotifs = getEmpNotifs();
     const rowsEmp = cfg.empleados.map(e=>{
       const primer = turnosDia.filter(t=>String(t.empleadoId)===String(e.id)).sort((a,b)=>a.hora.localeCompare(b.hora))[0];
       if(!primer) return '';
       const tel = (e.tel||'').replace(/\D/g,'');
-      const waBtn = tel ? (() => {
-        const msg = encodeURIComponent(`Hola ${e.nombre}! 👋 Tu primer turno ${etiqueta} es a las *${primer.hora}* con *${primer.cliente}* (${primer.servicioNombre||'servicio'}). ¡Que tengas un gran día! 💪`);
-        return `<a href="https://wa.me/549${tel}?text=${msg}" target="_blank" class="btn bs bsm" style="text-decoration:none">📲</a>`;
-      })() : '';
+      const yaNotif = empNotifs[String(e.id)];
+      const waBtn = !tel ? '' : yaNotif
+        ? `<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+             <span style="font-size:.73rem;font-weight:700;color:var(--ok);background:rgba(76,175,125,.15);padding:2px 8px;border-radius:10px;white-space:nowrap">✅ Notificado</span>
+             <button class="btn bsm" style="font-size:.7rem;padding:2px 7px" onclick="avisarHorarioEmpleado('${e.id}')" title="Re-enviar">↩</button>
+           </div>`
+        : `<button class="btn bs bsm" onclick="avisarHorarioEmpleado('${e.id}')">📲</button>`;
       return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;border-bottom:1px solid var(--bor)">
         <span style="font-size:.8rem;font-weight:600;flex:1">${esc(e.nombre)}</span>
         <span style="font-size:.77rem;color:var(--tx2)">1er turno: <strong style="color:var(--gld)">${primer.hora}</strong> · ${esc(primer.cliente)}</span>
@@ -7173,6 +7181,41 @@ function editarTurno(id){
   openM('mTurno', null);
 }
 
+function getEmpNotifs(){
+  try{
+    const raw = localStorage.getItem('remu_emp_notif_'+(currentTenant?.id||''));
+    if(!raw) return {};
+    const d = JSON.parse(raw);
+    return d.date===tod() ? (d.notified||{}) : {};
+  }catch(e){ return {}; }
+}
+function setEmpNotif(empId){
+  const n = getEmpNotifs();
+  n[String(empId)] = true;
+  localStorage.setItem('remu_emp_notif_'+(currentTenant?.id||''), JSON.stringify({date:tod(), notified:n}));
+}
+function avisarHorarioEmpleado(empId){
+  const cfg = getTurnosCfg();
+  const e = cfg.empleados.find(x=>String(x.id)===String(empId));
+  if(!e) return;
+  const tel = (e.tel||'').replace(/\D/g,'');
+  if(!tel){ showToast('Este empleado no tiene teléfono registrado','err'); return; }
+  const mañana = new Date(); mañana.setDate(mañana.getDate()+1);
+  const mañanaStr = mañana.toISOString().slice(0,10);
+  const hoyStr = tod();
+  const turnosMañana = getTurnos().filter(t=>t.fecha===mañanaStr&&t.estado!=='cancelado'&&t.estado!=='no_vino');
+  const turnosHoy = getTurnos().filter(t=>t.fecha===hoyStr&&t.estado==='confirmado');
+  const dia = turnosMañana.length ? mañanaStr : hoyStr;
+  const etiqueta = dia===mañanaStr ? 'mañana' : 'hoy';
+  const turnosDia = dia===mañanaStr ? turnosMañana : turnosHoy;
+  const primer = turnosDia.filter(t=>String(t.empleadoId)===String(empId)).sort((a,b)=>a.hora.localeCompare(b.hora))[0];
+  if(!primer) return;
+  const msg = `Hola ${e.nombre}! 👋 Tu primer turno ${etiqueta} es a las *${primer.hora}* con *${primer.cliente}* (${primer.servicioNombre||'servicio'}). ¡Que tengas un gran día! 💪`;
+  window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`,'_blank');
+  setEmpNotif(empId);
+  mostrarAvisosDaily();
+}
+
 function enviarRecordatorioWA(id){
   const turnos = getTurnos();
   const t = turnos.find(x=>x.id===id);
@@ -7205,6 +7248,7 @@ Te recordamos tu turno en *${negocio}*:
     turnos[idx] = {...turnos[idx], avisado:true, avisadoAt:new Date().toISOString()};
     saveTurnosLocal(turnos);
     rTurnos();
+    mostrarAvisosDaily();
   }
 }
 
