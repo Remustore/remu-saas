@@ -1536,7 +1536,7 @@ $$;</pre>
 <!-- Stock -->
 <div class="mb" id="mStock"><div class="md"><div class="mh"><div class="mt2">Agregar Producto</div><button class="xbtn" onclick="closeM('mStock')">✕</button></div>
 <div class="mc"><input type="hidden" id="sId">
-<div class="fr"><div><label>Nombre</label><input id="sNom" placeholder="Ej: Funda iPhone 14"></div><div><label>Categoría</label><select id="sCat"></select></div></div>
+<div class="fr"><div><label>Nombre</label><input id="sNom" placeholder="Ej: Funda iPhone 14"></div><div><label>Categoría</label><select id="sCat" onchange="onCatChange()"></select><input id="sNewCat" placeholder="Nombre de la nueva categoría..." style="display:none;margin-top:5px"></div></div>
 <div class="fr"><div><label>Cantidad</label><input type="number" id="sCant" placeholder="0"></div><div><label>Stock mínimo</label><input type="number" id="sMin" placeholder="3"></div></div>
 <div class="fr"><div><label>Precio venta ($)</label><input type="number" id="sPre" placeholder="0"></div><div><label>Precio costo ($)</label><input type="number" id="sCos" placeholder="0"></div></div>
 <div class="fr full"><div><label>Notas</label><input id="sNot" placeholder="Opcional..."></div></div>
@@ -3698,7 +3698,7 @@ function openM(id, editId){
 }
 
 function fillModalEdit(modal, id){
-  if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
+  if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;const _snc=document.getElementById('sNewCat');if(_snc){_snc.style.display='none';_snc.value='';}document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
   if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
   if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;
     document.getElementById('mTallerTitle').textContent='Editar Trabajo';
@@ -3830,8 +3830,14 @@ function openNuevoStock(){
 async function saveStock(){
   const id = document.getElementById('sId').value;
   const n = document.getElementById('sNom').value.trim(); if(!n) return alert('Ingresá el nombre');
+  let catVal = document.getElementById('sCat').value;
+  if(catVal === '__nueva__'){
+    catVal = (document.getElementById('sNewCat').value||'').trim();
+    if(!catVal){ showToast('Escribí el nombre de la nueva categoría','err'); return; }
+    await agregarCategoriaStock(catVal);
+  }
   const snap = JSON.parse(JSON.stringify(S.stock));
-  const obj = { nombre:n, categoria:document.getElementById('sCat').value, cantidad:parseInt(document.getElementById('sCant').value)||0, minimo:parseInt(document.getElementById('sMin').value)||3, precio:parseFloat(document.getElementById('sPre').value)||0, costo:parseFloat(document.getElementById('sCos').value)||0, notas:document.getElementById('sNot').value };
+  const obj = { nombre:n, categoria:catVal, cantidad:parseInt(document.getElementById('sCant').value)||0, minimo:parseInt(document.getElementById('sMin').value)||3, precio:parseFloat(document.getElementById('sPre').value)||0, costo:parseFloat(document.getElementById('sCos').value)||0, notas:document.getElementById('sNot').value };
   if(id){
     const i = S.stock.findIndex(s=>s.id===parseInt(id));
     if(i>-1){
@@ -9178,9 +9184,29 @@ function setupCategoriasStock(){
     stabs.innerHTML = html;
   }
   var scat = document.getElementById("sCat");
-  if(scat){ var o=""; cats.forEach(function(c){o+="<option value=\""+c+"\">"+c+"</option>";}); scat.innerHTML=o; }
+  if(scat){ var o=""; cats.forEach(function(c){o+="<option value=\""+c+"\">"+c+"</option>";}); o+='<option value="__nueva__">+ Nueva categoría...</option>'; scat.innerHTML=o; }
   var vcf = document.getElementById("vCatFilt");
   if(vcf){ var o2="<option value=\"\">Todas</option>"; cats.forEach(function(c){o2+="<option value=\""+c+"\">"+c+"</option>";}); vcf.innerHTML=o2; }
+}
+
+function onCatChange(){
+  const sel = document.getElementById('sCat');
+  const inp = document.getElementById('sNewCat');
+  if(!sel || !inp) return;
+  inp.style.display = sel.value === '__nueva__' ? '' : 'none';
+  if(sel.value === '__nueva__') setTimeout(()=>inp.focus(), 40);
+}
+
+async function agregarCategoriaStock(nombre){
+  const cats = getCategorias();
+  if(cats.some(c=>c.toLowerCase()===nombre.toLowerCase())) return;
+  const nuevas = [...cats, nombre];
+  if(!currentTenant.modulos) currentTenant.modulos = {};
+  currentTenant.modulos.categoriasStock = nuevas;
+  try{
+    await sb.from('tenants').update({ modulos: currentTenant.modulos }).eq('id', currentTenant.id);
+  }catch(e){ console.error('Error guardando categoría', e); }
+  setupCategoriasStock();
 }
 
 function aplicarModoEmpleado(){
