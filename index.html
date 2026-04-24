@@ -6618,6 +6618,59 @@ async function liberarSlotSupabase(turno){
   } catch(e){ console.warn('[liberarSlot]', e); }
 }
 
+// Sincroniza turnos fijos como bloqueados en turnos_solicitudes (6 meses)
+async function sincronizarFijosSupabase(fijos, accion){
+  if(!sb || !currentTenant?.id || !fijos?.length) return;
+  const todStr = tod();
+  try{
+    if(accion === 'borrar'){
+      for(const f of fijos){
+        await sb.from('turnos_solicitudes').delete()
+          .eq('tenant_id', currentTenant.id)
+          .eq('nombre', '__fijo__:' + f.id)
+          .eq('estado', 'bloqueado')
+          .gte('fecha', todStr);
+      }
+      return;
+    }
+    // accion === 'crear': borrar primero los futuros y reinsertar 6 meses
+    const hoy = new Date();
+    const limite = new Date(hoy);
+    limite.setMonth(limite.getMonth() + 6);
+    const rows = [];
+    for(const fijo of fijos){
+      if(!fijo.activo) continue;
+      await sb.from('turnos_solicitudes').delete()
+        .eq('tenant_id', currentTenant.id)
+        .eq('nombre', '__fijo__:' + fijo.id)
+        .eq('estado', 'bloqueado')
+        .gte('fecha', todStr);
+      const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
+      const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
+      let fecha = new Date(hoy);
+      fecha.setDate(hoy.getDate() + diasHasta);
+      while(fecha <= limite){
+        rows.push({
+          tenant_id: currentTenant.id,
+          nombre: '__fijo__:' + fijo.id,
+          tel: fijo.tel||'',
+          servicio_id: null,
+          empleado_id: empId,
+          fecha: fecha.toISOString().slice(0,10),
+          hora: fijo.hora,
+          estado: 'bloqueado',
+          created_at: new Date().toISOString()
+        });
+        fecha.setDate(fecha.getDate() + 7);
+      }
+    }
+    for(let i=0; i<rows.length; i+=100){
+      const { error } = await sb.from('turnos_solicitudes').insert(rows.slice(i, i+100));
+      if(error) console.warn('[fijos sync] insert error:', error.message);
+    }
+  }catch(e){ console.warn('[fijos sync]', e); }
+}
+
 // Sincroniza todos los turnos manuales a Supabase al iniciar sesión
 async function resyncTurnosToSupabase(){
   if(!sb || !currentTenant?.id) return;
@@ -6960,9 +7013,8 @@ async function saveTurno(_override){
       const idx2 = allTurnos.findIndex(t=>t.id===obj.id);
       if(idx2>-1) allTurnos[idx2] = obj;
       saveTurnosLocal(allTurnos);
-      // Generar para las próximas 4 semanas (excluyendo la fecha actual, ya fue creado)
-      generarTurnosDesdeFijos([nuevoFijo]);
-      showToast('✓ Turno agendado + turno fijo creado — se repetirá cada ' + DIAS_NOMBRES[diaNum]);
+      generarTurnosDesdeFijos([nuevoFijo], true); // genera 6 meses + sync Supabase
+      showToast('✓ Turno agendado + turno fijo creado — bloqueado 6 meses online');
     } else {
       showToast('Turno agendado ✓ (ya existe un fijo similar para ese horario)');
     }
@@ -7232,6 +7284,9 @@ function rTurnos(){
     const fin = new Date(2000,0,1,h,m+(t.duracion||60));
     const finStr = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
     const borderColor = t.sector==='Peluquería'?'var(--inf)':t.sector==='Manicuria'?'var(--ok)':t.sector==='Maquillaje'?'var(--wrn)':'var(--gld)';
+    const cardStyle = t.esFijo
+      ? `margin-bottom:10px;border:2px solid var(--gld);border-radius:10px;background:rgba(201,168,76,.04)`
+      : `margin-bottom:10px;border-left:3px solid ${borderColor}`;
     // Botones de acción según estado actual
     const acciones = {
       pendiente:   `<button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="cambiarEstadoTurno('${t.id}','confirmado')">✅ Confirmar</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
@@ -7241,11 +7296,12 @@ function rTurnos(){
       terminado:   `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span>`,
       no_vino:     `<span style="font-size:.72rem;color:var(--bad)">❌ No asistió</span>`,
     };
-    return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${borderColor}">
+    return `<div class="card" style="${cardStyle}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-weight:600;font-size:.95rem">${t.cliente}</span>
+            ${t.esFijo?'<span style="font-size:.68rem;font-weight:700;color:var(--gld);background:rgba(201,168,76,.18);padding:2px 7px;border-radius:10px">🔒 Fijo</span>':''}
             ${estadoBadge[t.estado]||''}
             ${t.precio>0?`<span style="font-size:.78rem;color:var(--gld);font-weight:600">${fmt(t.precio)}</span>`:''}
           </div>
@@ -9843,80 +9899,66 @@ function guardarTurnoFijo(){
   }
 
   saveTurnosFijosLocal(fijos);
-  
-  // Generar turnos para las próximas 4 semanas
-  generarTurnosDesdeFijos([obj]);
-  
+  generarTurnosDesdeFijos([obj], true); // genera 6 meses y sincroniza con Supabase
   closeM('mTurnoFijo');
   rTurnosFijos();
-  showToast('Turno fijo guardado ✓ — generado para las próximas 4 semanas');
+  showToast('Turno fijo guardado ✓ — bloqueado por 6 meses en turnos online');
 }
 
-function generarTurnosDesdeFijos(fijos){
+function generarTurnosDesdeFijos(fijos, syncSupabase){
   const turnosExistentes = getTurnos();
   const cfg = getTurnosCfg();
   const nuevos = [];
+  const hoyBase = new Date();
+  const limite = new Date(hoyBase);
+  limite.setMonth(limite.getMonth() + 6);
 
   fijos.forEach(fijo=>{
     if(!fijo.activo) return;
-    // Generate for next 4 weeks
-    for(let semana=0; semana<4; semana++){
-      const hoy = new Date();
-      const diasHastaProximo = (fijo.dia - hoy.getDay() + 7) % 7 + (semana * 7);
-      const fecha = new Date(hoy);
-      fecha.setDate(hoy.getDate() + diasHastaProximo);
-      const fechaStr = fecha.toISOString().slice(0,10);
-
-      // Check if turno already exists for this date/hora
+    const diasHastaProximo = (fijo.dia - hoyBase.getDay() + 7) % 7;
+    let fechaIter = new Date(hoyBase);
+    fechaIter.setDate(hoyBase.getDate() + diasHastaProximo);
+    while(fechaIter <= limite){
+      const fechaStr = fechaIter.toISOString().slice(0,10);
       const yaExiste = turnosExistentes.find(t=>
         t.fecha===fechaStr && t.hora===fijo.hora && t.cliente===fijo.cliente
       );
-      if(yaExiste) continue;
-
-      const srv = cfg.servicios.find(s=>s.nombre===fijo.servicio) || cfg.servicios[0];
-      // Usar el empleado asignado al turno fijo; si no tiene, usar el primero
-      const emp = (fijo.empleadoId ? cfg.empleados.find(e=>String(e.id)===String(fijo.empleadoId)) : null) || cfg.empleados[0];
-
-      nuevos.push({
-        id: 'fijo_' + fijo.id + '_' + fechaStr,
-        cliente: fijo.cliente,
-        tel: fijo.tel,
-        fecha: fechaStr,
-        hora: fijo.hora,
-        empleadoId: emp?.id||'',
-        empleadoNombre: emp?.nombre||'',
-        servicioId: srv?.id||0,
-        servicioNombre: fijo.servicio,
-        sector: srv?.sector||'',
-        duracion: fijo.duracion,
-        precio: srv?.precio||0,
-        notas: '🔒 Turno fijo — ' + (fijo.notas||''),
-        estado: 'confirmado',
-        esFijo: true,
-        fijoId: fijo.id,
-        creadoEn: new Date().toISOString()
-      });
+      if(!yaExiste){
+        const srv = cfg.servicios.find(s=>s.nombre===fijo.servicio) || cfg.servicios[0];
+        const emp = (fijo.empleadoId ? cfg.empleados.find(e=>String(e.id)===String(fijo.empleadoId)) : null) || cfg.empleados[0];
+        nuevos.push({
+          id: 'fijo_' + fijo.id + '_' + fechaStr,
+          cliente: fijo.cliente, tel: fijo.tel,
+          fecha: fechaStr, hora: fijo.hora,
+          empleadoId: emp?.id||'', empleadoNombre: emp?.nombre||'',
+          servicioId: srv?.id||0, servicioNombre: fijo.servicio,
+          sector: srv?.sector||'', duracion: fijo.duracion,
+          precio: srv?.precio||0,
+          notas: '🔒 Turno fijo' + (fijo.notas ? ' — ' + fijo.notas : ''),
+          estado: 'confirmado', esFijo: true, fijoId: fijo.id,
+          creadoEn: new Date().toISOString()
+        });
+      }
+      fechaIter.setDate(fechaIter.getDate() + 7);
     }
   });
 
   if(nuevos.length){
-    const todos = [...turnosExistentes, ...nuevos];
-    saveTurnosLocal(todos);
+    saveTurnosLocal([...turnosExistentes, ...nuevos]);
   }
+  if(syncSupabase) sincronizarFijosSupabase(fijos.filter(f=>f.activo), 'crear');
   return nuevos.length;
 }
 
 function eliminarTurnoFijo(id){
   if(!confirm('¿Eliminar este turno fijo? Se eliminarán también los turnos futuros generados.')) return;
-  const fijos = getTurnosFijos().filter(f=>f.id!==id);
-  saveTurnosFijosLocal(fijos);
-  
-  // Remove future generated turnos
-  const turnos = getTurnos().filter(t=>!(t.esFijo && t.fijoId===id && t.fecha >= tod()));
-  saveTurnosLocal(turnos);
-  
+  const todosLosFijos = getTurnosFijos();
+  const fijo = todosLosFijos.find(f=>f.id===id);
+  saveTurnosFijosLocal(todosLosFijos.filter(f=>f.id!==id));
+  saveTurnosLocal(getTurnos().filter(t=>!(t.esFijo && t.fijoId===id && t.fecha >= tod())));
+  if(fijo) sincronizarFijosSupabase([fijo], 'borrar');
   rTurnosFijos();
-  showToast('Turno fijo eliminado ✓');
+  showToast('Turno fijo eliminado ✓ — horarios liberados en turnos online');
 }
 
 function editarTurnoFijo(id){
@@ -9944,9 +9986,14 @@ function toggleTurnoFijo(id){
   if(!f) return;
   f.activo = !f.activo;
   saveTurnosFijosLocal(fijos);
-  if(f.activo) generarTurnosDesdeFijos([f]);
+  if(f.activo){
+    generarTurnosDesdeFijos([f], true); // reactiva y sincroniza 6 meses
+  } else {
+    saveTurnosLocal(getTurnos().filter(t=>!(t.esFijo && t.fijoId===id && t.fecha >= tod())));
+    sincronizarFijosSupabase([f], 'borrar'); // libera slots en Supabase
+  }
   rTurnosFijos();
-  showToast(f.activo ? 'Turno fijo activado ✓' : 'Turno fijo pausado');
+  showToast(f.activo ? 'Turno fijo activado ✓ — bloqueado online' : 'Turno fijo pausado — horarios liberados');
 }
 
 function rTurnosFijos(){
