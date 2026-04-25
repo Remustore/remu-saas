@@ -13830,6 +13830,125 @@ function checkMetaCelebration(){
 })();
 </script>
 
+<!-- ── Alertas inteligentes + Ganancia neta de equipos ───────────────────
+     Envuelve getCajas, rGananciaHoy, rDash sin modificar originales.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── Alertas inteligentes en dashboard ────────────────────────────────────
+function rSmartAlerts(){
+  // Crear contenedor dinámico antes de #gananciaHoyCard si no existe
+  var container = document.getElementById('smartAlertsContainer');
+  if(!container){
+    var ganCard = document.getElementById('gananciaHoyCard');
+    if(!ganCard) return;
+    container = document.createElement('div');
+    container.id = 'smartAlertsContainer';
+    ganCard.parentNode.insertBefore(container, ganCard);
+  }
+
+  var alerts = [];
+  var hoy = tod();
+
+  // 1. Reparaciones sin resolver hace +3 días
+  var fecha3d = new Date(); fecha3d.setDate(fecha3d.getDate()-3);
+  var limite3d = fecha3d.toISOString().slice(0,10);
+  var sinResolver = S.reparaciones.filter(function(r){
+    return r.estado!=='entregado' && r.estado!=='cancelado' && r.fecha && r.fecha<=limite3d;
+  });
+  if(sinResolver.length){
+    alerts.push({
+      icon:'⚠️', colorBg:'rgba(201,160,76,.08)', colorBor:'rgba(201,160,76,.3)', colorTx:'var(--wrn)',
+      text: sinResolver.length+' reparaci'+(sinResolver.length===1?'ón':'ones')+' sin resolver hace más de 3 días',
+      go:"go('taller')"
+    });
+  }
+
+  // 2. Productos con stock bajo mínimo
+  var bajStock = S.stock.filter(function(s){ return (s.cantidad||0)<=(s.minimo||0); });
+  if(bajStock.length){
+    alerts.push({
+      icon:'📦', colorBg:'rgba(76,139,225,.08)', colorBor:'rgba(76,139,225,.3)', colorTx:'var(--inf)',
+      text: bajStock.length+' producto'+(bajStock.length===1?'':'s')+' con stock bajo mínimo',
+      go:"go('stock')"
+    });
+  }
+
+  // 3. Turnos mañana sin recordatorio
+  if(typeof getTurnos==='function'){
+    var man = new Date(); man.setDate(man.getDate()+1);
+    var manStr = man.toISOString().slice(0,10);
+    var sinAviso = getTurnos().filter(function(t){
+      return t.fecha===manStr && !t.avisado && t.tel && t.estado!=='cancelado' && t.estado!=='no_vino';
+    });
+    if(sinAviso.length){
+      alerts.push({
+        icon:'📲', colorBg:'rgba(76,175,125,.08)', colorBor:'rgba(76,175,125,.3)', colorTx:'var(--ok)',
+        text: sinAviso.length+' turno'+(sinAviso.length===1?'':'s')+' mañana sin recordatorio de WhatsApp',
+        go:"go('turnos')"
+      });
+    }
+  }
+
+  if(!alerts.length){ container.innerHTML=''; container.style.marginBottom='0'; return; }
+  container.style.marginBottom='14px';
+  container.innerHTML = alerts.map(function(a){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;'+
+      'padding:10px 14px;background:'+a.colorBg+';border:1px solid '+a.colorBor+';border-radius:10px;margin-bottom:6px">'+
+      '<span style="font-size:.82rem;color:var(--tx2)"><span style="margin-right:5px">'+a.icon+'</span>'+a.text+'</span>'+
+      '<button class="btn bsm" style="flex-shrink:0;font-size:.72rem;padding:4px 11px;white-space:nowrap" onclick="'+a.go+'">Ver →</button>'+
+    '</div>';
+  }).join('');
+}
+
+// ── Ganancia neta de equipos en getCajas() ────────────────────────────────
+// Cambia la caja "Equipos" de mostrar precio total → ganancia neta (precio-costo)
+(function(){
+  var _getCajasOrig = getCajas;
+  getCajas = function(){
+    var cajas = _getCajasOrig.apply(this, arguments);
+    var hoy = tod();
+    var eqHoy = S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo==='equipo'; });
+    if(!eqHoy.length) return cajas;
+    var bruto = eqHoy.reduce(function(a,v){ return a+(v.total||0); }, 0);
+    var neto  = eqHoy.reduce(function(a,v){ return a+(v.total||0)-(v.costo||0); }, 0);
+    cajas.equipos = cajas.equipos - bruto + neto;
+    return cajas;
+  };
+})();
+
+// ── Agregar línea de equipos hoy a gananciaHoyCard ────────────────────────
+(function(){
+  var _rGananciaHoyPrev = rGananciaHoy;
+  rGananciaHoy = function(){
+    _rGananciaHoyPrev.apply(this, arguments);
+    var card = document.getElementById('gananciaHoyCard');
+    if(!card || !card.innerHTML) return;
+    var hoy = tod();
+    var eqHoy = S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo==='equipo'; });
+    if(!eqHoy.length) return;
+    var cantEq = eqHoy.length;
+    var ganEq  = eqHoy.reduce(function(a,v){ return a+(v.total||0)-(v.costo||0); }, 0);
+    var color  = ganEq>=0 ? 'var(--gld)' : 'var(--bad)';
+    card.innerHTML +=
+      '<div style="display:flex;align-items:center;justify-content:space-between;font-size:.82rem;'+
+      'margin-top:8px;padding-top:8px;border-top:1px solid var(--bor)">'+
+        '<span style="color:var(--tx2)">📱 Equipo'+(cantEq>1?'s':'')+' vendido'+(cantEq>1?'s':'')+' hoy ('+cantEq+')</span>'+
+        '<span style="color:'+color+';font-weight:600">'+(ganEq>=0?'':'-')+(typeof fmt==='function'?fmt(Math.abs(ganEq)):ganEq)+' ganancia neta</span>'+
+      '</div>';
+  };
+})();
+
+// ── Incluir rSmartAlerts en cada rDash ────────────────────────────────────
+(function(){
+  var _prev = rDash;
+  rDash = function(){
+    var r = _prev.apply(this, arguments);
+    setTimeout(rSmartAlerts, 30);
+    return r;
+  };
+})();
+</script>
+
 <!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
      Envuelve _rwS4 y _rwFinish sin modificar las funciones originales.
 ──────────────────────────────────────────────────────────────────────── -->
