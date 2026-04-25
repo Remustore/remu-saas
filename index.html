@@ -14068,36 +14068,49 @@ function eliminarTurnoAdmin(id){
 }
 
 // 3. Panel de servicios en sec-turnosOnline
-// El usuario espera gestionar servicios desde "Reservas online → Configurar".
-// Los servicios solo estaban en sec-turnosConfig; ahora se renderizan en ambas.
+// Secciones usan CSS class ".sec.active", NO style.display — cualquier guarda
+// basada en style.display es incorrecta. Usamos setTimeout(0) para diferir
+// hasta que el layout esté estable, e insertamos después de la tarjeta "Configurar".
 function _renderServiciosOnline(){
-  var sec = document.getElementById('sec-turnosOnline');
-  if(!sec || sec.style.display === 'none') return;
-  var cid = 'serviciosOnlineMgr';
-  var container = document.getElementById(cid);
-  if(!container){
-    container = document.createElement('div');
-    container.className = 'card';
-    container.id = cid;
-    container.style.marginBottom = '14px';
-    var firstCard = sec.querySelector('.card');
-    if(firstCard) sec.insertBefore(container, firstCard);
-    else sec.appendChild(container);
-  }
-  var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
-  var F = typeof fmt === 'function' ? fmt : function(n){ return '$'+n; };
-  container.innerHTML = '<div class="ch"><h3>✂ Servicios disponibles</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>' +
-    (cfg.servicios.length ? cfg.servicios.map(function(s){
-      return '<div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
-        '<div><span class="bx bg2" style="margin-right:6px">' + (s.sector||'') + '</span>' +
-        '<strong style="font-size:.85rem">' + (s.nombre||'') + '</strong>' +
-        '<span style="color:var(--tx2);font-size:.78rem;margin-left:8px">' + (s.duracion||30) + ' min</span>' +
-        (s.precio > 0 ? '<span style="color:var(--gld);font-size:.78rem;margin-left:4px">· ' + F(s.precio) + '</span>' : '') +
-        '</div><div style="display:flex;gap:6px">' +
-        '<button class="btn be bsm" onclick="editarServicioTurno(' + s.id + ')">✎</button>' +
-        '<button class="btn bd bsm" onclick="eliminarServicioTurno(' + s.id + ')">✕</button>' +
-        '</div></div>';
-    }).join('') : '<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Sin servicios. Agregá uno para que aparezca en tu página de turnos online.</div>');
+  setTimeout(function(){
+    var sec = document.getElementById('sec-turnosOnline');
+    if(!sec) return;
+    var cid = 'serviciosOnlineMgr';
+    var container = document.getElementById(cid);
+    if(!container){
+      container = document.createElement('div');
+      container.className = 'card';
+      container.id = cid;
+      container.style.marginBottom = '14px';
+      // Insertar justo después de la tarjeta "⚙ Configurar página online"
+      var inserted = false;
+      Array.from(sec.children).forEach(function(child){
+        if(!inserted && child.classList.contains('card')){
+          var h = child.querySelector('h3');
+          if(h && (h.textContent||'').indexOf('Configurar') >= 0){
+            if(child.nextSibling) sec.insertBefore(container, child.nextSibling);
+            else sec.appendChild(container);
+            inserted = true;
+          }
+        }
+      });
+      if(!inserted) sec.appendChild(container);
+    }
+    var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
+    var F = typeof fmt === 'function' ? fmt : function(n){ return '$'+n; };
+    container.innerHTML = '<div class="ch"><h3>✂ Servicios disponibles</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>' +
+      (cfg.servicios.length ? cfg.servicios.map(function(s){
+        return '<div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+          '<div><span class="bx bg2" style="margin-right:6px">' + (s.sector||'') + '</span>' +
+          '<strong style="font-size:.85rem">' + (s.nombre||'') + '</strong>' +
+          '<span style="color:var(--tx2);font-size:.78rem;margin-left:8px">' + (s.duracion||30) + ' min</span>' +
+          (s.precio > 0 ? '<span style="color:var(--gld);font-size:.78rem;margin-left:4px">· ' + F(s.precio) + '</span>' : '') +
+          '</div><div style="display:flex;gap:6px">' +
+          '<button class="btn be bsm" onclick="editarServicioTurno(' + s.id + ')">✎</button>' +
+          '<button class="btn bd bsm" onclick="eliminarServicioTurno(' + s.id + ')">✕</button>' +
+          '</div></div>';
+      }).join('') : '<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Sin servicios configurados.</div>');
+  }, 0);
 }
 
 (function(){
