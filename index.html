@@ -13276,6 +13276,119 @@ ${r.garantiaDias > 0 ? `
 }
 </script>
 
+<!-- ── Personalización de notificaciones push ──────────────────────────────
+     Sonido sintetizado (Web Audio API, sin archivos externos),
+     vibración por tipo y requireInteraction para reservas.
+     Override de _swNotif sin modificar la función original.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// Genera el sonido de notificación en código usando Web Audio API.
+// Equivale a un archivo de audio en base64 pero sintetizado al vuelo:
+// cero archivos externos, cero dependencias, sonido de calidad nativa.
+function _playNotifSound(tipo) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    if (ctx.state === 'suspended') ctx.resume();
+
+    // tone: genera una nota con envelope attack/release suave
+    const tone = (freq, at, dur, vol) => {
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      g.gain.setValueAtTime(0, at);
+      g.gain.linearRampToValueAtTime(vol, at + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.001, at + dur);
+      osc.start(at);
+      osc.stop(at + dur + 0.02);
+    };
+
+    const t = ctx.currentTime;
+    if (tipo === 'reserva') {
+      // Chime de tres notas ascendente Do-Mi-Sol — fácil de distinguir
+      tone(523.25, t,        0.22, 0.30); // Do5
+      tone(659.25, t + 0.18, 0.22, 0.30); // Mi5
+      tone(783.99, t + 0.36, 0.38, 0.35); // Sol5
+    } else {
+      // Ding suave de una nota para avisos de taller
+      tone(659.25, t, 0.28, 0.20); // Mi5
+    }
+
+    setTimeout(() => { try { ctx.close(); } catch(e) {} }, 1500);
+  } catch(e) {}
+}
+
+// Override de _swNotif: agrega sonido, vibración y prioridad por tipo.
+// No modifica la función original — la envuelve con nueva versión.
+(function(){
+  var _swNotifBase = _swNotif;
+
+  // Opciones extendidas por tipo de notificación
+  var _NOTIF_EX = {
+    reserva: {
+      vibrate: [200, 100, 200],   // vibración larga — destaca la reserva
+      requireInteraction: true,   // permanece visible hasta que el admin la descarta
+    },
+    taller: {
+      vibrate: [100],             // vibración corta
+      requireInteraction: false,
+    },
+  };
+
+  _swNotif = async function(title, body, section, tag) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+    var tipo = section === 'turnosOnline' ? 'reserva'
+             : section === 'taller'       ? 'taller'
+             : null;
+    var ex = _NOTIF_EX[tipo] || {};
+
+    // 1. Sonido (main thread — funciona aunque la pestaña esté minimizada)
+    if (tipo) _playNotifSound(tipo);
+
+    // 2. Vibración del dispositivo desde el main thread
+    if (ex.vibrate && navigator.vibrate) {
+      try { navigator.vibrate(ex.vibrate); } catch(e) {}
+    }
+
+    // 3. Notificación via SW con opciones extendidas (vibrate + prioridad)
+    var reg = window._swReg;
+    if (reg) {
+      try {
+        await reg.showNotification(title, {
+          body,
+          icon:               '/icon.svg',
+          badge:              '/icon.svg',
+          tag:                tag || (section + '_' + Date.now()),
+          data:               { section: section || '' },
+          vibrate:            ex.vibrate            || [],
+          requireInteraction: ex.requireInteraction || false,
+        });
+        return;
+      } catch(e) {}
+    }
+    // Fallback: Notification API clásica
+    try {
+      var n = new Notification(title, {
+        body,
+        icon:               '/icon.svg',
+        tag:                tag || section,
+        requireInteraction: ex.requireInteraction || false,
+      });
+      n.onclick = function() {
+        window.focus();
+        if (section && typeof go === 'function') go(section);
+        n.close();
+      };
+    } catch(e) {}
+  };
+})();
+</script>
+
 <!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
      Envuelve _rwS4 y _rwFinish sin modificar las funciones originales.
 ──────────────────────────────────────────────────────────────────────── -->
