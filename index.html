@@ -4723,6 +4723,7 @@ function rTaller(){
         <button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>
         ${r.tel?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}
         ${r.estado==='recibido'?`<button class="btn bgh bsm" onclick="generarPresupuestoPDF(${r.id})">📋</button>`:''}
+        <button class="btn bgh bsm" onclick="generarOrdenTrabajoPDF(${r.id})" title="Orden de trabajo">📄</button>
         <button class="btn bgh bsm" onclick="generarEtiquetaTaller(${r.id})" title="Imprimir etiqueta">🏷️</button>
         <button class="btn bd bsm" onclick="delRep(${r.id})">✕</button>
       </div>
@@ -13074,6 +13075,205 @@ async function verificarEmailsVencimiento(tenants){
     return _precargarOrig.apply(this, arguments);
   };
 })();
+</script>
+
+<!-- ── Orden de Trabajo PDF ────────────────────────────────────────────────
+     Genera una orden de trabajo profesional en una nueva pestaña lista
+     para imprimir o guardar como PDF (browser print → Save as PDF).
+     No usa jsPDF ya que no está cargado — usa el mismo patrón que
+     generarPresupuestoPDF() y generarEtiquetaTaller(): window.open + print.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+function generarOrdenTrabajoPDF(id){
+  const r = S.reparaciones.find(x => x.id === id);
+  if(!r) return;
+
+  const neg  = currentTenant?.nombre || 'Servicio Técnico';
+  const nro  = String(r.id).slice(-6).toUpperCase();
+  const hoy  = new Date().toLocaleDateString('es-AR', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const fIng = r.fecha ? new Date(r.fecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}) : hoy;
+  const fEnt = r.fechaEnt ? new Date(r.fechaEnt+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
+
+  const ESTADOS = {
+    recibido:'Recibido', proceso:'En proceso', diagnostico:'En diagnóstico',
+    reparacion:'En reparación', listo:'Listo para retirar',
+    entregado:'Entregado', sin_reparacion:'Sin reparación'
+  };
+  const estadoLabel = ESTADOS[r.estado] || r.estado || '—';
+
+  const COND_PANTALLA = { funciona:'Funciona', rota:'Rota / Rajada', manchas:'Con manchas', no_funciona:'No funciona' };
+  const COND_FISICO   = { excelente:'Excelente', bueno:'Bueno', regular:'Regular', malo:'Malo' };
+
+  const saldo = (r.presupuesto||0) - (r.sena||0);
+  const fmt2  = v => v > 0 ? `$${Number(v).toLocaleString('es-AR')}` : '—';
+
+  // Solo mostrar la sección de condición si hay datos
+  const hayCondicion = r.golpes || r.humedad || r.estPantalla || r.estFisico || r.accesorios;
+  const condHtml = hayCondicion ? `
+    <div class="seccion">
+      <div class="sec-titulo">Estado del equipo al ingreso</div>
+      <div class="grilla">
+        ${r.golpes     ? `<div class="campo"><span class="lb">Golpes</span><span class="vl">${r.golpes==='leve'?'Golpe leve':'Golpe grave'}</span></div>` : ''}
+        ${r.humedad    ? `<div class="campo"><span class="lb">Humedad</span><span class="vl">Presenta humedad</span></div>` : ''}
+        ${r.estPantalla? `<div class="campo"><span class="lb">Pantalla</span><span class="vl">${COND_PANTALLA[r.estPantalla]||r.estPantalla}</span></div>` : ''}
+        ${r.estFisico  ? `<div class="campo"><span class="lb">Estado físico</span><span class="vl">${COND_FISICO[r.estFisico]||r.estFisico}</span></div>` : ''}
+        ${r.accesorios ? `<div class="campo full"><span class="lb">Accesorios</span><span class="vl">${r.accesorios}</span></div>` : ''}
+      </div>
+    </div>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orden N° ${nro} — ${neg}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;font-size:13px;line-height:1.5;padding:28px 32px;max-width:720px;margin:0 auto}
+
+  /* ─── Cabecera ─── */
+  .header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #111;padding-bottom:14px;margin-bottom:18px}
+  .biz-name{font-size:22px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;line-height:1.1}
+  .biz-sub{font-size:10px;color:#666;letter-spacing:.8px;text-transform:uppercase;margin-top:4px}
+  .orden-box{text-align:right}
+  .orden-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:#666}
+  .orden-nro{font-size:26px;font-weight:900;letter-spacing:2px;color:#111}
+  .orden-fecha{font-size:11px;color:#666;margin-top:2px}
+
+  /* ─── Secciones ─── */
+  .seccion{margin-bottom:14px;border:1px solid #ddd;border-radius:4px;overflow:hidden}
+  .sec-titulo{background:#111;color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:5px 12px}
+  .grilla{display:grid;grid-template-columns:1fr 1fr;padding:8px 12px;gap:6px 20px}
+  .campo{display:flex;flex-direction:column;gap:1px}
+  .campo.full{grid-column:1/-1}
+  .lb{font-size:9.5px;text-transform:uppercase;letter-spacing:.6px;color:#888;font-weight:600}
+  .vl{font-size:13px;font-weight:600;word-break:break-word}
+  .vl.grande{font-size:15px}
+
+  /* ─── Tabla económica ─── */
+  .tabla-eco{width:100%;border-collapse:collapse;margin:0}
+  .tabla-eco td{padding:7px 12px;border:1px solid #ddd;font-size:12.5px}
+  .tabla-eco td:first-child{background:#f5f5f5;font-weight:700;width:50%;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:#444}
+  .tabla-eco .total-row td{background:#111;color:#fff;font-size:14px;font-weight:900;border-color:#111}
+  .tabla-eco .saldo-row td{background:#f0f0f0;font-weight:700}
+  .estado-chip{display:inline-block;background:#111;color:#fff;padding:3px 10px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+
+  /* ─── Aviso / notas ─── */
+  .aviso{background:#f9f9f9;border-left:3px solid #111;padding:9px 13px;font-size:11.5px;color:#444;margin-top:4px}
+
+  /* ─── Firmas ─── */
+  .firmas{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;padding-top:16px;border-top:2px solid #ddd}
+  .firma-box{text-align:center}
+  .firma-linea{border-top:1px solid #333;margin-bottom:6px;height:44px}
+  .firma-label{font-size:10.5px;color:#555;text-transform:uppercase;letter-spacing:.7px}
+
+  /* ─── Footer ─── */
+  .footer{margin-top:20px;padding-top:10px;border-top:1px solid #ddd;font-size:10px;color:#999;text-align:center}
+
+  @media print{
+    body{padding:10px 14px;font-size:12px}
+    .sin-imprimir{display:none}
+    @page{size:A4;margin:12mm}
+  }
+</style>
+</head>
+<body>
+
+<!-- Botón de imprimir (se oculta al imprimir) -->
+<div class="sin-imprimir" style="text-align:right;margin-bottom:16px">
+  <button onclick="window.print()" style="background:#111;color:#fff;border:none;padding:9px 22px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px">🖨️ Imprimir / Guardar PDF</button>
+</div>
+
+<!-- Cabecera -->
+<div class="header">
+  <div>
+    <div class="biz-name">${neg}</div>
+    <div class="biz-sub">Orden de trabajo · Servicio técnico</div>
+  </div>
+  <div class="orden-box">
+    <div class="orden-label">Orden N°</div>
+    <div class="orden-nro">${nro}</div>
+    <div class="orden-fecha">Ingreso: ${fIng}</div>
+  </div>
+</div>
+
+<!-- Cliente y equipo -->
+<div class="seccion">
+  <div class="sec-titulo">Datos del cliente y equipo</div>
+  <div class="grilla">
+    <div class="campo"><span class="lb">Cliente</span><span class="vl grande">${r.cliente||'—'}</span></div>
+    <div class="campo"><span class="lb">Teléfono</span><span class="vl">${r.tel||'—'}</span></div>
+    <div class="campo"><span class="lb">Equipo / Modelo</span><span class="vl">${r.equipo||'—'}</span></div>
+    ${r.imei ? `<div class="campo"><span class="lb">IMEI</span><span class="vl" style="font-family:monospace">${r.imei}</span></div>` : '<div class="campo"></div>'}
+  </div>
+</div>
+
+<!-- Falla reportada -->
+<div class="seccion">
+  <div class="sec-titulo">Falla reportada</div>
+  <div style="padding:10px 12px">
+    <div class="vl" style="font-size:14px;line-height:1.5">${r.falla||'—'}</div>
+  </div>
+</div>
+
+<!-- Condición al ingreso (solo si hay datos) -->
+${condHtml}
+
+<!-- Presupuesto y estado -->
+<div class="seccion">
+  <div class="sec-titulo">Presupuesto y estado</div>
+  <div style="padding:10px 12px 0">
+    <table class="tabla-eco">
+      <tr><td>Presupuesto acordado</td><td>${fmt2(r.presupuesto)}</td></tr>
+      ${r.sena > 0 ? `<tr><td>Seña recibida</td><td>${fmt2(r.sena)}</td></tr>` : ''}
+      ${r.sena > 0 ? `<tr class="saldo-row"><td>Saldo a pagar</td><td>${fmt2(saldo > 0 ? saldo : 0)}</td></tr>` : ''}
+      <tr class="total-row"><td>Total presupuestado</td><td>${fmt2(r.presupuesto)}</td></tr>
+    </table>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 10px">
+      <div><span class="lb">Estado actual</span><br><span class="estado-chip" style="margin-top:4px;display:inline-block">${estadoLabel}</span></div>
+      <div style="text-align:right"><span class="lb">Fecha estimada de entrega</span><br><span class="vl grande" style="margin-top:4px;display:inline-block">${fEnt}</span></div>
+    </div>
+  </div>
+</div>
+
+${r.garantiaDias > 0 ? `
+<div class="aviso">
+  🛡 <strong>Garantía:</strong> ${r.garantiaDias} días por la reparación realizada, a partir de la fecha de entrega.
+  El equipo debe ser retirado dentro de los 30 días hábiles. Pasado ese plazo no se responde por el mismo.
+</div>` : `
+<div class="aviso">
+  El equipo debe ser retirado dentro de los 30 días hábiles. Pasado ese plazo no se responde por el mismo.
+  La reparación comienza una vez aprobado este presupuesto por el cliente.
+</div>`}
+
+<!-- Firmas -->
+<div class="firmas">
+  <div class="firma-box">
+    <div class="firma-linea"></div>
+    <div class="firma-label">Firma del cliente</div>
+    <div style="font-size:11px;color:#999;margin-top:3px">${r.cliente||'—'}</div>
+  </div>
+  <div class="firma-box">
+    <div class="firma-linea"></div>
+    <div class="firma-label">Firma del técnico</div>
+    <div style="font-size:11px;color:#999;margin-top:3px">${neg}</div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <strong>Remu Store — Servicio Técnico</strong> · ${neg} · Orden generada el ${hoy}
+</div>
+
+</body>
+</html>`;
+
+  const ventana = window.open('', '_blank');
+  if(!ventana){ showToast('Bloqueado por el navegador — permitir popups para este sitio','err'); return; }
+  ventana.document.write(html);
+  ventana.document.close();
+  setTimeout(() => ventana.print(), 600);
+}
 </script>
 
 <!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
