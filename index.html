@@ -13743,17 +13743,30 @@ function checkMetaCelebration(){
     try {
       var ganEsta = _calcGananciaSemana(0);
       var ganPasada = _calcGananciaSemana(1);
-      if(ganPasada !== 0){
-        var difPct = Math.round((ganEsta - ganPasada) / Math.abs(ganPasada) * 100);
-        var posMas = difPct > 0;
+      if(ganPasada === 0 && ganEsta <= 0){
+        // Sin datos suficientes para comparar — no mostrar nada
+      } else if(ganPasada === 0){
+        compHtml =
+          '<div style="font-size:.78rem;color:var(--tx2);margin-top:8px">📊 Primera semana con datos — ¡buen comienzo!</div>';
+      } else {
+        var dif = ganEsta - ganPasada;
+        var difPct = Math.round(dif / Math.abs(ganPasada) * 100);
+        var posMas = dif > 0;
+        var label;
+        if(Math.abs(difPct) > 200){
+          // Diferencia extrema: mostrar monto en vez de porcentaje
+          label = '<strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+
+                  (posMas?'+':'-')+(typeof fmt==='function'?fmt(Math.abs(dif)):Math.abs(dif))+
+                  '</strong> '+(posMas?'más':'menos');
+        } else {
+          label = '<strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+
+                  (posMas?'+':'')+difPct+'%</strong> '+(posMas?'más':'menos');
+        }
         compHtml =
           '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.8rem;color:var(--tx2)">' +
             '<span>'+(posMas?'📈':'📉')+'</span>' +
-            '<span>Esta semana ganaste <strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+(posMas?'+':'')+difPct+'%</strong> '+(posMas?'más':'menos')+' que la semana pasada</span>' +
+            '<span>Esta semana ganaste '+label+' que la semana pasada</span>' +
           '</div>';
-      } else if(ganEsta > 0) {
-        compHtml =
-          '<div style="font-size:.78rem;color:var(--tx2);margin-top:8px">📊 Primera semana registrada — ¡buen comienzo!</div>';
       }
     } catch(e){}
 
