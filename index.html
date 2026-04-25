@@ -13398,84 +13398,83 @@ function _playNotifSound(tipo) {
      Envuelve rDash, rDivision, rPanelDinero y rStock sin modificar originales.
 ──────────────────────────────────────────────────────────────────────── -->
 <script>
-// ── rGananciaHoy: ganancia real del día (revenue - COGS - gastos) ──────
+// ── rGananciaHoy: ganancia real del período activo (respeta dFilt) ──────
 function rGananciaHoy(){
   var card = document.getElementById('gananciaHoyCard');
   if(!card) return;
-  var hoy = tod();
   var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
   var esBarberia = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
   var F = typeof fmt==='function' ? fmt : function(n){ return '$'+n; };
+  // Etiqueta del período activo
+  var periodo = typeof getDFiltLabel==='function' ? getDFiltLabel() : 'Hoy';
+  var esHoy = typeof dFilt==='undefined' || dFilt==='hoy';
+  var titulo = esHoy ? '💰 Ganancia real hoy' : ('💰 Ganancia real — ' + periodo);
 
-  // ── Calcular ingresos y costo de mercadería ──
-  var vendido = 0;   // facturación total (precio de venta)
-  var cogs    = 0;   // costo de lo vendido
-  var sinCosto = 0;  // productos sin costo cargado
+  // ── Calcular ingresos y costo de mercadería usando filtrarDash ──
+  var vendido = 0;
+  var cogs    = 0;
+  var sinCosto = 0;
+
+  var ventasFilt = typeof filtrarDash==='function' ? filtrarDash(S.ventas, 'fecha') : S.ventas.filter(function(v){ return v.fecha===tod(); });
+  var gastosFilt = typeof filtrarDash==='function' ? filtrarDash(S.gastos, 'fecha') : S.gastos.filter(function(g){ return g.fecha===tod(); });
 
   if(esBarberia){
-    // Servicios desde getTurnos (sin duplicados): ganancia = precio, sin costo
+    // Servicios desde getTurnos filtrados por período (sin duplicados con S.ventas)
     if(typeof getTurnos==='function'){
-      getTurnos().filter(function(t){ return t.fecha===hoy && t.estado==='terminado'; })
-                 .forEach(function(t){ vendido += t.precio||0; });
+      var turnosFilt = typeof filtrarDash==='function'
+        ? filtrarDash(getTurnos(), 'fecha').filter(function(t){ return t.estado==='terminado'; })
+        : getTurnos().filter(function(t){ return t.fecha===tod() && t.estado==='terminado'; });
+      turnosFilt.forEach(function(t){ vendido += t.precio||0; });
     }
-    // Productos vendidos hoy: ganancia = precio - costo
-    S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo!=='servicio'; })
-            .forEach(function(v){
-              vendido += v.total||0;
-              if(v.tipo==='equipo'){
+    // Productos/equipos del período
+    ventasFilt.filter(function(v){ return v.tipo!=='servicio'; })
+              .forEach(function(v){
+                vendido += v.total||0;
                 cogs += v.costo||0;
                 if(!(v.costo>0)) sinCosto++;
-              } else if(v.tipo==='producto'){
-                cogs += v.costo||0;
-                if(!(v.costo>0)) sinCosto++;
-              }
-            });
+              });
   } else {
-    // Ventas del día (productos, equipos, servicios en tienda)
-    S.ventas.filter(function(v){ return v.fecha===hoy; })
-            .forEach(function(v){
-              vendido += v.total||0;
-              if(v.tipo==='servicio'){
-                // servicio técnico vendido: sin costo de mercadería
-              } else {
-                cogs += v.costo||0;
-                if(!(v.costo>0)) sinCosto++;
-              }
-            });
-    // Reparaciones entregadas: ganancia = presupuesto cobrado, sin costo de mercadería
-    S.reparaciones.filter(function(r){ return r.fecha===hoy && r.estado==='entregado'; })
-                  .forEach(function(r){ vendido += r.presupuesto||0; });
+    ventasFilt.forEach(function(v){
+      vendido += v.total||0;
+      if(v.tipo!=='servicio'){
+        cogs += v.costo||0;
+        if(!(v.costo>0)) sinCosto++;
+      }
+    });
+    // Reparaciones entregadas del período
+    var repsFilt = typeof filtrarDash==='function'
+      ? filtrarDash(S.reparaciones.filter(function(r){ return r.estado==='entregado'; }), 'fecha')
+      : S.reparaciones.filter(function(r){ return r.fecha===tod() && r.estado==='entregado'; });
+    repsFilt.forEach(function(r){ vendido += r.presupuesto||0; });
   }
 
-  var gastos    = S.gastos.filter(function(g){ return g.fecha===hoy; })
-                          .reduce(function(a,g){ return a+g.monto; }, 0);
-  var ganBruta  = vendido - cogs;          // ganancia bruta (antes de gastos operativos)
-  var ganNeta   = ganBruta - gastos;       // ganancia real del día
-  var colorNeta = ganNeta >= 0 ? 'var(--ok)' : 'var(--bad)';
+  var gastos   = gastosFilt.reduce(function(a,g){ return a+g.monto; }, 0);
+  var ganNeta  = vendido - cogs - gastos;
+  var colorN   = ganNeta >= 0 ? 'var(--ok)' : 'var(--bad)';
 
-  var row = function(icon, label, valor, color, bold, sep){
+  var row = function(icon, lbl, val, color, bold, sep){
     return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;'+(sep?'border-top:1px solid var(--bor);padding-top:7px;margin-top:4px':'')+'">' +
-      '<span style="color:var(--tx2)">'+icon+' '+label+'</span>' +
-      '<span style="color:'+color+';font-weight:'+(bold?'700':'500')+'">'+(typeof valor==='string'?valor:F(valor))+'</span>' +
+      '<span style="color:var(--tx2)">'+icon+' '+lbl+'</span>' +
+      '<span style="color:'+color+';font-weight:'+(bold?'700':'500')+'">'+F(val)+'</span>' +
     '</div>';
   };
 
   var aviso = sinCosto > 0
     ? '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:rgba(201,160,76,.08);border:1px solid rgba(201,160,76,.25);border-radius:8px;font-size:.75rem;color:var(--wrn)">'+
-        '<span>⚠️</span><span>'+sinCosto+' producto'+(sinCosto===1?'':'s')+' sin costo cargado — el cálculo puede ser inexacto</span>'+
+        '⚠️ '+sinCosto+' producto'+(sinCosto===1?'':'s')+' sin costo cargado — el cálculo puede ser inexacto'+
       '</div>'
     : '';
 
   card.innerHTML =
-    '<div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">💰 Ganancia real hoy</div>' +
-    '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorNeta+';line-height:1.1;margin-bottom:12px">' +
+    '<div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">'+titulo+'</div>' +
+    '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorN+';line-height:1.1;margin-bottom:12px">' +
       (ganNeta>=0?'':'-')+F(Math.abs(ganNeta)) +
     '</div>' +
     '<div style="display:flex;flex-direction:column;gap:6px">' +
-      row('📥','Vendiste',     vendido,       'var(--ok)',   false, false) +
-      row('📦','Costo mercadería', cogs,      'var(--wrn)',  false, false) +
-      row('📤','Gastos del día',   gastos,    'var(--bad)',  false, false) +
-      row('💵','Te quedó limpio',  Math.abs(ganNeta), colorNeta, true,  true) +
+      row('📥','Vendiste',         vendido, 'var(--ok)',  false, false) +
+      row('📦','Costo mercadería', cogs,    'var(--wrn)', false, false) +
+      row('📤','Gastos del período',gastos, 'var(--bad)', false, false) +
+      row('💵','Te quedó limpio',  Math.abs(ganNeta), colorN, true, true) +
     '</div>' +
     aviso;
 }
@@ -13987,6 +13986,32 @@ function rSmartAlerts(){
     var r = _prev.apply(this, arguments);
     setTimeout(rSmartAlerts, 30);
     return r;
+  };
+})();
+
+// ── Fix eliminarServicioTurno: reemplaza confirm() por modal propio + toast ─
+// window.confirm() puede quedar bloqueado en PWAs instaladas (Android/iOS);
+// si devuelve false inmediatamente, el delete nunca se ejecuta.
+(function(){
+  var _orig = eliminarServicioTurno;
+  eliminarServicioTurno = function(id){
+    if(typeof _confirmarModal==='function'){
+      _confirmarModal('¿Eliminar este servicio?', function(){
+        // Ejecutar la lógica interna sin pasar por el confirm() original
+        var cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : null;
+        if(!cfg) return;
+        cfg.servicios = cfg.servicios.filter(function(s){ return s.id!==id; });
+        if(typeof TURNOS_CFG_KEY!=='undefined' && typeof currentTenant!=='undefined'){
+          localStorage.setItem(TURNOS_CFG_KEY+'_'+(currentTenant?currentTenant.id:''), JSON.stringify(cfg));
+        }
+        if(typeof persistCfgToSupabase==='function') persistCfgToSupabase();
+        if(typeof rTurnosConfig==='function') rTurnosConfig();
+        if(typeof showToast==='function') showToast('Servicio eliminado ✓');
+      });
+    } else {
+      _orig.apply(this, arguments);
+      if(typeof showToast==='function') showToast('Servicio eliminado ✓');
+    }
   };
 })();
 </script>
