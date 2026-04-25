@@ -9043,6 +9043,10 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
         <div style="text-align:center;margin-top:28px;font-size:.62rem;color:#e0d5c5;letter-spacing:1.5px;text-transform:uppercase">Precios actualizados en tiempo real</div>
       </div>
     </div>
+    ${oc.tel ? `<a href="https://wa.me/549${oc.tel.replace(/\D/g,'')}?text=${encodeURIComponent('Hola! Quisiera consultar sobre una reparación')}" target="_blank" rel="noopener"
+      style="position:fixed;bottom:22px;right:20px;display:flex;align-items:center;gap:9px;background:#25d366;color:#fff;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:600;padding:12px 20px;border-radius:50px;text-decoration:none;box-shadow:0 4px 18px rgba(37,211,102,.35);z-index:999;white-space:nowrap">
+      💬 Consultar por WhatsApp
+    </a>` : ''}
   `;
   pubRender();
 }
