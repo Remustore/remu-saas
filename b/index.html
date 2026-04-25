@@ -48,6 +48,22 @@
   .wa-btn:hover{transform:scale(1.04)}
   .cerrado-banner{background:rgba(201,82,76,.08);border:1px solid rgba(201,82,76,.25);border-radius:10px;padding:14px;text-align:center;font-size:.85rem;color:#e87070;margin-top:10px}
   @media(max-width:480px){.card{padding:18px}.hdr{padding:12px 16px}}
+  /* ── Catálogo unificado (?negocio=SLUG) ── */
+  .cat-hdr{text-align:center;margin-bottom:20px}
+  .cat-title{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c}
+  .cat-subtitle{font-size:.8rem;color:#a89880;margin-top:4px;line-height:1.5}
+  .cat-addr{font-size:.74rem;color:#a89880;margin-top:3px}
+  .cat-nota{background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.18);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#a89880;line-height:1.5;margin-bottom:18px}
+  .cat-sector-lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:1px;color:#585044;font-weight:700;margin:18px 0 8px;padding-bottom:5px;border-bottom:1px solid #1e1e1e}
+  .cat-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+  .cat-row:last-child{border-bottom:none}
+  .cat-name{font-size:.88rem;font-weight:600;color:#f5f0e8;margin-bottom:3px}
+  .cat-det{font-size:.75rem;color:#a89880}
+  .cat-price{color:#c9a84c;font-weight:600}
+  .cat-btn{flex-shrink:0;padding:8px 14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:background .15s;white-space:nowrap}
+  .cat-btn:hover{background:#e8c96a}
+  .cat-back{display:block;width:100%;margin-top:8px;padding:11px;background:#111;color:#a89880;border:1px solid #2e2e2e;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;cursor:pointer;text-align:center}
+  .cat-back:hover{border-color:#b8976a;color:#c9a84c}
 </style>
 </head>
 <body>
@@ -548,11 +564,106 @@ async function enviar(){
   }
 }
 
+// ── Vista catálogo unificado (?negocio=SLUG) ──────────────────────────────
+function renderCatalog(){
+  const cfg    = G.cfg    || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
+  const online = G.online || {mensaje:'',insta:'',direccion:'',tel:''};
+  const nombre = G.tenant?.nombre || G.tenantNombre || 'Negocio';
+  document.getElementById('hdrNeg').textContent = nombre;
+  document.title = nombre + ' — Servicios y turnos';
+
+  const card = document.getElementById('mainCard');
+
+  if(!cfg.servicios.length){
+    card.innerHTML = `<div class="cat-hdr">
+      <div class="cat-title">${esc(nombre)}</div>
+      ${online.mensaje?`<div class="cat-subtitle">${esc(online.mensaje)}</div>`:''}
+    </div>
+    <div class="msg-info">Este negocio todavía no publicó sus servicios. Contactanos por WhatsApp para reservar.</div>`;
+    _catWA(online, nombre);
+    return;
+  }
+
+  // Agrupar por sector
+  const bySector = {};
+  cfg.servicios.forEach(s=>{
+    const sec = s.sector || '';
+    if(!bySector[sec]) bySector[sec] = [];
+    bySector[sec].push(s);
+  });
+  const sectores = Object.keys(bySector);
+  const multiSector = sectores.filter(k=>k).length > 1;
+
+  const notaPrecios = online.notaPrecios||'';
+
+  card.innerHTML = `
+    <div class="cat-hdr">
+      <div class="cat-title">${esc(nombre)}</div>
+      ${online.mensaje?`<div class="cat-subtitle">${esc(online.mensaje)}</div>`:''}
+      ${online.direccion?`<div class="cat-addr">📍 ${esc(online.direccion)}</div>`:''}
+    </div>
+    ${notaPrecios?`<div class="cat-nota">ℹ️ ${esc(notaPrecios)}</div>`:''}
+    ${sectores.map(sec=>`
+      ${multiSector&&sec?`<div class="cat-sector-lbl">${esc(sec)}</div>`:''}
+      ${bySector[sec].map(s=>`
+        <div class="cat-row">
+          <div style="min-width:0">
+            <div class="cat-name">${esc(s.nombre)}</div>
+            <div class="cat-det">${s.duracion||30} min${s.precio>0?` · <span class="cat-price">${fmt(s.precio)}</span>`:' · Precio a consultar'}</div>
+          </div>
+          <button class="cat-btn" onclick="reservarServicio(${s.id})">📅 Reservar</button>
+        </div>
+      `).join('')}
+    `).join('')}
+  `;
+
+  _catWA(online, nombre);
+}
+
+function reservarServicio(srvId){
+  renderBooking();
+  setTimeout(function(){
+    // Pre-seleccionar el servicio elegido
+    var sel = document.getElementById('bServicio');
+    if(sel){
+      for(var i=0;i<sel.options.length;i++){
+        if(parseInt(sel.options[i].value)===srvId){ sel.selectedIndex=i; onSrvChange(); break; }
+      }
+    }
+    // Botón para volver al catálogo
+    var card = document.getElementById('mainCard');
+    if(card){
+      var back = document.createElement('button');
+      back.className = 'cat-back';
+      back.textContent = '← Ver todos los servicios';
+      back.onclick = renderCatalog;
+      card.insertBefore(back, card.firstChild);
+    }
+    // Scroll suave al inicio del card
+    card && card.scrollIntoView({behavior:'smooth',block:'start'});
+  }, 20);
+}
+
+function _catWA(online, nombre){
+  // Botón WA flotante
+  if(document.querySelector('.wa-btn')) return;
+  const waTel = (online.tel||'').replace(/\D/g,'');
+  if(!waTel) return;
+  const waMsg = encodeURIComponent('Hola! Quiero consultar antes de reservar en '+nombre+' 😊');
+  const a = document.createElement('a');
+  a.className = 'wa-btn';
+  a.href = 'https://wa.me/549'+waTel+'?text='+waMsg;
+  a.target = '_blank';
+  a.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg> Consultar`;
+  document.body.appendChild(a);
+}
+
 // ── Init ──────────────────────────────────────────────────────────────────
 (async function init(){
   // Leer slug del query param ?s= (puesto por 404.html) o del pathname directo
   const params = new URLSearchParams(location.search);
   let slug = params.get('s') || '';
+  let modoNegocio = false;  // ?negocio=SLUG → vista catálogo unificado
 
   // Si viene del 404 redirect, restaurar URL limpia en el browser
   if(slug && !params.get('_direct')){
@@ -563,6 +674,12 @@ async function enviar(){
   if(!slug){
     const m = location.pathname.match(/^\/b\/([^/?#]+)/);
     if(m) slug = decodeURIComponent(m[1]);
+  }
+
+  // Nuevo: ?negocio=SLUG — página unificada con catálogo + reserva
+  if(!slug && params.get('negocio')){
+    slug = params.get('negocio');
+    modoNegocio = true;
   }
 
   if(!slug){
@@ -592,7 +709,7 @@ async function enviar(){
       G.tenant = {id:result.tenantId, nombre:tenantNombre, rubro:tenantRubro};
     }
 
-    renderBooking();
+    if(modoNegocio) renderCatalog(); else renderBooking();
   } catch(e){
     document.getElementById('mainCard').innerHTML = `<div class="msg-err" style="text-align:center;padding:20px">Error al cargar: ${esc(e.message)}</div>`;
   }
