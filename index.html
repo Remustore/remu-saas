@@ -924,6 +924,9 @@ $$;</pre>
       <!-- AVISOS DIARIOS -->
       <div id="dashAvisos" style="margin-bottom:14px"></div>
 
+      <!-- GANANCIA HOY — tarjeta destacada, primera en mobile -->
+      <div id="gananciaHoyCard" class="card" style="margin-bottom:14px"></div>
+
       <!-- BARRA DE ENERGÍA -->
       <div class="card" style="margin-bottom:14px" id="energyCard">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
@@ -1048,6 +1051,8 @@ $$;</pre>
     <div class="sec" id="sec-stock">
       <div class="pt">Stock</div><div class="ps" id="stockSub">Productos</div>
       <div id="stockAlertBanner" style="display:none;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.82rem;color:var(--bad)"></div>
+      <!-- RESUMEN DE INVERSIÓN EN STOCK -->
+      <div id="stockResumenCard" style="display:none;margin-bottom:14px"></div>
       <div class="card">
         <div class="ch">
           <div class="tabs" id="stabs" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px"></div>
@@ -13385,6 +13390,164 @@ function _playNotifSound(tipo) {
         n.close();
       };
     } catch(e) {}
+  };
+})();
+</script>
+
+<!-- ── Ganancia Hoy (dashboard) + Resumen Stock ────────────────────────────
+     Envuelve rDash, rDivision, rPanelDinero y rStock sin modificar originales.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── rGananciaHoy: tarjeta destacada con ingreso/gasto/ganancia del día ──
+function rGananciaHoy(){
+  var card = document.getElementById('gananciaHoyCard');
+  if(!card) return;
+  var hoy = tod();
+  var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
+  var esBarberia = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+
+  var ingresos = 0;
+  if(esBarberia){
+    // servicios: desde getTurnos (localStorage) para evitar duplicados
+    if(typeof getTurnos === 'function'){
+      ingresos += getTurnos().filter(function(t){ return t.fecha===hoy && t.estado==='terminado'; })
+                             .reduce(function(a,t){ return a+(t.precio||0); }, 0);
+    }
+    // productos vendidos hoy (no servicios)
+    ingresos += S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo!=='servicio'; })
+                        .reduce(function(a,v){ return a+v.total; }, 0);
+  } else {
+    // taller/otros: ventas + reparaciones entregadas hoy
+    ingresos += S.ventas.filter(function(v){ return v.fecha===hoy; })
+                        .reduce(function(a,v){ return a+v.total; }, 0);
+    ingresos += S.reparaciones.filter(function(r){ return r.fecha===hoy && r.estado==='entregado'; })
+                              .reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
+  }
+  var gastos = S.gastos.filter(function(g){ return g.fecha===hoy; })
+                       .reduce(function(a,g){ return a+g.monto; }, 0);
+  var ganancia = ingresos - gastos;
+  var colorGan = ganancia >= 0 ? 'var(--ok)' : 'var(--bad)';
+
+  card.innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
+      '<span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600">💰 Ganancia hoy</span>' +
+    '</div>' +
+    '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorGan+';line-height:1.1;margin-bottom:10px">' +
+      (ganancia>=0?'':'-') + (typeof fmt==='function'?fmt(Math.abs(ganancia)):Math.abs(ganancia)) +
+    '</div>' +
+    '<div style="display:flex;flex-direction:column;gap:5px">' +
+      '<div style="display:flex;justify-content:space-between;font-size:.85rem">' +
+        '<span style="color:var(--tx2)">📥 Ingresó</span>' +
+        '<span style="color:var(--ok);font-weight:600">'+(typeof fmt==='function'?fmt(ingresos):ingresos)+'</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:.85rem">' +
+        '<span style="color:var(--tx2)">📤 Gasté</span>' +
+        '<span style="color:var(--bad);font-weight:600">'+(typeof fmt==='function'?fmt(gastos):gastos)+'</span>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:.88rem;border-top:1px solid var(--bor);padding-top:6px;margin-top:2px">' +
+        '<span style="color:var(--tx);font-weight:600">💵 Me quedó</span>' +
+        '<span style="color:'+colorGan+';font-weight:700;font-size:.95rem">'+(ganancia>=0?'':'-')+(typeof fmt==='function'?fmt(Math.abs(ganancia)):Math.abs(ganancia))+'</span>' +
+      '</div>' +
+    '</div>';
+}
+
+// ── rStockResumen: inversión total y valor de venta del stock ──────────
+function rStockResumen(){
+  var card = document.getElementById('stockResumenCard');
+  if(!card) return;
+  var inversion = S.stock.reduce(function(a,s){ return a+(s.costo||0)*(s.cantidad||0); }, 0);
+  var valorVenta = S.stock.reduce(function(a,s){ return a+(s.precio||0)*(s.cantidad||0); }, 0);
+  var margen = inversion > 0 ? Math.round((valorVenta-inversion)/inversion*100) : 0;
+  card.style.display = 'block';
+  card.className = 'card';
+  card.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+      '<span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600">Resumen de stock</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+      '<div style="background:var(--bg);border-radius:8px;padding:12px;border-left:3px solid var(--bad)">' +
+        '<div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">📦 Inversión en stock</div>' +
+        '<div style="font-family:var(--fh);font-size:1.15rem;font-weight:700;color:var(--bad)">'+(typeof fmt==='function'?fmt(inversion):inversion)+'</div>' +
+        '<div style="font-size:.68rem;color:var(--mut);margin-top:2px">costo × cantidad</div>' +
+      '</div>' +
+      '<div style="background:var(--bg);border-radius:8px;padding:12px;border-left:3px solid var(--ok)">' +
+        '<div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">💰 Valor de venta</div>' +
+        '<div style="font-family:var(--fh);font-size:1.15rem;font-weight:700;color:var(--ok)">'+(typeof fmt==='function'?fmt(valorVenta):valorVenta)+'</div>' +
+        '<div style="font-size:.68rem;color:var(--mut);margin-top:2px">'+(margen>0?'+'+margen+'% margen':'precio × cantidad')+'</div>' +
+      '</div>' +
+    '</div>';
+}
+
+(function(){
+  // Wrap rDash: llama rGananciaHoy después de renderizar
+  var _rDashOrig = rDash;
+  rDash = function(){
+    var r = _rDashOrig.apply(this, arguments);
+    setTimeout(rGananciaHoy, 10);
+    return r;
+  };
+
+  // Wrap rDivision: después de renderizar, colapsa detrás de "Ver detalle"
+  var _rDivisionOrig = rDivision;
+  rDivision = function(){
+    _rDivisionOrig.apply(this, arguments);
+    var card = document.getElementById('divisionCard');
+    if(!card || card.style.display==='none') return;
+    if(card.getAttribute('data-collapsible')) return; // ya colapsado
+    card.setAttribute('data-collapsible','1');
+    // Insertar botón antes de la card si no existe ya
+    var btn = document.getElementById('divisionToggleBtn');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.id = 'divisionToggleBtn';
+      btn.className = 'btn bgh';
+      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
+      btn.textContent = '📊 Ver detalle de distribución';
+      btn.onclick = function(){
+        var collapsed = card.getAttribute('data-open') !== '1';
+        card.style.display = collapsed ? 'block' : 'none';
+        card.setAttribute('data-open', collapsed ? '1' : '0');
+        btn.textContent = collapsed ? '📊 Ocultar distribución' : '📊 Ver detalle de distribución';
+      };
+      card.parentNode.insertBefore(btn, card);
+    }
+    card.style.display = 'none';
+    card.setAttribute('data-open','0');
+  };
+
+  // Wrap rPanelDinero: después de renderizar, colapsa detrás de "Ver detalle"
+  var _rPanelDineroOrig = rPanelDinero;
+  rPanelDinero = function(){
+    _rPanelDineroOrig.apply(this, arguments);
+    var panel = document.getElementById('panelDinero');
+    if(!panel || panel.style.display==='none') return;
+    if(panel.getAttribute('data-collapsible')) return;
+    panel.setAttribute('data-collapsible','1');
+    var btn = document.getElementById('panelDineroToggleBtn');
+    if(!btn){
+      btn = document.createElement('button');
+      btn.id = 'panelDineroToggleBtn';
+      btn.className = 'btn bgh';
+      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
+      btn.textContent = '💡 Ver análisis 50/30/20';
+      btn.onclick = function(){
+        var collapsed = panel.getAttribute('data-open') !== '1';
+        panel.style.display = collapsed ? 'block' : 'none';
+        panel.setAttribute('data-open', collapsed ? '1' : '0');
+        btn.textContent = collapsed ? '💡 Ocultar análisis 50/30/20' : '💡 Ver análisis 50/30/20';
+      };
+      panel.parentNode.insertBefore(btn, panel);
+    }
+    panel.style.display = 'none';
+    panel.setAttribute('data-open','0');
+  };
+
+  // Wrap rStock: llama rStockResumen después de renderizar
+  var _rStockOrig = rStock;
+  rStock = function(){
+    var r = _rStockOrig.apply(this, arguments);
+    rStockResumen();
+    return r;
   };
 })();
 </script>
