@@ -774,6 +774,23 @@ textarea{resize:vertical;min-height:70px;}
       <div id="saStats" style="color:var(--mut);font-size:.8rem;margin-top:8px">Cargando estadísticas...</div>
     </div>
 
+    <!-- MÉTRICAS EXTENDIDAS -->
+    <div class="sa-card" id="saMetricasCard" style="margin-top:20px;display:none">
+      <h3>📈 Métricas del negocio</h3>
+      <div id="saMetricas" style="margin-top:10px;color:var(--mut);font-size:.8rem">Cargando...</div>
+    </div>
+
+    <!-- SIMULAR VENCIMIENTO -->
+    <div class="sa-card" style="margin-top:20px;border-color:rgba(201,82,76,.3)">
+      <h3 style="color:var(--wrn)">🧪 Test — Simular vencimiento de trial</h3>
+      <div style="font-size:.75rem;color:var(--tx2);margin:8px 0 12px">Útil para probar el flujo de pago sin esperar 30 días. Setea el <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.7rem">trial_hasta</code> al pasado inmediato.</div>
+      <select id="saSimTenantSel" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.84rem;margin-bottom:10px;font-family:var(--fb);outline:none">
+        <option value="">— Seleccioná un tenant en trial —</option>
+      </select>
+      <button class="sa-btn danger" style="margin:0" onclick="simularVencimientoTrial()">🧪 Simular vencimiento ahora</button>
+      <div id="saSimMsg" style="font-size:.75rem;margin-top:8px;display:none"></div>
+    </div>
+
     <!-- ── DIAGNÓSTICO ADMIN EXTERNO ─────────────────────────────────────── -->
     <div class="sa-card" style="margin-top:20px;border-color:rgba(138,92,201,.35)">
       <h3 style="color:#b08ad4">🔍 Diagnóstico — Admin Externo Multi-Tenant</h3>
@@ -12702,6 +12719,166 @@ function checkNotifGastosFijos(){
   });
   if(proximos.length) localStorage.setItem(storageKey, JSON.stringify([...vistoSet]));
 }
+</script>
+
+<!-- ── Features: métricas SA, test MP, emails bienvenida/vencimiento ──────
+     Todas las funciones nuevas y wrappers se agregan aquí sin tocar el código original.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── Feature 3: Métricas extendidas del superadmin ───────────────────────
+async function loadSaMetricas(){
+  const { data } = await sb.from('tenants').select('*').neq('id', MP_SYSTEM_TENANT_ID);
+  const el = document.getElementById('saMetricas');
+  const card = document.getElementById('saMetricasCard');
+  if(!data || !el || !card) return;
+  card.style.display = '';
+  const now = new Date();
+  const semanaAtras = new Date(now.getTime() - 7*24*60*60*1000);
+  const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+  const enSieteDias = new Date(now.getTime() + 7*24*60*60*1000);
+
+  const nuevosSemanales = data.filter(t => t.created_at && new Date(t.created_at) >= semanaAtras).length;
+  const nuevosMensuales = data.filter(t => t.created_at && new Date(t.created_at) >= inicioMes).length;
+  const conPago = data.filter(t => t.modulos?.pago_activo).length;
+  const enTrial = data.filter(t => t.activo && !t.modulos?.pago_activo).length;
+  const vencenProximo = data.filter(t => {
+    if(t.modulos?.pago_activo) return false;
+    const th = t.modulos?.trial_hasta ? new Date(t.modulos.trial_hasta) : new Date(new Date(t.created_at||Date.now()).getTime() + 30*24*60*60*1000);
+    return th > now && th <= enSieteDias;
+  }).length;
+
+  // Precio mensual configurado para ingreso estimado
+  let precioMensual = 0;
+  try {
+    const { data: mpRow } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).single();
+    precioMensual = parseFloat(mpRow?.data?.precio || mpRow?.precio || 0) || 0;
+  } catch(e){}
+
+  const ingresoEst = conPago * precioMensual;
+
+  // Poblar el select de simulación de vencimiento
+  const sel = document.getElementById('saSimTenantSel');
+  if(sel){
+    const enTrialData = data.filter(t => t.activo && !t.modulos?.pago_activo);
+    sel.innerHTML = '<option value="">— Seleccioná un tenant en trial —</option>' +
+      enTrialData.map(t => {
+        const th = t.modulos?.trial_hasta ? new Date(t.modulos.trial_hasta) : new Date(new Date(t.created_at||Date.now()).getTime()+30*24*60*60*1000);
+        const dias = Math.ceil((th - now) / 86400000);
+        const label = dias > 0 ? dias+'d restantes' : 'vencido';
+        return `<option value="${t.id}">${t.nombre} — ${label}</option>`;
+      }).join('');
+  }
+
+  const stat = (val, label, color, borderColor) =>
+    `<div style="background:var(--bg);border:1px solid ${borderColor||'var(--bor)'};border-radius:8px;padding:10px;text-align:center">
+      <div style="font-size:1.5rem;font-weight:800;color:${color}">${val}</div>
+      <div style="font-size:.68rem;color:var(--tx2);margin-top:2px">${label}</div>
+    </div>`;
+
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">
+      ${stat(nuevosSemanales, 'Nuevos esta semana', 'var(--inf)', '')}
+      ${stat(nuevosMensuales, 'Nuevos este mes', 'var(--inf)', '')}
+      ${stat(conPago, 'Con pago activo', 'var(--ok)', 'rgba(76,175,125,.25)')}
+      ${stat(enTrial, 'En trial', 'var(--wrn)', 'rgba(201,148,76,.25)')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      ${stat(vencenProximo, 'Vencen en 7 días', 'var(--bad)', 'rgba(201,82,76,.3)')}
+      ${stat(precioMensual > 0 ? '$'+ingresoEst.toLocaleString('es-AR') : '—', 'Ingreso estimado/mes', 'var(--ok)', 'rgba(76,175,125,.2)')}
+    </div>`;
+}
+
+// ── Feature 4: Simular vencimiento de trial ──────────────────────────────
+async function simularVencimientoTrial(){
+  const sel = document.getElementById('saSimTenantSel');
+  const msg = document.getElementById('saSimMsg');
+  const tenantId = sel?.value;
+  const _m = (txt, ok) => { if(!msg) return; msg.style.display='block'; msg.style.color=ok?'var(--ok)':'var(--bad)'; msg.textContent=txt; };
+  if(!tenantId){ _m('Seleccioná un tenant primero.', false); return; }
+  if(!confirm('¿Confirmar? Esto setea el trial_hasta de este tenant al pasado. Podés revertirlo con "+30 días trial".')){ return; }
+  const { data: t, error: te } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+  if(te || !t){ _m('Error al cargar el tenant.', false); return; }
+  const nuevosMods = { ...(t.modulos||{}), trial_hasta: new Date(Date.now() - 120000).toISOString() };
+  const { error } = await sb.from('tenants').update({ modulos: nuevosMods }).eq('id', tenantId);
+  if(error){ _m('Error: ' + error.message, false); return; }
+  _m('✓ Trial vencido. El tenant verá el bloqueo en su próximo login.', true);
+  loadTenants();
+  loadSaMetricas();
+}
+
+// ── Feature 1: Email de bienvenida tras registro ─────────────────────────
+async function enviarEmailBienvenida(email, nombre, tenantId){
+  try {
+    const fnUrl = sb.supabaseUrl + '/functions/v1/send-welcome-email';
+    const anonKey = sb.supabaseKey;
+    await fetch(fnUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + anonKey },
+      body: JSON.stringify({ email, nombre, tenantId })
+    });
+  } catch(e){ /* silencioso — no bloquea el registro */ }
+}
+
+// ── Feature 2: Emails de aviso de vencimiento (se llama en login SA) ─────
+async function verificarEmailsVencimiento(tenants){
+  try {
+    const now = new Date();
+    const en7d = new Date(now.getTime() + 7*24*60*60*1000);
+    const porVencer = (tenants||[]).filter(t => {
+      if(!t.activo || t.modulos?.pago_activo) return false;
+      const th = t.modulos?.trial_hasta ? new Date(t.modulos.trial_hasta) : new Date(new Date(t.created_at||Date.now()).getTime()+30*24*60*60*1000);
+      return th > now && th <= en7d;
+    });
+    if(!porVencer.length) return;
+    const storageKey = 'sa_venc_notif_' + now.toISOString().slice(0,10);
+    const yaNotif = new Set(JSON.parse(localStorage.getItem(storageKey)||'[]'));
+    const { data: mpRow } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).single();
+    const mpLink = mpRow?.data?.mp_link || mpRow?.mp_link || localStorage.getItem('remu_mp_link') || '';
+    const fnUrl = sb.supabaseUrl + '/functions/v1/send-trial-expiry';
+    const anonKey = sb.supabaseKey;
+    for(const t of porVencer){
+      if(yaNotif.has(t.id)) continue;
+      const th = t.modulos?.trial_hasta ? new Date(t.modulos.trial_hasta) : new Date(new Date(t.created_at||Date.now()).getTime()+30*24*60*60*1000);
+      const dias = Math.ceil((th - now) / 86400000);
+      await fetch(fnUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + anonKey },
+        body: JSON.stringify({ tenantId: t.id, nombre: t.nombre, diasRestantes: dias, mpLink })
+      });
+      yaNotif.add(t.id);
+    }
+    localStorage.setItem(storageKey, JSON.stringify([...yaNotif]));
+  } catch(e){ /* silencioso */ }
+}
+
+// ── Wrappers (no modifican las funciones originales) ─────────────────────
+(function(){
+  // Wrap loadSaStats → también carga métricas extendidas
+  var _saStatsOrig = loadSaStats;
+  loadSaStats = async function(){
+    var r = await _saStatsOrig.apply(this, arguments);
+    loadSaMetricas();
+    return r;
+  };
+
+  // Wrap loadTenants → también verifica emails de vencimiento
+  var _loadTenantsOrig = loadTenants;
+  loadTenants = async function(){
+    await _loadTenantsOrig.apply(this, arguments);
+    // Obtener tenants para chequeo de vencimiento
+    try {
+      var { data } = await sb.from('tenants').select('*').neq('id', MP_SYSTEM_TENANT_ID);
+      if(data) verificarEmailsVencimiento(data);
+    } catch(e){}
+  };
+
+  // Wrap precargarServiciosTenant → dispara email de bienvenida tras registro exitoso
+  var _precargarOrig = precargarServiciosTenant;
+  precargarServiciosTenant = async function(tenantId, rubro, nombre){
+    enviarEmailBienvenida(__rw?.email||'', nombre||__rw?.nombre||'', tenantId);
+    return _precargarOrig.apply(this, arguments);
+  };
+})();
 </script>
 
 <!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
