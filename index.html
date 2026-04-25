@@ -12703,5 +12703,33 @@ function checkNotifGastosFijos(){
   if(proximos.length) localStorage.setItem(storageKey, JSON.stringify([...vistoSet]));
 }
 </script>
+
+<!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
+     Envuelve _rwS4 y _rwFinish sin modificar las funciones originales.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+(function(){
+  var _s4orig = _rwS4;
+  _rwS4 = function(){
+    var html = _s4orig.apply(this, arguments);
+    var chk = '<label style="display:flex;align-items:flex-start;gap:10px;font-size:.78rem;color:#a89880;line-height:1.55;margin-bottom:12px;cursor:pointer">' +
+      '<input type="checkbox" id="rwAceptaTerminos" style="width:18px;height:18px;margin-top:1px;accent-color:#c9a84c;cursor:pointer;flex-shrink:0">' +
+      '<span>Acepto los <a href="terminos.html" target="_blank" rel="noopener" style="color:#c9a84c;text-decoration:underline" onclick="event.stopPropagation()">Términos y Condiciones</a> y la <a href="privacidad.html" target="_blank" rel="noopener" style="color:#c9a84c;text-decoration:underline" onclick="event.stopPropagation()">Política de Privacidad</a> de Remu Gestión.</span>' +
+      '</label>';
+    return html.replace('<div id="rwErr"', chk + '<div id="rwErr"');
+  };
+
+  var _finOrig = _rwFinish;
+  _rwFinish = async function(btn){
+    var chk = document.getElementById('rwAceptaTerminos');
+    if(chk && !chk.checked){
+      var err = document.getElementById('rwErr');
+      if(err) err.textContent = 'Debés aceptar los Términos y Condiciones y la Política de Privacidad para continuar.';
+      return;
+    }
+    return _finOrig.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
