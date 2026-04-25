@@ -13552,6 +13552,284 @@ function rStockResumen(){
 })();
 </script>
 
+<!-- ── Acciones rápidas · Racha · Comparativa · Celebración meta ──────────
+     Envuelve rDash, rDivision, rPanelDinero, rGananciaHoy sin modificar originales.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── Feature 1: Acciones rápidas en dashboard ─────────────────────────────
+function rAccionesRapidas(){
+  var el = document.getElementById('dashQuickBtns');
+  if(!el) return;
+  var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
+  var esBarb = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+
+  var btnStyle = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 8px;font-size:.82rem;font-weight:600;border-radius:10px;cursor:pointer;border:1px solid var(--bor2);background:var(--sur);color:var(--tx2);transition:all .15s;';
+  var emStyle = 'font-size:1.5rem;line-height:1';
+
+  if(esBarb){
+    el.innerHTML =
+      '<div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Acciones rápidas</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+        '<button style="'+btnStyle+'" onclick="go(\'turnos\');setTimeout(function(){openM(\'mTurno\',null)},300)" onmouseover="this.style.borderColor=\'var(--gld)\';this.style.color=\'var(--gld)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+          '<span style="'+emStyle+'">➕</span>Turno rápido' +
+        '</button>' +
+        '<button style="'+btnStyle+'" onclick="openM(\'mVenta\',null);go(\'ventas\')" onmouseover="this.style.borderColor=\'var(--ok)\';this.style.color=\'var(--ok)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+          '<span style="'+emStyle+'">💰</span>Cobrar servicio' +
+        '</button>' +
+        '<button style="'+btnStyle+'" onclick="go(\'clientes\')" onmouseover="this.style.borderColor=\'var(--inf)\';this.style.color=\'var(--inf)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+          '<span style="'+emStyle+'">👤</span>Clientes' +
+        '</button>' +
+      '</div>';
+  } else {
+    el.innerHTML =
+      '<div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Acciones rápidas</div>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+        '<button style="'+btnStyle+'" onclick="openM(\'mTaller\',null);go(\'taller\')" onmouseover="this.style.borderColor=\'var(--wrn)\';this.style.color=\'var(--wrn)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+          '<span style="'+emStyle+'">🔧</span>Equipo nuevo' +
+        '</button>' +
+        '<button style="'+btnStyle+'" onclick="openM(\'mVenta\',null);go(\'ventas\')" onmouseover="this.style.borderColor=\'var(--ok)\';this.style.color=\'var(--ok)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+          '<span style="'+emStyle+'">💰</span>Registrar venta' +
+        '</button>' +
+        '<button style="'+btnStyle+'" onclick="go(\'pedidos\');setTimeout(function(){openM(\'mPedido\',null)},300)" onmouseover="this.style.borderColor=\'var(--inf)\';this.style.color=\'var(--inf)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+          '<span style="'+emStyle+'">📋</span>Pedido nuevo' +
+        '</button>' +
+      '</div>';
+  }
+}
+
+// ── Feature 2: Racha de uso ────────────────────────────────────────────────
+function _actualizarRacha(){
+  if(!currentTenant || !currentTenant.id) return 1;
+  var key = 'racha_' + currentTenant.id;
+  var hoy = tod();
+  var stored = localStorage.getItem(key);
+  var data = stored ? JSON.parse(stored) : {lastDate:'', count:0};
+  if(data.lastDate === hoy) return data.count;
+  var ayer = new Date(); ayer.setDate(ayer.getDate()-1);
+  var ayerStr = ayer.toISOString().slice(0,10);
+  data.count = data.lastDate === ayerStr ? data.count+1 : 1;
+  data.lastDate = hoy;
+  localStorage.setItem(key, JSON.stringify(data));
+  return data.count;
+}
+
+// ── Feature 3: Comparativa de semanas ────────────────────────────────────
+function _calcGananciaSemana(weekOffset){
+  var today = new Date();
+  var dow = today.getDay();
+  var monOffset = dow===0 ? 6 : dow-1;
+  var weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - monOffset - weekOffset*7);
+
+  var fechas = [];
+  for(var i=0; i<7; i++){
+    var d = new Date(weekStart); d.setDate(weekStart.getDate()+i);
+    var f = d.toISOString().slice(0,10);
+    if(f <= tod()) fechas.push(f);
+  }
+  if(!fechas.length) return 0;
+
+  var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
+  var esBarb = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+
+  var ing = 0;
+  if(esBarb){
+    if(typeof getTurnos==='function')
+      ing += getTurnos().filter(function(t){ return fechas.indexOf(t.fecha)>=0&&t.estado==='terminado'; })
+                        .reduce(function(a,t){ return a+(t.precio||0); }, 0);
+    ing += S.ventas.filter(function(v){ return fechas.indexOf(v.fecha)>=0&&v.tipo!=='servicio'; })
+                   .reduce(function(a,v){ return a+v.total; }, 0);
+  } else {
+    ing += S.ventas.filter(function(v){ return fechas.indexOf(v.fecha)>=0; })
+                   .reduce(function(a,v){ return a+v.total; }, 0);
+    ing += S.reparaciones.filter(function(r){ return fechas.indexOf(r.fecha)>=0&&r.estado==='entregado'; })
+                         .reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
+  }
+  var gas = S.gastos.filter(function(g){ return fechas.indexOf(g.fecha)>=0; })
+                    .reduce(function(a,g){ return a+g.monto; }, 0);
+  return ing - gas;
+}
+
+// ── Feature 4: Confetti + celebración al cumplir meta ─────────────────────
+function _lanzarConfetti(){
+  if(!document.getElementById('confettiStyle')){
+    var s = document.createElement('style');
+    s.id = 'confettiStyle';
+    s.textContent = '@keyframes cfall{0%{transform:translateY(0) rotate(0deg);opacity:.95}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}';
+    document.head.appendChild(s);
+  }
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;pointer-events:none;overflow:hidden';
+  document.body.appendChild(ov);
+  var cols = ['#c9a84c','#4caf7d','#f5f0e8','#c9524c','#4c9af5','#e8c96a'];
+  for(var i=0; i<90; i++){
+    (function(){
+      var p = document.createElement('div');
+      var c = cols[Math.floor(Math.random()*cols.length)];
+      var sz = 5+Math.floor(Math.random()*9);
+      var dur = (2+Math.random()*2).toFixed(1);
+      var del = (Math.random()*1.8).toFixed(2);
+      p.style.cssText = 'position:absolute;left:'+Math.random()*100+'%;top:-20px;width:'+sz+'px;height:'+sz+'px;background:'+c+';border-radius:'+(Math.random()>.5?'50%':'2px')+';animation:cfall '+dur+'s '+del+'s ease-in forwards';
+      ov.appendChild(p);
+    })();
+  }
+  setTimeout(function(){ ov.remove(); }, 5500);
+}
+
+function checkMetaCelebration(){
+  var hoy = tod();
+  var tid = currentTenant&&currentTenant.id ? currentTenant.id : 'def';
+  var key = 'meta_cel_'+tid+'_'+hoy;
+  if(localStorage.getItem(key)) return;
+
+  var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
+  var esBarb = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+  var totalHoy = 0;
+  if(esBarb){
+    if(typeof getTurnos==='function')
+      totalHoy += getTurnos().filter(function(t){ return t.fecha===hoy&&t.estado==='terminado'; })
+                             .reduce(function(a,t){ return a+(t.precio||0); }, 0);
+    totalHoy += S.ventas.filter(function(v){ return v.fecha===hoy&&v.tipo!=='servicio'; })
+                        .reduce(function(a,v){ return a+v.total; }, 0);
+  } else {
+    totalHoy += S.ventas.filter(function(v){ return v.fecha===hoy; })
+                        .reduce(function(a,v){ return a+v.total; }, 0);
+    totalHoy += S.reparaciones.filter(function(r){ return r.fecha===hoy&&r.estado==='entregado'; })
+                              .reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
+  }
+
+  var obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000};
+  var metaDia = (obj.repCant||7)*(obj.repPre||40000) + (obj.accCant||10)*(obj.accPre||10000);
+  if(metaDia<=0 || totalHoy<metaDia) return;
+
+  localStorage.setItem(key,'1');
+  _lanzarConfetti();
+
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.75)';
+  modal.innerHTML =
+    '<div style="background:#0f0f0f;border:1px solid rgba(201,168,76,.4);border-radius:16px;padding:32px 28px;text-align:center;max-width:320px;width:100%">' +
+      '<div style="font-size:3.2rem;margin-bottom:10px">🎉</div>' +
+      '<div style="font-family:var(--fh);font-size:1.35rem;font-weight:800;color:var(--gld);margin-bottom:6px">¡Meta cumplida!</div>' +
+      '<div style="font-family:var(--fh);font-size:2rem;font-weight:800;color:var(--ok);margin-bottom:10px">'+(typeof fmt==='function'?fmt(totalHoy):totalHoy)+'</div>' +
+      '<div style="font-size:.85rem;color:var(--tx2);line-height:1.65;margin-bottom:22px">Superaste tu meta diaria.<br>¡Excelente jornada! 🏆</div>' +
+      '<button onclick="this.closest(\'[style*=fixed]\').remove()" style="width:100%;background:var(--gld);color:#080808;border:none;border-radius:8px;padding:13px;font-family:var(--fb);font-size:.9rem;font-weight:700;cursor:pointer">¡Gracias!</button>' +
+    '</div>';
+  document.body.appendChild(modal);
+}
+
+// ── Wrap rGananciaHoy: agrega racha + comparativa debajo de la tarjeta ───
+(function(){
+  var _orig = rGananciaHoy;
+  rGananciaHoy = function(){
+    _orig.apply(this, arguments);
+    var card = document.getElementById('gananciaHoyCard');
+    if(!card || !card.innerHTML) return;
+
+    // Racha
+    var racha = _actualizarRacha();
+    var rachaHtml = '';
+    if(racha >= 2){
+      var llama = racha>=30?'🔥🔥🔥':racha>=14?'🔥🔥':'🔥';
+      rachaHtml =
+        '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bor)">' +
+          '<span style="font-size:1.1rem">'+llama+'</span>' +
+          '<span style="font-size:.82rem;color:var(--tx2)">Llevas <strong style="color:var(--gld)">'+racha+' días</strong> seguidos usando el sistema</span>' +
+        '</div>';
+    }
+
+    // Comparativa semana actual vs semana pasada
+    var compHtml = '';
+    try {
+      var ganEsta = _calcGananciaSemana(0);
+      var ganPasada = _calcGananciaSemana(1);
+      if(ganPasada !== 0){
+        var difPct = Math.round((ganEsta - ganPasada) / Math.abs(ganPasada) * 100);
+        var posMas = difPct > 0;
+        compHtml =
+          '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.8rem;color:var(--tx2)">' +
+            '<span>'+(posMas?'📈':'📉')+'</span>' +
+            '<span>Esta semana ganaste <strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+(posMas?'+':'')+difPct+'%</strong> '+(posMas?'más':'menos')+' que la semana pasada</span>' +
+          '</div>';
+      } else if(ganEsta > 0) {
+        compHtml =
+          '<div style="font-size:.78rem;color:var(--tx2);margin-top:8px">📊 Primera semana registrada — ¡buen comienzo!</div>';
+      }
+    } catch(e){}
+
+    if(rachaHtml || compHtml){
+      card.innerHTML += rachaHtml + compHtml;
+    }
+  };
+})();
+
+// ── Corregir wrappers de rDivision/rPanelDinero (se re-colapsan en cada render) ──
+(function(){
+  var _prevDiv = rDivision;
+  rDivision = function(){
+    _prevDiv.apply(this, arguments);
+    var card = document.getElementById('divisionCard');
+    if(!card || card.style.display==='none') return;
+    if(!document.getElementById('divisionToggleBtn')){
+      var btn = document.createElement('button');
+      btn.id = 'divisionToggleBtn';
+      btn.className = 'btn bgh';
+      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
+      btn.textContent = '📊 Ver detalle de distribución';
+      btn.onclick = function(){
+        var open = card.getAttribute('data-open')==='1';
+        card.style.display = open?'none':'block';
+        card.setAttribute('data-open', open?'0':'1');
+        btn.textContent = open?'📊 Ver detalle de distribución':'📊 Ocultar distribución';
+      };
+      card.parentNode.insertBefore(btn, card);
+    }
+    if(card.getAttribute('data-open')!=='1'){
+      card.style.display='none';
+      var tb = document.getElementById('divisionToggleBtn');
+      if(tb) tb.textContent='📊 Ver detalle de distribución';
+    }
+  };
+
+  var _prevPan = rPanelDinero;
+  rPanelDinero = function(){
+    _prevPan.apply(this, arguments);
+    var panel = document.getElementById('panelDinero');
+    if(!panel || panel.style.display==='none') return;
+    if(!document.getElementById('panelDineroToggleBtn')){
+      var btn = document.createElement('button');
+      btn.id = 'panelDineroToggleBtn';
+      btn.className = 'btn bgh';
+      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
+      btn.textContent = '💡 Ver análisis 50/30/20';
+      btn.onclick = function(){
+        var open = panel.getAttribute('data-open')==='1';
+        panel.style.display = open?'none':'block';
+        panel.setAttribute('data-open', open?'0':'1');
+        btn.textContent = open?'💡 Ver análisis 50/30/20':'💡 Ocultar análisis 50/30/20';
+      };
+      panel.parentNode.insertBefore(btn, panel);
+    }
+    if(panel.getAttribute('data-open')!=='1'){
+      panel.style.display='none';
+      var tb = document.getElementById('panelDineroToggleBtn');
+      if(tb) tb.textContent='💡 Ver análisis 50/30/20';
+    }
+  };
+})();
+
+// ── Wrap rDash: acciones rápidas + celebración meta ───────────────────────
+(function(){
+  var _prev = rDash;
+  rDash = function(){
+    var r = _prev.apply(this, arguments);
+    setTimeout(rAccionesRapidas, 20);
+    setTimeout(checkMetaCelebration, 600);
+    return r;
+  };
+})();
+</script>
+
 <!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
      Envuelve _rwS4 y _rwFinish sin modificar las funciones originales.
 ──────────────────────────────────────────────────────────────────────── -->

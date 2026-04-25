@@ -473,19 +473,74 @@ async function enviar(){
     const cfg = G.cfg;
     const srvNombre = (cfg.servicios||[]).find(s=>String(s.id)===String(srvId))?.nombre||'el servicio';
     const fechaFmt = new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+
+    // Datos adicionales para pantalla de confirmación
+    const profNombre = empId
+      ? ((cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||'')
+      : '';
+    const rubroStr = (G.tenant?.rubro||'').toLowerCase();
+    const rubroEmoji = rubroStr.includes('barber')||rubroStr.includes('salon')||rubroStr.includes('belleza') ? '✂️'
+      : rubroStr.includes('telefon')||rubroStr.includes('tecnico')||rubroStr.includes('técnico') ? '🔧'
+      : '⭐';
+    const negWaTel = (G.online?.tel||'').replace(/\D/g,'');
+    const waConfMsg = encodeURIComponent('Hola! Reservé un turno para el ' + fechaFmt + ' a las ' + hora + '. Quería consultarles algo.');
+    const waLink = negWaTel ? 'https://wa.me/549'+negWaTel+'?text='+waConfMsg : '';
+    const fechaCal = fecha.replace(/-/g,'');
+    const horaCal = hora.replace(':','');
+    const endMinCal = hhToMin(hora) + (_dur0||30);
+    const endHoraCal = minToHH(endMinCal).replace(':','');
+    const gcalTitle = encodeURIComponent('Turno en ' + (G.tenant?.nombre||'el negocio'));
+    const gcalDetails = encodeURIComponent(srvNombre + (profNombre?' — '+profNombre:'') + (G.tenant?.nombre?' | '+G.tenant.nombre:''));
+    const gcalLink = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+gcalTitle+'&dates='+fechaCal+'T'+horaCal+'00/'+fechaCal+'T'+endHoraCal+'00&details='+gcalDetails;
+
     document.getElementById('mainCard').innerHTML = `
-      <div class="msg-ok" style="padding:24px">
-        <div style="font-size:2.5rem;margin-bottom:12px">✅</div>
-        <div style="font-size:1.1rem;font-weight:700;color:#4caf7d;margin-bottom:8px">¡Solicitud enviada!</div>
-        <div style="font-size:.85rem;color:#a89880;line-height:1.7">
-          <strong style="color:#f5f0e8">${esc(nombre)}</strong><br>
-          ${esc(srvNombre)}<br>
-          📅 ${esc(fechaFmt)}<br>
-          🕐 ${esc(hora)}<br><br>
-          El negocio va a confirmar tu turno por WhatsApp al <strong style="color:#f5f0e8">${esc(tel)}</strong>.
+      <div style="text-align:center;padding:8px 0 20px">
+        <div style="font-size:2.8rem;margin-bottom:8px">${rubroEmoji}</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;color:#c9a84c;margin-bottom:3px">${esc(G.tenant?.nombre||'')}</div>
+        <div style="font-size:.68rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:16px">Confirmación de reserva</div>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(76,175,125,.1);border:1px solid rgba(76,175,125,.3);border-radius:20px;padding:6px 16px;margin-bottom:20px">
+          <span style="color:#4caf7d;font-size:.9rem">✓</span>
+          <span style="font-size:.82rem;color:#4caf7d;font-weight:600">Solicitud enviada</span>
         </div>
       </div>
-      <button class="btn" style="margin-top:16px;background:#1a1a1a;color:#c9a84c;border:1px solid rgba(201,168,76,.3)" onclick="location.reload()">Hacer otra reserva</button>
+
+      <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:18px;margin-bottom:14px">
+        <div style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+            <span style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Servicio</span>
+            <span style="font-size:.88rem;color:#f5f0e8;font-weight:600">${esc(srvNombre)}</span>
+          </div>
+          <div style="height:1px;background:#1e1e1e"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+            <span style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Fecha</span>
+            <span style="font-size:.88rem;color:#f5f0e8;font-weight:600">${esc(fechaFmt)}</span>
+          </div>
+          <div style="height:1px;background:#1e1e1e"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+            <span style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Hora</span>
+            <span style="font-size:.88rem;color:#f5f0e8;font-weight:600">🕐 ${esc(hora)}</span>
+          </div>
+          ${profNombre ? `
+          <div style="height:1px;background:#1e1e1e"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
+            <span style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Profesional</span>
+            <span style="font-size:.88rem;color:#f5f0e8;font-weight:600">${esc(profNombre)}</span>
+          </div>` : ''}
+        </div>
+      </div>
+
+      <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:13px 15px;margin-bottom:14px;font-size:.83rem;color:#a89880;line-height:1.65">
+        ¡Te esperamos, <strong style="color:#f5f0e8">${esc(nombre)}</strong>!
+        El negocio confirmará tu turno por WhatsApp al <strong style="color:#f5f0e8">${esc(tel)}</strong>.
+        ${waLink ? `Ante cualquier consulta <a href="${waLink}" target="_blank" rel="noopener" style="color:#c9a84c;font-weight:600">escribinos por WhatsApp</a>.` : ''}
+      </div>
+
+      <a href="${gcalLink}" target="_blank" rel="noopener"
+         style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:1px solid #2e2e2e;border-radius:10px;color:#a89880;font-size:.84rem;text-decoration:none;margin-bottom:14px">
+        📅 Agregar al calendario
+      </a>
+
+      <button class="btn" style="margin-top:0;background:#1a1a1a;color:#c9a84c;border:1px solid rgba(201,168,76,.3)" onclick="location.reload()">Hacer otra reserva</button>
     `;
   } catch(e){
     showErr(e.message||'Error al enviar. Intentá de nuevo.');
