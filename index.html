@@ -13997,7 +13997,6 @@ function rSmartAlerts(){
   eliminarServicioTurno = function(id){
     if(typeof _confirmarModal==='function'){
       _confirmarModal('¿Eliminar este servicio?', function(){
-        // Ejecutar la lógica interna sin pasar por el confirm() original
         var cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : null;
         if(!cfg) return;
         cfg.servicios = cfg.servicios.filter(function(s){ return s.id!==id; });
@@ -14012,6 +14011,110 @@ function rSmartAlerts(){
       _orig.apply(this, arguments);
       if(typeof showToast==='function') showToast('Servicio eliminado ✓');
     }
+  };
+})();
+
+// ── remu-v41: Fix calendario · servicios en Online · eliminar turno ───────────
+
+// 1. Garantizar render del calendario aunque rTurnos() lanze antes de llegar a él
+//    + inyectar botón 🗑 en cada card de turno para eliminación individual.
+(function(){
+  var _rTurnosV41Orig = rTurnos;
+  rTurnos = function(){
+    try {
+      _rTurnosV41Orig.apply(this, arguments);
+    } catch(e) {}
+    if(typeof turnosVista !== 'undefined' && turnosVista === 'calendario'){
+      var el = document.getElementById('turnosCalendario');
+      if(el && el.style.display !== 'none' && !el.innerHTML.trim()){
+        try{ rTurnosCalendario(); } catch(e2){}
+      }
+    }
+    setTimeout(function(){
+      var listaEl = document.getElementById('turnosLista');
+      if(!listaEl) return;
+      listaEl.querySelectorAll('[onclick*="editarTurno"]').forEach(function(btn){
+        if(btn.nextElementSibling && btn.nextElementSibling.getAttribute('data-delturno')) return;
+        var m = (btn.getAttribute('onclick')||'').match(/editarTurno\('([^']+)'\)/);
+        if(!m) return;
+        var tid = m[1];
+        var delBtn = document.createElement('button');
+        delBtn.className = 'btn bd bsm';
+        delBtn.setAttribute('data-delturno', tid);
+        delBtn.setAttribute('title', 'Eliminar turno definitivamente');
+        delBtn.textContent = '🗑';
+        delBtn.onclick = function(){ eliminarTurnoAdmin(tid); };
+        btn.parentNode.insertBefore(delBtn, btn.nextSibling);
+      });
+    }, 20);
+  };
+})();
+
+// 2. Eliminar turno individual — borra de localStorage sin posibilidad de recuperar
+function eliminarTurnoAdmin(id){
+  if(typeof _confirmarModal !== 'function') return;
+  _confirmarModal('¿Eliminar este turno? Esta acción no se puede deshacer.', function(){
+    var k = TURNOS_KEY + '_' + (currentTenant ? currentTenant.id : '');
+    try {
+      var arr = JSON.parse(localStorage.getItem(k) || '[]');
+      arr = arr.filter(function(t){ return t.id !== id; });
+      localStorage.setItem(k, JSON.stringify(arr));
+      if(typeof rTurnos === 'function') rTurnos();
+      if(typeof showToast === 'function') showToast('Turno eliminado ✓');
+    } catch(e) {
+      if(typeof showToast === 'function') showToast('Error al eliminar');
+    }
+  });
+}
+
+// 3. Panel de servicios en sec-turnosOnline
+// El usuario espera gestionar servicios desde "Reservas online → Configurar".
+// Los servicios solo estaban en sec-turnosConfig; ahora se renderizan en ambas.
+function _renderServiciosOnline(){
+  var sec = document.getElementById('sec-turnosOnline');
+  if(!sec || sec.style.display === 'none') return;
+  var cid = 'serviciosOnlineMgr';
+  var container = document.getElementById(cid);
+  if(!container){
+    container = document.createElement('div');
+    container.className = 'card';
+    container.id = cid;
+    container.style.marginBottom = '14px';
+    var firstCard = sec.querySelector('.card');
+    if(firstCard) sec.insertBefore(container, firstCard);
+    else sec.appendChild(container);
+  }
+  var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
+  var F = typeof fmt === 'function' ? fmt : function(n){ return '$'+n; };
+  container.innerHTML = '<div class="ch"><h3>✂ Servicios disponibles</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>' +
+    (cfg.servicios.length ? cfg.servicios.map(function(s){
+      return '<div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
+        '<div><span class="bx bg2" style="margin-right:6px">' + (s.sector||'') + '</span>' +
+        '<strong style="font-size:.85rem">' + (s.nombre||'') + '</strong>' +
+        '<span style="color:var(--tx2);font-size:.78rem;margin-left:8px">' + (s.duracion||30) + ' min</span>' +
+        (s.precio > 0 ? '<span style="color:var(--gld);font-size:.78rem;margin-left:4px">· ' + F(s.precio) + '</span>' : '') +
+        '</div><div style="display:flex;gap:6px">' +
+        '<button class="btn be bsm" onclick="editarServicioTurno(' + s.id + ')">✎</button>' +
+        '<button class="btn bd bsm" onclick="eliminarServicioTurno(' + s.id + ')">✕</button>' +
+        '</div></div>';
+    }).join('') : '<div style="color:var(--mut);font-size:.8rem;padding:8px 0">Sin servicios. Agregá uno para que aparezca en tu página de turnos online.</div>');
+}
+
+(function(){
+  var _rTurnosOnlineOrig = rTurnosOnline;
+  rTurnosOnline = async function(){
+    await _rTurnosOnlineOrig.apply(this, arguments);
+    _renderServiciosOnline();
+  };
+})();
+
+// Refrescar panel online cada vez que se guarda la config de servicios
+(function(){
+  var _rTurnosConfigOrig2 = rTurnosConfig;
+  rTurnosConfig = async function(){
+    var r = await _rTurnosConfigOrig2.apply(this, arguments);
+    setTimeout(_renderServiciosOnline, 50);
+    return r;
   };
 })();
 </script>
