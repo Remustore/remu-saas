@@ -1,8 +1,8 @@
-// Remu Gestión — Service Worker v2
+// Remu Gestión — Service Worker v3
 // index.html: network-first (siempre toma la versión más nueva)
 // CDN / assets: cache-first (sin cambios frecuentes)
 
-const CACHE_NAME = 'remu-v31';
+const CACHE_NAME = 'remu-v32';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon.svg',
@@ -117,9 +117,72 @@ self.addEventListener('fetch', event => {
   );
 });
 
-// ── Mensaje del cliente ────────────────────────────────────────────────
+// ── Mensajes del cliente ───────────────────────────────────────────────
 self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (!event.data) return;
+  if (event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    return;
   }
+  // SHOW_NOTIF: el cliente pide mostrar una notificación via SW
+  // (funciona aunque la pestaña esté en segundo plano o minimizada)
+  if (event.data.type === 'SHOW_NOTIF') {
+    const { title, body, section, tag, icon } = event.data;
+    event.waitUntil(
+      self.registration.showNotification(title || 'Remu Gestión', {
+        body: body || '',
+        icon: icon || '/icon.svg',
+        badge: '/icon.svg',
+        tag: tag || ('remu_' + Date.now()),
+        data: { section: section || '' },
+        requireInteraction: false
+      })
+    );
+  }
+});
+
+// ── Notification click — navegar a la sección correcta ─────────────────
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const section = event.notification.data?.section || '';
+  const targetUrl = self.registration.scope + (section ? '?go=' + section : '');
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      // Primero intentar enfocar una ventana abierta de la app
+      for (const client of list) {
+        try {
+          const clientOrigin = new URL(client.url).origin;
+          const swOrigin = new URL(self.registration.scope).origin;
+          if (clientOrigin === swOrigin && 'focus' in client) {
+            client.focus();
+            if (section) client.postMessage({ type: 'GO_SECTION', section });
+            return;
+          }
+        } catch(e) {}
+      }
+      // Sin ventana abierta — abrir una nueva
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
+  );
+});
+
+// ── Push (preparado para VAPID en el futuro) ───────────────────────────
+// Para activar notificaciones cuando la app esté completamente cerrada
+// se necesita suscribir con PushManager.subscribe() y un servidor VAPID.
+self.addEventListener('push', event => {
+  if (!event.data) return;
+  try {
+    const d = event.data.json();
+    event.waitUntil(
+      self.registration.showNotification(d.title || 'Remu Gestión', {
+        body: d.body || '',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag: d.tag || 'remu-push',
+        data: { section: d.section || '' },
+        requireInteraction: false
+      })
+    );
+  } catch(e) {}
 });

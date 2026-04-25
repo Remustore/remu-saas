@@ -12553,7 +12553,7 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
   <span style="font-size:1.3rem;flex-shrink:0">🔔</span>
   <div style="flex:1;min-width:0">
     <div style="font-weight:600;font-size:.88rem;color:#f5f0e8">Activá las alertas</div>
-    <div style="font-size:.74rem;color:#a89880;margin-top:1px">Recibí una notificación cuando llegue una reserva nueva o un gasto requiera revisión.</div>
+    <div style="font-size:.74rem;color:#a89880;margin-top:1px">Nuevas reservas online, turnos en 1 hora y cambios en el taller.</div>
   </div>
   <button onclick="activarNotificaciones()" style="background:#c9a84c;color:#080808;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:.8rem;cursor:pointer;font-family:'Outfit',sans-serif;white-space:nowrap;flex-shrink:0">Activar</button>
   <button onclick="descartarBannerNotif()" style="background:none;border:none;color:#a89880;font-size:1.3rem;cursor:pointer;padding:4px 6px;flex-shrink:0;line-height:1">✕</button>
@@ -12719,6 +12719,201 @@ function checkNotifGastosFijos(){
   });
   if(proximos.length) localStorage.setItem(storageKey, JSON.stringify([...vistoSet]));
 }
+</script>
+
+<!-- ── Push Notifications — Web Push API nativa (sin servicios externos) ──
+     Tres tipos: nueva reserva, turno en 1 hora, cambio de estado taller.
+     Usa registration.showNotification() via SW → funciona con app minimizada.
+     El SW maneja notificationclick para abrir/enfocar la sección correcta.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── Guardar registro del SW para showNotification ────────────────────
+(function(){
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready.then(reg => { window._swReg = reg; });
+  // Mensaje del SW → navegar a la sección (cuando se hace click en notificación)
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if (ev.data?.type === 'GO_SECTION' && typeof go === 'function') go(ev.data.section);
+  });
+})();
+
+// ── Preferencias de notificación ─────────────────────────────────────
+function _getNotifPrefs(){
+  const k = 'notif_prefs_' + (currentTenant?.id || 'guest');
+  try { return JSON.parse(localStorage.getItem(k) || '{}'); } catch(e) { return {}; }
+}
+function _isNotifEnabled(tipo){
+  return _getNotifPrefs()[tipo] !== false; // habilitado por defecto
+}
+function _setNotifPref(tipo, val){
+  const k = 'notif_prefs_' + (currentTenant?.id || 'guest');
+  const p = _getNotifPrefs(); p[tipo] = val;
+  localStorage.setItem(k, JSON.stringify(p));
+}
+
+// ── Función central: notificación via SW ─────────────────────────────
+// Usa registration.showNotification() para que funcione con app minimizada.
+// Fallback a new Notification() si el SW no está disponible.
+async function _swNotif(title, body, section, tag){
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  const reg = window._swReg;
+  if (reg){
+    try {
+      await reg.showNotification(title, {
+        body, icon: '/icon.svg', badge: '/icon.svg',
+        tag: tag || (section + '_' + Date.now()),
+        data: { section: section || '' },
+        requireInteraction: false
+      });
+      return;
+    } catch(e) {}
+  }
+  // Fallback: Notification API clásica
+  try {
+    const n = new Notification(title, { body, icon: '/icon.svg', tag: tag || section });
+    n.onclick = () => { window.focus(); if (section && typeof go==='function') go(section); n.close(); };
+  } catch(e) {}
+}
+
+// ── Recordatorio: turno en 1 hora ────────────────────────────────────
+function checkTurnosEnUnaHora(){
+  if (!_isNotifEnabled('recordatorio') || Notification.permission !== 'granted') return;
+  const turnos = typeof getTurnos === 'function' ? getTurnos() : [];
+  if (!turnos.length) return;
+  const now = new Date();
+  const hoy = now.toISOString().slice(0, 10);
+  const storKey = 'notif_1h_' + hoy + '_' + (currentTenant?.id || '');
+  const yaSet = new Set(JSON.parse(localStorage.getItem(storKey) || '[]'));
+  const cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : { servicios: [] };
+  let changed = false;
+
+  turnos.forEach(t => {
+    if (t.fecha !== hoy) return;
+    if (['cancelado', 'terminado', 'no_vino'].includes(t.estado)) return;
+    const [h, m] = (t.hora || '00:00').split(':').map(Number);
+    const tTime = new Date(now); tTime.setHours(h, m, 0, 0);
+    const diffMin = (tTime - now) / 60000;
+    // Ventana de 55-65 min para tolerar imprecisión del setInterval
+    if (diffMin < 55 || diffMin > 65) return;
+    if (yaSet.has(String(t.id))) return;
+    yaSet.add(String(t.id)); changed = true;
+    const srvNombre = (cfg.servicios || []).find(s => s.id == t.servicioId)?.nombre || '';
+    _swNotif(
+      `⏰ Turno en 1 hora — ${currentTenant?.nombre || 'tu negocio'}`,
+      `${t.cliente}${srvNombre ? ' · ' + srvNombre : ''} a las ${t.hora}`,
+      'turnos',
+      'rec_' + t.id
+    );
+  });
+  if (changed) localStorage.setItem(storKey, JSON.stringify([...yaSet]));
+}
+
+// ── Card de configuración de notificaciones en turnosConfig ──────────
+function _renderNotifCard(){
+  const sec = document.getElementById('sec-turnosConfig');
+  if (!sec) return;
+  let card = document.getElementById('notifConfigCard');
+  if (!card){
+    card = document.createElement('div');
+    card.id = 'notifConfigCard';
+    card.className = 'card';
+    card.style.marginTop = '14px';
+    sec.appendChild(card);
+  }
+  const perm = 'Notification' in window ? Notification.permission : 'unavailable';
+  const enabled = tipo => _getNotifPrefs()[tipo] !== false;
+
+  const toggle = (tipo, emoji, label) =>
+    `<label style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--bor);cursor:pointer;gap:12px">
+      <span style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:var(--tx2)">
+        <span style="width:22px;text-align:center;flex-shrink:0">${emoji}</span>${label}
+      </span>
+      <input type="checkbox" ${enabled(tipo) ? 'checked' : ''}
+        onchange="_setNotifPref('${tipo}', this.checked)"
+        style="width:18px;height:18px;accent-color:var(--gld);cursor:pointer;flex-shrink:0">
+    </label>`;
+
+  const permBanner = perm === 'granted' ? '' :
+    `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:.78rem;color:var(--tx2);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:1.2rem">🔔</span>
+      <span style="flex:1">
+        ${perm === 'denied'
+          ? 'Las notificaciones están <strong style="color:var(--bad)">bloqueadas</strong> en el navegador — habilitarlas desde la configuración del sitio.'
+          : 'Las notificaciones están desactivadas.'}
+        ${perm === 'default' ? `<button onclick="activarNotificaciones();setTimeout(_renderNotifCard,500)" style="background:var(--gld);color:#080808;border:none;padding:4px 10px;border-radius:6px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:var(--fb);margin-left:6px">Activar ahora</button>` : ''}
+      </span>
+    </div>`;
+
+  card.innerHTML =
+    `<div class="ch"><h3>🔔 Notificaciones push</h3></div>
+     ${permBanner}
+     <div style="margin-bottom:4px">
+       ${toggle('reserva',   '📅', 'Nueva reserva online')}
+       ${toggle('recordatorio', '⏰', 'Turno próximo (aviso 1 hora antes)')}
+       ${toggle('taller',    '🔧', 'Cambio de estado en taller')}
+     </div>
+     <div style="font-size:.72rem;color:var(--mut);margin-top:10px;line-height:1.5">
+       Las notificaciones aparecen aunque la app esté minimizada o en otra pestaña.
+     </div>`;
+}
+
+// ── Wrappers sobre funciones existentes ──────────────────────────────
+(function(){
+  // 1. Redirigir _notifLocal al sistema SW + respetar preferencias por tipo
+  var _notifLocalOrig = _notifLocal;
+  _notifLocal = function(titulo, cuerpo, seccion){
+    var tipo = seccion === 'turnosOnline' ? 'reserva'
+             : seccion === 'taller'       ? 'taller'
+             : seccion;
+    if (!_isNotifEnabled(tipo)) return;
+    _swNotif(titulo, cuerpo, seccion);
+  };
+
+  // 2. confAv → notificar al admin cuando cambia estado de una reparación
+  var _confAvOrig = confAv;
+  confAv = async function(){
+    const _avId   = typeof avId !== 'undefined' ? avId : null;
+    const _rBefore = _avId && S.reparaciones ? S.reparaciones.find(r => r.id === _avId) : null;
+    const _eAntes  = _rBefore?.estado;
+    const _ns      = document.getElementById('avEst')?.value;
+    const _cli     = _rBefore?.cliente || '';
+    const _eq      = _rBefore?.equipo  || '';
+    const result   = await _confAvOrig.apply(this, arguments);
+    if (_rBefore && _ns && _ns !== _eAntes && _isNotifEnabled('taller')){
+      const lbl = { recibido:'Recibido', diagnostico:'En diagnóstico', reparacion:'En reparación',
+                    listo:'Listo para retirar', entregado:'Entregado', sin_reparacion:'Sin reparación' };
+      _swNotif(
+        `🔧 Avance en taller — ${currentTenant?.nombre || 'tu negocio'}`,
+        `${_cli}${_eq ? ' · ' + _eq : ''}: ${lbl[_ns] || _ns}`,
+        'taller',
+        'taller_' + _avId
+      );
+    }
+    return result;
+  };
+
+  // 3. rTurnosConfig → inyectar card de configuración de notificaciones
+  var _rTurnosConfigOrig = rTurnosConfig;
+  rTurnosConfig = async function(){
+    var result = await _rTurnosConfigOrig.apply(this, arguments);
+    _renderNotifCard();
+    return result;
+  };
+
+  // 4. activarNotificaciones → también arrancar el checker de 1h
+  var _activarNotifOrig = activarNotificaciones;
+  activarNotificaciones = async function(){
+    var result = await _activarNotifOrig.apply(this, arguments);
+    setTimeout(checkTurnosEnUnaHora, 500);
+    return result;
+  };
+})();
+
+// ── Arrancar el checker de recordatorios cada minuto ─────────────────
+setInterval(checkTurnosEnUnaHora, 60000);
+// Primera ejecución tras carga de datos (15s = tiempo estimado de carga)
+setTimeout(checkTurnosEnUnaHora, 15000);
 </script>
 
 <!-- ── Features: métricas SA, test MP, emails bienvenida/vencimiento ──────
