@@ -13398,57 +13398,86 @@ function _playNotifSound(tipo) {
      Envuelve rDash, rDivision, rPanelDinero y rStock sin modificar originales.
 ──────────────────────────────────────────────────────────────────────── -->
 <script>
-// ── rGananciaHoy: tarjeta destacada con ingreso/gasto/ganancia del día ──
+// ── rGananciaHoy: ganancia real del día (revenue - COGS - gastos) ──────
 function rGananciaHoy(){
   var card = document.getElementById('gananciaHoyCard');
   if(!card) return;
   var hoy = tod();
   var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
   var esBarberia = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+  var F = typeof fmt==='function' ? fmt : function(n){ return '$'+n; };
 
-  var ingresos = 0;
+  // ── Calcular ingresos y costo de mercadería ──
+  var vendido = 0;   // facturación total (precio de venta)
+  var cogs    = 0;   // costo de lo vendido
+  var sinCosto = 0;  // productos sin costo cargado
+
   if(esBarberia){
-    // servicios: desde getTurnos (localStorage) para evitar duplicados
-    if(typeof getTurnos === 'function'){
-      ingresos += getTurnos().filter(function(t){ return t.fecha===hoy && t.estado==='terminado'; })
-                             .reduce(function(a,t){ return a+(t.precio||0); }, 0);
+    // Servicios desde getTurnos (sin duplicados): ganancia = precio, sin costo
+    if(typeof getTurnos==='function'){
+      getTurnos().filter(function(t){ return t.fecha===hoy && t.estado==='terminado'; })
+                 .forEach(function(t){ vendido += t.precio||0; });
     }
-    // productos vendidos hoy (no servicios)
-    ingresos += S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo!=='servicio'; })
-                        .reduce(function(a,v){ return a+v.total; }, 0);
+    // Productos vendidos hoy: ganancia = precio - costo
+    S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo!=='servicio'; })
+            .forEach(function(v){
+              vendido += v.total||0;
+              if(v.tipo==='equipo'){
+                cogs += v.costo||0;
+                if(!(v.costo>0)) sinCosto++;
+              } else if(v.tipo==='producto'){
+                cogs += v.costo||0;
+                if(!(v.costo>0)) sinCosto++;
+              }
+            });
   } else {
-    // taller/otros: ventas + reparaciones entregadas hoy
-    ingresos += S.ventas.filter(function(v){ return v.fecha===hoy; })
-                        .reduce(function(a,v){ return a+v.total; }, 0);
-    ingresos += S.reparaciones.filter(function(r){ return r.fecha===hoy && r.estado==='entregado'; })
-                              .reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
+    // Ventas del día (productos, equipos, servicios en tienda)
+    S.ventas.filter(function(v){ return v.fecha===hoy; })
+            .forEach(function(v){
+              vendido += v.total||0;
+              if(v.tipo==='servicio'){
+                // servicio técnico vendido: sin costo de mercadería
+              } else {
+                cogs += v.costo||0;
+                if(!(v.costo>0)) sinCosto++;
+              }
+            });
+    // Reparaciones entregadas: ganancia = presupuesto cobrado, sin costo de mercadería
+    S.reparaciones.filter(function(r){ return r.fecha===hoy && r.estado==='entregado'; })
+                  .forEach(function(r){ vendido += r.presupuesto||0; });
   }
-  var gastos = S.gastos.filter(function(g){ return g.fecha===hoy; })
-                       .reduce(function(a,g){ return a+g.monto; }, 0);
-  var ganancia = ingresos - gastos;
-  var colorGan = ganancia >= 0 ? 'var(--ok)' : 'var(--bad)';
+
+  var gastos    = S.gastos.filter(function(g){ return g.fecha===hoy; })
+                          .reduce(function(a,g){ return a+g.monto; }, 0);
+  var ganBruta  = vendido - cogs;          // ganancia bruta (antes de gastos operativos)
+  var ganNeta   = ganBruta - gastos;       // ganancia real del día
+  var colorNeta = ganNeta >= 0 ? 'var(--ok)' : 'var(--bad)';
+
+  var row = function(icon, label, valor, color, bold, sep){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;'+(sep?'border-top:1px solid var(--bor);padding-top:7px;margin-top:4px':'')+'">' +
+      '<span style="color:var(--tx2)">'+icon+' '+label+'</span>' +
+      '<span style="color:'+color+';font-weight:'+(bold?'700':'500')+'">'+(typeof valor==='string'?valor:F(valor))+'</span>' +
+    '</div>';
+  };
+
+  var aviso = sinCosto > 0
+    ? '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:rgba(201,160,76,.08);border:1px solid rgba(201,160,76,.25);border-radius:8px;font-size:.75rem;color:var(--wrn)">'+
+        '<span>⚠️</span><span>'+sinCosto+' producto'+(sinCosto===1?'':'s')+' sin costo cargado — el cálculo puede ser inexacto</span>'+
+      '</div>'
+    : '';
 
   card.innerHTML =
-    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">' +
-      '<span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600">💰 Ganancia hoy</span>' +
+    '<div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">💰 Ganancia real hoy</div>' +
+    '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorNeta+';line-height:1.1;margin-bottom:12px">' +
+      (ganNeta>=0?'':'-')+F(Math.abs(ganNeta)) +
     '</div>' +
-    '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorGan+';line-height:1.1;margin-bottom:10px">' +
-      (ganancia>=0?'':'-') + (typeof fmt==='function'?fmt(Math.abs(ganancia)):Math.abs(ganancia)) +
+    '<div style="display:flex;flex-direction:column;gap:6px">' +
+      row('📥','Vendiste',     vendido,       'var(--ok)',   false, false) +
+      row('📦','Costo mercadería', cogs,      'var(--wrn)',  false, false) +
+      row('📤','Gastos del día',   gastos,    'var(--bad)',  false, false) +
+      row('💵','Te quedó limpio',  Math.abs(ganNeta), colorNeta, true,  true) +
     '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:5px">' +
-      '<div style="display:flex;justify-content:space-between;font-size:.85rem">' +
-        '<span style="color:var(--tx2)">📥 Ingresó</span>' +
-        '<span style="color:var(--ok);font-weight:600">'+(typeof fmt==='function'?fmt(ingresos):ingresos)+'</span>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:.85rem">' +
-        '<span style="color:var(--tx2)">📤 Gasté</span>' +
-        '<span style="color:var(--bad);font-weight:600">'+(typeof fmt==='function'?fmt(gastos):gastos)+'</span>' +
-      '</div>' +
-      '<div style="display:flex;justify-content:space-between;font-size:.88rem;border-top:1px solid var(--bor);padding-top:6px;margin-top:2px">' +
-        '<span style="color:var(--tx);font-weight:600">💵 Me quedó</span>' +
-        '<span style="color:'+colorGan+';font-weight:700;font-size:.95rem">'+(ganancia>=0?'':'-')+(typeof fmt==='function'?fmt(Math.abs(ganancia)):Math.abs(ganancia))+'</span>' +
-      '</div>' +
-    '</div>';
+    aviso;
 }
 
 // ── rStockResumen: inversión total y valor de venta del stock ──────────
