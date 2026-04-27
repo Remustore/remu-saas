@@ -9103,6 +9103,11 @@ function pubRender(){
     'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
     'lifting':     /lifting|pesta[ñn]/i,
     'depilacion':  /depilac|cera|laser/i,
+    'pantalla':    /pantalla|display|lcd/i,
+    'bateria':     /bater[ií]a/i,
+    'tapa':        /tapa|back|trasera/i,
+    'conector':    /conector|carga|puerto/i,
+    'camara':      /c[aá]mara/i,
     'otro':        /.*/
   };
   const items = (window.__preciosPublicItems||[]).filter(p=>{
@@ -9110,8 +9115,11 @@ function pubRender(){
     const matchQ = !q || norm(p.nombre).includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
     let matchC = !cat;
     if(!matchC){
-      const kw = pubCatKw[norm(cat)];
-      matchC = kw ? kw.test(p.nombre) : norm(p.nombre).includes(norm(cat));
+      if(p.categoria && norm(p.categoria) === norm(cat)){ matchC = true; }
+      else {
+        const kw = pubCatKw[norm(cat)];
+        matchC = kw ? kw.test(p.nombre) : norm(p.nombre).includes(norm(cat));
+      }
     }
     return matchQ && matchC;
   });
