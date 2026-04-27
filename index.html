@@ -5444,7 +5444,7 @@ function rDash(){
   // S.ventas puede tener duplicados históricos → no usar para servicios en barberías.
   const tVProducto = esBarberiaD ? vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0) : 0;
   const tTurnosMes = esBarberiaD && getTurnos ? filtrarDash(getTurnos().filter(t=>t.estado==='terminado'),'fecha').reduce((a,t)=>a+(t.precio||0),0) : 0;
-  const repEntregadas = !esBarberiaD ? filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado'||r.estado==='listo').map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha}),'fechaEnt') : [];
+  const repEntregadas = !esBarberiaD ? filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado').map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha}),'fechaEnt') : [];
   const tR = repEntregadas.reduce((a,r)=>a+(r.presupuesto||0),0);
   const totalMesReal = esBarberiaD ? tVProducto + tTurnosMes : tV + tR;
   console.log('[rDash] esBarberiaD:', esBarberiaD, '| tTurnosMes (getTurnos):', tTurnosMes, '| tVProducto:', tVProducto, '| totalMesReal:', totalMesReal, '| S.ventas servicio (puede tener dups):', vm.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0));
@@ -5769,11 +5769,7 @@ function getCajas(){
     });
   } else {
     S.ventas.filter(v=>v.fecha===hoy).forEach(v=>{if(v.tipo==='servicio')cajas.servicio+=v.total||0;else if(v.tipo==='producto')cajas.accesorios+=v.total||0;else if(v.tipo==='equipo')cajas.equipos+=v.comision||v.total||0;});
-    S.reparaciones.filter(r=>{
-      if(r.estado==='entregado') return (r.fechaEnt||r.fecha)===hoy;
-      if(r.estado==='listo'){const fL=(r.historial||[]).filter(h=>h.estado==='listo').pop()?.fecha||r.fecha;return fL===hoy;}
-      return false;
-    }).forEach(r=>{cajas.servicio+=r.presupuesto||0;});
+    S.reparaciones.filter(r=>r.estado==='entregado'&&(r.fechaEnt||r.fecha)===hoy).forEach(r=>{cajas.servicio+=r.presupuesto||0;});
   }
   S.gastos.filter(g=>g.fecha===hoy).forEach(g=>{const c=g.caja||'general';cajas[c]-=g.monto||0;});
   (S.movCaja||[]).filter(m=>(!m.fecha||m.fecha===hoy)).forEach(m=>{if(m.tipo==='ingreso')cajas[m.caja]+=m.monto||0;else if(m.tipo==='egreso')cajas[m.caja]-=m.monto||0;});
