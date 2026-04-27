@@ -1334,6 +1334,15 @@ $$;</pre>
         <label style="margin-top:14px">Nota sobre precios (visible en lista pública)</label>
         <input id="onlineNotaPrecios" placeholder="Los precios pueden variar según..." style="margin-bottom:4px">
         <div style="font-size:.72rem;color:var(--mut)">Este texto aparece en la parte superior de tu lista de precios pública. Dejalo vacío para usar el texto por defecto.</div>
+        <label style="margin-top:14px">Logo del negocio <span style="font-weight:400">(JPG/PNG · máx. 500 KB)</span></label>
+        <input id="onlineLogoFile" type="file" accept="image/jpeg,image/png" style="display:none" onchange="handleLogoUpload(this)">
+        <input id="onlineLogo" type="hidden">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <button type="button" class="btn bgh bsm" style="width:auto;margin:0" onclick="document.getElementById('onlineLogoFile').click()">📷 Elegir imagen</button>
+          <span id="onlineLogoNombre" style="font-size:.75rem;color:var(--mut)">Sin logo cargado</span>
+        </div>
+        <div id="onlineLogoPreview" style="margin-bottom:4px"></div>
+        <div style="font-size:.72rem;color:var(--mut)">Aparece en tu página de turnos, lista de precios y catálogo público.</div>
         <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
@@ -8301,6 +8310,12 @@ async function rTurnosOnline(){
     if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
     if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
     if(document.getElementById('onlineNotaPrecios')) document.getElementById('onlineNotaPrecios').value = cfg.notaPrecios||'';
+    const _logo = cfg.logo||'';
+    if(document.getElementById('onlineLogo')) document.getElementById('onlineLogo').value = _logo;
+    const _logoNombre = document.getElementById('onlineLogoNombre');
+    if(_logoNombre) _logoNombre.textContent = _logo ? 'Logo guardado' : 'Sin logo cargado';
+    const _logoPreview = document.getElementById('onlineLogoPreview');
+    if(_logoPreview) _logoPreview.innerHTML = _logo ? `<img src="${_logo}" alt="Logo" style="max-height:64px;max-width:160px;object-fit:contain;border-radius:6px;border:1px solid var(--brd)">` : '';
   }
 
   cargarSolicitudes();
@@ -8514,13 +8529,31 @@ Tu turno en *${neg}* fue *confirmado* ✅
   window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
 }
 
+function handleLogoUpload(input){
+  const file = input.files?.[0];
+  if(!file) return;
+  if(file.size > 500*1024){ alert('La imagen no puede superar 500 KB. Elegí una imagen más pequeña.'); input.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    const b64 = e.target.result;
+    const logoInput = document.getElementById('onlineLogo');
+    if(logoInput) logoInput.value = b64;
+    const nombre = document.getElementById('onlineLogoNombre');
+    if(nombre) nombre.textContent = file.name;
+    const preview = document.getElementById('onlineLogoPreview');
+    if(preview) preview.innerHTML = `<img src="${b64}" alt="Logo" style="max-height:64px;max-width:160px;object-fit:contain;border-radius:6px;border:1px solid var(--brd)">`;
+  };
+  reader.readAsDataURL(file);
+}
+
 function saveOnlineConfig(){
   const cfg = {
     mensaje: document.getElementById('onlineMensaje')?.value||'',
     insta: document.getElementById('onlineInsta')?.value||'',
     direccion: document.getElementById('onlineDireccion')?.value||'',
     tel: (document.getElementById('onlineTel')?.value||'').replace(/\D/g,''),
-    notaPrecios: document.getElementById('onlineNotaPrecios')?.value||''
+    notaPrecios: document.getElementById('onlineNotaPrecios')?.value||'',
+    logo: document.getElementById('onlineLogo')?.value||''
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
@@ -8552,6 +8585,7 @@ function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
   document.body.innerHTML = `
     <div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif">
       <div style="background:#141414;border:1px solid #242424;border-radius:16px;width:100%;max-width:420px;padding:24px">
+        ${cfg.logo?`<div style="text-align:center;margin-bottom:14px"><img src="${cfg.logo}" alt="Logo" style="max-height:72px;max-width:180px;object-fit:contain;border-radius:8px"></div>`:''}
         <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;text-align:center;margin-bottom:4px">${esc(tenant.nombre)}</div>
         <div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:20px">${esc(cfg.mensaje||'Reservá tu turno online')}</div>
         ${cfg.direccion?`<div style="text-align:center;font-size:.75rem;color:#a89880;margin-bottom:16px">📍 ${esc(cfg.direccion)}</div>`:''}
@@ -9022,7 +9056,7 @@ function mostrarPreciosPublicos(tenantId, items, cfg){
 
       <!-- HEADER -->
       <div style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
-        <div style="font-size:2.2rem;margin-bottom:6px">${rubroIcon}</div>
+        ${oc.logo?`<div style="margin-bottom:14px"><img src="${oc.logo}" alt="Logo" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:10px"></div>`:`<div style="font-size:2.2rem;margin-bottom:6px">${rubroIcon}</div>`}
         <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(tenantName)}</div>
         ${rubro ? `<div style="font-size:.66rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
         ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
