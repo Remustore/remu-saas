@@ -3696,6 +3696,7 @@ async function loadAll(){
       }
     }
     renderAll();
+    setupCategoriasStock();
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
     // Sincronizar turnos manuales a Supabase (asegurar que página pública vea disponibilidad correcta)
@@ -9479,7 +9480,7 @@ async function enviarSolicitudTurno(tenantId){
 function getCategorias(){
   const cats = currentTenant?.modulos?.categoriasStock;
   if(cats && Array.isArray(cats) && cats.length) return cats;
-  return ['Fundas siliconadas', 'Fundas con diseño', 'Cables', 'Cargadores', 'Templados', 'Parlantes', 'Auriculares', 'Baterías portátiles', 'Soportes y accesorios', 'Stanley y termos', 'Gorras', 'Otros'];
+  return [...new Set((S.stock||[]).map(s=>s.categoria).filter(Boolean))].sort();
 }
 
 function setupCategoriasStock(){
