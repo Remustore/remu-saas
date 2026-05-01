@@ -468,10 +468,10 @@ textarea{resize:vertical;min-height:70px;}
 /* ── TABLAS RESPONSIVE MOBILE: layout de tarjetas ── */
 @media(max-width:480px){
   /* Sin scroll horizontal — tabla se convierte en lista de tarjetas */
-  .tw{overflow-x:visible !important;}
+  .tw{overflow-x:visible !important;overflow-y:visible !important;}
   .tw table{display:block;width:100%;min-width:0 !important;}
   .tw thead{display:none;}
-  .tw tbody{display:block;}
+  .tw tbody{display:block;width:100%;}
   .tw tr{
     display:block;
     background:var(--car);
@@ -966,13 +966,13 @@ $$;</pre>
         </div>
       </div>
       <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
-      <div class="card" id="objetivosCompraCard">
+      <div class="card" id="objetivosCompraCard" style="display:none">
         <div class="ch"><h3>🛒 Objetivos de compra</h3><button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Agregar</button></div>
         <div id="objetivosCompraList"></div>
       </div>
       <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div><div id="movCajaLista" style="margin-top:10px"></div></div>
       <div class="g2" style="margin-bottom:14px">
-        <div class="card">
+        <div class="card" style="display:none">
           <div class="ch"><h3>Meta mensual</h3></div>
           <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
             <div style="text-align:center">
@@ -1669,7 +1669,7 @@ $$;</pre>
   </div>
 </div>
 <div class="fr full"><div><label>Fecha estimada de entrega</label><input type="date" id="tFechaEnt" placeholder="Fecha estimada"></div></div>
-<div class="fr"><div><label>Costo del repuesto ($)</label><input type="number" id="tCosRep" placeholder="0" oninput="calcGanTaller()"></div><div><label>Flete / Comisionista ($)</label><input type="number" id="tFlete" placeholder="0" oninput="calcGanTaller()"></div></div>
+<div class="fr"><div><label>Costo del repuesto ($)</label><input type="number" id="tCosRep" placeholder="0" oninput="calcGanTaller()"></div><div><label>Comisión / Flete ($)</label><input type="number" id="tFlete" placeholder="0" oninput="calcGanTaller()"></div></div>
 <div style="margin-top:10px;padding:10px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">
   <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;font-weight:600">🔍 Estado del equipo al ingreso</div>
   <div class="fr">
@@ -1909,7 +1909,8 @@ $$;</pre>
 <div class="mb" id="mAv"><div class="md"><div class="mh"><div class="mt2">Actualizar trabajo</div><button class="xbtn" onclick="closeM('mAv')">✕</button></div>
 <div class="mc">
 <div id="avInfo" style="font-size:.82rem;color:var(--tx2);margin-bottom:12px;padding:10px;background:var(--bg);border-radius:7px;"></div>
-<label>Nuevo estado</label><select id="avEst" onchange="chkWA()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo para retirar ✓</option><option value="entregado">Entregado</option></select>
+<label>Nuevo estado</label><select id="avEst" onchange="chkWA();_toggleAvMetodo()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo para retirar ✓</option><option value="entregado">Entregado</option></select>
+<div id="avMetodoBox" style="display:none;margin-top:8px"><label>Método de pago</label><select id="avMetodo"><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option><option value="Mercado Pago">Mercado Pago</option><option value="Tarjeta débito">Tarjeta débito</option><option value="Tarjeta crédito">Tarjeta crédito</option></select></div>
 <label>Nota</label><input id="avNot" placeholder="Ej: Esperando repuesto...">
 <div id="waH" style="display:none;background:rgba(76,175,125,.07);border:1px solid rgba(76,175,125,.2);border-radius:8px;padding:10px;margin-top:10px;font-size:.78rem;color:var(--tx2)">
   📲Al marcar como <strong>"Listo"</strong> se genera el aviso de WhatsApp.
@@ -3310,6 +3311,20 @@ async function editarTenant(id){
         <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Rubro</label>
         <input id="etRubro" value="${t.rubro||''}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:14px">
 
+        <div style="border-top:1px solid var(--bor);padding-top:14px;margin-bottom:14px">
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">📦 Módulos habilitados</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModVentas" ${mods.ventas?'checked':''}> Ventas</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModStock" ${mods.stock?'checked':''}> Stock</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModTaller" ${mods.taller?'checked':''}> Taller/Servicios</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModEquipos" ${mods.equipos?'checked':''}> Equipos</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModGastos" ${mods.gastos?'checked':''}> Gastos</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModPrecios" ${mods.precios?'checked':''}> Lista de precios</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModPedidos" ${mods.pedidos?'checked':''}> Pedidos</label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;cursor:pointer"><input type="checkbox" id="etModInversores" ${mods.inversores?'checked':''}> Inversores</label>
+          </div>
+        </div>
+
         <div style="border-top:1px solid var(--bor);padding-top:14px;margin-bottom:4px">
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">🎨 Personalización visual</div>
           
@@ -3374,7 +3389,16 @@ async function guardarEdicionTenant(id){
   
   // Get current modulos and update
   const { data: t } = await sb.from('tenants').select('modulos').eq('id', id).single();
-  const mods = { ...(t?.modulos||{}), color, emoji, fuente, modo };
+  const mods = { ...(t?.modulos||{}), color, emoji, fuente, modo,
+    ventas:    !!(document.getElementById('etModVentas')?.checked),
+    stock:     !!(document.getElementById('etModStock')?.checked),
+    taller:    !!(document.getElementById('etModTaller')?.checked),
+    equipos:   !!(document.getElementById('etModEquipos')?.checked),
+    gastos:    !!(document.getElementById('etModGastos')?.checked),
+    precios:   !!(document.getElementById('etModPrecios')?.checked),
+    pedidos:   !!(document.getElementById('etModPedidos')?.checked),
+    inversores:!!(document.getElementById('etModInversores')?.checked)
+  };
   if(logo) mods.logo = logo;
   
   const { error } = await sb.from('tenants').update({ nombre, rubro, modulos: mods }).eq('id', id);
@@ -3396,7 +3420,7 @@ async function accederComoTenant(id){
   if(error || !t){ alert('No se pudo cargar el tenant'); return; }
 
   // Limpiar estado del tenant anterior completamente
-  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
 
   currentTenant = t;
   currentRole = 'admin';
@@ -3412,7 +3436,7 @@ async function accederComoTenant(id){
 
 function volverAlSuperadmin(){
   // Limpiar estado del tenant visitado
-  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
   currentTenant = null;
   currentRole = 'superadmin';
 
@@ -3635,8 +3659,13 @@ async function loadAll(){
       if(cfgRow){
         const tKey = TURNOS_CFG_KEY + '_' + tid;
         const oKey = ONLINE_CFG_KEY  + '_' + tid;
-        if(cfgRow.__turnosCfg && !localStorage.getItem(tKey))
-          localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
+        if(cfgRow.__turnosCfg){
+          // Siempre sincronizar desde Supabase para que servicios del wizard aparezcan
+          const localCfg = localStorage.getItem(tKey);
+          const localSvcs = localCfg ? (JSON.parse(localCfg).servicios||[]) : [];
+          if(!localCfg || localSvcs.length === 0)
+            localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
+        }
         if(cfgRow.__onlineCfg  && !localStorage.getItem(oKey))
           localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
         if(cfgRow.__fichasCli){
@@ -4542,11 +4571,18 @@ async function delRep(id){
   S.reparaciones=S.reparaciones.filter(r=>r.id!==id);await dbDelete('reparaciones',id);pushUndo('Eliminar trabajo','reparaciones',snap);rTaller();
 }
 
+function _toggleAvMetodo(){
+  const ns = document.getElementById('avEst').value;
+  const box = document.getElementById('avMetodoBox');
+  if(box) box.style.display = ns === 'entregado' ? 'block' : 'none';
+}
+
 function openAv(id){
   avId=id; const r=S.reparaciones.find(r=>r.id===id);
   const est=ESTS.find(e=>e.k===r.estado);
   document.getElementById('avInfo').innerHTML=`<strong style="color:var(--tx)">${esc(r.cliente)}</strong> — ${esc(r.equipo||'trabajo')}<br>Estado actual: <span class="bx ${esc(est?.c||'bgx')}">${esc(est?.l||r.estado)}</span>`;
   document.getElementById('avEst').value=r.estado;document.getElementById('avNot').value='';document.getElementById('waH').style.display='none';
+  _toggleAvMetodo();
   openM('mAv',null);
 }
 
@@ -4555,9 +4591,22 @@ async function confAv(){
   const snap=JSON.parse(JSON.stringify(S.reparaciones));
   const ns=document.getElementById('avEst').value;
   r.estado=ns;r.historial=r.historial||[];r.historial.push({estado:ns,nota:document.getElementById('avNot').value,fecha:tod()});
-  if(ns==='entregado'&&!r.fechaEnt) r.fechaEnt=tod(); // registrar fecha de entrega para la caja
+  if(ns==='entregado'){
+    if(!r.fechaEnt) r.fechaEnt=tod();
+    const metodo = document.getElementById('avMetodo')?.value || 'Efectivo';
+    r.metodoPago = metodo;
+    // Registrar en caja del día
+    if(r.presupuesto > 0){
+      if(!S.movCaja) S.movCaja=[];
+      const yaReg = S.movCaja.some(m=>m.repId===r.id&&m.fecha===r.fechaEnt);
+      if(!yaReg){
+        S.movCaja.push({id:Date.now(),caja:'servicio',tipo:'ingreso',monto:r.presupuesto,fecha:r.fechaEnt,concepto:`Reparación entregada: ${r.cliente} — ${r.equipo||'trabajo'}`,metodo,repId:r.id});
+        try{ await dbSetConfig('movCaja',S.movCaja); }catch(e){}
+      }
+    }
+  }
   await dbUpsert('reparaciones',r);pushUndo('Avance taller','reparaciones',snap);
-  closeM('mAv');rTaller();if(ns==='listo')showWA(r);
+  closeM('mAv');rTaller();rCajas();if(ns==='listo')showWA(r);
 }
 
 function showWA(r){
@@ -4871,7 +4920,7 @@ function editarPedido(id){
   document.getElementById('pedFecha').value    = p.fecha||tod();
   document.getElementById('pedNotas').value    = p.notas||'';
   document.getElementById('mPedidoTitle').textContent = '✎ Editar pedido';
-  openM('mPedido');
+  document.getElementById('mPedido').classList.add('open');
 }
 
 async function marcarPedidoLlego(id){
@@ -5431,8 +5480,7 @@ function rDash(){
   updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily();
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
-  setTimeout(rObjetivosCompra, 200);
-  setTimeout(rDashPareja, 250);
+  setTimeout(rDashPareja, 200);
   setTimeout(rDivision, 150);
   const vm=filtrarDash(S.ventas,'fecha');
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
@@ -5949,14 +5997,9 @@ function rObjetivos(){
   const esBarberia = rubro.includes('barberia')||rubro.includes('barbería');
   const esDeco = rubro.includes('deco')||rubro.includes('perfum');
   
-  // Semana actual (lunes a domingo)
-  const hoy = new Date();
-  const diaSem = hoy.getDay();
-  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - (diaSem===0?6:diaSem-1));
-  const domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
-  const desdeStr = lunes.toISOString().slice(0,10);
-  const hastaStr = domingo.toISOString().slice(0,10);
-  const periodoLabel = fD(desdeStr) + ' → ' + fD(hastaStr);
+  // Día actual
+  const hoyStr = tod();
+  const periodoLabel = 'Hoy, ' + fD(hoyStr);
 
   function bloque(emoji,titulo,actual,meta,monto,metaMonto){
     const pct=meta>0?Math.min(100,Math.round(actual/meta*100)):0;
@@ -5966,29 +6009,29 @@ function rObjetivos(){
 
   if(esSalon || esBarberia){
     // Turnos del día como objetivo principal
-    const turnosSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado!=='cancelado').length : 0;
-    const turnosTermSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado==='terminado').length : 0;
-    const facturadoSem = getTurnos ? getTurnos().filter(t=>t.fecha>=desdeStr&&t.fecha<=hastaStr&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
-    // Excluir tipo='servicio' — esos ingresos ya están en facturadoSem (getTurnos), sumarlos sería doble conteo
-    const ventasSem = S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
+    const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoyStr&&t.estado!=='cancelado').length : 0;
+    const turnosTermHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoyStr&&t.estado==='terminado').length : 0;
+    const facturadoHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoyStr&&t.estado==='terminado').reduce((a,t)=>a+(t.precio||0),0) : 0;
+    // Excluir tipo='servicio' — esos ingresos ya están en facturadoHoy (getTurnos), sumarlos sería doble conteo
+    const ventasHoy = S.ventas.filter(v=>v.fecha===hoyStr&&v.tipo!=='servicio').reduce((a,v)=>a+v.total,0);
     const metaTurnos = obj.repCant||20;
     const metaMontoTurnos = (obj.repCant||20)*(obj.repPre||5000);
     document.getElementById('objHoy').innerHTML =
-      `<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 Semana: ${periodoLabel}</div>` +
-      bloque('📅','Turnos agendados',turnosSem,metaTurnos,0,0) +
-      bloque('✓','Turnos terminados',turnosTermSem,metaTurnos,facturadoSem,metaMontoTurnos) +
-      bloque('💰','Facturado semana',Math.round(ventasSem+facturadoSem),1,ventasSem+facturadoSem,(obj.accCant||1)*(obj.accPre||10000));
+      `<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 ${periodoLabel}</div>` +
+      bloque('📅','Turnos agendados',turnosHoy,metaTurnos,0,0) +
+      bloque('✓','Turnos terminados',turnosTermHoy,metaTurnos,facturadoHoy,metaMontoTurnos) +
+      bloque('💰','Facturado hoy',Math.round(ventasHoy+facturadoHoy),1,ventasHoy+facturadoHoy,(obj.accCant||1)*(obj.accPre||10000));
   } else {
     // Remu Store — original
-    const repsSem=S.reparaciones.filter(r=>r.fecha>=desdeStr&&r.fecha<=hastaStr&&r.estado!=='recibido').length;
-    const accSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='producto').reduce((a,v)=>a+v.cantidad,0);
-    const eqSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='equipo').length;
-    const ingRepSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
-    const ingAccSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='producto').reduce((a,v)=>a+v.total,0);
-    const ingEqSem=S.ventas.filter(v=>v.fecha>=desdeStr&&v.fecha<=hastaStr&&v.tipo==='equipo').reduce((a,v)=>a+(v.comision||0),0);
+    const repsHoy=S.reparaciones.filter(r=>r.fecha===hoyStr&&r.estado!=='recibido').length;
+    const accHoy=S.ventas.filter(v=>v.fecha===hoyStr&&v.tipo==='producto').reduce((a,v)=>a+v.cantidad,0);
+    const eqHoy=S.ventas.filter(v=>v.fecha===hoyStr&&v.tipo==='equipo').length;
+    const ingRepHoy=S.ventas.filter(v=>v.fecha===hoyStr&&v.tipo==='servicio').reduce((a,v)=>a+v.total,0);
+    const ingAccHoy=S.ventas.filter(v=>v.fecha===hoyStr&&v.tipo==='producto').reduce((a,v)=>a+v.total,0);
+    const ingEqHoy=S.ventas.filter(v=>v.fecha===hoyStr&&v.tipo==='equipo').reduce((a,v)=>a+(v.comision||0),0);
     const metaRepMonto=(obj.repCant||7)*(obj.repPre||40000);
     const metaAccMonto=(obj.accCant||10)*(obj.accPre||10000);
-    document.getElementById('objHoy').innerHTML=`<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 Semana: ${periodoLabel}</div>`+bloque('🔧','Trabajos',repsSem,obj.repCant||7,ingRepSem,metaRepMonto)+bloque('📦','Accesorios',accSem,obj.accCant||10,ingAccSem,metaAccMonto)+bloque('📱','Equipos',eqSem,obj.eqCant||1,ingEqSem,0);
+    document.getElementById('objHoy').innerHTML=`<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 ${periodoLabel}</div>`+bloque('🔧','Trabajos',repsHoy,obj.repCant||7,ingRepHoy,metaRepMonto)+bloque('📦','Accesorios',accHoy,obj.accCant||10,ingAccHoy,metaAccMonto)+bloque('📱','Equipos',eqHoy,obj.eqCant||1,ingEqHoy,0);
   }
 }
 
@@ -11697,6 +11740,10 @@ function aplicarModulosPorRubro(rubro){
 
   // Módulos habilitados explícitamente en la BD (independiente del rubro)
   if(mods.equipos) showNav('nav-equipos');
+  if(mods.ventas)  showNav('nav-ventas');
+  if(mods.taller)  showNav('nav-taller');
+  if(mods.stock)   showNav('nav-stock');
+  if(mods.pedidos) showNav('nav-pedidos');
 
   // Ocultar tab "Servicios" en Análisis para barberías/salones (no aplica reparaciones)
   const tabRep = document.getElementById('tabRep');
