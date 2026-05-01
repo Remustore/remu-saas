@@ -4595,15 +4595,7 @@ async function confAv(){
     if(!r.fechaEnt) r.fechaEnt=tod();
     const metodo = document.getElementById('avMetodo')?.value || 'Efectivo';
     r.metodoPago = metodo;
-    // Registrar en caja del día
-    if(r.presupuesto > 0){
-      if(!S.movCaja) S.movCaja=[];
-      const yaReg = S.movCaja.some(m=>m.repId===r.id&&m.fecha===r.fechaEnt);
-      if(!yaReg){
-        S.movCaja.push({id:Date.now(),caja:'servicio',tipo:'ingreso',monto:r.presupuesto,fecha:r.fechaEnt,concepto:`Reparación entregada: ${r.cliente} — ${r.equipo||'trabajo'}`,metodo,repId:r.id});
-        try{ await dbSetConfig('movCaja',S.movCaja); }catch(e){}
-      }
-    }
+    r.metodo = metodo; // para compatibilidad con cierre diario
   }
   await dbUpsert('reparaciones',r);pushUndo('Avance taller','reparaciones',snap);
   closeM('mAv');rTaller();rCajas();if(ns==='listo')showWA(r);
@@ -4778,7 +4770,7 @@ function rTaller(){
         ${r.presupuesto?`<span style="font-size:.74rem;color:var(--gld);font-weight:600">${fmt(r.presupuesto)}</span>`:''}
       </div>
       ${r.ganancia!=null&&r.presupuesto?`<div style="font-size:.7rem;margin-top:3px;padding:3px 6px;border-radius:4px;background:${r.margen>=50?'rgba(74,222,128,.12)':r.margen>=30?'rgba(250,204,21,.12)':'rgba(248,113,113,.12)'};color:${r.margen>=50?'var(--ok)':r.margen>=30?'var(--wrn)':'var(--bad)'};font-weight:600">
-        Gan: ${fmt(r.ganancia)} · ${r.margen}% ${r.margen>=50?'✓':r.margen>=30?'⚠':'✕'}
+        Gan: ${fmt(r.ganancia)} · ${r.margen}% ${r.margen>=50?'✓':r.margen>=30?'⚠':'✕'}${r.metodoPago?` <span style="font-weight:400;color:var(--tx2)">${r.metodoPago}</span>`:''}
       </div>`:''}
       ${_garantiaChip(r)}
       <div class="ka">
@@ -13531,10 +13523,16 @@ function rGananciaHoy(){
       }
     });
     // Reparaciones entregadas del período
+    // Usa fechaEnt para filtrar (fecha real de entrega, no de ingreso)
+    var repsEntregadas = S.reparaciones.filter(function(r){ return r.estado==='entregado'; }).map(function(r){ return r.fechaEnt ? r : {...r, fechaEnt: r.fecha}; });
     var repsFilt = typeof filtrarDash==='function'
-      ? filtrarDash(S.reparaciones.filter(function(r){ return r.estado==='entregado'; }), 'fecha')
-      : S.reparaciones.filter(function(r){ return r.fecha===tod() && r.estado==='entregado'; });
-    repsFilt.forEach(function(r){ vendido += r.presupuesto||0; });
+      ? filtrarDash(repsEntregadas, 'fechaEnt')
+      : repsEntregadas.filter(function(r){ return r.fechaEnt===tod(); });
+    // Ganancia neta = presupuesto − costo repuesto − comisión/flete
+    repsFilt.forEach(function(r){
+      vendido += r.presupuesto||0;
+      cogs += (r.costoRep||0) + (r.flete||0); // descontar costo repuesto y comisión del técnico/flete
+    });
   }
 
   var gastos   = gastosFilt.reduce(function(a,g){ return a+g.monto; }, 0);
@@ -13554,16 +13552,17 @@ function rGananciaHoy(){
       '</div>'
     : '';
 
+  var cogsLabel = esBarberia ? 'Costo mercadería' : 'Costos (mercadería + repuestos/comisiones)';
   card.innerHTML =
     '<div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">'+titulo+'</div>' +
     '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorN+';line-height:1.1;margin-bottom:12px">' +
       (ganNeta>=0?'':'-')+F(Math.abs(ganNeta)) +
     '</div>' +
     '<div style="display:flex;flex-direction:column;gap:6px">' +
-      row('📥','Vendiste',         vendido, 'var(--ok)',  false, false) +
-      row('📦','Costo mercadería', cogs,    'var(--wrn)', false, false) +
-      row('📤','Gastos del período',gastos, 'var(--bad)', false, false) +
-      row('💵','Te quedó limpio',  Math.abs(ganNeta), colorN, true, true) +
+      row('📥','Ingresos del período', vendido, 'var(--ok)',  false, false) +
+      row('📦', cogsLabel,             cogs,    'var(--wrn)', false, false) +
+      row('📤','Gastos operativos',    gastos,  'var(--bad)', false, false) +
+      row('💵','Ganancia neta',  Math.abs(ganNeta), colorN, true, true) +
     '</div>' +
     aviso;
 }
