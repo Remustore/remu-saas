@@ -3532,11 +3532,12 @@ async function dbLoad(table){
     let query = sb.from(table).select('*');
     if(currentTenant) query = query.eq('tenant_id', currentTenant.id);
     const { data, error } = await query;
-    if(error) throw error;
-    return data.map(r => {
+    if(error){ console.error('[dbLoad] error en', table, error); throw error; }
+    console.log('[dbLoad]', table, '→', (data||[]).length, 'filas');
+    return (data||[]).map(r => {
       if(typeof r.data === 'string'){ try{ return JSON.parse(r.data); }catch(e){ return r.data; } }
       return r.data;
-    });
+    }).filter(Boolean);
   }catch(e){ console.error('Load error', table, e); return []; }
 }
 
@@ -3632,7 +3633,8 @@ async function loadAll(){
       dbGetConfig('objetivos'), dbGetConfig('movCaja'),
       dbLoadPedidos()
     ]);
-    S.stock=stock; S.equipos=equipos;
+    S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
+    console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
     // Deduplicar ventas por turnoId: si hay múltiples ventas del mismo turno (bug anterior),
     // conservar solo la primera. Ventas sin turnoId (ventas manuales) se conservan todas.
     const ventasSinDuplicar = [];
