@@ -2246,8 +2246,11 @@ async function _iniciarSesionAdminExterno(user){
   window.__adminExternoTenants = tenants;
 
   if(tenants.length === 1){
-    console.log('[AE-LOGIN] 1 tenant → login directo a:', tenants[0].nombre);
-    _cargarTenantExterno(tenants[0]);
+    const t0 = tenants[0];
+    const t0id = t0.id || t0.tenant_id;
+    console.log('[AE-LOGIN] 1 tenant → login directo a:', t0.nombre, '— id:', t0id);
+    if(!t0id){ console.error('[AE-LOGIN] tenant sin id:', JSON.stringify(t0)); throw new Error('Error interno: negocio sin ID. Contactá al soporte.'); }
+    _cargarTenantExterno({...t0, id: t0id});
   } else {
     console.log('[AE-LOGIN] Múltiples tenants → mostrando selector');
     document.getElementById('loginScreen').style.display='none';
@@ -2256,6 +2259,8 @@ async function _iniciarSesionAdminExterno(user){
 }
 
 function _cargarTenantExterno(t){
+  if(!t?.id){ console.error('[AE] _cargarTenantExterno: tenant sin id', JSON.stringify(t)); return; }
+  console.log('[AE] cargando tenant:', t.nombre, '— id:', t.id);
   currentTenant = t;
   currentRole = 'admin';
   document.getElementById('loginScreen').style.display='none';
@@ -2291,14 +2296,27 @@ async function _seleccionarTenantExterno(idx){
   if(!t) return;
   document.getElementById('tenantSelectorOv')?.remove();
 
-  // Si el objeto es mínimo (solo tiene id/nombre/rubro desde metadata), buscar datos completos
-  if(!t.modulos && !t.config){
-    try {
-      const { data: full } = await sb.from('tenants').select('*').eq('id', t.id).single();
-      if(full){ _cargarTenantExterno(full); return; }
-    } catch(_){}
+  // Resolver id — soportar tanto 'id' como 'tenant_id' según origen del objeto
+  const tenantId = t.id || t.tenant_id;
+  if(!tenantId){
+    console.error('[AE] tenant sin id en posición', idx, ':', JSON.stringify(t));
+    alert('No se pudo identificar el negocio. Recargá la página e intentá de nuevo.');
+    return;
   }
-  _cargarTenantExterno(t);
+
+  // Siempre buscar datos completos desde la DB (id, modulos, rubro, etc.)
+  try {
+    const { data: full, error: ferr } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+    if(!ferr && full && full.id){
+      console.log('[AE] tenant cargado completo:', full.nombre, '— id:', full.id);
+      _cargarTenantExterno(full);
+      return;
+    }
+    console.warn('[AE] fetch completo falló:', ferr?.message, '— usando objeto parcial');
+  } catch(e){ console.warn('[AE] fetch completo excepción:', e.message); }
+
+  // Fallback: usar objeto original con id normalizado
+  _cargarTenantExterno({...t, id: tenantId});
 }
 
 function setupApp(){
