@@ -958,7 +958,7 @@ $$;</pre>
       </div>
       <div class="card" style="margin-bottom:14px" id="dashQuickBtns">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mVenta',null);go('ventas')">
+          <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="_initVTipoSelect();openM('mVenta',null);go('ventas')">
             <span style="font-size:1.1rem">💰</span> Registrar venta
           </button>
           <button class="btn bgh" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mTaller',null);go('taller')">
@@ -1044,7 +1044,7 @@ $$;</pre>
     <!-- VENTAS -->
     <div class="sec" id="sec-ventas">
       <div class="pt">Ventas</div><div class="ps">Registro de operaciones</div>
-      <div class="card"><div class="ch"><h3></h3><button class="btn bg" onclick="openM('mVenta',null)">+ Registrar venta</button></div>
+      <div class="card"><div class="ch"><h3></h3><button class="btn bg" onclick="_initVTipoSelect();openM('mVenta',null)">+ Registrar venta</button></div>
       <div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th class="col-hide">Cant.</th><th class="col-hide">Precio</th><th>Total</th><th class="col-hide">Pago</th><th></th></tr></thead><tbody id="tbV"></tbody></table></div></div>
     </div>
 
@@ -3717,6 +3717,7 @@ async function loadAll(){
     }
     renderAll();
     setupCategoriasStock();
+    _initVTipoSelect();
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
     // Sincronizar turnos manuales a Supabase (asegurar que página pública vea disponibilidad correcta)
@@ -9517,6 +9518,30 @@ function setupCategoriasStock(){
   if(scat){ var o=""; cats.forEach(function(c){o+="<option value=\""+c+"\">"+c+"</option>";}); o+='<option value="__nueva__">+ Nueva categoría...</option>'; scat.innerHTML=o; }
   var vcf = document.getElementById("vCatFilt");
   if(vcf){ var o2="<option value=\"\">Todas</option>"; cats.forEach(function(c){o2+="<option value=\""+c+"\">"+c+"</option>";}); vcf.innerHTML=o2; }
+}
+
+function _initVTipoSelect(){
+  const sel = document.getElementById('vTipo');
+  if(!sel) return;
+  const rub = (currentTenant?.rubro||'').toLowerCase();
+  const esSalon = /barber|salon|belleza|peluq|manicur|unas|uñas/i.test(rub);
+  let opts;
+  if(esSalon){
+    opts = [
+      {v:'servicio', l:'Servicio'},
+      {v:'producto', l:'Producto'}
+    ];
+  } else {
+    opts = [
+      {v:'producto', l:'Accesorio'},
+      {v:'equipo',   l:'Equipo'},
+      {v:'servicio', l:'Servicio técnico'}
+    ];
+  }
+  const prev = sel.value;
+  sel.innerHTML = opts.map(o=>`<option value="${o.v}">${o.l}</option>`).join('');
+  sel.value = opts.some(o=>o.v===prev) ? prev : opts[0].v;
+  uVUI();
 }
 
 function onCatChange(){
