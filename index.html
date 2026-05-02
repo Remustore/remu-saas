@@ -1062,7 +1062,7 @@ $$;</pre>
       <div class="card">
         <div class="ch">
           <div class="tabs" id="stabs" style="overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px"></div>
-          <select id="stabsMobile" style="display:none;padding:8px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);font-family:var(--fb);font-size:.85rem;cursor:pointer;min-width:160px" onchange="setSF(this.value,this.selectedIndex)"><option value="todos">Todos</option></select>
+          <select id="stabsMobile" style="display:none;padding:9px 14px;border-radius:8px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);font-family:var(--fb);font-size:.9rem;cursor:pointer;width:100%;max-width:260px;font-weight:500" onchange="setSF(this.value,this.selectedIndex)"><option value="todos">Todas las categorías</option></select>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rStock()" id="sQ"></div>
             <button class="btn bgh" onclick="openRegistrarCompra(null)">📦 Registrar compra</button>
@@ -1130,18 +1130,34 @@ $$;</pre>
       <div class="card" id="fidelCard" style="margin-bottom:14px;display:none">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
           <div>
-            <div style="font-weight:600;font-size:.88rem">🎁 Alerta de fidelización</div>
-            <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">Avisarte cuando un cliente alcanza cierta cantidad de visitas</div>
+            <div style="font-weight:600;font-size:.88rem">🎁 Programa de fidelización</div>
+            <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">Premiá a tus clientes cuando alcancen el umbral configurado</div>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
               <label style="font-size:.78rem;color:var(--tx2)">Alertar cada</label>
-              <input type="number" id="fidelUmbral" min="1" max="99" value="10" style="width:60px;padding:6px 10px;text-align:center;font-size:.9rem;font-weight:700" oninput="_saveFidelConf()">
-              <label style="font-size:.78rem;color:var(--tx2)">visitas</label>
+              <input type="number" id="fidelUmbral" min="1" max="999999" value="10" style="width:70px;padding:6px 10px;text-align:center;font-size:.9rem;font-weight:700" oninput="_saveFidelConf();_saveFidelConfigFull()">
+              <label id="fidelUmbralLabel" style="font-size:.78rem;color:var(--tx2)">visitas</label>
             </div>
           </div>
         </div>
-        <div id="fidelStats" style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap"></div>
+        <!-- Config extendida -->
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--bor);display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <span style="font-size:.78rem;color:var(--tx2)">Tipo de recompensa:</span>
+            <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer"><input type="radio" name="fidelTipo" value="visitas" onchange="_onFidelTipoChange()" checked> Visitas/turnos</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:.82rem;cursor:pointer"><input type="radio" name="fidelTipo" value="puntos" onchange="_onFidelTipoChange()"> Puntos ($)</label>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label style="font-size:.78rem;color:var(--tx2);white-space:nowrap">🎁 Premio:</label>
+            <input type="text" id="fidelPremio" placeholder="Ej: Corte gratis, 20% descuento, Producto de regalo..." style="flex:1;min-width:180px;padding:7px 12px;font-size:.82rem;border-radius:8px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)" oninput="_saveFidelConfigFull()">
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.82rem">
+            <input type="checkbox" id="fidelNotifWA" onchange="_saveFidelConfigFull()" style="width:16px;height:16px;accent-color:var(--gld)">
+            Enviar WhatsApp automático al cliente cuando alcance el umbral
+          </label>
+        </div>
+        <div id="fidelStats" style="margin-top:14px;display:flex;flex-direction:column;gap:8px"></div>
       </div>
       <div class="card">
         <div class="ch">
@@ -14313,32 +14329,38 @@ function _renderServiciosOnline(){
 })();
 </script>
 
-<!-- ── Mobile improvements: category dropdown + fidelización taller ─────────
-     Wrappers sin modificar funciones originales.
+<!-- ── Mobile improvements v2: dropdown categorías + fidelización configurable ──
+     Wrappers y helpers sin modificar funciones originales.
 ──────────────────────────────────────────────────────────────────────────── -->
 <script>
-// Sync #stabsMobile dropdown from #stabs tabs whenever setupCategoriasStock() updates them
+// ── Categorías mobile: sync dropdown con tabs ────────────────────────────
 function _syncStabsMobile(){
   var sel = document.getElementById('stabsMobile');
   if(!sel) return;
   var btns = document.querySelectorAll('#stabs .tab');
   if(!btns.length) return;
+  var prev = sel.value;
   var html = '';
   btns.forEach(function(btn, i){
     var val = i === 0 ? 'todos' : btn.textContent.trim();
-    html += '<option value="' + val + '">' + btn.textContent.trim() + '</option>';
+    var label = i === 0 ? 'Todas las categorías' : btn.textContent.trim();
+    html += '<option value="' + val + '">' + label + '</option>';
   });
   sel.innerHTML = html;
+  // Restore selection if still valid
+  if(prev && prev !== 'todos'){
+    for(var j=0;j<sel.options.length;j++){
+      if(sel.options[j].value === prev){ sel.selectedIndex = j; break; }
+    }
+  }
 }
 
-// Watch #stabs for innerHTML changes (fired by setupCategoriasStock)
 (function(){
   var stabs = document.getElementById('stabs');
   if(!stabs) return;
   new MutationObserver(_syncStabsMobile).observe(stabs, {childList:true});
 })();
 
-// Keep mobile dropdown in sync when desktop tabs are clicked
 (function(){
   var _orig = setSF;
   setSF = function(f, i){
@@ -14348,26 +14370,126 @@ function _syncStabsMobile(){
   };
 })();
 
-// Fidelización para taller de celulares (rClientes original solo la muestra para salones)
+// ── Fidelización configurable por tenant ─────────────────────────────────
+function _getFidelConfig(){
+  var stored = dbGetConfig('fidelConfig');
+  var base = {tipo:'visitas', umbral:parseInt(dbGetConfig('fidelUmbral')||'10'), premio:'', notifWA:false};
+  return stored ? Object.assign({}, base, stored) : base;
+}
+
+function _saveFidelConfigFull(){
+  var tipoEl = document.querySelector('input[name="fidelTipo"]:checked');
+  var tipo = tipoEl ? tipoEl.value : 'visitas';
+  var umbral = parseInt((document.getElementById('fidelUmbral')||{}).value||'10');
+  var premio = ((document.getElementById('fidelPremio')||{}).value||'').trim();
+  var notifWA = !!((document.getElementById('fidelNotifWA')||{}).checked);
+  var cfg = {tipo:tipo, umbral:umbral, premio:premio, notifWA:notifWA};
+  dbSetConfig('fidelConfig', cfg);
+  if(!currentTenant) return;
+  if(!currentTenant.modulos) currentTenant.modulos = {};
+  currentTenant.modulos.fidelConfig = cfg;
+  sb.from('tenants').update({modulos:currentTenant.modulos}).eq('id',currentTenant.id).then(function(){}).catch(function(){});
+}
+
+function _onFidelTipoChange(){
+  var tipoEl = document.querySelector('input[name="fidelTipo"]:checked');
+  var tipo = tipoEl ? tipoEl.value : 'visitas';
+  var lbl = document.getElementById('fidelUmbralLabel');
+  if(lbl) lbl.textContent = tipo === 'puntos' ? 'pesos' : 'visitas';
+  _saveFidelConfigFull();
+}
+
+function _loadFidelConfigUI(){
+  var cfg = _getFidelConfig();
+  document.querySelectorAll('input[name="fidelTipo"]').forEach(function(r){ r.checked = r.value === cfg.tipo; });
+  var inp = document.getElementById('fidelUmbral');
+  if(inp) inp.value = cfg.umbral;
+  var lbl = document.getElementById('fidelUmbralLabel');
+  if(lbl) lbl.textContent = cfg.tipo === 'puntos' ? 'pesos' : 'visitas';
+  var premioEl = document.getElementById('fidelPremio');
+  if(premioEl) premioEl.value = cfg.premio || '';
+  var notifEl = document.getElementById('fidelNotifWA');
+  if(notifEl) notifEl.checked = !!cfg.notifWA;
+}
+
+function _enviarWAFidel(nombre, tel){
+  var cfg = _getFidelConfig();
+  var negocio = (currentTenant && currentTenant.nombre) || 'el negocio';
+  var tipoLabel = cfg.tipo === 'puntos' ? 'en compras' : 'visitas';
+  var umbralStr = cfg.tipo === 'puntos' ? '$' + cfg.umbral : cfg.umbral + ' ' + tipoLabel;
+  var msg = '¡Hola ' + nombre + '! 🎉\n\nAlcanzaste ' + umbralStr + ' en ' + negocio + '.';
+  if(cfg.premio) msg += '\n\nTu premio: *' + cfg.premio + '*';
+  msg += '\n\n¡Gracias por tu fidelidad! Pasate a reclamarlo.';
+  window.open('https://wa.me/54' + (tel||'').replace(/\D/g,'') + '?text=' + encodeURIComponent(msg), '_blank');
+}
+
+function _marcarPremioEntregado(nombre, visitas, gasto){
+  var cfg = _getFidelConfig();
+  if(cfg.tipo === 'puntos'){
+    saveFichaCli(nombre, {fidelGastoAlReset: gasto});
+    showToast('Premio entregado — puntos reseteados ✓');
+  } else {
+    resetFidelCli(nombre, visitas);
+  }
+  rClientes();
+}
+
+// Wrapper rClientes: muestra fidelCard para taller + stats enriquecidos para todos
 (function(){
   var _orig = rClientes;
   rClientes = function(){
     _orig();
+    // Sync config desde Supabase al entrar
+    if(currentTenant && currentTenant.modulos && currentTenant.modulos.fidelConfig){
+      dbSetConfig('fidelConfig', currentTenant.modulos.fidelConfig);
+    }
     var r = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
-    if(/barber|salon|belleza|peluq|manicur|uña|una/i.test(r)) return; // ya manejado por original
+    var esSalon = /barber|salon|belleza|peluq|manicur|uña|una/i.test(r);
     var fCard = document.getElementById('fidelCard');
     if(!fCard) return;
-    fCard.style.display = '';
-    var umbral = parseInt(dbGetConfig('fidelUmbral') || '10');
-    var inp = document.getElementById('fidelUmbral');
-    if(inp) inp.value = umbral;
+    if(!esSalon) fCard.style.display = '';
+    _loadFidelConfigUI();
+    var cfg = _getFidelConfig();
+    var tipoLabel = esSalon ? 'visitas' : 'trabajos';
     var todos = getClientes();
-    var cerca = todos.filter(function(c){ return c.visitas > 0 && c.visitas % umbral === 0; }).slice(0, 5);
+    var fichas = getFichasCli();
+    var premiados = todos.filter(function(c){
+      if(!c || !c.nombre) return false;
+      var ficha = fichas[normNomCli(c.nombre)] || {};
+      if(cfg.tipo === 'puntos'){
+        return (c.gasto - parseFloat(ficha.fidelGastoAlReset||0)) >= cfg.umbral;
+      }
+      var activas = c.visitas - parseInt(ficha.fidelVisitasAlReset||0);
+      return activas > 0 && activas % cfg.umbral === 0;
+    }).slice(0, 8);
     var fStats = document.getElementById('fidelStats');
     if(!fStats) return;
-    fStats.innerHTML = cerca.length
-      ? cerca.map(function(c){ return '<div style="background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:8px;padding:8px 12px;font-size:.8rem"><div style="font-weight:700;color:var(--gld)">' + esc(c.nombre) + '</div><div style="color:var(--tx2);margin-top:2px">🎉 ' + c.visitas + ' trabajos — ¡fidelización!</div></div>'; }).join('')
-      : '<div style="font-size:.78rem;color:var(--mut)">Nadie alcanzó el umbral aún. Umbral actual: cada ' + umbral + ' trabajos.</div>';
+    var umbralLabel = cfg.tipo === 'puntos' ? '$'+cfg.umbral : cfg.umbral+' '+tipoLabel;
+    if(!premiados.length){
+      fStats.innerHTML = '<div style="font-size:.78rem;color:var(--mut)">Nadie alcanzó el umbral aún. Umbral: cada '+umbralLabel+'.</div>';
+      return;
+    }
+    fStats.innerHTML = premiados.map(function(c){
+      var ficha = fichas[normNomCli(c.nombre)] || {};
+      var activas = cfg.tipo === 'puntos'
+        ? fmt(c.gasto - parseFloat(ficha.fidelGastoAlReset||0)) + ' acumulados'
+        : (c.visitas - parseInt(ficha.fidelVisitasAlReset||0)) + ' ' + tipoLabel;
+      var premioHtml = cfg.premio ? '<div style="margin-top:3px;font-size:.78rem;color:var(--gld)">🎁 '+esc(cfg.premio)+'</div>' : '';
+      var waBtn = (c.tel && cfg.notifWA)
+        ? '<button data-nom="'+esc(c.nombre)+'" data-tel="'+esc(c.tel||'')+'" onclick="_enviarWAFidel(this.dataset.nom,this.dataset.tel)" style="padding:4px 10px;border-radius:6px;font-size:.72rem;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.4);color:#25d366;cursor:pointer">📲 WA</button>'
+        : '';
+      var resetBtn = '<button data-nom="'+esc(c.nombre)+'" data-vis="'+c.visitas+'" data-gas="'+c.gasto+'" onclick="_marcarPremioEntregado(this.dataset.nom,+this.dataset.vis,+this.dataset.gas)" style="padding:4px 10px;border-radius:6px;font-size:.72rem;background:var(--bg);border:1px solid var(--bor2);color:var(--tx2);cursor:pointer">✓ Entregado</button>';
+      return '<div style="background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:8px;padding:10px 14px">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">'+
+          '<div>'+
+            '<div style="font-weight:700;color:var(--gld);font-size:.88rem">🎉 '+esc(c.nombre)+'</div>'+
+            '<div style="color:var(--tx2);font-size:.78rem;margin-top:2px">'+activas+'</div>'+
+            premioHtml+
+          '</div>'+
+          '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">'+waBtn+resetBtn+'</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
   };
 })();
 </script>
