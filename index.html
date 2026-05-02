@@ -1130,7 +1130,7 @@ $$;</pre>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:8px">
               <label style="font-size:.78rem;color:var(--tx2)">Alertar cada</label>
-              <input type="number" id="fidelUmbral" min="1" max="99" value="10" style="width:60px;padding:6px 10px;text-align:center;font-size:.9rem;font-weight:700" oninput="saveFidelUmbral()">
+              <input type="number" id="fidelUmbral" min="1" max="99" value="10" style="width:60px;padding:6px 10px;text-align:center;font-size:.9rem;font-weight:700" oninput="_saveFidelConf()">
               <label style="font-size:.78rem;color:var(--tx2)">visitas</label>
             </div>
           </div>
@@ -3625,7 +3625,7 @@ async function dbSetConfig(key, value){
   }catch(e){ setSyncErr(); }
 }
 
-async function dbGetConfig(key){
+function dbGetConfig(key){
   try{
     const k = key + '_' + currentTenant.id;
     const v = localStorage.getItem(k);
@@ -3718,6 +3718,8 @@ async function loadAll(){
     renderAll();
     setupCategoriasStock();
     _initVTipoSelect();
+    // Sincronizar fidelUmbral desde modulos (fuente de verdad cross-device)
+    if(currentTenant?.modulos?.fidelUmbral) dbSetConfig('fidelUmbral', currentTenant.modulos.fidelUmbral);
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
     // Sincronizar turnos manuales a Supabase (asegurar que página pública vea disponibilidad correcta)
@@ -11407,7 +11409,7 @@ function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClie
 
 function getClientes(){
   const r = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonRubro = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur');
+  const esSalonRubro = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('una');
   const mapa = {};
   const agregar = (nombre, tel, fecha, gasto, servicio)=>{
     if(!nombre) return;
@@ -11438,6 +11440,16 @@ function resetFidelCli(nombre, visitasTotales){
 function saveFidelUmbral(){
   const v = parseInt(document.getElementById('fidelUmbral')?.value||'10');
   if(v>0) dbSetConfig('fidelUmbral', v);
+}
+
+function _saveFidelConf(){
+  const v = parseInt(document.getElementById('fidelUmbral')?.value||'10');
+  if(!(v>0)) return;
+  dbSetConfig('fidelUmbral', v);
+  if(!currentTenant) return;
+  if(!currentTenant.modulos) currentTenant.modulos = {};
+  currentTenant.modulos.fidelUmbral = v;
+  sb.from('tenants').update({modulos: currentTenant.modulos}).eq('id', currentTenant.id).then(()=>{}).catch(()=>{});
 }
 
 // ── FICHAS DE CLIENTES ─────────────────────────────────────────────
@@ -11555,7 +11567,7 @@ function rClientes(){
   const box = document.getElementById('cliList');
   if(!box) return;
   const r = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonR = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur');
+  const esSalonR = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('una');
   // Mostrar fidelización card para salones/barberías
   const fCard = document.getElementById('fidelCard');
   if(fCard) fCard.style.display = esSalonR ? '' : 'none';
