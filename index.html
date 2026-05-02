@@ -797,6 +797,14 @@ textarea{resize:vertical;min-height:70px;}
       <div id="saSimMsg" style="font-size:.75rem;margin-top:8px;display:none"></div>
     </div>
 
+    <!-- ── TESTS DE AISLAMIENTO ────────────────────────────────────────── -->
+    <div class="sa-card" style="margin-top:20px;border-color:rgba(76,175,125,.3)">
+      <h3 style="color:var(--ok)">🧪 Tests de aislamiento de datos</h3>
+      <div style="font-size:.75rem;color:var(--tx2);margin:8px 0 12px">Verifica que cada tenant solo ve sus propios datos y detecta posibles inconsistencias en la base de datos.</div>
+      <button class="sa-btn" style="margin:0;background:rgba(76,175,125,.15);border-color:rgba(76,175,125,.4);color:var(--ok)" onclick="verificarIntegridad()">🧪 Verificar integridad de datos</button>
+      <div id="saIntegMsg" style="font-size:.78rem;margin-top:12px;display:none;padding:10px 12px;border-radius:8px;line-height:1.8"></div>
+    </div>
+
     <!-- ── DIAGNÓSTICO ADMIN EXTERNO ─────────────────────────────────────── -->
     <div class="sa-card" style="margin-top:20px;border-color:rgba(138,92,201,.35)">
       <h3 style="color:#b08ad4">🔍 Diagnóstico — Admin Externo Multi-Tenant</h3>
@@ -2014,6 +2022,7 @@ $$;</pre>
 <div id="cdMetodos" style="margin-bottom:16px"></div>
 <div style="font-size:.72rem;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Cierres anteriores</div>
 <div id="cdHistorial" style="margin-bottom:8px"></div>
+<div id="cdExtra"></div>
 <div style="background:rgba(201,82,76,.08);border:1px solid rgba(201,82,76,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--bad);margin-top:10px">
   ⚠️ El <strong>reset</strong> es solo visual — no elimina datos. Los totales se reinician para el próximo turno del día.
 </div>
@@ -14328,6 +14337,160 @@ function _renderServiciosOnline(){
   };
 })();
 </script>
+
+<!-- ── Mejoras v3: validaciones, alertas, cierre, gráficos ───────────────────
+     Wrappers sin modificar funciones originales.
+──────────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── 1. Validaciones obligatorias ─────────────────────────────────────────
+
+(function(){
+  var _orig = saveVenta;
+  saveVenta = async function(){
+    var precio = parseFloat(document.getElementById('vPre')?.value||'0');
+    if(!(precio > 0)){
+      var el = document.getElementById('vPre');
+      if(el){ el.style.boxShadow='0 0 0 2px var(--bad)'; el.focus(); setTimeout(function(){ el.style.boxShadow=''; },2000); }
+      showToast('El precio es obligatorio y debe ser mayor a $0','err');
+      return;
+    }
+    return _orig.apply(this, arguments);
+  };
+})();
+
+(function(){
+  var _orig = confAv;
+  confAv = async function(){
+    var ns = document.getElementById('avEst')?.value;
+    if(ns === 'entregado'){
+      var r = (S.reparaciones||[]).find(function(x){ return x.id === avId; });
+      if(r && !(parseFloat(r.presupuesto) > 0)){
+        var avMetEl = document.getElementById('avMetodoBox');
+        if(avMetEl){ avMetEl.style.boxShadow='0 0 0 2px var(--bad)'; setTimeout(function(){ avMetEl.style.boxShadow=''; },2000); }
+        showToast('Ingresá el presupuesto antes de marcar como entregado','err');
+        return;
+      }
+    }
+    return _orig.apply(this, arguments);
+  };
+})();
+
+(function(){
+  var _orig = saveTurno;
+  saveTurno = async function(_override){
+    var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
+    if(cfg.servicios && cfg.servicios.length){
+      var servicioId = parseInt(document.getElementById('turnoServicio')?.value||'0');
+      if(!servicioId){
+        var el = document.getElementById('turnoServicio');
+        if(el){ el.style.boxShadow='0 0 0 2px var(--bad)'; el.focus(); setTimeout(function(){ el.style.boxShadow=''; },2000); }
+        showToast('Seleccioná un servicio','err');
+        return;
+      }
+    }
+    return _orig.apply(this, arguments);
+  };
+})();
+
+// ── 2. Alertas de inconsistencia en dashboard ─────────────────────────────
+
+(function(){
+  var _prev = rDash;
+  rDash = function(){
+    var result = _prev.apply(this, arguments);
+    // Inconsistency alerts (delayed to run after rDash fills #alerts)
+    setTimeout(function(){
+      var als = [];
+      var repSinPres = (S.reparaciones||[]).filter(function(x){ return x.estado !== 'entregado' && !(parseFloat(x.presupuesto) > 0); }).length;
+      if(repSinPres > 0) als.push(repSinPres+' reparación'+(repSinPres>1?'es':'')+' sin presupuesto cargado');
+      var stockSinCosto = (S.stock||[]).filter(function(s){ return !(parseFloat(s.costo) > 0); }).length;
+      if(stockSinCosto > 0) als.push(stockSinCosto+' producto'+(stockSinCosto>1?'s':'')+' sin precio de costo');
+      var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
+      if(/barber|salon|belleza|peluq/i.test(rub) && typeof getTurnos === 'function'){
+        var turnosSinCobro = getTurnos().filter(function(t){ return t.estado === 'terminado' && !(parseFloat(t.precio) > 0); }).length;
+        if(turnosSinCobro > 0) als.push(turnosSinCobro+' turno'+(turnosSinCobro>1?'s':'')+' finalizado'+(turnosSinCobro>1?'s':'')+' sin cobro registrado');
+      }
+      if(!als.length) return;
+      var box = document.getElementById('alerts');
+      if(box) box.innerHTML += als.map(function(m){ return '<div class="al aw"><span>⚠</span><span>'+m+'</span></div>'; }).join('');
+    }, 350);
+    // 3. Resumen diario automático a las 20:00
+    var h = new Date().getHours();
+    var ciKey = 'cierre_prompted_'+tod()+'_'+(currentTenant&&currentTenant.id||'');
+    if(h >= 20 && !localStorage.getItem(ciKey) && currentTenant){
+      localStorage.setItem(ciKey, '1');
+      setTimeout(function(){ if(typeof cierreDiario === 'function') cierreDiario(); }, 2500);
+    }
+    return result;
+  };
+})();
+
+// ── 3. Cierre diario: sección extra con resumen operativo ─────────────────
+
+(function(){
+  var _orig = cierreDiario;
+  cierreDiario = function(){
+    _orig.apply(this, arguments);
+    var hoy = tod();
+    var extra = document.getElementById('cdExtra');
+    if(!extra) return;
+    var repEnt = (S.reparaciones||[]).filter(function(r){ return r.estado==='entregado'&&(r.fechaEnt||r.fecha)===hoy; }).length;
+    var gastos = (S.movCaja||[]).filter(function(m){ return m.tipo==='egreso'&&m.fecha===hoy; }).reduce(function(a,m){ return a+parseFloat(m.monto||0); }, 0);
+    var ventasHoy = (S.ventas||[]).filter(function(v){ return v.fecha===hoy; }).reduce(function(a,v){ return a+(v.total||0); }, 0);
+    var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
+    var turnosHoy = 0;
+    if(/barber|salon|belleza|peluq/i.test(rub) && typeof getTurnos==='function'){
+      turnosHoy = getTurnos().filter(function(t){ return t.estado==='terminado'&&t.fecha===hoy; }).length;
+    }
+    var ganancia = ventasHoy - gastos;
+    var rows = '';
+    if(repEnt > 0) rows += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.8rem;color:var(--tx2)">🔧 Reparaciones entregadas</span><span style="font-size:.8rem;font-weight:600">'+repEnt+'</span></div>';
+    if(turnosHoy > 0) rows += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.8rem;color:var(--tx2)">✂️ Turnos finalizados</span><span style="font-size:.8rem;font-weight:600">'+turnosHoy+'</span></div>';
+    if(gastos > 0) rows += '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.8rem;color:var(--tx2)">📤 Gastos del día</span><span style="font-size:.8rem;font-weight:600;color:var(--bad)">- '+fmt(gastos)+'</span></div>';
+    rows += '<div style="display:flex;justify-content:space-between;padding:6px 0"><span style="font-size:.82rem;font-weight:700">💚 Ganancia neta</span><span style="font-size:.82rem;font-weight:700;color:'+(ganancia>=0?'var(--ok)':'var(--bad)')+'">'+fmt(ganancia)+'</span></div>';
+    extra.innerHTML = '<div style="font-size:.72rem;color:var(--gld);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--bor)">Resumen operativo</div>'+rows;
+  };
+})();
+
+// ── 4. Gráficos: indicador de tendencia + mensaje si hay pocos datos ───────
+
+(function(){
+  var _orig = rGrafico7Dias;
+  rGrafico7Dias = function(){
+    _orig.apply(this, arguments);
+    var el = document.getElementById('grafico7dias');
+    if(!el) return;
+    // Compute data independently
+    var diasConDatos = 0, estaSemana = 0, semanaAnterior = 0;
+    for(var i=0;i<7;i++){
+      var d = new Date(); d.setDate(d.getDate()-i);
+      var f = d.toISOString().slice(0,10);
+      var v = (S.ventas||[]).filter(function(x){ return x.fecha===f; }).reduce(function(a,x){ return a+(x.total||0); },0);
+      estaSemana += v;
+      if(v > 0) diasConDatos++;
+    }
+    if(diasConDatos < 3){
+      el.innerHTML = '<div style="text-align:center;padding:28px 16px;color:var(--mut)"><div style="font-size:1.6rem;margin-bottom:8px">🚀</div><div style="font-size:.88rem;font-weight:600;color:var(--tx);margin-bottom:4px">¡Registrá tus primeras ventas!</div><div style="font-size:.76rem">Con al menos 3 días de datos verás tu progreso aquí</div></div>';
+      return;
+    }
+    for(var j=7;j<14;j++){
+      var dj = new Date(); dj.setDate(dj.getDate()-j);
+      var fj = dj.toISOString().slice(0,10);
+      semanaAnterior += (S.ventas||[]).filter(function(x){ return x.fecha===fj; }).reduce(function(a,x){ return a+(x.total||0); },0);
+    }
+    var pct = semanaAnterior > 0 ? Math.round((estaSemana - semanaAnterior)/semanaAnterior*100) : null;
+    var trendHtml = pct !== null
+      ? '<span style="font-size:.75rem;color:'+(pct>=0?'var(--ok)':'var(--bad)')+';font-weight:700;margin-left:8px">'+(pct>=0?'▲':'▼')+' '+Math.abs(pct)+'% vs semana pasada</span>'
+      : '';
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:baseline;gap:4px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--bor)';
+    header.innerHTML = '<span style="font-family:var(--fh);font-size:1.7rem;font-weight:700;color:var(--gld)">'+fmt(estaSemana)+'</span>'+trendHtml;
+    el.insertBefore(header, el.firstChild);
+  };
+})();
+</script>
+
+<script src="tests.js" onerror="void 0"></script>
 
 <!-- ── Mobile improvements v2: dropdown categorías + fidelización configurable ──
      Wrappers y helpers sin modificar funciones originales.
