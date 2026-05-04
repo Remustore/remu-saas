@@ -14873,6 +14873,69 @@ function _filtrarSlotsPasados(){
   };
 })();
 
+// ── FIX: Turno rápido desde dashboard — openM no llena selects ──────────
+// openM solo resetea el modal; openNuevoTurno() es quien puebla los selects.
+// Cuando el botón del dashboard llama openM('mTurno',null) directamente,
+// los selects de servicio y empleado quedan vacíos.
+// Fix: wrapper que detecta esa apertura y puebla los selects.
+(function(){
+  var _prev = openM;
+  openM = function(id, editId){
+    _prev.apply(this, arguments);
+    if(id === 'mTurno' && (editId === null || editId === undefined)){
+      _poblarSelectsTurnoModal();
+    }
+  };
+})();
+
+function _poblarSelectsTurnoModal(){
+  var empSel = document.getElementById('turnoEmpleado');
+  var srvSel = document.getElementById('turnoServicio');
+  if(!empSel || !srvSel) return;
+
+  var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
+
+  // Empleados
+  empSel.innerHTML = (cfg.empleados && cfg.empleados.length)
+    ? cfg.empleados.map(function(e){
+        return '<option value="'+esc(String(e.id))+'">'+esc(e.nombre)+'</option>';
+      }).join('')
+    : '<option value="">Sin empleados — configurar primero</option>';
+
+  // Servicios (misma lógica que openNuevoTurno)
+  var svcs = (cfg.servicios && cfg.servicios.length > 0)
+    ? cfg.servicios
+    : (typeof S !== 'undefined' && S.precios
+        ? S.precios
+            .filter(function(p){ return p.nombre && (p.disponibilidad||'disponible') !== 'no_disponible'; })
+            .map(function(p){ return {id:p.id, nombre:p.nombre, sector:p.categoria||'', duracion:p.duracion||30, precio:parseFloat(p.precio)||0}; })
+        : []);
+
+  if(!svcs.length){
+    srvSel.innerHTML = '<option value="">Sin servicios — configurá primero en ⚙</option>';
+  } else {
+    srvSel.innerHTML = svcs.map(function(s){
+      return '<option value="'+s.id
+        +'" data-dur="'+(s.duracion||30)
+        +'" data-precio="'+(s.precio||0)+'">'
+        +(s.sector ? esc(s.sector)+': ' : '')+esc(s.nombre)
+        +' ('+(s.duracion||30)+' min)'
+        +(s.precio > 0 ? ' · $'+Number(s.precio).toLocaleString('es-AR') : '')
+        +'</option>';
+    }).join('');
+  }
+
+  // Fecha: restaurar la del calendario de turnos, o hoy
+  var fechaEl = document.getElementById('turnoFecha');
+  if(fechaEl && !fechaEl.value){
+    var calFecha = document.getElementById('turnosFecha');
+    fechaEl.value = (calFecha && calFecha.value) ? calFecha.value : (typeof tod === 'function' ? tod() : '');
+  }
+
+  // Actualizar display de duración y conflictos
+  if(typeof updateDuracionTurno === 'function') updateDuracionTurno();
+}
+
 // ── ITEM 4: Metas del día — modal adaptado según rubro ──────────────────
 
 function _adaptarObjetivosModal(){
