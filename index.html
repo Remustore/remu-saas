@@ -14656,5 +14656,155 @@ function _marcarPremioEntregado(nombre, visitas, gasto){
   };
 })();
 </script>
+
+<!-- ── Fixes v4: notificaciones reservas, cfg row slug, servicios wizard ──
+     Solo wrappers — no se modifican funciones existentes.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── BUG 1a: refreshBadgeSolicitudes consultaba 'pendiente' pero todas las
+//    reservas se insertan como 'confirmado' → badge siempre 0, _notifLocal nunca llamado.
+//    Fix: reemplazar comportamiento con la query correcta.
+var _solBadgeInited = false;
+(function(){
+  refreshBadgeSolicitudes = async function(){
+    if(!sb || !currentTenant?.id) return;
+    try {
+      var hoy = new Date().toISOString().slice(0,10);
+      var { data: rows } = await sb.from('turnos_solicitudes')
+        .select('id,nombre,servicio_id')
+        .eq('tenant_id', currentTenant.id)
+        .eq('estado', 'confirmado')
+        .eq('fecha', hoy);
+      var count = (rows||[]).length;
+      var badge = document.getElementById('solicitudesBadge');
+      if(badge){ badge.textContent = count||0; badge.style.display = count > 0 ? '' : 'none'; }
+      // Primera llamada: inicializar set sin notificar (evitar spam al cargar)
+      if(!_solBadgeInited){
+        _solBadgeInited = true;
+        _solicitudesNotifVistas = new Set((rows||[]).map(function(r){ return String(r.id); }));
+      } else {
+        for(var i = 0; i < (rows||[]).length; i++){
+          var row = rows[i];
+          if(!_solicitudesNotifVistas || !_solicitudesNotifVistas.has(String(row.id))){
+            if(!_solicitudesNotifVistas) _solicitudesNotifVistas = new Set();
+            _solicitudesNotifVistas.add(String(row.id));
+            if(typeof _notifLocal === 'function')
+              _notifLocal('📅 Nueva reserva online',
+                (row.nombre||'Cliente') + (row.servicio_id ? ' — '+row.servicio_id : ''),
+                'turnosOnline');
+          }
+        }
+      }
+      // Sync lastSolicCount para que checkNuevasSolicitudes no duplique la notif
+      localStorage.setItem('lastSolicCount_'+(currentTenant.id||''), String(count));
+    } catch(e){}
+  };
+})();
+
+// ── BUG 1b: checkNuevasSolicitudes muestra toast pero no llama _notifLocal
+//    Fix: llamar _notifLocal cuando el conteo crece (backup para usuarios idle).
+(function(){
+  var _orig = checkNuevasSolicitudes;
+  checkNuevasSolicitudes = async function(){
+    var key = 'lastSolicCount_'+(currentTenant?.id||'');
+    var prev = parseInt(localStorage.getItem(key)||'0');
+    await _orig.apply(this, arguments);
+    var next = parseInt(localStorage.getItem(key)||'0');
+    if(next > prev && typeof _notifLocal === 'function'){
+      _notifLocal('📅 Nueva reserva online',
+        (next-prev) > 1 ? (next-prev)+' nuevas reservas para hoy' : 'Nueva reserva para hoy',
+        'turnosOnline');
+    }
+  };
+})();
+
+// ── BUG 2: la fila cfg (__slug) no siempre existe → "Negocio no encontrado"
+//    Fix: llamar persistCfgToSupabase() después de guardar cualquier servicio.
+(function(){
+  var _orig = savePrecio;
+  savePrecio = async function(){
+    await _orig.apply(this, arguments);
+    if(typeof persistCfgToSupabase === 'function') persistCfgToSupabase().catch(function(){});
+  };
+})();
+
+// ── BUG 2+3: precargarServiciosTenant — el count guard cuenta la fila cfg como
+//    servicio real → si el tenant solo tiene cfg row (sin servicios), count=1 → return early
+//    → servicios nunca precargados. Además, los servicios del wizard se descartan.
+//    Fix: contar solo servicios reales (excluyendo cfg); si el wizard dejó servicios
+//    en localStorage, usarlos en lugar de los defaults de SERVICIOS_POR_RUBRO.
+(function(){
+  var _orig = precargarServiciosTenant;
+  precargarServiciosTenant = async function(tenantId, rubro, nombre){
+    // Verificar si ya existen servicios reales (excluir fila cfg)
+    try {
+      var { data: existRows } = await sb.from('precios').select('id,data').eq('tenant_id', tenantId);
+      var realSvcs = (existRows||[]).filter(function(r){ return r.data && !r.data.__tipo && !r.data.__turnosCfg; });
+      if(realSvcs.length > 0) return; // Ya tiene servicios, no hacer nada
+      // Solo tiene fila cfg (o está vacío): borrar cfg para que el count guard del original pase
+      var cfgId = parseInt((tenantId||'').replace(/-/g,'').substring(0,8),16) % 1000000 + 9999;
+      try { await sb.from('precios').delete().eq('id', cfgId).eq('tenant_id', tenantId); } catch(e2){}
+    } catch(e){}
+
+    // Consumir servicios del wizard ANTES de llamar original (evitar reintento si falla a mitad)
+    var wizardSvcs = null;
+    try {
+      var wRaw = localStorage.getItem('_wizardPendingSvcs');
+      if(wRaw) wizardSvcs = JSON.parse(wRaw);
+    } catch(e){}
+    localStorage.removeItem('_wizardPendingSvcs');
+
+    // Llamar original (inserta SERVICIOS_POR_RUBRO + crea fila cfg)
+    await _orig.apply(this, [tenantId, rubro, nombre]);
+
+    // Si el wizard configuró servicios propios, reemplazar los defaults
+    if(wizardSvcs && wizardSvcs.length){
+      try {
+        var { data: freshRows } = await sb.from('precios').select('id,data').eq('tenant_id', tenantId);
+        var defIds = (freshRows||[]).filter(function(r){ return r.data && !r.data.__tipo && !r.data.__turnosCfg; }).map(function(r){ return r.id; });
+        if(defIds.length) await sb.from('precios').delete().in('id', defIds);
+        var base = Date.now();
+        for(var i = 0; i < wizardSvcs.length; i++){
+          var svc = wizardSvcs[i];
+          var pid = base + i;
+          await sb.from('precios').insert({
+            id: pid,
+            data: {id:pid, nombre:svc.n, modelo:'General', categoria:'otro', precio:svc.p||0, disponibilidad:'disponible', notas:''},
+            tenant_id: tenantId
+          });
+        }
+        // Actualizar fila cfg con servicios y horarios del wizard
+        var cfgId2 = parseInt((tenantId||'').replace(/-/g,'').substring(0,8),16) % 1000000 + 9999;
+        var tc = {apertura:'09:00', cierre:'20:00', dias:[1,2,3,4,5,6], empleados:[],
+          servicios: wizardSvcs.map(function(s,i){ return {id:base+1000+i,nombre:s.n,sector:'General',duracion:30,precio:s.p||0}; })
+        };
+        try {
+          var lRaw = localStorage.getItem(TURNOS_CFG_KEY+'_'+tenantId);
+          if(lRaw){ var lc=JSON.parse(lRaw); tc.apertura=lc.apertura||tc.apertura; tc.cierre=lc.cierre||tc.cierre; if(lc.dias&&lc.dias.length) tc.dias=lc.dias; if(lc.empleados) tc.empleados=lc.empleados; }
+        } catch(e3){}
+        localStorage.setItem(TURNOS_CFG_KEY+'_'+tenantId, JSON.stringify(tc));
+        await sb.from('precios').upsert({
+          id: cfgId2, tenant_id: tenantId,
+          data: {id:cfgId2, __turnosCfg:tc, __onlineCfg:{mensaje:'',insta:'',direccion:'',tel:''},
+            __tipo:'cfg', __tenantName:nombre||'', __rubro:rubro||'',
+            __slug: typeof tenantSlug==='function' ? tenantSlug(nombre||'') : ''}
+        }, {onConflict:'id'});
+      } catch(e){ console.error('[remu] wizard svcs apply error', e); }
+    }
+  };
+})();
+
+// ── BUG 3: guardar servicios del wizard antes de _rwFinish para que el
+//    wrapper de precargarServiciosTenant los aplique en lugar de los defaults.
+(function(){
+  if(typeof _rwFinish !== 'function') return;
+  var _orig = _rwFinish;
+  _rwFinish = async function(btn){
+    if(window.__rw && window.__rw.svcs && window.__rw.svcs.length)
+      localStorage.setItem('_wizardPendingSvcs', JSON.stringify(window.__rw.svcs));
+    return _orig.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
