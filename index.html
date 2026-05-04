@@ -14806,5 +14806,139 @@ var _solBadgeInited = false;
   };
 })();
 </script>
+
+<!-- ── Mejoras v5: horarios pasados + metas por rubro ──────────────────────
+     Solo wrappers — no se modifican funciones existentes.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── ITEM 5: Horarios pasados disponibles ────────────────────────────────
+
+// Helper: retorna fecha y hora local como strings "YYYY-MM-DD" y "HH:MM"
+function _horaLocalAhora(){
+  var n = new Date();
+  return {
+    fecha: n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'),
+    hora:  String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')
+  };
+}
+
+// Grisa y deshabilita los slots pasados en la grilla pública de turnos
+function _filtrarSlotsPasados(){
+  var fechaEl = document.getElementById('onFecha');
+  if(!fechaEl || !fechaEl.value) return;
+  var ahora = _horaLocalAhora();
+  if(fechaEl.value !== ahora.fecha) return;
+  var grid = document.getElementById('onSlotsGrid');
+  if(!grid) return;
+  grid.querySelectorAll('div[onclick]').forEach(function(div){
+    var hora = div.textContent.trim().substring(0,5);
+    if(!hora || !/^\d{2}:\d{2}$/.test(hora)) return;
+    if(hora <= ahora.hora){
+      div.removeAttribute('onclick');
+      div.removeAttribute('onmouseover');
+      div.removeAttribute('onmouseout');
+      div.style.cssText = 'padding:8px 14px;border-radius:8px;background:rgba(80,80,80,.05);border:1px solid #1c1c1c;font-size:.82rem;cursor:default;min-width:72px;text-align:center;opacity:.38';
+      div.innerHTML = '<div style="color:#555">'+hora+'</div><div style="font-size:.6rem;color:#444;text-transform:uppercase;letter-spacing:.5px">Pasado</div>';
+    }
+  });
+}
+
+// Página pública: filtrar después de renderizar la grilla
+(function(){
+  var _orig = cargarHorasDisponibles;
+  cargarHorasDisponibles = async function(tenantId, cfg){
+    await _orig.apply(this, arguments);
+    _filtrarSlotsPasados();
+  };
+})();
+
+// Calendario interno (admin): advertencia si el horario elegido ya pasó
+(function(){
+  var _orig = verificarConflicto;
+  verificarConflicto = async function(){
+    await _orig.apply(this, arguments);
+    var fecha = (document.getElementById('turnoFecha')||{}).value;
+    var hora  = (document.getElementById('turnoHora') ||{}).value;
+    var box   = document.getElementById('turnoConflicto');
+    if(!fecha || !hora || !box) return;
+    var ahora = _horaLocalAhora();
+    if(fecha !== ahora.fecha) return;
+    // Solo mostrar aviso si el box está vacío (no hay otro conflicto)
+    if(box.style.display === 'none' || !box.style.display || !box.innerHTML.trim()){
+      if(hora.substring(0,5) <= ahora.hora){
+        box.style.display = 'block';
+        box.innerHTML = '⏰ Este horario ya pasó. Podés guardarlo igual para registrar un turno anterior.';
+      }
+    }
+  };
+})();
+
+// ── ITEM 4: Metas del día — modal adaptado según rubro ──────────────────
+
+function _adaptarObjetivosModal(){
+  var obj = S && S.objetivos ? S.objetivos : {repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
+  // Rellenar campos (openM los resetea a '' cuando editId es null)
+  var set = function(id, v){ var el = document.getElementById(id); if(el && v != null) el.value = v; };
+  set('objRepCant', obj.repCant); set('objRepPre', obj.repPre);
+  set('objAccCant', obj.accCant); set('objAccPre', obj.accPre);
+  set('objEqCant',  obj.eqCant);  set('objEqPre',  obj.eqPre);
+
+  var r = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
+  var esSalon = /salon|belleza|peluq|barber/i.test(r);
+  var modal = document.getElementById('mObjetivos');
+  if(!modal) return;
+  var labels = modal.querySelectorAll('label');
+  var frDivs = modal.querySelectorAll('.fr');
+
+  if(esSalon){
+    if(labels[0]) labels[0].textContent = '📅 Turnos por día (meta)';
+    if(labels[1]) labels[1].textContent = '💰 Ticket promedio por turno ($)';
+    // Fila 2: ocultar celda accCant, label accPre = meta facturación
+    if(frDivs[1]){
+      var celdas = frDivs[1].querySelectorAll(':scope > div');
+      if(celdas[0]) celdas[0].style.display = 'none';
+      if(celdas[1]) celdas[1].style.display = '';
+    }
+    if(labels[3]) labels[3].textContent = '🏆 Meta de facturación del día ($)';
+    // Fila 3: ocultar para salón/barbería
+    if(frDivs[2]) frDivs[2].style.display = 'none';
+  } else {
+    if(labels[0]) labels[0].textContent = '🔧 Trabajos por día (cantidad)';
+    if(labels[1]) labels[1].textContent = 'Precio promedio ($)';
+    if(frDivs[1]){
+      var celdas2 = frDivs[1].querySelectorAll(':scope > div');
+      if(celdas2[0]) celdas2[0].style.display = '';
+      if(celdas2[1]) celdas2[1].style.display = '';
+    }
+    if(labels[2]) labels[2].textContent = '📦 Ventas accesorios por día';
+    if(labels[3]) labels[3].textContent = 'Precio promedio ($)';
+    if(frDivs[2]) frDivs[2].style.display = '';
+    if(labels[4]) labels[4].textContent = '📱 Equipos a vender por día';
+    if(labels[5]) labels[5].textContent = 'Comisión promedio ($)';
+  }
+}
+
+// Interceptar openM para rellenar y adaptar el modal de objetivos al abrirlo
+(function(){
+  var _orig = openM;
+  openM = function(id, editId){
+    _orig.apply(this, arguments);
+    if(id === 'mObjetivos') _adaptarObjetivosModal();
+  };
+})();
+
+// Interceptar saveObjetivos para salón: forzar accCant=1 (meta = accPre directo)
+(function(){
+  var _orig = saveObjetivos;
+  saveObjetivos = async function(){
+    var r = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
+    if(/salon|belleza|peluq|barber/i.test(r)){
+      var el = document.getElementById('objAccCant');
+      if(el) el.value = '1';
+    }
+    return _orig.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
