@@ -15076,5 +15076,23 @@ function _adaptarObjetivosModal(){
   };
 })();
 </script>
+<script>
+(function(){
+  if(typeof enviarSolicitudTurno !== 'function') return;
+  var _eSTOrig = enviarSolicitudTurno;
+  enviarSolicitudTurno = async function(tenantId){
+    var nombre = document.getElementById('onNombre')?.value?.trim() || '';
+    var fecha  = document.getElementById('onFecha')?.value || '';
+    var hora   = document.getElementById('onHora')?.value || '';
+    await _eSTOrig.apply(this, arguments);
+    var submitBtn = document.querySelector('button[onclick*="enviarSolicitudTurno"]');
+    if(submitBtn && submitBtn.textContent.includes('Reservado')){
+      try {
+        _notifLocal('📅 Nuevo turno reservado', nombre + ' · ' + fecha + ' ' + hora, 'turnos');
+      } catch(e){}
+    }
+  };
+})();
+</script>
 </body>
 </html>
