@@ -15094,5 +15094,84 @@ function _adaptarObjetivosModal(){
   };
 })();
 </script>
+<script>
+/* ── BUG 1: sync S.precios → turnosCfg.servicios antes de persistir en Supabase ── */
+(function(){
+  if(typeof persistCfgToSupabase !== 'function') return;
+  var _origP = persistCfgToSupabase;
+  persistCfgToSupabase = async function(){
+    if(currentTenant && currentTenant.id && typeof S !== 'undefined' && Array.isArray(S.precios)){
+      var svcs = S.precios
+        .filter(function(p){ return p && !p.__tipo && !p.__turnosCfg && p.nombre; })
+        .filter(function(p){ return (p.disponibilidad||'disponible') !== 'no_disponible'; })
+        .map(function(p){ return {id:p.id, nombre:p.nombre, sector:p.categoria||p.sector||'', duracion:parseInt(p.duracion)||30, precio:parseFloat(p.precio)||0}; });
+      var cfg = getTurnosCfg();
+      cfg.servicios = svcs;
+      localStorage.setItem(TURNOS_CFG_KEY + '_' + currentTenant.id, JSON.stringify(cfg));
+    }
+    return _origP.apply(this, arguments);
+  };
+})();
+
+/* ── BUG 1: persistCfgToSupabase también al eliminar un precio ── */
+(function(){
+  if(typeof delPrecio !== 'function') return;
+  var _origDel = delPrecio;
+  delPrecio = async function(id){
+    await _origDel.apply(this, arguments);
+    if(typeof persistCfgToSupabase === 'function'){
+      try { await persistCfgToSupabase(); } catch(e){}
+    }
+  };
+})();
+
+/* ── BUG 2: limpiar TODO el localStorage al cerrar sesión (sin preservar tenant anterior) ── */
+(function(){
+  if(typeof doLogout !== 'function') return;
+  var _origLogout = doLogout;
+  doLogout = async function(){
+    await _origLogout.apply(this, arguments);
+    _clearTenantCache(); // sin keepTenantId → elimina TODOS los datos de tenant
+    window.__onlineTenantId = null;
+    window.__onlineTurnosCfg = null;
+    window.__estadoTenantId = null;
+    window.__preciosPublicItems = null;
+    window.__preciosCfgSynced = false;
+    window.currentEmpleadoNombre = '';
+    window.__cierreDiarioData = null;
+  };
+})();
+
+/* ── BUG 2: al cargar un nuevo tenant, limpiar datos de sesiones anteriores ── */
+(function(){
+  if(typeof loadAll !== 'function') return;
+  var _origLoad = loadAll;
+  loadAll = async function(){
+    if(currentTenant && currentTenant.id) _clearTenantCache(currentTenant.id);
+    return _origLoad.apply(this, arguments);
+  };
+})();
+
+/* ── BUG 3: verificar y re-borrar turnos_solicitudes si persisten tras borrarTodosMisDatos ── */
+(function(){
+  if(typeof borrarTodosMisDatos !== 'function') return;
+  var _origBorrar = borrarTodosMisDatos;
+  borrarTodosMisDatos = async function(){
+    await _origBorrar.apply(this, arguments);
+    if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return;
+    try {
+      var tid = currentTenant.id;
+      var res = await sb.from('turnos_solicitudes')
+        .select('id', {count:'exact', head:true})
+        .eq('tenant_id', tid);
+      var remaining = res.count || 0;
+      if(remaining > 0){
+        await sb.from('turnos_solicitudes').delete().eq('tenant_id', tid);
+        console.warn('[remu] turnos_solicitudes: re-borrado', remaining, 'registros residuales');
+      }
+    } catch(e){ console.warn('[remu] post-borrar verificación turnos_solicitudes:', e); }
+  };
+})();
+</script>
 </body>
 </html>
