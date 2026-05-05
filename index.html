@@ -15003,5 +15003,78 @@ function _adaptarObjetivosModal(){
   };
 })();
 </script>
+
+<!-- ── Fixes v6: nuevos tenants — cfg sync + notificaciones en tiempo real ──
+     Solo wrappers — no se modifican funciones existentes.
+──────────────────────────────────────────────────────────────────────── -->
+<script>
+// ── BUGS 1+2 (nuevos tenants): la fila cfg en Supabase puede tener __slug
+//    incorrecto o __turnosCfg con horarios default porque persistCfgToSupabase()
+//    solo corre al guardar servicios o cuando la cfg row falta. Tras el registro,
+//    la cfg row YA existe (la creó precargar) pero con datos de fábrica.
+//    Fix: al primer renderAll de la sesión por tenant, forzar un sync
+//    localStorage → Supabase para que las páginas públicas vean datos reales.
+//
+// ── BUG 3 (nuevos tenants): las notificaciones push llegan solo cuando
+//    silentRefresh corre (cada 30s). Con Supabase Realtime el admin recibe
+//    la notificación en < 1 segundo tras cada reserva online.
+//    Fix: suscripción Realtime en INSERT de turnos_solicitudes → dispara
+//    refreshBadgeSolicitudes() inmediatamente.
+(function(){
+  var _orig = renderAll;
+  var _syncedTenant = '';
+  var _realtimeSub = null;
+  var _realtimeTenant = '';
+
+  function _setupReservasRealtime(tid){
+    if(!sb || !tid || _realtimeTenant === tid) return;
+    _realtimeTenant = tid;
+    if(_realtimeSub){ try{ sb.removeChannel(_realtimeSub); }catch(e){} }
+    try{
+      _realtimeSub = sb.channel('remu_reservas_' + tid)
+        .on('postgres_changes', {event:'INSERT', schema:'public', table:'turnos_solicitudes',
+            filter:'tenant_id=eq.'+tid}, function(){
+          if(typeof refreshBadgeSolicitudes === 'function') refreshBadgeSolicitudes();
+        })
+        .subscribe();
+    }catch(e){}
+  }
+
+  renderAll = function(){
+    _orig.apply(this, arguments);
+    if(!currentTenant || !currentTenant.id || currentRole !== 'admin') return;
+    var tid = currentTenant.id;
+    // Sync cfg row una sola vez por sesión (corrige slug + horarios en Supabase)
+    if(_syncedTenant !== tid){
+      _syncedTenant = tid;
+      setTimeout(function(){
+        if(typeof persistCfgToSupabase === 'function') persistCfgToSupabase().catch(function(){});
+      }, 1500);
+    }
+    // Canal Realtime: notificaciones instantáneas de nuevas reservas
+    _setupReservasRealtime(tid);
+  };
+})();
+</script>
+
+<script>
+// ── Garantía: persistCfgToSupabase awaited tras savePrecio ───────────────────
+//    El patch anterior (~línea 14722) llama persistCfgToSupabase() fire-and-forget
+//    con .catch(()=>{}) que traga errores. Este lo espera para que si el usuario
+//    abre la página pública inmediatamente después de guardar, el cfg row ya exista.
+(function(){
+  if(typeof savePrecio !== 'function') return;
+  var _spRobust = savePrecio;
+  savePrecio = async function(){
+    await _spRobust.apply(this, arguments);
+    if(typeof persistCfgToSupabase !== 'function') return;
+    try {
+      await persistCfgToSupabase();
+    } catch(e){
+      console.warn('[remu] persistCfgToSupabase falló tras savePrecio:', e);
+    }
+  };
+})();
+</script>
 </body>
 </html>
