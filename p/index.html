@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080808">
+<title>Servicios y turnos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#080808;color:#f5f0e8;font-family:'Outfit',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* Skeleton loader */
+.skeleton{background:linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%);background-size:200% 100%;animation:sk 1.2s infinite;border-radius:8px}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+/* Booking overlay */
+.bk-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;opacity:0;pointer-events:none;transition:opacity .25s}
+.bk-ov.vis{opacity:1;pointer-events:all}
+
+/* Booking panel — bottom sheet */
+.bk-pan{
+  position:fixed;bottom:0;left:0;right:0;
+  background:#111;border-top:1px solid #2e2e2e;
+  border-radius:20px 20px 0 0;
+  padding:20px 20px 36px;
+  z-index:101;
+  max-height:90vh;overflow-y:auto;
+  transform:translateY(100%);
+  transition:transform .28s cubic-bezier(.4,0,.2,1);
+  -webkit-overflow-scrolling:touch
+}
+.bk-pan.vis{transform:translateY(0)}
+@media(min-width:600px){
+  .bk-pan{max-width:520px;left:50%;right:auto;margin-left:-260px}
+  .bk-pan{transform:translateY(100%)}
+  .bk-pan.vis{transform:translateY(0)}
+}
+
+/* Form elements inside panel */
+.bk-pan label{display:block;font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;margin-top:14px}
+.bk-pan label:first-of-type{margin-top:0}
+.bk-pan input,.bk-pan select{
+  width:100%;background:#080808;border:1px solid #2e2e2e;
+  color:#f5f0e8;padding:11px 14px;border-radius:8px;
+  font-family:'Outfit',sans-serif;font-size:.88rem;outline:none;
+  transition:border .15s;-webkit-appearance:none;appearance:none
+}
+.bk-pan input:focus,.bk-pan select:focus{border-color:#b8976a}
+.bk-pan select{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a89880' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:36px
+}
+.bk-pan select option{background:#0d0d0d}
+
+/* Slots */
+.slots-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.slot{padding:8px 14px;border-radius:8px;font-size:.83rem;border:1px solid #2e2e2e;cursor:pointer;min-width:72px;text-align:center;background:#0a0a0a;color:#a89880;transition:all .12s}
+.slot:hover{border-color:#b8976a;color:#c9a84c}
+.slot.sel{background:#b8976a;color:#080808;font-weight:700;border-color:#b8976a}
+.slot.ocu{background:rgba(201,168,76,.06);border-color:rgba(201,168,76,.2);cursor:default;display:flex;flex-direction:column;align-items:center;gap:3px}
+.slot.blq{background:rgba(201,82,76,.06);border-color:rgba(201,82,76,.2);cursor:default;display:flex;flex-direction:column;align-items:center;gap:3px}
+.slot-tag{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:8px}
+.tag-ocu{color:#b8976a;background:rgba(201,148,76,.18)}
+.tag-blq{color:#c9524c;background:rgba(201,82,76,.15)}
+
+.msg-info{background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.18);border-radius:10px;padding:14px;text-align:center;color:#a89880;font-size:.82rem;margin-top:10px}
+.msg-err{background:rgba(201,82,76,.08);border:1px solid rgba(201,82,76,.25);border-radius:8px;padding:12px 14px;color:#e87070;font-size:.82rem;margin-top:12px}
+.cerrado-banner{background:rgba(201,82,76,.08);border:1px solid rgba(201,82,76,.25);border-radius:10px;padding:14px;text-align:center;font-size:.85rem;color:#e87070;margin-top:10px}
+
+.bk-btn{
+  width:100%;padding:14px;background:#c9a84c;color:#080808;
+  border:none;border-radius:10px;font-family:'Outfit',sans-serif;
+  font-size:.95rem;font-weight:700;cursor:pointer;
+  transition:background .15s;margin-top:18px
+}
+.bk-btn:hover:not(:disabled){background:#e8c96a}
+.bk-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* WA floating */
+.wa-btn{
+  position:fixed;bottom:20px;right:16px;
+  display:flex;align-items:center;gap:10px;
+  background:#25d366;color:#fff;text-decoration:none;
+  padding:12px 16px;border-radius:50px;
+  font-family:'Outfit',sans-serif;font-weight:600;font-size:.85rem;
+  box-shadow:0 4px 18px rgba(37,211,102,.45);
+  z-index:50;transition:transform .15s
+}
+.wa-btn:hover{transform:scale(1.04)}
+</style>
+</head>
+<body>
+
+<!-- Loader inicial -->
+<div id="pLoader" style="text-align:center;padding:100px 20px;color:#a89880">
+  <div class="skeleton" style="height:24px;width:200px;margin:0 auto 12px"></div>
+  <div class="skeleton" style="height:14px;width:280px;margin:0 auto 8px"></div>
+  <div class="skeleton" style="height:14px;width:160px;margin:0 auto"></div>
+</div>
+
+<!-- Overlay + panel de reserva (siempre en el DOM) -->
+<div class="bk-ov" id="bkOv" onclick="cerrarReserva()"></div>
+<div class="bk-pan" id="bkPan">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+    <span style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#c9a84c">Reservar turno</span>
+    <button onclick="cerrarReserva()" style="background:none;border:none;color:#a89880;font-size:1.5rem;cursor:pointer;padding:4px;line-height:1">✕</button>
+  </div>
+  <div id="bkBody"></div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const SURL = 'https://xycagqxhpwrbdurrjkdl.supabase.co';
+const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Y2FncXhocHdyYmR1cnJqa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNDMxMTgsImV4cCI6MjA4ODgxOTExOH0.AfXJcUn2hNsLX8ooO1jwOF1ogTqDnSp1Up-Fv2tnKDQ';
+const sb = supabase.createClient(SURL, SKEY);
+
+let G = { tenantId: null, cfg: null, online: null, tenant: null };
+let _allItems = [];
+let _filterCat = '';
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function fmt(n){ return '$' + Number(n||0).toLocaleString('es-AR'); }
+function tod(){ return new Date().toISOString().slice(0,10); }
+function minToHH(m){ return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+function hhToMin(hh){ const [h,m]=(hh||'00:00').split(':').map(Number); return h*60+m; }
+function norm(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,''); }
+function tenantSlug(n){ return (n||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'')||'mi-negocio'; }
+function tryParseData(r){ const d=r?.data; if(!d) return null; if(typeof d==='string'){try{return JSON.parse(d);}catch(e){return null;}} return typeof d==='object'?d:null; }
+
+const CAT_KW = {
+  'corte':       /corte|degradado|capado|navaja|pelo|cabello|fade/i,
+  'barba':       /barba|afeitado|contorno|bigote|perfil/i,
+  'coloracion':  /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+  'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
+  'tratamiento': /tratamiento|keratina|brushing|hidrat|botox|permanente|alisado/i,
+  'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
+  'lifting':     /lifting|pesta[ñn]/i,
+  'depilacion':  /depilac|cera|laser/i,
+  'maquillaje':  /maquillaje/i,
+  'pantalla':    /pantalla|display|lcd/i,
+  'bateria':     /bater[ií]a/i,
+  'tapa':        /tapa|back|trasera/i,
+  'conector':    /conector|carga|puerto/i,
+  'camara':      /c[aá]mara/i,
+  'otro':        /.*/
+};
+
+// ── Resolución de slug → tenant (idéntica a b/index.html) ─────────────────
+async function resolveSlug(slug){
+  if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(slug)){
+    const {data} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', slug).limit(30);
+    if(data&&data.length) return { tenantId: slug, rows: data };
+  }
+  try {
+    const {data: cfgRows, error} = await sb.from('precios')
+      .select('tenant_id,data').contains('data', {__slug: slug}).limit(5);
+    if(!error && cfgRows && cfgRows.length){
+      const tid = cfgRows[0].tenant_id;
+      const {data: all} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', tid).limit(50);
+      return { tenantId: tid, rows: all||[] };
+    }
+  } catch(e){}
+  const {data: allRows} = await sb.from('precios').select('tenant_id,data').limit(500);
+  if(allRows && allRows.length){
+    const cfgCandidates = allRows.filter(r=>{ const d=tryParseData(r); return d&&(d.__tenantName||d.__turnosCfg||d.__slug); });
+    const found = cfgCandidates.find(r=>{
+      const d = tryParseData(r);
+      if(!d) return false;
+      if(d.__slug && d.__slug===slug) return true;
+      if(d.__tenantName && tenantSlug(d.__tenantName)===slug) return true;
+      return false;
+    });
+    if(found){
+      const tid = found.tenant_id;
+      return { tenantId: tid, rows: allRows.filter(r=>r.tenant_id===tid) };
+    }
+  }
+  return null;
+}
+
+// ── Parseo de filas (idéntico a b/index.html) ─────────────────────────────
+function parseRows(rows){
+  let turnosCfg = {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
+  let onlineCfg = {mensaje:'',insta:'',direccion:'',tel:''};
+  let tenantNombre = '', tenantRubro = '';
+  const cfgRow = rows.map(r=>({...r,_d:tryParseData(r)})).find(r=>r._d&&(r._d.__tipo==='cfg'||r._d.__turnosCfg));
+  if(cfgRow){
+    const d = cfgRow._d;
+    if(d.__turnosCfg) turnosCfg = {...turnosCfg, ...d.__turnosCfg};
+    if(d.__onlineCfg) onlineCfg = {...onlineCfg, ...d.__onlineCfg};
+    if(d.__tenantName) tenantNombre = d.__tenantName;
+    if(d.__rubro)      tenantRubro  = d.__rubro;
+  }
+  const durMap = {};
+  (turnosCfg.servicios||[]).forEach(s=>{ durMap[norm(s.nombre||'')] = s.duracion||30; });
+  const itemsPrecios = rows
+    .map(r=>tryParseData(r))
+    .filter(d=>d&&!d.__tipo&&!d.__turnosCfg&&d.nombre)
+    .filter(p=>(p.disponibilidad||'disponible')!=='no_disponible');
+  if(itemsPrecios.length){
+    turnosCfg.servicios = itemsPrecios.map(p=>({
+      id: p.id, nombre: p.nombre,
+      categoria: p.categoria||p.sector||'',
+      precio: parseFloat(p.precio)||0,
+      duracion: durMap[norm(p.nombre||'')]||p.duracion||30,
+      notas: p.notas||''
+    }));
+  }
+  return {turnosCfg, onlineCfg, tenantNombre, tenantRubro};
+}
+
+// ── Render principal ──────────────────────────────────────────────────────
+function renderPage(){
+  const cfg = G.cfg || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
+  const oc  = G.online || {};
+  const nombre = G.tenant?.nombre || G.tenantNombre || 'Negocio';
+  const rubro  = G.tenant?.rubro  || G.tenantRubro  || '';
+  const rubroLC = rubro.toLowerCase();
+  const esBarber = /barber/i.test(rubroLC);
+  const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
+  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
+
+  document.title = nombre + ' — Servicios y turnos';
+
+  // Tabs por rubro
+  const cats = esBarber
+    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'barba',l:'🪒 Barba'},{k:'coloracion',l:'🎨 Coloración'},{k:'tratamiento',l:'✨ Tratamientos'},{k:'otro',l:'🔧 Otros'}]
+    : esSalon
+    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'tintura',l:'🎨 Tintura'},{k:'manicuria',l:'💅 Manicuria'},{k:'maquillaje',l:'💄 Maquillaje'},{k:'lifting',l:'👁 Lifting'},{k:'depilacion',l:'✨ Depilación'}]
+    : [{k:'',l:'Todos'},{k:'pantalla',l:'📱 Pantallas'},{k:'tapa',l:'🔲 Tapas'},{k:'bateria',l:'🔋 Baterías'},{k:'conector',l:'🔌 Conectores'},{k:'camara',l:'📸 Cámaras'},{k:'otro',l:'🔧 Otros'}];
+
+  // Nota de precios
+  const textoNota = oc.notaPrecios || (
+    (esBarber||esSalon) ? 'Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.'
+    : 'Trabajamos con transplante de IC y Flex para que tu equipo NO MARQUE CARTELES. ⏰ Tiempo: 2–3 días hábiles · 🔋 Baterías: con restablecimiento de fábrica.'
+  );
+
+  // Deduplicar items
+  const dedupMap = new Map();
+  cfg.servicios.forEach(p=>{
+    const key = norm(p.nombre||'');
+    const prev = dedupMap.get(key);
+    if(!prev || (p.precio||0) > (prev.precio||0)) dedupMap.set(key, p);
+  });
+  _allItems = Array.from(dedupMap.values());
+
+  // Quitar loader e insertar HTML
+  const loader = document.getElementById('pLoader');
+  if(loader) loader.remove();
+
+  // Construir la página
+  const pageDiv = document.createElement('div');
+  pageDiv.innerHTML = `
+    <!-- HEADER -->
+    <div style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
+      ${oc.logo ? `<img src="${oc.logo}" alt="Logo" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:10px;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto">` : `<div style="font-size:2.2rem;margin-bottom:6px">${rubroIcon}</div>`}
+      <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(nombre)}</div>
+      ${rubro ? `<div style="font-size:.66rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
+      ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
+      ${oc.direccion ? `<div style="font-size:.75rem;color:#a89880;margin-top:8px">📍 ${esc(oc.direccion)}</div>` : ''}
+    </div>
+
+    <!-- MENSAJE -->
+    <div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">
+      ${esc(oc.mensaje||'¡Bienvenido! 👋 Reservá tu turno de forma rápida y sencilla.')}
+    </div>
+
+    <!-- CONTENIDO -->
+    <div style="max-width:720px;margin:0 auto;padding:24px 16px 100px">
+
+      <!-- Nota -->
+      <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">
+        ${rubroIcon} ${esc(textoNota)}
+      </div>
+
+      <!-- Búsqueda -->
+      <div style="display:flex;align-items:center;background:#111;border:1px solid #222;border-radius:10px;padding:0 14px;margin-bottom:14px">
+        <span style="color:#a89880;font-size:1.1rem;margin-right:8px">⌕</span>
+        <input id="pSrch" placeholder="Buscar servicio..." oninput="renderItems()"
+          style="flex:1;background:none;border:none;color:#f5f0e8;padding:12px 0;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none"
+          autocomplete="off">
+      </div>
+
+      <!-- Tabs -->
+      <div id="pTabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px">
+        ${cats.map((c,i)=>`<button data-cat="${esc(c.k)}" onclick="setCat(this)"
+          style="padding:7px 15px;border-radius:20px;border:1px solid ${i===0?'#c9a84c':'#242424'};background:${i===0?'rgba(201,168,76,.15)':'transparent'};color:${i===0?'#c9a84c':'#a89880'};font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;white-space:nowrap;transition:all .15s">
+          ${esc(c.l)}
+        </button>`).join('')}
+      </div>
+
+      <!-- Grilla de servicios -->
+      <div id="pGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
+      <div id="pEmpty" style="display:none;text-align:center;padding:48px 0;color:#a89880">
+        <div style="font-size:2.5rem;margin-bottom:10px">🔍</div>
+        <div style="font-size:.88rem">No se encontraron servicios</div>
+      </div>
+
+      <!-- Compartir -->
+      <div style="margin-top:36px;display:flex;flex-direction:column;align-items:center;gap:12px">
+        <button id="pShareBtn" onclick="compartir()"
+          style="background:transparent;border:1px solid #2e2e2e;color:#a89880;padding:10px 22px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;cursor:pointer;transition:all .2s">
+          🔗 Compartir este link
+        </button>
+      </div>
+      <div style="text-align:center;margin-top:24px;font-size:.62rem;color:#585044;letter-spacing:1.5px;text-transform:uppercase">
+        Precios actualizados en tiempo real
+      </div>
+    </div>
+  `;
+  document.body.insertBefore(pageDiv, document.getElementById('bkOv'));
+
+  // WA flotante
+  const waTel = (oc.tel||'').replace(/\D/g,'');
+  if(waTel){
+    const waMsg = encodeURIComponent('Hola! Quiero consultar antes de reservar en '+nombre+' 😊');
+    document.body.insertAdjacentHTML('beforeend',
+      `<a class="wa-btn" href="https://wa.me/549${waTel}?text=${waMsg}" target="_blank" rel="noopener">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+        Consultar
+      </a>`
+    );
+  }
+
+  renderItems();
+}
+
+// ── Filtros ───────────────────────────────────────────────────────────────
+function setCat(btn){
+  _filterCat = btn.dataset.cat;
+  document.querySelectorAll('#pTabs button').forEach(b=>{
+    const on = b === btn;
+    b.style.borderColor  = on ? '#c9a84c' : '#242424';
+    b.style.background   = on ? 'rgba(201,168,76,.15)' : 'transparent';
+    b.style.color        = on ? '#c9a84c' : '#a89880';
+  });
+  renderItems();
+}
+
+function renderItems(){
+  const grid  = document.getElementById('pGrid');
+  const empty = document.getElementById('pEmpty');
+  if(!grid) return;
+  const q = norm(document.getElementById('pSrch')?.value||'');
+
+  const items = _allItems.filter(p=>{
+    if(q && !norm(p.nombre).includes(q)) return false;
+    if(_filterCat){
+      const matchCat = norm(p.categoria||'') === norm(_filterCat);
+      const kw = CAT_KW[norm(_filterCat)];
+      if(!matchCat && !(kw && kw.test(p.nombre))) return false;
+    }
+    return true;
+  });
+
+  if(!items.length){
+    grid.style.display='none'; empty.style.display='block'; return;
+  }
+  grid.style.display='grid'; empty.style.display='none';
+
+  grid.innerHTML = items.map(p=>`
+    <div style="background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s"
+         onmouseover="this.style.borderColor='rgba(201,168,76,.3)'" onmouseout="this.style.borderColor='#1e1e1e'">
+      <div>
+        <div style="font-weight:600;font-size:.92rem;margin-bottom:4px;line-height:1.3">${esc(p.nombre)}</div>
+        <div style="font-size:.77rem;color:#a89880">
+          ${p.duracion||30} min
+          ${p.precio>0 ? `· <span style="color:#c9a84c;font-weight:600;font-family:'Playfair Display',serif;font-size:1rem">${fmt(p.precio)}</span>` : '· <span style="color:#a89880">Precio a consultar</span>'}
+        </div>
+        ${p.notas ? `<div style="font-size:.72rem;color:#a89880;margin-top:4px;line-height:1.5">${esc(p.notas)}</div>` : ''}
+      </div>
+      <button onclick="abrirReserva(${JSON.stringify(p.id)})"
+        style="margin-top:auto;padding:9px 14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .15s;text-align:center"
+        onmouseover="this.style.background='#e8c96a'" onmouseout="this.style.background='#c9a84c'">
+        📅 Reservar
+      </button>
+    </div>
+  `).join('');
+}
+
+function compartir(){
+  navigator.clipboard.writeText(location.href).then(()=>{
+    const btn = document.getElementById('pShareBtn');
+    if(btn){ btn.textContent='¡Copiado! ✓'; btn.style.color='#4caf7d'; btn.style.borderColor='#4caf7d'; }
+    setTimeout(()=>{ if(btn){ btn.textContent='🔗 Compartir este link'; btn.style.color='#a89880'; btn.style.borderColor='#2e2e2e'; }},2500);
+  });
+}
+
+// ── Panel de reserva ──────────────────────────────────────────────────────
+function abrirReserva(srvId){
+  const cfg = G.cfg || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
+
+  if(!cfg.servicios.length){
+    alert('Este negocio todavía no configuró sus servicios online.');
+    return;
+  }
+
+  const minFecha = tod();
+  const hayEmpleados = cfg.empleados && cfg.empleados.length > 1;
+
+  document.getElementById('bkBody').innerHTML = `
+    <label>Servicio</label>
+    <select id="bkSrv" onchange="onBkSrvChange()">
+      ${cfg.servicios.map(s=>`<option value="${esc(String(s.id))}" data-dur="${s.duracion||30}">
+        ${esc(s.categoria?s.categoria+': ':'')}${esc(s.nombre)} (${s.duracion||30} min)${s.precio>0?' — '+fmt(s.precio):''}
+      </option>`).join('')}
+    </select>
+
+    <label>Tu nombre</label>
+    <input id="bkNombre" placeholder="Nombre completo" autocomplete="name" autocorrect="off">
+
+    <label>WhatsApp</label>
+    <input id="bkTel" type="tel" inputmode="numeric" placeholder="11 2345 6789" autocomplete="tel">
+
+    ${hayEmpleados ? `
+    <label>Profesional</label>
+    <select id="bkEmp" onchange="onBkFechaChange()">
+      <option value="">Sin preferencia</option>
+      ${cfg.empleados.map(e=>`<option value="${esc(String(e.id))}">${esc(e.nombre)}</option>`).join('')}
+    </select>` : '<input type="hidden" id="bkEmp" value="">'}
+
+    <label>Fecha</label>
+    <input type="date" id="bkFecha" min="${minFecha}" onchange="onBkFechaChange()" style="color-scheme:dark">
+
+    <label>Horario disponible</label>
+    <div id="bkSlots" class="msg-info" style="text-align:center">Elegí una fecha para ver los horarios</div>
+    <input type="hidden" id="bkHora">
+
+    <div id="bkErr" style="display:none" class="msg-err"></div>
+    <button class="bk-btn" id="bkBtn" onclick="enviarReserva()">Confirmar reserva</button>
+    <div style="text-align:center;margin-top:10px;font-size:.72rem;color:#a89880">Sin cargo · El negocio confirmará tu turno por WhatsApp</div>
+  `;
+
+  // Pre-seleccionar servicio si vino de un card
+  const srv = document.getElementById('bkSrv');
+  if(srv && srvId !== null){
+    for(let i=0;i<srv.options.length;i++){
+      if(String(srv.options[i].value) === String(srvId)){ srv.selectedIndex=i; break; }
+    }
+  }
+
+  // Mostrar panel
+  document.getElementById('bkOv').classList.add('vis');
+  document.getElementById('bkPan').classList.add('vis');
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarReserva(){
+  document.getElementById('bkOv').classList.remove('vis');
+  document.getElementById('bkPan').classList.remove('vis');
+  document.body.style.overflow = '';
+}
+
+function onBkSrvChange(){
+  const fecha = document.getElementById('bkFecha')?.value;
+  if(fecha) cargarSlotsPanel();
+}
+function onBkFechaChange(){
+  const fecha = document.getElementById('bkFecha')?.value;
+  if(fecha) cargarSlotsPanel();
+}
+
+function esBloqueado(bloqueos, fecha, hora){
+  if(!bloqueos||!bloqueos.length) return false;
+  const slotMin = hhToMin(hora);
+  const diaSemana = new Date(fecha+'T12:00:00').getDay();
+  return bloqueos.some(b=>{
+    if(b.tipo==='dia_unico'){
+      if(b.fecha!==fecha) return false;
+      if(!b.horaInicio) return true;
+      return slotMin>=hhToMin(b.horaInicio)&&slotMin<hhToMin(b.horaFin||'23:59');
+    }
+    if(b.tipo==='rango_fechas'){
+      if(fecha<b.fechaInicio||fecha>b.fechaFin) return false;
+      if(!b.horaInicio) return true;
+      return slotMin>=hhToMin(b.horaInicio)&&slotMin<hhToMin(b.horaFin||'23:59');
+    }
+    if(b.tipo==='semanal'){
+      if(parseInt(b.diaSemana)!==diaSemana) return false;
+      if(!b.horaInicio) return true;
+      return slotMin>=hhToMin(b.horaInicio)&&slotMin<hhToMin(b.horaFin||'23:59');
+    }
+    return false;
+  });
+}
+
+async function cargarSlotsPanel(){
+  const fecha = document.getElementById('bkFecha')?.value;
+  const wrap  = document.getElementById('bkSlots');
+  if(!fecha||!wrap) return;
+
+  // Reset hora seleccionada
+  const horaInput = document.getElementById('bkHora');
+  if(horaInput) horaInput.value = '';
+
+  const cfg  = G.cfg;
+  const DIAS = cfg.dias&&cfg.dias.length ? cfg.dias : [1,2,3,4,5,6];
+  const diaSel = new Date(fecha+'T12:00:00').getDay();
+  const nomDia = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
+
+  if(!DIAS.includes(diaSel)){
+    wrap.className = 'cerrado-banner';
+    wrap.innerHTML = `❌ No atendemos los ${nomDia}s. Por favor elegí otro día.`;
+    return;
+  }
+
+  wrap.className = 'msg-info';
+  wrap.innerHTML = 'Cargando horarios...';
+
+  const {data: ocuData} = await sb.from('turnos_solicitudes')
+    .select('hora,estado')
+    .eq('tenant_id', G.tenantId)
+    .eq('fecha', fecha)
+    .in('estado',['confirmado','bloqueado','pendiente']);
+
+  const ocupados = new Set((ocuData||[]).map(s=>(s.hora||'').substring(0,5)));
+  const bloqueos = new Set();
+
+  const empId = document.getElementById('bkEmp')?.value||'';
+  if(cfg.empleados&&cfg.empleados.length){
+    const emps = empId
+      ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
+      : cfg.empleados;
+    const ap = hhToMin(cfg.apertura||'09:00');
+    const ci = hhToMin(cfg.cierre||'20:00');
+    for(let m=ap; m<=ci; m+=30){
+      const hora = minToHH(m);
+      if(emps.length&&emps.every(e=>esBloqueado(e.bloqueos||[],fecha,hora))){
+        ocupados.add(hora); bloqueos.add(hora);
+      }
+    }
+  }
+
+  const srvSel = document.getElementById('bkSrv');
+  const srvId  = srvSel ? srvSel.value : null;
+  const srv    = (cfg.servicios||[]).find(s=>String(s.id)===String(srvId)) || (cfg.servicios||[])[0];
+  const duracion = srv?.duracion||30;
+
+  const ap = hhToMin(cfg.apertura||'09:00');
+  const ci = hhToMin(cfg.cierre||'20:00') - duracion;
+  const slots = [];
+  const slotsNeeded = Math.ceil(duracion/30);
+  for(let m=ap; m<=ci; m+=30){
+    const hora = minToHH(m);
+    let isOcu = false;
+    for(let k=0;k<slotsNeeded;k++){
+      if(ocupados.has(minToHH(m+k*30))){ isOcu=true; break; }
+    }
+    slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
+  }
+
+  if(!slots.length){
+    wrap.className = 'msg-info';
+    wrap.innerHTML = 'Sin horarios configurados para este día.';
+    return;
+  }
+
+  wrap.className = '';
+  wrap.innerHTML = '';
+  const grid = document.createElement('div');
+  grid.className = 'slots-grid';
+  slots.forEach(s=>{
+    const d = document.createElement('div');
+    if(s.blq){
+      d.className = 'slot blq';
+      d.innerHTML = `<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">🚫 No disp.</span>`;
+    } else if(s.ocu){
+      d.className = 'slot ocu';
+      d.innerHTML = `<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">Reservado</span>`;
+    } else {
+      d.className = 'slot';
+      d.textContent = s.hora;
+      d.onclick = () => selSlotPanel(s.hora, d);
+    }
+    grid.appendChild(d);
+  });
+  wrap.appendChild(grid);
+
+  const disp = slots.filter(s=>!s.ocu&&!s.blq).length;
+  const note = document.createElement('div');
+  note.style.cssText = 'font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
+  note.textContent = disp ? 'Tocá un horario para seleccionarlo' : 'Todos los horarios de este día están reservados';
+  wrap.appendChild(note);
+}
+
+function selSlotPanel(hora, el){
+  document.querySelectorAll('#bkSlots .slot.sel').forEach(d=>d.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('bkHora').value = hora;
+  document.getElementById('bkErr').style.display = 'none';
+}
+
+// ── Enviar reserva ────────────────────────────────────────────────────────
+async function enviarReserva(){
+  const nombre = document.getElementById('bkNombre')?.value.trim()||'';
+  const tel    = document.getElementById('bkTel')?.value.trim()||'';
+  const srvId  = document.getElementById('bkSrv')?.value||null;
+  const empId  = document.getElementById('bkEmp')?.value||null;
+  const fecha  = document.getElementById('bkFecha')?.value||'';
+  const hora   = document.getElementById('bkHora')?.value||'';
+  const btn    = document.getElementById('bkBtn');
+  const errEl  = document.getElementById('bkErr');
+
+  errEl.style.display = 'none';
+  const showErr = msg => { errEl.textContent=msg; errEl.style.display='block'; errEl.scrollIntoView({behavior:'smooth',block:'nearest'}); };
+
+  if(!nombre){ showErr('Ingresá tu nombre.'); return; }
+  if(!tel||tel.replace(/\D/g,'').length<6){ showErr('Ingresá un número de WhatsApp válido.'); return; }
+  if(!fecha){ showErr('Elegí una fecha.'); return; }
+  if(!hora){ showErr('Seleccioná un horario disponible.'); return; }
+  if(btn.disabled) return;
+  btn.disabled=true; btn.textContent='Enviando...';
+
+  try {
+    const _srv0   = (G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId)) || (G.cfg.servicios||[])[0] || {};
+    const _dur0   = _srv0.duracion||30;
+    const _sN     = Math.ceil(_dur0/30);
+    const _horasN = Array.from({length:_sN},(_,k)=>minToHH(hhToMin(hora)+k*30));
+
+    // Verificar disponibilidad antes de insertar
+    const {data: previo} = await sb.from('turnos_solicitudes')
+      .select('id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
+      .in('hora',_horasN).in('estado',['confirmado','bloqueado']).limit(1);
+    if(previo&&previo.length){
+      showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
+      btn.disabled=false; btn.textContent='Confirmar reserva';
+      cargarSlotsPanel(); return;
+    }
+
+    // Insertar solicitud como "pendiente"
+    const ts = new Date().toISOString();
+    const {data: ins, error: insErr} = await sb.from('turnos_solicitudes').insert({
+      tenant_id: G.tenantId, nombre, tel,
+      servicio_id: srvId||null,
+      empleado_id: empId ? (parseInt(empId)||null) : null,
+      fecha, hora, estado: 'pendiente', created_at: ts
+    }).select('id').single();
+    if(insErr) throw new Error(insErr.message||'Error al reservar');
+
+    // Bloquear slots adicionales si dura más de 30 min
+    if(_sN>1){
+      const extras = [];
+      for(let k=1;k<_sN;k++){
+        extras.push({tenant_id:G.tenantId, nombre:'__extra__:'+(ins?.id||''), tel,
+          servicio_id:srvId||null, empleado_id:empId?(parseInt(empId)||null):null,
+          fecha, hora:minToHH(hhToMin(hora)+k*30), estado:'bloqueado', created_at:ts});
+      }
+      if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
+    }
+
+    // Race condition check
+    const {data: todos} = await sb.from('turnos_solicitudes')
+      .select('id,created_at,estado')
+      .eq('tenant_id',G.tenantId).eq('fecha',fecha).eq('hora',hora)
+      .in('estado',['confirmado','bloqueado','pendiente']);
+    const conflicto = (todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
+    if(conflicto){
+      await sb.from('turnos_solicitudes').delete().eq('id',ins.id);
+      showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
+      btn.disabled=false; btn.textContent='Confirmar reserva';
+      cargarSlotsPanel(); return;
+    }
+
+    // Éxito — mostrar confirmación
+    const srvNombre  = _srv0.nombre||'el servicio';
+    const fechaFmt   = new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+    const profNombre = empId ? ((G.cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||'') : '';
+
+    cerrarReserva();
+
+    const confDiv = document.createElement('div');
+    confDiv.style.cssText = 'position:fixed;inset:0;background:#080808;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto';
+    confDiv.innerHTML = `
+      <div style="background:#111;border:1px solid #1e1e1e;border-radius:16px;max-width:400px;width:100%;padding:28px 24px;text-align:center">
+        <div style="font-size:2.8rem;margin-bottom:8px">✅</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;color:#c9a84c;margin-bottom:4px">¡Reserva enviada!</div>
+        <div style="font-size:.68rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:20px">El negocio confirmará tu turno</div>
+
+        <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:14px;text-align:left">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Servicio</span>
+            <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(srvNombre)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Fecha</span>
+            <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(fechaFmt)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0${profNombre?';border-bottom:1px solid #1e1e1e':''}">
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Hora</span>
+            <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">🕐 ${esc(hora)}</span>
+          </div>
+          ${profNombre ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0">
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Profesional</span>
+            <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(profNombre)}</span>
+          </div>` : ''}
+        </div>
+
+        <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:13px 15px;margin-bottom:16px;font-size:.83rem;color:#a89880;line-height:1.65;text-align:left">
+          ¡Te esperamos, <strong style="color:#f5f0e8">${esc(nombre)}</strong>!
+          Te confirmaremos al <strong style="color:#f5f0e8">${esc(tel)}</strong> por WhatsApp.
+        </div>
+
+        <button onclick="this.closest('[style*=\"position:fixed\"]').remove()"
+          style="width:100%;padding:12px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:10px">
+          Volver al catálogo
+        </button>
+        <button onclick="abrirReserva(null)"
+          style="width:100%;padding:11px;background:transparent;color:#a89880;border:1px solid #2e2e2e;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.85rem;cursor:pointer">
+          Hacer otra reserva
+        </button>
+      </div>
+    `;
+    document.body.appendChild(confDiv);
+
+  } catch(e){
+    showErr(e.message||'Error al enviar. Intentá de nuevo.');
+    btn.disabled=false; btn.textContent='Confirmar reserva';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+(async function init(){
+  const params = new URLSearchParams(location.search);
+  let slug = params.get('s') || '';
+
+  // Soporte para pathname directo /p/SLUG
+  if(!slug){
+    const m = location.pathname.match(/^\/p\/([^/?#]+)/);
+    if(m) slug = decodeURIComponent(m[1]);
+  }
+
+  if(!slug){
+    document.getElementById('pLoader').innerHTML =
+      '<div style="color:#e87070;text-align:center;padding:40px 20px">Link inválido. Pedile el link correcto al negocio.</div>';
+    return;
+  }
+
+  try {
+    const result = await resolveSlug(slug);
+    if(!result){
+      document.getElementById('pLoader').innerHTML =
+        '<div style="color:#e87070;text-align:center;padding:40px 20px">Negocio no encontrado. Verificá el link.</div>';
+      return;
+    }
+    const {turnosCfg, onlineCfg, tenantNombre, tenantRubro} = parseRows(result.rows);
+    G.tenantId    = result.tenantId;
+    G.cfg         = turnosCfg;
+    G.online      = onlineCfg;
+    G.tenantNombre = tenantNombre;
+    G.tenantRubro  = tenantRubro;
+
+    try {
+      const {data:td} = await sb.from('tenants').select('*').eq('id',result.tenantId).single();
+      G.tenant = td;
+    } catch(e){}
+    if(!G.tenant && tenantNombre){
+      G.tenant = {id:result.tenantId, nombre:tenantNombre, rubro:tenantRubro};
+    }
+
+    renderPage();
+  } catch(e){
+    document.getElementById('pLoader').innerHTML =
+      `<div style="color:#e87070;text-align:center;padding:40px 20px">Error al cargar: ${esc(e.message)}</div>`;
+  }
+})();
+</script>
+</body>
+</html>
