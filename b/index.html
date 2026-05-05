@@ -147,9 +147,10 @@ async function resolveSlug(slug){
     }
   } catch(e){}
 
-  // Estrategia 3: Fallback JS — busca en todas las filas de config y compara slug
-  // Funciona independientemente del tipo de columna (json, jsonb, text)
-  const {data: allRows} = await sb.from('precios').select('tenant_id,data').limit(500);
+  // Estrategia 3: Fallback JS — orden descendente para que tenants nuevos
+  // (IDs más grandes) aparezcan primero. Limit ampliado para mayor cobertura.
+  const {data: allRows} = await sb.from('precios')
+    .select('tenant_id,data').order('id',{ascending:false}).limit(1000);
   if(allRows && allRows.length){
     // Solo filas que parecen config (tienen __tenantName o __turnosCfg o __slug)
     const cfgCandidates = allRows.filter(r=>{
@@ -167,8 +168,9 @@ async function resolveSlug(slug){
     });
     if(found){
       const tid = found.tenant_id;
-      const rows = allRows.filter(r=>r.tenant_id===tid);
-      return { tenantId: tid, rows };
+      const {data: tenantRows} = await sb.from('precios')
+        .select('tenant_id,data').eq('tenant_id', tid);
+      return { tenantId: tid, rows: tenantRows||[] };
     }
   }
 

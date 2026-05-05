@@ -164,7 +164,9 @@ async function resolveSlug(slug){
       return { tenantId: tid, rows: all||[] };
     }
   } catch(e){}
-  const {data: allRows} = await sb.from('precios').select('tenant_id,data').limit(500);
+  // Orden descendente: tenants nuevos (IDs más grandes) aparecen primero.
+  const {data: allRows} = await sb.from('precios')
+    .select('tenant_id,data').order('id',{ascending:false}).limit(1000);
   if(allRows && allRows.length){
     const cfgCandidates = allRows.filter(r=>{ const d=tryParseData(r); return d&&(d.__tenantName||d.__turnosCfg||d.__slug); });
     const found = cfgCandidates.find(r=>{
@@ -176,7 +178,9 @@ async function resolveSlug(slug){
     });
     if(found){
       const tid = found.tenant_id;
-      return { tenantId: tid, rows: allRows.filter(r=>r.tenant_id===tid) };
+      const {data: tenantRows} = await sb.from('precios')
+        .select('tenant_id,data').eq('tenant_id', tid);
+      return { tenantId: tid, rows: tenantRows||[] };
     }
   }
   return null;
