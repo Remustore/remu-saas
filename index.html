@@ -15194,6 +15194,98 @@ function _adaptarObjetivosModal(){
   };
 })();
 
+/* ── SUPABASE REALTIME: notificaciones instantáneas de nuevas reservas ── */
+var _realtimeCh = null;
+
+function _iniciarRealtimeReservas(tenantId){
+  if(!tenantId || typeof sb === 'undefined') return;
+  if(_realtimeCh){
+    try { sb.removeChannel(_realtimeCh); } catch(e){}
+    _realtimeCh = null;
+  }
+  // Inyectar CSS de animación del badge (una sola vez)
+  if(!document.getElementById('_rtStyles')){
+    var s = document.createElement('style');
+    s.id = '_rtStyles';
+    s.textContent = '@keyframes badgePulse{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(201,82,76,.7)}50%{transform:scale(1.35);box-shadow:0 0 0 8px rgba(201,82,76,0)}} .badge-pulse{animation:badgePulse .55s ease-in-out 6}';
+    document.head.appendChild(s);
+  }
+  _realtimeCh = sb.channel('remu_rt_' + tenantId, {config:{broadcast:{self:false}}})
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'turnos_solicitudes',
+      filter: 'tenant_id=eq.' + tenantId
+    }, function(payload){
+      var row = payload.new || {};
+      // Solo reservas online de clientes: estado pendiente y nombre sin prefijo interno
+      if(row.estado !== 'pendiente') return;
+      if((row.nombre||'').startsWith('__')) return;
+      _onNuevaReservaRealtime(row);
+    })
+    .subscribe(function(status, err){
+      if(status === 'SUBSCRIBED') console.log('[Realtime] Reservas en tiempo real activas');
+      if(status === 'CHANNEL_ERROR') console.warn('[Realtime] Error:', err);
+    });
+}
+
+function _detenerRealtimeReservas(){
+  if(_realtimeCh){
+    try { sb.removeChannel(_realtimeCh); } catch(e){}
+    _realtimeCh = null;
+  }
+}
+
+function _onNuevaReservaRealtime(row){
+  var nombre = row.nombre || 'Cliente';
+  var fecha  = row.fecha  || '';
+  var hora   = row.hora   || '';
+  var negocio = (typeof currentTenant !== 'undefined' && currentTenant) ? (currentTenant.nombre||'Remu') : 'Remu';
+  // Notificación push
+  if(Notification.permission === 'granted' && typeof _swNotif === 'function'){
+    _swNotif('🔔 Nueva reserva — ' + negocio, nombre + ' · ' + fecha + ' ' + hora, 'turnosOnline', 'rt_' + (row.id||Date.now()));
+  }
+  // Flash badge sidebar
+  _flashBadgeReserva();
+  // Toast dentro de la app
+  if(typeof showToast === 'function') showToast('🔔 Nueva reserva: ' + nombre + ' — ' + fecha + ' ' + hora);
+  // Actualizar contador badge
+  if(typeof refreshBadgeSolicitudes === 'function') setTimeout(refreshBadgeSolicitudes, 600);
+}
+
+function _flashBadgeReserva(){
+  var badge = document.getElementById('solicitudesBadge');
+  if(!badge) return;
+  badge.style.display = '';
+  badge.classList.remove('badge-pulse');
+  void badge.offsetWidth; // reflow para re-trigger
+  badge.classList.add('badge-pulse');
+  setTimeout(function(){ badge.classList.remove('badge-pulse'); }, 3600);
+}
+
+/* ── Arrancar realtime después de cargar datos del tenant ── */
+(function(){
+  if(typeof loadAll !== 'function') return;
+  var _origRT = loadAll;
+  loadAll = async function(){
+    var r = await _origRT.apply(this, arguments);
+    if(typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id){
+      _iniciarRealtimeReservas(currentTenant.id);
+    }
+    return r;
+  };
+})();
+
+/* ── Detener realtime antes del logout ── */
+(function(){
+  if(typeof doLogout !== 'function') return;
+  var _origRTLO = doLogout;
+  doLogout = async function(){
+    _detenerRealtimeReservas();
+    return _origRTLO.apply(this, arguments);
+  };
+})();
+
 async function probarNotificacion(){
   var el = document.getElementById('notifDiagTxt');
   function status(msg, ok){ if(el){ el.textContent = msg; el.style.color = ok ? '#4caf7d' : ok === false ? '#c9524c' : 'var(--mut)'; } }
