@@ -9344,7 +9344,7 @@ async function cargarHorasDisponibles(tenantId, turnosCfg){
   const [ah, am] = apertura.split(':').map(Number);
   const [ch, cm] = cierre.split(':').map(Number);
   let cur = ah*60+am;
-  const fin = ch*60+cm - duracion;
+  const fin = ch*60+cm;
 
   while(cur <= fin){
     const h = String(Math.floor(cur/60)).padStart(2,'0');
@@ -15172,6 +15172,62 @@ function _adaptarObjetivosModal(){
     } catch(e){ console.warn('[remu] post-borrar verificación turnos_solicitudes:', e); }
   };
 })();
+</script>
+<script>
+/* ── NOTIFICACIONES: botón de prueba + diagnóstico en turnosConfig ── */
+(function(){
+  if(typeof _renderNotifCard !== 'function') return;
+  var _origRNC = _renderNotifCard;
+  _renderNotifCard = function(){
+    _origRNC.apply(this, arguments);
+    var card = document.getElementById('notifConfigCard');
+    if(!card) return;
+    var old = card.querySelector('#notifTestRow');
+    if(old) old.remove();
+    var row = document.createElement('div');
+    row.id = 'notifTestRow';
+    row.style.cssText = 'margin-top:14px;padding-top:12px;border-top:1px solid var(--bor);display:flex;align-items:center;gap:10px;flex-wrap:wrap';
+    row.innerHTML =
+      '<button onclick="probarNotificacion()" style="padding:8px 16px;background:var(--gld);color:#080808;border:none;border-radius:8px;font-family:var(--fb);font-size:.8rem;font-weight:700;cursor:pointer;flex-shrink:0">🔔 Probar notificación</button>' +
+      '<span id="notifDiagTxt" style="font-size:.72rem;color:var(--mut)"></span>';
+    card.appendChild(row);
+  };
+})();
+
+async function probarNotificacion(){
+  var el = document.getElementById('notifDiagTxt');
+  function status(msg, ok){ if(el){ el.textContent = msg; el.style.color = ok ? '#4caf7d' : ok === false ? '#c9524c' : 'var(--mut)'; } }
+
+  if(!('Notification' in window)){ status('❌ Navegador no soporta notificaciones', false); return; }
+
+  status('Verificando permisos...', null);
+  var perm = Notification.permission;
+
+  if(perm === 'denied'){
+    status('❌ Permiso BLOQUEADO — habilitá las notificaciones en la config del sitio (ícono 🔒 en la barra de dirección)', false);
+    return;
+  }
+  if(perm === 'default'){
+    status('Solicitando permiso...', null);
+    perm = await Notification.requestPermission();
+    _notifPermiso = perm === 'granted';
+    setTimeout(function(){ if(typeof _renderNotifCard === 'function') _renderNotifCard(); }, 300);
+  }
+  if(perm !== 'granted'){ status('❌ Permiso denegado por el usuario', false); return; }
+
+  var swInfo = window._swReg ? '· SW activo ✓' : '· Sin service worker (modo básico)';
+  status('Enviando...', null);
+  try {
+    if(typeof _swNotif === 'function'){
+      await _swNotif('🔔 Prueba — Remu Gestión', 'Las notificaciones están funcionando correctamente ✓', 'turnosConfig', 'test_' + Date.now());
+      status('✅ Notificación enviada ' + swInfo, true);
+    } else {
+      new Notification('🔔 Prueba — Remu Gestión', { body: 'Notificaciones activas ✓', icon: '/icon.svg' });
+      status('✅ Enviado (modo básico) ' + swInfo, true);
+    }
+    setTimeout(function(){ if(el) el.textContent = ''; }, 6000);
+  } catch(e){ status('❌ Error: ' + e.message, false); }
+}
 </script>
 </body>
 </html>

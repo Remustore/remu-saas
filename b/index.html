@@ -356,7 +356,7 @@ async function cargarSlots(){
 
   // Generar slots cada 30 min
   const ap = hhToMin(cfg.apertura||'09:00');
-  const ci = hhToMin(cfg.cierre||'20:00') - duracion;
+  const ci = hhToMin(cfg.cierre||'20:00');
   const slots = [];
   const slotsNeeded = Math.ceil(duracion/30);
   for(let m=ap; m<=ci; m+=30){
