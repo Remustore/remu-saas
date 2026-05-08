@@ -3711,14 +3711,9 @@ async function loadAll(){
       if(cfgRow){
         const tKey = TURNOS_CFG_KEY + '_' + tid;
         const oKey = ONLINE_CFG_KEY  + '_' + tid;
-        if(cfgRow.__turnosCfg){
-          // Siempre sincronizar desde Supabase para que servicios del wizard aparezcan
-          const localCfg = localStorage.getItem(tKey);
-          const localSvcs = localCfg ? (JSON.parse(localCfg).servicios||[]) : [];
-          if(!localCfg || localSvcs.length === 0)
-            localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
-        }
-        if(cfgRow.__onlineCfg  && !localStorage.getItem(oKey))
+        if(cfgRow.__turnosCfg)
+          localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
+        if(cfgRow.__onlineCfg)
           localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
         if(cfgRow.__fichasCli){
           const fKey = 'fichasCli_' + tid;
