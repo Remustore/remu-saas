@@ -15723,5 +15723,139 @@ async function _syncFijosSupabase(){
   };
 })();
 </script>
+<script>
+/* ── FIX 1: cargarSolicitudes — excluir bloqueados y limitar a ±7 días ── */
+/* Bug: .not('estado','eq','cancelado') incluía 'bloqueado' (turnos fijos)   */
+/* mezclando 6 meses de bloques con las reservas reales del admin.           */
+(function(){
+  if(typeof cargarSolicitudes !== 'function') return;
+  cargarSolicitudes = async function(){
+    const el = document.getElementById('solicitudesLista');
+    if(!el) return;
+    try {
+      const desde = new Date(); desde.setDate(desde.getDate()-7);
+      const desdeStr = desde.toISOString().slice(0,10);
+      const hasta = new Date(); hasta.setDate(hasta.getDate()+7);
+      const hastaStr = hasta.toISOString().slice(0,10);
+
+      const { data, error } = await sb.from('turnos_solicitudes')
+        .select('*')
+        .eq('tenant_id', currentTenant?.id||'')
+        .gte('fecha', desdeStr)
+        .lte('fecha', hastaStr)
+        .in('estado', ['pendiente','confirmado'])
+        .order('fecha', {ascending: false})
+        .order('hora', {ascending: false})
+        .limit(60);
+
+      if(error) throw error;
+
+      const pendientes = (data||[]).filter(s=>s.estado==='pendiente');
+      const pendienteCount = pendientes.length;
+      const badge = document.getElementById('solicitudesBadge');
+      if(badge){ badge.textContent = pendienteCount; badge.style.display = pendienteCount>0?'':'none'; }
+      if(_solicitudesNotifVistas === null){
+        _solicitudesNotifVistas = new Set(pendientes.map(s=>String(s.id)));
+      }
+
+      if(!data||!data.length){
+        el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin reservas en los últimos 7 días. Compartí tu link para empezar a recibir.</div>';
+        return;
+      }
+
+      const estadoBx   = {pendiente:'byw', confirmado:'bgr', cancelado:'brd'};
+      const estadoLabel = {pendiente:'⏳ pendiente', confirmado:'✅ confirmado', cancelado:'✕ cancelado'};
+      el.innerHTML = data.map(s=>`
+        <div style="padding:12px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:600;font-size:.88rem">${esc(s.nombre)} <span class="bx ${estadoBx[s.estado]||'bgx'}" style="margin-left:6px">${estadoLabel[s.estado]||s.estado}</span></div>
+            <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">
+              📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${(s.hora||'—').substring(0,5)} &nbsp;·&nbsp; 🔧 ${esc(s.servicio_id||'—')}
+            </div>
+            ${s.tel?`<div style="font-size:.75rem;color:var(--tx2)">📱 ${esc(s.tel)}</div>`:''}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${s.estado==='pendiente'?`
+              <button class="btn bg bsm" onclick="confirmarSolicitud('${s.id}','${esc(s.nombre)}','${s.tel||''}','${esc(s.servicio_id||'')}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">✓ Confirmar</button>
+              <button class="btn bd bsm" onclick="rechazarSolicitud('${s.id}','${esc(s.nombre)}','${s.tel||''}')">✕ Rechazar</button>
+            `:''}
+            ${s.estado==='confirmado'?`
+              <button class="btn bd bsm" onclick="cancelarReservaOnline('${s.id}','${esc(s.nombre)}','${s.tel||''}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">✕ Cancelar</button>
+            `:''}
+            ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">📲 WA</button>`:''}
+          </div>
+        </div>`).join('');
+    } catch(e){
+      if(el) el.innerHTML = '<div style="color:var(--bad);font-size:.82rem">Error al cargar reservas</div>';
+    }
+  };
+})();
+
+/* ── FIX 2: sincronizarFijosSupabase — fechas locales en lugar de UTC ── */
+/* Bug: fecha.toISOString().slice(0,10) usa UTC. En Argentina (UTC-3) después  */
+/* de las 21:00 locales el UTC ya es el día siguiente → bloques guardados      */
+/* un día tarde. Ej: jueves 22:00 local → UTC viernes → fecha = viernes.      */
+(function(){
+  if(typeof sincronizarFijosSupabase !== 'function') return;
+
+  function _locDate(d){
+    return d.getFullYear() + '-' +
+      String(d.getMonth()+1).padStart(2,'0') + '-' +
+      String(d.getDate()).padStart(2,'0');
+  }
+
+  sincronizarFijosSupabase = async function(fijos, accion){
+    if(!sb || !currentTenant?.id || !fijos?.length) return;
+    const todStr = _locDate(new Date());
+    try{
+      if(accion === 'borrar'){
+        for(const f of fijos){
+          await sb.from('turnos_solicitudes').delete()
+            .eq('tenant_id', currentTenant.id)
+            .eq('nombre', '__fijo__:' + f.id)
+            .eq('estado', 'bloqueado')
+            .gte('fecha', todStr);
+        }
+        return;
+      }
+      // accion === 'crear': borrar futuros y reinsertar 6 meses
+      const hoy = new Date();
+      const limite = new Date(hoy);
+      limite.setMonth(limite.getMonth() + 6);
+      const rows = [];
+      for(const fijo of fijos){
+        if(!fijo.activo) continue;
+        await sb.from('turnos_solicitudes').delete()
+          .eq('tenant_id', currentTenant.id)
+          .eq('nombre', '__fijo__:' + fijo.id)
+          .eq('estado', 'bloqueado')
+          .gte('fecha', todStr);
+        const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
+        const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
+        let fecha = new Date(hoy);
+        fecha.setDate(hoy.getDate() + diasHasta);
+        while(fecha <= limite){
+          rows.push({
+            tenant_id: currentTenant.id,
+            nombre: '__fijo__:' + fijo.id,
+            tel: fijo.tel||'',
+            servicio_id: null,
+            empleado_id: empId,
+            fecha: _locDate(fecha),
+            hora: fijo.hora,
+            estado: 'bloqueado',
+            created_at: new Date().toISOString()
+          });
+          fecha.setDate(fecha.getDate() + 7);
+        }
+      }
+      for(let i=0; i<rows.length; i+=100){
+        const { error } = await sb.from('turnos_solicitudes').insert(rows.slice(i, i+100));
+        if(error) console.warn('[fijos sync] insert error:', error.message);
+      }
+    }catch(e){ console.warn('[fijos sync]', e); }
+  };
+})();
+</script>
 </body>
 </html>
