@@ -15601,5 +15601,28 @@ async function _limpiarIpsViejas(){
   };
 })();
 </script>
+<script>
+/* ── DEBUG TEMPORAL: sesión JWT antes de cargar stock ── */
+(function(){
+  if(typeof dbLoad !== 'function') return;
+  var _origDbLoad = dbLoad;
+  dbLoad = async function(table){
+    if(table === 'stock'){
+      try {
+        var s = await sb.auth.getSession();
+        var sess = s && s.data && s.data.session;
+        console.log('[stock debug] session:', sess ? {
+          user_id:      sess.user.id,
+          tenant_id:    sess.user.user_metadata && sess.user.user_metadata.tenant_id,
+          expires_at:   sess.expires_at,
+          expired:      Date.now() / 1000 > sess.expires_at,
+          token_prefix: sess.access_token && sess.access_token.slice(0, 40) + '...'
+        } : 'SIN SESIÓN ACTIVA');
+      } catch(e){ console.log('[stock debug] error leyendo sesión:', e); }
+    }
+    return _origDbLoad.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
