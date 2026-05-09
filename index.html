@@ -15624,5 +15624,21 @@ async function _limpiarIpsViejas(){
   };
 })();
 </script>
+<script>
+/* ── FIX: _clearTenantCache no debe borrar tokens de sesión Supabase (sb-*) ── */
+(function(){
+  if(typeof _clearTenantCache !== 'function') return;
+  var _origCTC = _clearTenantCache;
+  _clearTenantCache = function(keepTenantId){
+    var sbSaved = {};
+    for(var i = 0; i < localStorage.length; i++){
+      var k = localStorage.key(i);
+      if(k && k.startsWith('sb-')) sbSaved[k] = localStorage.getItem(k);
+    }
+    _origCTC.apply(this, arguments);
+    Object.keys(sbSaved).forEach(function(k){ localStorage.setItem(k, sbSaved[k]); });
+  };
+})();
+</script>
 </body>
 </html>
