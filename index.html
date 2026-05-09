@@ -15602,25 +15602,27 @@ async function _limpiarIpsViejas(){
 })();
 </script>
 <script>
-/* ── DEBUG TEMPORAL: sesión JWT antes de cargar stock ── */
+/* ── BUG 2 NOTIFICACIONES: canal duplicado remu_reservas_ + pedir permisos antes ── */
+/* renderAll crea remu_reservas_<tid> (solo badge) y loadAll crea remu_rt_<tid>      */
+/* (notificación + badge). Dos suscripciones al mismo postgres_changes causan         */
+/* que Supabase entregue el evento a solo uno de los dos canales de forma impredecible */
 (function(){
-  if(typeof dbLoad !== 'function') return;
-  var _origDbLoad = dbLoad;
-  dbLoad = async function(table){
-    if(table === 'stock'){
-      try {
-        var s = await sb.auth.getSession();
-        var sess = s && s.data && s.data.session;
-        console.log('[stock debug] session:', sess ? {
-          user_id:      sess.user.id,
-          tenant_id:    sess.user.user_metadata && sess.user.user_metadata.tenant_id,
-          expires_at:   sess.expires_at,
-          expired:      Date.now() / 1000 > sess.expires_at,
-          token_prefix: sess.access_token && sess.access_token.slice(0, 40) + '...'
-        } : 'SIN SESIÓN ACTIVA');
-      } catch(e){ console.log('[stock debug] error leyendo sesión:', e); }
-    }
-    return _origDbLoad.apply(this, arguments);
+  if(typeof _iniciarRealtimeReservas !== 'function') return;
+  var _origIRR = _iniciarRealtimeReservas;
+  _iniciarRealtimeReservas = function(tenantId){
+    // 1. Pedir permisos antes de arrancar Realtime
+    if(typeof pedirPermisoNotificaciones === 'function') pedirPermisoNotificaciones();
+    // 2. Eliminar canal legado remu_reservas_ para evitar suscripción duplicada
+    try {
+      var chs = (typeof sb !== 'undefined' && typeof sb.getChannels === 'function')
+        ? sb.getChannels() : [];
+      chs.forEach(function(ch){
+        if(ch.topic && ch.topic.indexOf('remu_reservas_') !== -1){
+          try { sb.removeChannel(ch); } catch(e){}
+        }
+      });
+    } catch(e){}
+    return _origIRR.apply(this, arguments);
   };
 })();
 </script>
@@ -15637,6 +15639,87 @@ async function _limpiarIpsViejas(){
     }
     _origCTC.apply(this, arguments);
     Object.keys(sbSaved).forEach(function(k){ localStorage.setItem(k, sbSaved[k]); });
+  };
+})();
+</script>
+<script>
+/* ── TURNOS FIJOS 6 MESES: persistencia cross-device en Supabase ── */
+/* La lista de fijos vive solo en localStorage. Este patch la guarda en         */
+/* el cfgRow (precios.__turnosFijos) y la restaura en cualquier dispositivo.    */
+
+async function _syncFijosSupabase(){
+  if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return;
+  if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return;
+  try {
+    var rowId = _cfgRowId(currentTenant.id);
+    var fijos = getTurnosFijos();
+    var res = await sb.from('precios').select('data').eq('id', rowId).single();
+    var existing = res && res.data && res.data.data;
+    if(existing){
+      var merged = Object.assign({}, existing, { __turnosFijos: fijos });
+      await sb.from('precios').update({ data: merged })
+        .eq('id', rowId).eq('tenant_id', currentTenant.id);
+    }
+  } catch(e){ console.warn('[remu] syncFijos error:', e); }
+}
+
+// guardarTurnoFijo: sincronizar tras guardar (2s de margen para sincronizarFijosSupabase)
+(function(){
+  if(typeof guardarTurnoFijo !== 'function') return;
+  var _origGTF = guardarTurnoFijo;
+  guardarTurnoFijo = function(){
+    _origGTF.apply(this, arguments);
+    setTimeout(_syncFijosSupabase, 2000);
+  };
+})();
+
+// eliminarTurnoFijo: sincronizar tras eliminar
+(function(){
+  if(typeof eliminarTurnoFijo !== 'function') return;
+  var _origETF = eliminarTurnoFijo;
+  eliminarTurnoFijo = function(id){
+    _origETF.apply(this, arguments);
+    setTimeout(_syncFijosSupabase, 500);
+  };
+})();
+
+// toggleTurnoFijo: sincronizar tras cambiar estado activo
+(function(){
+  if(typeof toggleTurnoFijo !== 'function') return;
+  var _origTTF = toggleTurnoFijo;
+  toggleTurnoFijo = function(id){
+    _origTTF.apply(this, arguments);
+    setTimeout(_syncFijosSupabase, 500);
+  };
+})();
+
+// loadAll: si no hay fijos en localStorage, restaurar desde Supabase y re-sincronizar bloques
+(function(){
+  if(typeof loadAll !== 'function') return;
+  var _origLAF = loadAll;
+  loadAll = async function(){
+    var r = await _origLAF.apply(this, arguments);
+    if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return r;
+    if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return r;
+    try {
+      var localFijos = getTurnosFijos();
+      if(localFijos.length) return r; // ya tiene datos locales, no hacer nada
+      var rowId = _cfgRowId(currentTenant.id);
+      var res = await sb.from('precios').select('data').eq('id', rowId).single();
+      var cfgData = res && res.data && res.data.data;
+      if(cfgData && Array.isArray(cfgData.__turnosFijos) && cfgData.__turnosFijos.length){
+        if(typeof saveTurnosFijosLocal === 'function') saveTurnosFijosLocal(cfgData.__turnosFijos);
+        console.log('[remu] turnosFijos restaurados desde Supabase:', cfgData.__turnosFijos.length);
+        // Re-sincronizar bloques 6 meses en diferido
+        setTimeout(function(){
+          if(typeof sincronizarFijosSupabase === 'function'){
+            var activos = cfgData.__turnosFijos.filter(function(f){ return f.activo; });
+            if(activos.length) sincronizarFijosSupabase(activos, 'crear');
+          }
+        }, 2000);
+      }
+    } catch(e){ console.warn('[remu] loadFijos error:', e); }
+    return r;
   };
 })();
 </script>
