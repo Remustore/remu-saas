@@ -15579,5 +15579,27 @@ async function _limpiarIpsViejas(){
   };
 })();
 </script>
+<script>
+/* ── FIX: confirmarSolicitud — detectar update silenciado por RLS ── */
+(function(){
+  if(typeof confirmarSolicitud !== 'function') return;
+  var _origCS = confirmarSolicitud;
+  confirmarSolicitud = async function(id, nombre, tel, servicio, fecha, hora){
+    if(id && typeof sb !== 'undefined' && currentTenant && currentTenant.id){
+      var { data: upd, error: upErr } = await sb.from('turnos_solicitudes')
+        .update({ estado: 'confirmado' })
+        .eq('id', id)
+        .eq('tenant_id', currentTenant.id)
+        .select('id');
+      if(upErr){
+        console.error('[confirmarSolicitud] update error:', upErr.message);
+      } else if(!upd || !upd.length){
+        console.warn('[confirmarSolicitud] 0 filas actualizadas — verificar política RLS UPDATE en turnos_solicitudes');
+      }
+    }
+    return _origCS.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
