@@ -15703,7 +15703,16 @@ async function _syncFijosSupabase(){
     if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return r;
     try {
       var localFijos = getTurnosFijos();
-      if(localFijos.length) return r; // ya tiene datos locales, no hacer nada
+      if(localFijos.length){
+        // Fijos locales: regenerar bloques en Supabase para auto-reparar fechas incorrectas
+        setTimeout(function(){
+          if(typeof sincronizarFijosSupabase === 'function'){
+            var activos = localFijos.filter(function(f){ return f.activo; });
+            if(activos.length) sincronizarFijosSupabase(activos, 'crear');
+          }
+        }, 3000);
+        return r;
+      }
       var rowId = _cfgRowId(currentTenant.id);
       var res = await sb.from('precios').select('data').eq('id', rowId).single();
       var cfgData = res && res.data && res.data.data;
