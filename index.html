@@ -15831,18 +15831,17 @@ async function _syncFijosSupabase(){
         }
         return;
       }
-      // accion === 'crear': borrar futuros y reinsertar 6 meses
+      // accion === 'crear': borrar TODOS los bloqueados y reinsertar 6 meses
       const hoy = new Date();
       const limite = new Date(hoy);
       limite.setMonth(limite.getMonth() + 6);
+      // Delete masivo: limpia bloques con fechas incorrectas de versiones anteriores
+      await sb.from('turnos_solicitudes').delete()
+        .eq('tenant_id', currentTenant.id)
+        .eq('estado', 'bloqueado');
       const rows = [];
       for(const fijo of fijos){
         if(!fijo.activo) continue;
-        await sb.from('turnos_solicitudes').delete()
-          .eq('tenant_id', currentTenant.id)
-          .eq('nombre', '__fijo__:' + fijo.id)
-          .eq('estado', 'bloqueado')
-          .gte('fecha', todStr);
         const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
         const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
         let fecha = new Date(hoy);
@@ -15867,6 +15866,21 @@ async function _syncFijosSupabase(){
         if(error) console.warn('[fijos sync] insert error:', error.message);
       }
     }catch(e){ console.warn('[fijos sync]', e); }
+  };
+})();
+</script>
+<script>
+/* ── BUG 2: _onNuevaReservaRealtime disparaba notif en eventos repetidos del canal RT ── */
+(function(){
+  if(typeof _onNuevaReservaRealtime !== 'function') return;
+  var _origONRR = _onNuevaReservaRealtime;
+  _onNuevaReservaRealtime = function(row){
+    var rowId = String(row.id || '');
+    if(rowId && _solicitudesNotifVistas instanceof Set){
+      if(_solicitudesNotifVistas.has(rowId)) return;
+      _solicitudesNotifVistas.add(rowId);
+    }
+    return _origONRR.apply(this, arguments);
   };
 })();
 </script>
