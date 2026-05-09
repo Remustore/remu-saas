@@ -15704,7 +15704,9 @@ async function _syncFijosSupabase(){
     try {
       var localFijos = getTurnosFijos();
       if(localFijos.length){
-        // Fijos locales: regenerar bloques en Supabase para auto-reparar fechas incorrectas
+        // Persistir lista de fijos al cfgRow si aún no está en Supabase
+        if(typeof _syncFijosSupabase === 'function') _syncFijosSupabase();
+        // Regenerar bloques en Supabase para auto-reparar fechas incorrectas
         setTimeout(function(){
           if(typeof sincronizarFijosSupabase === 'function'){
             var activos = localFijos.filter(function(f){ return f.activo; });
