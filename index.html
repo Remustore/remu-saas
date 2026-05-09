@@ -15835,13 +15835,14 @@ async function _syncFijosSupabase(){
       const hoy = new Date();
       const limite = new Date(hoy);
       limite.setMonth(limite.getMonth() + 6);
-      // Delete masivo: limpia bloques con fechas incorrectas de versiones anteriores
-      await sb.from('turnos_solicitudes').delete()
-        .eq('tenant_id', currentTenant.id)
-        .eq('estado', 'bloqueado');
       const rows = [];
       for(const fijo of fijos){
         if(!fijo.activo) continue;
+        // Delete por fijo sin filtro de fecha: limpia bloques con fecha incorrecta de versiones anteriores
+        await sb.from('turnos_solicitudes').delete()
+          .eq('tenant_id', currentTenant.id)
+          .eq('nombre', '__fijo__:' + fijo.id)
+          .eq('estado', 'bloqueado');
         const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
         const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
         let fecha = new Date(hoy);
