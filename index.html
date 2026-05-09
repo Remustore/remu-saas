@@ -15643,9 +15643,9 @@ async function _limpiarIpsViejas(){
 })();
 </script>
 <script>
-/* ── TURNOS FIJOS 6 MESES: persistencia cross-device en Supabase ── */
-/* La lista de fijos vive solo en localStorage. Este patch la guarda en         */
-/* el cfgRow (precios.__turnosFijos) y la restaura en cualquier dispositivo.    */
+/* ── TURNOS FIJOS: Supabase como fuente de verdad, localStorage como caché ── */
+/* loadAll siempre lee precios.__turnosFijos. Escrituras sincronizan a Supabase */
+/* inmediatamente. Migración automática desde localStorage la primera vez.      */
 
 async function _syncFijosSupabase(){
   if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return;
@@ -15663,37 +15663,37 @@ async function _syncFijosSupabase(){
   } catch(e){ console.warn('[remu] syncFijos error:', e); }
 }
 
-// guardarTurnoFijo: sincronizar tras guardar (2s de margen para sincronizarFijosSupabase)
+// guardarTurnoFijo: escribir a Supabase inmediatamente
 (function(){
   if(typeof guardarTurnoFijo !== 'function') return;
   var _origGTF = guardarTurnoFijo;
   guardarTurnoFijo = function(){
     _origGTF.apply(this, arguments);
-    setTimeout(_syncFijosSupabase, 2000);
+    _syncFijosSupabase();
   };
 })();
 
-// eliminarTurnoFijo: sincronizar tras eliminar
+// eliminarTurnoFijo: escribir a Supabase inmediatamente
 (function(){
   if(typeof eliminarTurnoFijo !== 'function') return;
   var _origETF = eliminarTurnoFijo;
   eliminarTurnoFijo = function(id){
     _origETF.apply(this, arguments);
-    setTimeout(_syncFijosSupabase, 500);
+    _syncFijosSupabase();
   };
 })();
 
-// toggleTurnoFijo: sincronizar tras cambiar estado activo
+// toggleTurnoFijo: escribir a Supabase inmediatamente
 (function(){
   if(typeof toggleTurnoFijo !== 'function') return;
   var _origTTF = toggleTurnoFijo;
   toggleTurnoFijo = function(id){
     _origTTF.apply(this, arguments);
-    setTimeout(_syncFijosSupabase, 500);
+    _syncFijosSupabase();
   };
 })();
 
-// loadAll: si no hay fijos en localStorage, restaurar desde Supabase y re-sincronizar bloques
+// loadAll: Supabase es fuente de verdad — siempre leer primero, localStorage es caché
 (function(){
   if(typeof loadAll !== 'function') return;
   var _origLAF = loadAll;
@@ -15702,32 +15702,34 @@ async function _syncFijosSupabase(){
     if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return r;
     if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return r;
     try {
-      var localFijos = getTurnosFijos();
-      if(localFijos.length){
-        // Persistir lista de fijos al cfgRow si aún no está en Supabase
-        if(typeof _syncFijosSupabase === 'function') _syncFijosSupabase();
-        // Regenerar bloques en Supabase para auto-reparar fechas incorrectas
-        setTimeout(function(){
-          if(typeof sincronizarFijosSupabase === 'function'){
-            var activos = localFijos.filter(function(f){ return f.activo; });
-            if(activos.length) sincronizarFijosSupabase(activos, 'crear');
-          }
-        }, 3000);
-        return r;
-      }
       var rowId = _cfgRowId(currentTenant.id);
       var res = await sb.from('precios').select('data').eq('id', rowId).single();
       var cfgData = res && res.data && res.data.data;
-      if(cfgData && Array.isArray(cfgData.__turnosFijos) && cfgData.__turnosFijos.length){
-        if(typeof saveTurnosFijosLocal === 'function') saveTurnosFijosLocal(cfgData.__turnosFijos);
-        console.log('[remu] turnosFijos restaurados desde Supabase:', cfgData.__turnosFijos.length);
-        // Re-sincronizar bloques 6 meses en diferido
-        setTimeout(function(){
-          if(typeof sincronizarFijosSupabase === 'function'){
-            var activos = cfgData.__turnosFijos.filter(function(f){ return f.activo; });
-            if(activos.length) sincronizarFijosSupabase(activos, 'crear');
-          }
-        }, 2000);
+      var sbTieneFijos = cfgData && Object.prototype.hasOwnProperty.call(cfgData, '__turnosFijos');
+
+      if(sbTieneFijos){
+        // Supabase es fuente de verdad: sincronizar localStorage
+        var remoteFijos = cfgData.__turnosFijos || [];
+        if(typeof saveTurnosFijosLocal === 'function') saveTurnosFijosLocal(remoteFijos);
+        var activos = remoteFijos.filter(function(f){ return f.activo; });
+        if(activos.length){
+          setTimeout(function(){
+            if(typeof sincronizarFijosSupabase === 'function')
+              sincronizarFijosSupabase(activos, 'crear');
+          }, 3000);
+        }
+      } else {
+        // Primera vez / migración: localStorage → Supabase
+        var localFijos = getTurnosFijos();
+        if(localFijos.length){
+          _syncFijosSupabase();
+          setTimeout(function(){
+            if(typeof sincronizarFijosSupabase === 'function'){
+              var activos2 = localFijos.filter(function(f){ return f.activo; });
+              if(activos2.length) sincronizarFijosSupabase(activos2, 'crear');
+            }
+          }, 3000);
+        }
       }
     } catch(e){ console.warn('[remu] loadFijos error:', e); }
     return r;
