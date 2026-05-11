@@ -15887,5 +15887,31 @@ async function _syncFijosSupabase(){
   };
 })();
 </script>
+<script>
+/* ── DEBUG: logging en setupApp y loadAll para diagnosticar carga silenciosa ── */
+(function(){
+  if(typeof setupApp === 'function'){
+    var _origSA = setupApp;
+    setupApp = function(){
+      console.log('[DEBUG] setupApp() — tenant:', currentTenant?.id, currentTenant?.nombre);
+      return _origSA.apply(this, arguments);
+    };
+  }
+  if(typeof loadAll === 'function'){
+    var _origLA = loadAll;
+    loadAll = async function(){
+      console.log('[DEBUG] loadAll() START — tenant:', currentTenant?.id, currentTenant?.nombre);
+      try {
+        var r = await _origLA.apply(this, arguments);
+        console.log('[DEBUG] loadAll() OK — tenant:', currentTenant?.id);
+        return r;
+      } catch(e) {
+        console.error('[DEBUG] loadAll() ERROR — tenant:', currentTenant?.id, e);
+        throw e;
+      }
+    };
+  }
+})();
+</script>
 </body>
 </html>
