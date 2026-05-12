@@ -15888,15 +15888,25 @@ async function _syncFijosSupabase(){
 })();
 </script>
 <script>
-/* ── DEBUG: logging en setupApp y loadAll para diagnosticar carga silenciosa ── */
+/* ── DEBUG: logging granular en setupApp / loadAll / _cargarTenantExterno / _seleccionarTenantExterno ── */
 (function(){
+  // setupApp
   if(typeof setupApp === 'function'){
     var _origSA = setupApp;
     setupApp = function(){
-      console.log('[DEBUG] setupApp() — tenant:', currentTenant?.id, currentTenant?.nombre);
-      return _origSA.apply(this, arguments);
+      console.log('[DEBUG] setupApp() START — tenant:', currentTenant?.id, currentTenant?.nombre, '| role:', currentRole);
+      try {
+        var r = _origSA.apply(this, arguments);
+        console.log('[DEBUG] setupApp() OK');
+        return r;
+      } catch(e) {
+        console.error('[DEBUG] setupApp() ERROR:', e);
+        throw e;
+      }
     };
   }
+
+  // loadAll
   if(typeof loadAll === 'function'){
     var _origLA = loadAll;
     loadAll = async function(){
@@ -15907,6 +15917,39 @@ async function _syncFijosSupabase(){
         return r;
       } catch(e) {
         console.error('[DEBUG] loadAll() ERROR — tenant:', currentTenant?.id, e);
+        throw e;
+      }
+    };
+  }
+
+  // _cargarTenantExterno
+  if(typeof _cargarTenantExterno === 'function'){
+    var _origCTE = _cargarTenantExterno;
+    _cargarTenantExterno = async function(t){
+      console.log('[DEBUG] _cargarTenantExterno() — id:', t?.id, '| nombre:', t?.nombre, '| modulos:', JSON.stringify(t?.modulos));
+      try {
+        var r = _origCTE.apply(this, arguments);
+        console.log('[DEBUG] _cargarTenantExterno() retornó (setupApp+loadAll lanzados)');
+        return r;
+      } catch(e) {
+        console.error('[DEBUG] _cargarTenantExterno() ERROR:', e);
+        throw e;
+      }
+    };
+  }
+
+  // _seleccionarTenantExterno
+  if(typeof _seleccionarTenantExterno === 'function'){
+    var _origSTE = _seleccionarTenantExterno;
+    _seleccionarTenantExterno = async function(idx){
+      var tenants = window.__adminExternoTenants || [];
+      console.log('[DEBUG] _seleccionarTenantExterno() idx:', idx, '| tenant en lista:', JSON.stringify(tenants[idx]));
+      try {
+        var r = await _origSTE.apply(this, arguments);
+        console.log('[DEBUG] _seleccionarTenantExterno() completó idx:', idx);
+        return r;
+      } catch(e) {
+        console.error('[DEBUG] _seleccionarTenantExterno() ERROR idx:', idx, e);
         throw e;
       }
     };
