@@ -15906,110 +15906,102 @@ async function _syncFijosSupabase(){
 })();
 </script>
 <script>
-/* ── DEBUG: captura global de errores + logging granular para diagnóstico admin_externo ── */
-
-// 1. Capturar errores JS no manejados
-window.onerror = function(msg, src, line, col, err){
-  console.error('[DEBUG:onerror]', msg, '| archivo:', src, 'línea:', line, '| err:', err);
-};
-window.addEventListener('unhandledrejection', function(ev){
-  console.error('[DEBUG:unhandledrejection]', ev.reason);
-});
-
-// 2. Interceptar clicks en botones del selector de tenant (antes de que lleguen a _seleccionarTenantExterno)
-document.addEventListener('click', function(ev){
-  var btn = ev.target.closest('button[onclick*="_seleccionarTenantExterno"]');
-  if(btn){
-    console.log('[DEBUG:click] Botón selector clickeado:', btn.getAttribute('onclick'),
-      '| __adminExternoTenants:', JSON.stringify(window.__adminExternoTenants));
-  }
-}, true);
-
+/* ── FIX: cierreDiario — sincronización correcta de datos ── */
+/* La versión existente filtra reparaciones por r.fecha en vez de r.fechaEnt,  */
+/* no incluye reparaciones en el desglose por método de pago, y no muestra     */
+/* turnos finalizados del día. Este patch re-renderiza el overlay con los       */
+/* datos correctos después de que el original lo crea.                          */
 (function(){
-  // setupApp
-  if(typeof setupApp === 'function'){
-    var _origSA = setupApp;
-    setupApp = function(){
-      console.log('[DEBUG] setupApp() START — tenant:', currentTenant?.id, currentTenant?.nombre, '| role:', currentRole);
-      try {
-        var r = _origSA.apply(this, arguments);
-        console.log('[DEBUG] setupApp() OK');
-        return r;
-      } catch(e) {
-        console.error('[DEBUG] setupApp() ERROR:', e);
-        throw e;
-      }
-    };
-  }
+  if(typeof cierreDiario !== 'function') return;
+  var _origCierre = cierreDiario;
+  cierreDiario = function(){
+    _origCierre.apply(this, arguments);
 
-  // loadAll
-  if(typeof loadAll === 'function'){
-    var _origLA = loadAll;
-    loadAll = async function(){
-      console.log('[DEBUG] loadAll() START — tenant:', currentTenant?.id, currentTenant?.nombre);
-      try {
-        var r = await _origLA.apply(this, arguments);
-        console.log('[DEBUG] loadAll() OK — tenant:', currentTenant?.id);
-        return r;
-      } catch(e) {
-        console.error('[DEBUG] loadAll() ERROR — tenant:', currentTenant?.id, e);
-        throw e;
-      }
-    };
-  }
+    var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
 
-  // _cargarTenantExterno
-  if(typeof _cargarTenantExterno === 'function'){
-    var _origCTE = _cargarTenantExterno;
-    _cargarTenantExterno = async function(t){
-      console.log('[DEBUG] _cargarTenantExterno() — id:', t?.id, '| nombre:', t?.nombre, '| modulos:', JSON.stringify(t?.modulos));
-      try {
-        var r = _origCTE.apply(this, arguments);
-        console.log('[DEBUG] _cargarTenantExterno() retornó');
-        return r;
-      } catch(e) {
-        console.error('[DEBUG] _cargarTenantExterno() ERROR:', e);
-        throw e;
-      }
-    };
-  }
+    // Ventas del día
+    var ventasHoy = (S.ventas||[]).filter(function(v){ return v.fecha===hoy; });
 
-  // _seleccionarTenantExterno
-  if(typeof _seleccionarTenantExterno === 'function'){
-    var _origSTE = _seleccionarTenantExterno;
-    _seleccionarTenantExterno = async function(idx){
-      var tenants = window.__adminExternoTenants || [];
-      console.log('[DEBUG] _seleccionarTenantExterno() idx:', idx, '| tenant:', JSON.stringify(tenants[idx]));
-      try {
-        var r = await _origSTE.apply(this, arguments);
-        console.log('[DEBUG] _seleccionarTenantExterno() completó idx:', idx);
-        return r;
-      } catch(e) {
-        console.error('[DEBUG] _seleccionarTenantExterno() ERROR idx:', idx, e);
-        throw e;
-      }
-    };
-  }
+    // Reparaciones entregadas hoy (estado entregado + fechaEnt o fecha = hoy)
+    var repsHoy = (S.reparaciones||[]).filter(function(r){
+      return r.estado==='entregado' && (r.fechaEnt||r.fecha)===hoy;
+    });
 
-  // 3. Patch del init IIFE: loguear cuando la sesión cacheada es de admin_externo
-  //    El init IIFE no maneja admin_externo y puede mostrar landingPage silenciosamente.
-  //    Patcheamos _iniciarSesionAdminExterno para loguear cada estrategia.
-  if(typeof _iniciarSesionAdminExterno === 'function'){
-    var _origISAE = _iniciarSesionAdminExterno;
-    _iniciarSesionAdminExterno = async function(user){
-      console.log('[DEBUG] _iniciarSesionAdminExterno() START — email:', user?.email,
-        '| tenant_id en metadata:', user?.user_metadata?.tenant_id,
-        '| rol:', user?.user_metadata?.rol);
-      try {
-        var r = await _origISAE.apply(this, arguments);
-        console.log('[DEBUG] _iniciarSesionAdminExterno() OK');
-        return r;
-      } catch(e) {
-        console.error('[DEBUG] _iniciarSesionAdminExterno() ERROR:', e);
-        throw e;
-      }
-    };
-  }
+    // Turnos finalizados hoy (para count — en salón ya están en S.ventas)
+    var turnosHoy = typeof getTurnos==='function'
+      ? getTurnos().filter(function(t){ return t.fecha===hoy && t.estado==='terminado'; })
+      : [];
+
+    // Gastos del día
+    var gastosHoy = (S.gastos||[]).filter(function(g){ return g.fecha===hoy; });
+
+    var totalVentas = ventasHoy.reduce(function(a,v){ return a+(v.total||0); }, 0);
+    var totalReps   = repsHoy.reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
+    var totalGastos = gastosHoy.reduce(function(a,g){ return a+(g.monto||0); }, 0);
+    var totalNeto   = totalVentas + totalReps - totalGastos;
+
+    // Desglose por método de pago: ventas + reparaciones
+    var porMetodo = {};
+    ventasHoy.forEach(function(v){
+      var m = v.metodo||'Efectivo'; porMetodo[m]=(porMetodo[m]||0)+(v.total||0);
+    });
+    repsHoy.forEach(function(r){
+      var m = r.metodo||'Efectivo'; porMetodo[m]=(porMetodo[m]||0)+(r.presupuesto||0);
+    });
+
+    var fN = function(n){ return '$'+(n||0).toLocaleString('es-AR'); };
+    var listaPagos = Object.entries(porMetodo).map(function(kv){
+      return '<tr>'
+        +'<td style="padding:4px 0;font-size:.82rem;color:var(--tx2)">'+esc(kv[0])+'</td>'
+        +'<td style="text-align:right;font-weight:600;color:var(--ok);font-size:.82rem">'+fN(kv[1])+'</td>'
+        +'</tr>';
+    }).join('');
+
+    var html = '<div style="padding:16px">'
+      +'<div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;margin-bottom:4px">📋 Cierre del día — '+fD(hoy)+'</div>'
+      +'<div style="font-size:.75rem;color:var(--tx2);margin-bottom:16px">'+(currentTenant&&currentTenant.nombre?currentTenant.nombre:'')+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'
+        +'<div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">'
+          +'<div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Ventas</div>'
+          +'<div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--ok)">'+fN(totalVentas)+'</div>'
+          +'<div style="font-size:.7rem;color:var(--tx2)">'+ventasHoy.length+' operaciones</div>'
+        +'</div>'
+        +'<div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">'
+          +'<div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Taller</div>'
+          +'<div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--gld)">'+fN(totalReps)+'</div>'
+          +'<div style="font-size:.7rem;color:var(--tx2)">'+repsHoy.length+' entregados</div>'
+        +'</div>'
+      +'</div>';
+
+    if(turnosHoy.length > 0){
+      html += '<div style="font-size:.8rem;color:var(--tx2);margin-bottom:12px">✂️ Turnos finalizados: <strong>'+turnosHoy.length+'</strong></div>';
+    }
+
+    if(listaPagos){
+      html += '<div style="margin-bottom:16px">'
+        +'<div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Desglose por método de pago</div>'
+        +'<table style="width:100%;border-collapse:collapse">'+listaPagos+'</table>'
+        +'</div>';
+    } else {
+      html += '<div style="font-size:.8rem;color:var(--mut);padding:6px 0;margin-bottom:12px">Sin operaciones registradas</div>';
+    }
+
+    html += '<div style="border-top:1px solid var(--bor);padding-top:12px;display:flex;justify-content:space-between;align-items:center">'
+      +'<div><div style="font-size:.72rem;color:var(--tx2)">Gastos del día</div>'
+      +'<div style="font-weight:600;color:var(--bad)">- '+fN(totalGastos)+'</div></div>'
+      +'<div style="text-align:right"><div style="font-size:.72rem;color:var(--tx2)">Resultado neto</div>'
+      +'<div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:'+(totalNeto>=0?'var(--gld)':'var(--bad)')+'">'+fN(totalNeto)+'</div>'
+      +'</div></div></div>';
+
+    var overlay = document.getElementById('cierreOverlay');
+    if(overlay){
+      overlay.innerHTML = '<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto">'
+        +html
+        +'<div style="padding:14px;text-align:right;border-top:1px solid var(--bor)"><button class="btn" onclick="document.getElementById(\'cierreOverlay\').remove()">Cerrar</button></div>'
+        +'</div>';
+      overlay.style.display = 'flex';
+    }
+  };
 })();
 </script>
 </body>
