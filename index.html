@@ -15888,7 +15888,25 @@ async function _syncFijosSupabase(){
 })();
 </script>
 <script>
-/* ── DEBUG: logging granular en setupApp / loadAll / _cargarTenantExterno / _seleccionarTenantExterno ── */
+/* ── DEBUG: captura global de errores + logging granular para diagnóstico admin_externo ── */
+
+// 1. Capturar errores JS no manejados
+window.onerror = function(msg, src, line, col, err){
+  console.error('[DEBUG:onerror]', msg, '| archivo:', src, 'línea:', line, '| err:', err);
+};
+window.addEventListener('unhandledrejection', function(ev){
+  console.error('[DEBUG:unhandledrejection]', ev.reason);
+});
+
+// 2. Interceptar clicks en botones del selector de tenant (antes de que lleguen a _seleccionarTenantExterno)
+document.addEventListener('click', function(ev){
+  var btn = ev.target.closest('button[onclick*="_seleccionarTenantExterno"]');
+  if(btn){
+    console.log('[DEBUG:click] Botón selector clickeado:', btn.getAttribute('onclick'),
+      '| __adminExternoTenants:', JSON.stringify(window.__adminExternoTenants));
+  }
+}, true);
+
 (function(){
   // setupApp
   if(typeof setupApp === 'function'){
@@ -15929,7 +15947,7 @@ async function _syncFijosSupabase(){
       console.log('[DEBUG] _cargarTenantExterno() — id:', t?.id, '| nombre:', t?.nombre, '| modulos:', JSON.stringify(t?.modulos));
       try {
         var r = _origCTE.apply(this, arguments);
-        console.log('[DEBUG] _cargarTenantExterno() retornó (setupApp+loadAll lanzados)');
+        console.log('[DEBUG] _cargarTenantExterno() retornó');
         return r;
       } catch(e) {
         console.error('[DEBUG] _cargarTenantExterno() ERROR:', e);
@@ -15943,13 +15961,33 @@ async function _syncFijosSupabase(){
     var _origSTE = _seleccionarTenantExterno;
     _seleccionarTenantExterno = async function(idx){
       var tenants = window.__adminExternoTenants || [];
-      console.log('[DEBUG] _seleccionarTenantExterno() idx:', idx, '| tenant en lista:', JSON.stringify(tenants[idx]));
+      console.log('[DEBUG] _seleccionarTenantExterno() idx:', idx, '| tenant:', JSON.stringify(tenants[idx]));
       try {
         var r = await _origSTE.apply(this, arguments);
         console.log('[DEBUG] _seleccionarTenantExterno() completó idx:', idx);
         return r;
       } catch(e) {
         console.error('[DEBUG] _seleccionarTenantExterno() ERROR idx:', idx, e);
+        throw e;
+      }
+    };
+  }
+
+  // 3. Patch del init IIFE: loguear cuando la sesión cacheada es de admin_externo
+  //    El init IIFE no maneja admin_externo y puede mostrar landingPage silenciosamente.
+  //    Patcheamos _iniciarSesionAdminExterno para loguear cada estrategia.
+  if(typeof _iniciarSesionAdminExterno === 'function'){
+    var _origISAE = _iniciarSesionAdminExterno;
+    _iniciarSesionAdminExterno = async function(user){
+      console.log('[DEBUG] _iniciarSesionAdminExterno() START — email:', user?.email,
+        '| tenant_id en metadata:', user?.user_metadata?.tenant_id,
+        '| rol:', user?.user_metadata?.rol);
+      try {
+        var r = await _origISAE.apply(this, arguments);
+        console.log('[DEBUG] _iniciarSesionAdminExterno() OK');
+        return r;
+      } catch(e) {
+        console.error('[DEBUG] _iniciarSesionAdminExterno() ERROR:', e);
         throw e;
       }
     };
