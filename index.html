@@ -15360,6 +15360,24 @@ async function _validarJwtTenant(){
   };
 })();
 
+/* ── FIX: _validarJwtTenant no debe validar tenant para admin_externo ── */
+/* admin_externo tiene el tenant_id de su negocio original en el JWT pero    */
+/* puede acceder a múltiples tenants — forzar re-login es incorrecto.        */
+(function(){
+  if(typeof _validarJwtTenant !== 'function') return;
+  var _origVJT = _validarJwtTenant;
+  _validarJwtTenant = async function(){
+    try {
+      var res = await sb.auth.getSession();
+      var session = res && res.data && res.data.session;
+      if(session && session.user &&
+         session.user.user_metadata &&
+         session.user.user_metadata.rol === 'admin_externo') return;
+    } catch(e){}
+    return _origVJT.apply(this, arguments);
+  };
+})();
+
 /* ── 3. CAPTCHA matemático en wizard de registro (paso 4) ── */
 var __rwCaptchaAns = null;
 
