@@ -15922,9 +15922,9 @@ async function _syncFijosSupabase(){
     // Ventas del día
     var ventasHoy = (S.ventas||[]).filter(function(v){ return v.fecha===hoy; });
 
-    // Reparaciones entregadas hoy (estado entregado + fechaEnt o fecha = hoy)
+    // Reparaciones entregadas hoy (estado entregado + fechaEnt = hoy)
     var repsHoy = (S.reparaciones||[]).filter(function(r){
-      return r.estado==='entregado' && (r.fechaEnt||r.fecha)===hoy;
+      return r.estado==='entregado' && r.fechaEnt===hoy;
     });
 
     // Turnos finalizados hoy (para count — en salón ya están en S.ventas)
@@ -16002,6 +16002,96 @@ async function _syncFijosSupabase(){
       overlay.style.display = 'flex';
     }
   };
+})();
+</script>
+<script>
+/* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
+
+// getCajas: (fechaEnt||fecha) puede incluir reps sin fechaEnt usando fecha de ingreso
+(function(){
+  if(typeof getCajas !== 'function') return;
+  var _orig = getCajas;
+  getCajas = function(){
+    var result = _orig.apply(this, arguments);
+    var hoy = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
+    var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
+    if(!/barber|barbería|salon|belleza/i.test(rub)){
+      // Quitar las reps entregado sin fechaEnt que se incluyeron vía r.fecha
+      (S.reparaciones||[]).forEach(function(r){
+        if(r.estado==='entregado' && !r.fechaEnt && r.fecha===hoy)
+          result.servicio -= r.presupuesto||0;
+      });
+    }
+    return result;
+  };
+})();
+
+// rObjetivos: la rama de taller cuenta reps por r.fecha (ingreso) en vez de r.fechaEnt (entrega)
+(function(){
+  if(typeof rObjetivos !== 'function') return;
+  var _orig = rObjetivos;
+  rObjetivos = function(){
+    var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
+    if(/barber|barbería|salon|belleza|peluq/i.test(rub)) return _orig.apply(this, arguments);
+    _orig.apply(this, arguments);
+    var hoyStr = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
+    var obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
+    var repsHoy = (S.reparaciones||[]).filter(function(r){ return r.estado==='entregado'&&r.fechaEnt===hoyStr; }).length;
+    var accHoy  = (S.ventas||[]).filter(function(v){ return v.fecha===hoyStr&&v.tipo==='producto'; }).reduce(function(a,v){ return a+(v.cantidad||0); }, 0);
+    var eqHoy   = (S.ventas||[]).filter(function(v){ return v.fecha===hoyStr&&v.tipo==='equipo'; }).length;
+    var ingRepHoy  = (S.ventas||[]).filter(function(v){ return v.fecha===hoyStr&&v.tipo==='servicio'; }).reduce(function(a,v){ return a+(v.total||0); }, 0);
+    var ingAccHoy  = (S.ventas||[]).filter(function(v){ return v.fecha===hoyStr&&v.tipo==='producto'; }).reduce(function(a,v){ return a+(v.total||0); }, 0);
+    var ingEqHoy   = (S.ventas||[]).filter(function(v){ return v.fecha===hoyStr&&v.tipo==='equipo'; }).reduce(function(a,v){ return a+(v.comision||0); }, 0);
+    var metaRepMonto = (obj.repCant||7)*(obj.repPre||40000);
+    var metaAccMonto = (obj.accCant||10)*(obj.accPre||10000);
+    var periodoLabel = 'Hoy, '+(typeof fD==='function'?fD(hoyStr):hoyStr);
+    function bloque(e,t,actual,meta,monto,metaMonto){
+      var pct=meta>0?Math.min(100,Math.round(actual/meta*100)):0;
+      var c=pct>=100?'var(--ok)':pct>=60?'var(--wrn)':'var(--bad)';
+      var bg=pct>=100?'linear-gradient(90deg,var(--ok),#6fd4a0)':pct>=60?'linear-gradient(90deg,var(--wrn),#e8c96a)':'linear-gradient(90deg,var(--bad),#e07070)';
+      var fmtFn=typeof fmt==='function'?fmt:function(n){ return '$'+n; };
+      return '<div class="stat"><div class="sl">'+e+' '+t+'</div>'
+        +'<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px">'
+        +'<div style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:'+c+'">'+actual+'</div>'
+        +'<div style="font-size:.78rem;color:var(--mut)">/ '+meta+' hoy</div></div>'
+        +'<div class="pb"><div class="pf" style="width:'+pct+'%;background:'+bg+'"></div></div>'
+        +'<div style="display:flex;justify-content:space-between;margin-top:5px;font-size:.7rem">'
+        +'<span style="color:var(--mut)">'+pct+'% logrado</span>'
+        +'<span style="color:var(--gld);font-weight:600">'+fmtFn(monto)+'</span></div>'
+        +(metaMonto>0?'<div style="font-size:.68rem;color:var(--mut);margin-top:2px">Meta: '+fmtFn(metaMonto)+'</div>':'')
+        +'</div>';
+    }
+    var el = document.getElementById('objHoy');
+    if(el) el.innerHTML = '<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 '+periodoLabel+'</div>'
+      +bloque('🔧','Trabajos',repsHoy,obj.repCant||7,ingRepHoy,metaRepMonto)
+      +bloque('📦','Accesorios',accHoy,obj.accCant||10,ingAccHoy,metaAccMonto)
+      +bloque('📱','Equipos',eqHoy,obj.eqCant||1,ingEqHoy,0);
+  };
+})();
+
+// _calcGananciaSemana y checkMetaDia: usan r.fecha (ingreso) en vez de r.fechaEnt (entrega)
+(function(){
+  function remapReps(){
+    return (S.reparaciones||[]).map(function(r){
+      return (r.estado==='entregado'&&r.fechaEnt) ? Object.assign({},r,{fecha:r.fechaEnt}) : r;
+    });
+  }
+  if(typeof _calcGananciaSemana === 'function'){
+    var _origCGS = _calcGananciaSemana;
+    _calcGananciaSemana = function(weekOffset){
+      var _bak = S.reparaciones; S.reparaciones = remapReps();
+      var r = _origCGS.apply(this, arguments);
+      S.reparaciones = _bak; return r;
+    };
+  }
+  if(typeof checkMetaCelebration === 'function'){
+    var _origCMC = checkMetaCelebration;
+    checkMetaCelebration = function(){
+      var _bak = S.reparaciones; S.reparaciones = remapReps();
+      var r = _origCMC.apply(this, arguments);
+      S.reparaciones = _bak; return r;
+    };
+  }
 })();
 </script>
 </body>
