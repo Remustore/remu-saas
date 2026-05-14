@@ -16005,6 +16005,57 @@ async function _syncFijosSupabase(){
 })();
 </script>
 <script>
+/* ── FIX: Realtime — reconexión automática si el canal WebSocket se cierra ── */
+/* Supabase cierra el socket con código 1000 (normal closure) tras inactividad  */
+/* y no reconecta el canal automáticamente. Watchdog cada 30s.                  */
+(function(){
+  var _rtWatchdog = null;
+  var _rtTenant   = '';
+  var _rtReconnects = 0;
+
+  function _watchdog(){
+    if(!_rtTenant || typeof currentTenant === 'undefined' || !currentTenant || currentTenant.id !== _rtTenant) return;
+    var needsReconnect = false;
+    try {
+      if(!_realtimeCh){
+        needsReconnect = true;
+      } else {
+        var st = _realtimeCh.state;
+        // 'joined'/'joining' → OK; 'closed'/'errored'/'leaving'/undefined → reconectar
+        if(!st || (st !== 'joined' && st !== 'joining')) needsReconnect = true;
+      }
+    } catch(e){ needsReconnect = true; }
+
+    if(needsReconnect){
+      _rtReconnects++;
+      console.log('[Realtime] Canal cerrado — reconectando (intento ' + _rtReconnects + ')');
+      try { _iniciarRealtimeReservas(_rtTenant); } catch(e){ console.warn('[Realtime] Error al reconectar:', e); }
+    }
+  }
+
+  if(typeof _iniciarRealtimeReservas === 'function'){
+    var _origIRR = _iniciarRealtimeReservas;
+    _iniciarRealtimeReservas = function(tenantId){
+      _rtTenant = tenantId || '';
+      _origIRR.apply(this, arguments);
+      if(!_rtWatchdog && _rtTenant){
+        _rtWatchdog = setInterval(_watchdog, 30000);
+        console.log('[Realtime] Watchdog de reconexión activo (cada 30s)');
+      }
+    };
+  }
+
+  if(typeof _detenerRealtimeReservas === 'function'){
+    var _origDRR = _detenerRealtimeReservas;
+    _detenerRealtimeReservas = function(){
+      _rtTenant = '';
+      if(_rtWatchdog){ clearInterval(_rtWatchdog); _rtWatchdog = null; }
+      return _origDRR.apply(this, arguments);
+    };
+  }
+})();
+</script>
+<script>
 /* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
 
 // getCajas: (fechaEnt||fecha) puede incluir reps sin fechaEnt usando fecha de ingreso
