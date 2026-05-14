@@ -16103,6 +16103,113 @@ async function _syncFijosSupabase(){
 })();
 </script>
 <script>
+/* ── FIX: Realtime — backoff + reconexión al renovar token JWT ── */
+/*                                                                           */
+/* Causa raíz: el socket cierra con "InvalidJWTToken: Token has expired".   */
+/* El canal queda muerto hasta que se reinicia manualmente.                  */
+/*                                                                           */
+/* Fix 1 — onAuthStateChange TOKEN_REFRESHED: recrear canal con token nuevo */
+/* Fix 2 — backoff en CLOSED/CHANNEL_ERROR/TIMED_OUT: 5s → 15s → 30s      */
+(function(){
+  if(typeof _iniciarRealtimeReservas !== 'function') return;
+
+  var DELAYS  = [5000, 15000, 30000];
+  var _bTimer = null;
+  var _bIdx   = 0;
+  var _bTenant = '';
+  var _authUnsub = null;
+
+  function _clearBackoff(){ if(_bTimer){ clearTimeout(_bTimer); _bTimer = null; } }
+
+  function _scheduleReconnect(tenantId){
+    _clearBackoff();
+    _bTenant = tenantId;
+    var delay = DELAYS[Math.min(_bIdx, DELAYS.length - 1)];
+    _bIdx = Math.min(_bIdx + 1, DELAYS.length - 1);
+    console.log('[Realtime] Reconexión en ' + (delay / 1000) + 's (intento ' + _bIdx + ')');
+    _bTimer = setTimeout(function(){
+      _bTimer = null;
+      if(_bTenant){
+        console.log('[Realtime] Reconectando por backoff...');
+        _iniciarRealtimeReservas(_bTenant);
+      }
+    }, delay);
+  }
+
+  var _origIRR = _iniciarRealtimeReservas;
+  _iniciarRealtimeReservas = function(tenantId){
+    _clearBackoff();
+    _bTenant = tenantId || '';
+
+    if(!sb || typeof sb.channel !== 'function') return _origIRR.apply(this, arguments);
+
+    // Interceptar sb.channel para inyectar backoff en el callback de suscripción
+    var _origSbCh = sb.channel.bind(sb);
+    sb.channel = function(name, opts){
+      var ch = _origSbCh(name, opts);
+      var _origSub = ch.subscribe.bind(ch);
+      ch.subscribe = function(statusCb){
+        return _origSub(function(status, err){
+          if(status === 'SUBSCRIBED'){
+            _bIdx = 0; // reset backoff al conectar con éxito
+            console.log('[Realtime] Conectado — backoff reseteado');
+          } else if(status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
+            var tid = _bTenant || (typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.id : '');
+            if(tid) _scheduleReconnect(tid);
+          }
+          if(typeof statusCb === 'function') statusCb.apply(this, arguments);
+        });
+      };
+      return ch;
+    };
+
+    var result = _origIRR.apply(this, arguments);
+    sb.channel = _origSbCh; // restaurar
+    return result;
+  };
+
+  // Fix 2: onAuthStateChange — recrear canal cuando el token JWT se renueva
+  function _setupAuthListener(){
+    if(!sb || !sb.auth || typeof sb.auth.onAuthStateChange !== 'function') return;
+    if(_authUnsub) return; // ya registrado
+    var _sub = sb.auth.onAuthStateChange(function(event, session){
+      if(event !== 'TOKEN_REFRESHED') return;
+      var tid = typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.id : '';
+      if(!tid) return;
+      console.log('[Realtime] TOKEN_REFRESHED — recreando canal con token renovado');
+      _clearBackoff();
+      _bIdx = 0;
+      _iniciarRealtimeReservas(tid);
+    });
+    _authUnsub = (_sub && typeof _sub.unsubscribe === 'function') ? _sub.unsubscribe : (_sub && _sub.data && _sub.data.subscription ? _sub.data.subscription.unsubscribe : null);
+  }
+
+  // Arrancar el listener cuando sb esté disponible
+  if(typeof sb !== 'undefined' && sb && sb.auth){
+    _setupAuthListener();
+  } else {
+    var _authSetupRetry = setInterval(function(){
+      if(typeof sb !== 'undefined' && sb && sb.auth){
+        clearInterval(_authSetupRetry);
+        _setupAuthListener();
+      }
+    }, 1000);
+  }
+
+  // Limpiar en logout
+  if(typeof _detenerRealtimeReservas === 'function'){
+    var _origDRR2 = _detenerRealtimeReservas;
+    _detenerRealtimeReservas = function(){
+      _clearBackoff();
+      _bTenant = '';
+      _bIdx = 0;
+      if(typeof _authUnsub === 'function'){ try{ _authUnsub(); }catch(e){} _authUnsub = null; }
+      return _origDRR2.apply(this, arguments);
+    };
+  }
+})();
+</script>
+<script>
 /* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
 
 // getCajas: (fechaEnt||fecha) puede incluir reps sin fechaEnt usando fecha de ingreso
