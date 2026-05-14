@@ -15766,7 +15766,7 @@ async function _syncFijosSupabase(){
     try {
       const desde = new Date(); desde.setDate(desde.getDate()-7);
       const desdeStr = desde.toISOString().slice(0,10);
-      const hasta = new Date(); hasta.setDate(hasta.getDate()+7);
+      const hasta = new Date(); hasta.setDate(hasta.getDate()+30);
       const hastaStr = hasta.toISOString().slice(0,10);
 
       const { data, error } = await sb.from('turnos_solicitudes')
@@ -15790,7 +15790,7 @@ async function _syncFijosSupabase(){
       }
 
       if(!data||!data.length){
-        el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin reservas en los últimos 7 días. Compartí tu link para empezar a recibir.</div>';
+        el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin reservas en los últimos 7 días ni en los próximos 30. Compartí tu link para empezar a recibir.</div>';
         return;
       }
 
