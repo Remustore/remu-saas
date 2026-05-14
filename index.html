@@ -16056,6 +16056,53 @@ async function _syncFijosSupabase(){
 })();
 </script>
 <script>
+/* ── DIAG: log de eventos Realtime y estado del canal ── */
+/* Intercepta sb.channel() durante _iniciarRealtimeReservas para añadir logs  */
+/* al callback de eventos (postgres_changes) y al callback de estado.         */
+(function(){
+  if(typeof _iniciarRealtimeReservas !== 'function') return;
+  var _origIRR = _iniciarRealtimeReservas;
+  _iniciarRealtimeReservas = function(tenantId){
+    if(!sb || typeof sb.channel !== 'function') return _origIRR.apply(this, arguments);
+    var _origSbCh = sb.channel.bind(sb);
+    sb.channel = function(name, opts){
+      var ch = _origSbCh(name, opts);
+      // Añadir log al callback del evento postgres_changes
+      var _origOn = ch.on.bind(ch);
+      ch.on = function(type, filter, callback){
+        if(type === 'postgres_changes' && typeof callback === 'function'){
+          var _cb = callback;
+          callback = function(payload){
+            var p = payload && payload.new ? payload.new : {};
+            console.log('[Realtime] evento recibido:'
+              , 'eventType=' + (payload.eventType||'?')
+              , '| estado canal=' + ch.state
+              , '| estado registro=' + (p.estado||'?')
+              , '| nombre=' + (p.nombre||'?')
+              , '| fecha=' + (p.fecha||'?'));
+            return _cb.apply(this, arguments);
+          };
+        }
+        return _origOn(type, filter, callback);
+      };
+      // Añadir log al callback de estado de suscripción
+      var _origSub = ch.subscribe.bind(ch);
+      ch.subscribe = function(statusCb){
+        return _origSub(function(status, err){
+          console.log('[Realtime] estado suscripción: ' + status
+            + (err ? ' — ' + JSON.stringify(err) : ''));
+          if(typeof statusCb === 'function') statusCb.apply(this, arguments);
+        });
+      };
+      return ch;
+    };
+    var result = _origIRR.apply(this, arguments);
+    sb.channel = _origSbCh; // restaurar
+    return result;
+  };
+})();
+</script>
+<script>
 /* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
 
 // getCajas: (fechaEnt||fecha) puede incluir reps sin fechaEnt usando fecha de ingreso
