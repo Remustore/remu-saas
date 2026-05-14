@@ -16274,29 +16274,71 @@ async function _syncFijosSupabase(){
   };
 })();
 
-// _calcGananciaSemana y checkMetaDia: usan r.fecha (ingreso) en vez de r.fechaEnt (entrega)
+// _calcGananciaSemana y checkMetaCelebration: usan r.fecha (ingreso) en vez de r.fechaEnt (entrega)
 (function(){
+  // Copia manual sin Object.assign (mayor compatibilidad) para remapear fecha→fechaEnt
   function remapReps(){
-    return (S.reparaciones||[]).map(function(r){
-      return (r.estado==='entregado'&&r.fechaEnt) ? Object.assign({},r,{fecha:r.fechaEnt}) : r;
-    });
+    if(typeof S === 'undefined' || !S || !S.reparaciones) return [];
+    var reps = S.reparaciones;
+    var out  = [];
+    for(var i = 0; i < reps.length; i++){
+      var rep = reps[i];
+      if(rep.estado === 'entregado' && rep.fechaEnt){
+        var copy = {};
+        for(var k in rep){ if(Object.prototype.hasOwnProperty.call(rep, k)) copy[k] = rep[k]; }
+        copy.fecha = rep.fechaEnt;
+        out.push(copy);
+      } else {
+        out.push(rep);
+      }
+    }
+    return out;
+  }
+  function conRepsRemapeadas(fn){
+    if(typeof S === 'undefined' || !S) return fn();
+    var _bak = S.reparaciones;
+    S.reparaciones = remapReps();
+    try { return fn(); } finally { S.reparaciones = _bak; }
   }
   if(typeof _calcGananciaSemana === 'function'){
     var _origCGS = _calcGananciaSemana;
     _calcGananciaSemana = function(weekOffset){
-      var _bak = S.reparaciones; S.reparaciones = remapReps();
-      var r = _origCGS.apply(this, arguments);
-      S.reparaciones = _bak; return r;
+      var wo = weekOffset;
+      return conRepsRemapeadas(function(){ return _origCGS(wo); });
     };
   }
   if(typeof checkMetaCelebration === 'function'){
     var _origCMC = checkMetaCelebration;
     checkMetaCelebration = function(){
-      var _bak = S.reparaciones; S.reparaciones = remapReps();
-      var r = _origCMC.apply(this, arguments);
-      S.reparaciones = _bak; return r;
+      return conRepsRemapeadas(function(){ return _origCMC(); });
     };
   }
+})();
+
+// applyBranding: ignorar logos con ruta local file:// (solo funcionan en la compu donde se subió)
+(function(){
+  if(typeof applyBranding !== 'function') return;
+  var _origAB = applyBranding;
+  applyBranding = function(){
+    var savedLogo = null;
+    try {
+      if(currentTenant && currentTenant.modulos){
+        var logo = currentTenant.modulos.logo || '';
+        if(logo && logo.indexOf('file://') === 0){
+          console.warn('[remu] Logo con ruta local ignorado (subilo como base64 para que funcione en todos los dispositivos):', logo.slice(0, 80));
+          savedLogo = logo;
+          currentTenant.modulos.logo = '';
+        }
+      }
+    } catch(e){}
+    try {
+      return _origAB.apply(this, arguments);
+    } finally {
+      if(savedLogo !== null && currentTenant && currentTenant.modulos){
+        currentTenant.modulos.logo = savedLogo;
+      }
+    }
+  };
 })();
 </script>
 </body>
