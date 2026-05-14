@@ -16315,6 +16315,105 @@ async function _syncFijosSupabase(){
   }
 })();
 
+/* ── POLLING: reemplaza Realtime WebSocket por consulta cada 30s ── */
+/*                                                                    */
+/* El WebSocket se rompe con InvalidJWTToken / socket closed 1000.   */
+/* El polling a Supabase REST es 100% confiable.                     */
+(function(){
+  var _pollTimer  = null;
+  var _pollTenant = '';
+  var _pollSeen   = new Set();
+  var _pollStart  = 0;
+
+  function _stopPolling(){
+    if(_pollTimer){ clearInterval(_pollTimer); _pollTimer = null; }
+    _pollTenant = '';
+  }
+
+  function _startPolling(tenantId){
+    _stopPolling();
+    _pollTenant = tenantId;
+    _pollSeen   = new Set();
+    _pollStart  = Date.now();
+    _doPoll();
+    _pollTimer  = setInterval(_doPoll, 30000);
+    console.log('[Polling] Iniciado — consultando reservas cada 30s');
+  }
+
+  async function _doPoll(){
+    if(!_pollTenant || typeof sb === 'undefined' || !sb) return;
+    try {
+      var desde = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+      var res = await sb.from('turnos_solicitudes')
+        .select('id,nombre,fecha,hora,tel,servicio_id,empleado_id,estado,created_at')
+        .eq('tenant_id', _pollTenant)
+        .eq('estado', 'pendiente')
+        .gte('created_at', desde);
+
+      if(res.error){ console.warn('[Polling] Error:', res.error.message); return; }
+      var rows = res.data || [];
+
+      rows.forEach(function(row){
+        var rowId = String(row.id || '');
+        if(!rowId || _pollSeen.has(rowId)) return;
+        _pollSeen.add(rowId);
+
+        // Ignorar reservas que ya existían antes de iniciar el polling
+        var createdMs = row.created_at ? new Date(row.created_at).getTime() : 0;
+        if(createdMs < _pollStart) return;
+
+        // Ignorar bloques internos (__fijo__, etc.)
+        if((row.nombre || '').startsWith('__')) return;
+
+        console.log('[Polling] Nueva reserva:', row.nombre, row.fecha, row.hora);
+        if(typeof _onNuevaReservaRealtime === 'function') _onNuevaReservaRealtime(row);
+      });
+
+      if(typeof refreshBadgeSolicitudes === 'function') refreshBadgeSolicitudes();
+    } catch(e){
+      console.warn('[Polling] Excepción:', e && e.message ? e.message : e);
+    }
+  }
+
+  // Reemplazar _iniciarRealtimeReservas con polling
+  _iniciarRealtimeReservas = function(tenantId){
+    if(tenantId) _startPolling(tenantId);
+  };
+
+  // Reemplazar _detenerRealtimeReservas con stop del poll
+  _detenerRealtimeReservas = function(){
+    _stopPolling();
+    if(typeof _realtimeCh !== 'undefined' && _realtimeCh){
+      try { if(sb && sb.removeChannel) sb.removeChannel(_realtimeCh); } catch(e){}
+      _realtimeCh = null;
+    }
+    console.log('[Polling] Detenido');
+  };
+
+  // Bloquear sb.channel() para canales de reservas con un dummy inofensivo.
+  // Neutraliza _setupReservasRealtime (renderAll patch) y cualquier
+  // canal Realtime residual de los patches anteriores.
+  function _bloquear(){
+    if(typeof sb === 'undefined' || !sb || typeof sb.channel !== 'function') return;
+    var _orig = sb.channel.bind(sb);
+    sb.channel = function(name, opts){
+      if(typeof name === 'string' &&
+         (name.indexOf('remu_reservas_') === 0 || name.indexOf('remu_rt_') === 0)){
+        return { on: function(){ return this; }, subscribe: function(){ return this; }, unsubscribe: function(){ return this; } };
+      }
+      return _orig(name, opts);
+    };
+    console.log('[Polling] WebSocket Realtime bloqueado — modo polling activo');
+  }
+
+  if(typeof sb !== 'undefined' && sb){ _bloquear(); }
+  else {
+    var _rbl = setInterval(function(){
+      if(typeof sb !== 'undefined' && sb){ clearInterval(_rbl); _bloquear(); }
+    }, 500);
+  }
+})();
+
 // applyBranding: ignorar logos con ruta local file:// (solo funcionan en la compu donde se subió)
 (function(){
   if(typeof applyBranding !== 'function') return;
