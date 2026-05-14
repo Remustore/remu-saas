@@ -16414,6 +16414,19 @@ async function _syncFijosSupabase(){
   }
 })();
 
+// _onNuevaReservaRealtime: refrescar lista de Reservas online automáticamente
+(function(){
+  if(typeof _onNuevaReservaRealtime !== 'function') return;
+  var _origONRR = _onNuevaReservaRealtime;
+  _onNuevaReservaRealtime = function(row){
+    var result = _origONRR.apply(this, arguments);
+    if(typeof cargarSolicitudes === 'function'){
+      setTimeout(cargarSolicitudes, 1200);
+    }
+    return result;
+  };
+})();
+
 // applyBranding: ignorar logos con ruta local file:// (solo funcionan en la compu donde se subió)
 (function(){
   if(typeof applyBranding !== 'function') return;
