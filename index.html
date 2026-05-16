@@ -16710,5 +16710,72 @@ async function _mFCS_sinCobro(){
   };
 })();
 </script>
+<script>
+/* ── Fix: confirmarSolicitud vuelve a mostrar "pendiente" tras confirmar ──
+   Causa: race condition entre cargarSolicitudes() llamado desde silentRefresh
+   (vía rTurnosOnline) y el llamado desde confirmarSolicitud() después del UPDATE.
+   La query que empezó ANTES del UPDATE puede resolverse DESPUÉS y pisar el DOM.
+
+   Fix 1 – serializar cargarSolicitudes: si ya hay una query en vuelo, encolar
+   la nueva; cuando la primera termina, la encolada corre una vez más (ya con
+   el estado actualizado en Supabase). Solo la corrida más reciente escribe en el DOM.
+
+   Fix 2 – actualización optimista en confirmarSolicitud: cambiar el badge y
+   quitar los botones inmediatamente al hacer click, antes del round-trip a Supabase.
+*/
+(function(){
+  if(typeof cargarSolicitudes !== 'function') return;
+  var _origCS   = cargarSolicitudes;
+  var _csActive = false;
+  var _csQueued = false;
+
+  cargarSolicitudes = async function(){
+    if(_csActive){ _csQueued = true; return; }
+    _csActive = true;
+    try {
+      do {
+        _csQueued = false;
+        await _origCS.apply(this, arguments);
+      } while(_csQueued);
+    } finally {
+      _csActive = false;
+    }
+  };
+})();
+
+(function(){
+  if(typeof confirmarSolicitud !== 'function') return;
+  var _origConf = confirmarSolicitud;
+
+  confirmarSolicitud = async function(id, nombre, tel, servicio, fecha, hora){
+    // Optimistic UI: marcar como confirmado antes del await a Supabase
+    var lista = document.getElementById('solicitudesLista');
+    if(lista){
+      var prefix = "confirmarSolicitud('" + String(id) + "',";
+      var btns   = lista.querySelectorAll('button');
+      for(var i = 0; i < btns.length; i++){
+        if((btns[i].getAttribute('onclick') || '').indexOf(prefix) === 0){
+          var actDiv = btns[i].parentElement;
+          var row    = actDiv ? actDiv.parentElement : null;
+          if(row){
+            var badge = row.querySelector('.byw');
+            if(badge){
+              badge.className = badge.className.replace('byw', 'bgr');
+              badge.textContent = '✅ confirmado';
+            }
+          }
+          if(actDiv){
+            var waBtn = actDiv.querySelector('[onclick*="waRespuestaSolicitud"]');
+            actDiv.innerHTML = '';
+            if(waBtn) actDiv.appendChild(waBtn.cloneNode(true));
+          }
+          break;
+        }
+      }
+    }
+    return _origConf.apply(this, arguments);
+  };
+})();
+</script>
 </body>
 </html>
