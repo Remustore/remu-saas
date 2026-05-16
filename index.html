@@ -16561,5 +16561,154 @@ async function _syncFijosSupabase(){
   };
 })();
 </script>
+
+<script>
+/* ── Finalizar turno: selector de servicio + precio editable + método de pago ──
+   Permite corregir el servicio realizado antes de registrar en caja.
+   Ej: el cliente pidió esmaltado pero terminó haciéndose capping.
+   Monkey-patches: cambiarEstadoTurno (intercepta 'terminado').
+   Funciones nuevas: _mostrarModalFinalizarConServicio, _mFCS_* helpers.       */
+
+function _mFCS_cerrar(){
+  var ov = document.getElementById('mFinalizarConServicio');
+  if(ov) ov.remove();
+}
+
+function _mFCS_onSrvChange(){
+  var srvEl = document.getElementById('mFCS_srv');
+  var opt   = srvEl && srvEl.options[srvEl.selectedIndex];
+  if(!opt) return;
+  var precio   = parseFloat(opt.getAttribute('data-precio') || 0);
+  var precioEl = document.getElementById('mFCS_precio');
+  if(precioEl) precioEl.value = precio > 0 ? precio : '';
+}
+
+function _mostrarModalFinalizarConServicio(turno, servicios){
+  _mFCS_cerrar();
+
+  var currentSrvId  = String(turno.servicioId || '');
+  var currentSrv    = servicios.find(function(s){ return String(s.id) === currentSrvId; });
+  var currentPrecio = parseFloat(turno.precio) || (currentSrv ? parseFloat(currentSrv.precio) || 0 : 0);
+  var hasSvcs       = servicios.length > 0;
+
+  var iStyle = 'width:100%;background:#0a0a0a;border:1px solid #2e2e2e;color:#f5f0e8;padding:11px 14px;border-radius:8px;font-family:\'Outfit\',sans-serif;font-size:.88rem;outline:none;box-sizing:border-box';
+  var sStyle = iStyle + ';-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'8\' viewBox=\'0 0 12 8\'%3E%3Cpath d=\'M1 1l5 5 5-5\' stroke=\'%23a89880\' stroke-width=\'1.5\' fill=\'none\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:36px';
+  var lStyle = 'display:block;font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;margin-top:14px';
+  var l0Style= 'display:block;font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px';
+
+  // Servicio selector (o texto si no hay servicios configurados)
+  var srvBlock;
+  if(hasSvcs){
+    var optsHtml = servicios.map(function(s){
+      var sel   = String(s.id) === currentSrvId ? ' selected' : '';
+      var pFmt  = (parseFloat(s.precio)||0) > 0 ? ' — ' + fmt(s.precio) : '';
+      var label = esc((s.sector ? s.sector + ': ' : '') + s.nombre) + pFmt;
+      return '<option value="' + s.id + '" data-precio="' + (parseFloat(s.precio)||0) + '"' + sel + '>' + label + '</option>';
+    }).join('');
+    srvBlock = '<label style="' + l0Style + '">Servicio realizado</label>'
+             + '<select id="mFCS_srv" onchange="_mFCS_onSrvChange()" style="' + sStyle + '">' + optsHtml + '</select>';
+  } else {
+    srvBlock = '<label style="' + l0Style + '">Servicio</label>'
+             + '<div style="font-size:.88rem;color:#f5f0e8;padding:8px 0 12px">' + esc(turno.servicioNombre||'Servicio') + '</div>';
+  }
+
+  var metodosHtml = [
+    ['Efectivo','💵 Efectivo'],['Transferencia','🏦 Transferencia'],
+    ['Débito','💳 Débito'],['Crédito','💳 Crédito'],['Mercado Pago','📱 Mercado Pago']
+  ].map(function(m){ return '<option value="' + m[0] + '">' + m[1] + '</option>'; }).join('');
+
+  var ov = document.createElement('div');
+  ov.id = 'mFinalizarConServicio';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.88);display:flex;align-items:flex-end;justify-content:center;padding:0';
+  ov.addEventListener('click', function(e){ if(e.target === ov) _mFCS_cerrar(); });
+
+  ov.innerHTML =
+    '<div style="background:#141414;border:1px solid #2e2e2e;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:24px 20px 40px;box-sizing:border-box">' +
+      '<div style="font-weight:700;font-size:1rem;color:#c9a84c;margin-bottom:4px">✓ Finalizar turno</div>' +
+      '<div style="font-size:.82rem;color:#a89880;margin-bottom:20px">' + esc(turno.cliente||'Cliente') + (turno.fecha ? ' · ' + esc(turno.fecha) : '') + (turno.hora ? ' · ' + esc((turno.hora||'').substring(0,5)) : '') + '</div>' +
+      srvBlock +
+      '<label style="' + lStyle + '">Precio ($)</label>' +
+      '<input type="number" id="mFCS_precio" value="' + (currentPrecio > 0 ? currentPrecio : '') + '" placeholder="0 — sin cobro" min="0" style="' + iStyle + '">' +
+      '<label style="' + lStyle + '">Método de pago</label>' +
+      '<select id="mFCS_metodo" style="' + sStyle + '">' + metodosHtml + '</select>' +
+      '<div style="display:flex;gap:10px;margin-top:22px">' +
+        '<button onclick="_mFCS_confirmar()" style="flex:1;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.92rem;font-weight:700;cursor:pointer">✓ Registrar y finalizar</button>' +
+        '<button onclick="_mFCS_sinCobro()" style="padding:14px 18px;background:transparent;border:1px solid #2e2e2e;color:#a89880;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.85rem;cursor:pointer">Sin cobro</button>' +
+      '</div>' +
+      '<button onclick="_mFCS_cerrar()" style="width:100%;margin-top:10px;padding:10px;background:transparent;border:none;color:#585044;font-family:\'Outfit\',sans-serif;font-size:.78rem;cursor:pointer">Cancelar</button>' +
+    '</div>';
+
+  document.body.appendChild(ov);
+
+  // Pre-seleccionar método del turno (si existe)
+  var metodoEl = document.getElementById('mFCS_metodo');
+  if(metodoEl && turno.metodo){
+    for(var i = 0; i < metodoEl.options.length; i++){
+      if(metodoEl.options[i].value === turno.metodo){ metodoEl.selectedIndex = i; break; }
+    }
+  }
+}
+
+function _mFCS_getServicio(){
+  var srvEl = document.getElementById('mFCS_srv');
+  if(!srvEl) return null;
+  var srvId = srvEl.value;
+  var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
+  return (cfg.servicios || []).find(function(s){ return String(s.id) === String(srvId); }) || null;
+}
+
+function _mFCS_aplicarServicioAlTurno(id, srv, precio, metodo){
+  var turnos = typeof getTurnos === 'function' ? getTurnos() : [];
+  var idx = turnos.findIndex(function(x){ return String(x.id) === String(id); });
+  if(idx === -1) return;
+  var upd = {};
+  if(srv){
+    upd.servicioId   = srv.id;
+    upd.servicioNombre = srv.nombre;
+    upd.sector       = srv.sector || '';
+  }
+  if(precio != null) upd.precio = precio;
+  if(metodo)         upd.metodo = metodo;
+  turnos[idx] = Object.assign({}, turnos[idx], upd);
+  if(typeof saveTurnosLocal === 'function') saveTurnosLocal(turnos);
+}
+
+async function _mFCS_confirmar(){
+  var id = window.__pendingFinalizarId;
+  if(id == null) return;
+  var monto  = parseFloat((document.getElementById('mFCS_precio')  || {}).value || 0) || 0;
+  var metodo = ((document.getElementById('mFCS_metodo') || {}).value) || 'Efectivo';
+  var srv    = _mFCS_getServicio();
+  _mFCS_cerrar();
+  _mFCS_aplicarServicioAlTurno(id, srv, monto > 0 ? monto : null, metodo);
+  if(typeof _doEstadoTurno === 'function') await _doEstadoTurno(id, 'terminado', monto > 0 ? monto : null, metodo);
+}
+
+async function _mFCS_sinCobro(){
+  var id = window.__pendingFinalizarId;
+  if(id == null) return;
+  var srv = _mFCS_getServicio();
+  _mFCS_cerrar();
+  _mFCS_aplicarServicioAlTurno(id, srv, null, null);
+  if(typeof _doEstadoTurno === 'function') await _doEstadoTurno(id, 'terminado', null, null);
+}
+
+// Monkey-patch: interceptar cambiarEstadoTurno para 'terminado'
+// y mostrar el modal mejorado en lugar del mPrecioFinalizar original.
+(function(){
+  if(typeof cambiarEstadoTurno !== 'function') return;
+  var _origCET = cambiarEstadoTurno;
+  cambiarEstadoTurno = async function(id, nuevoEstado){
+    if(nuevoEstado !== 'terminado') return _origCET.apply(this, arguments);
+    var turnos    = typeof getTurnos === 'function' ? getTurnos() : [];
+    var idx       = turnos.findIndex(function(x){ return String(x.id) === String(id); });
+    if(idx === -1) return _origCET.apply(this, arguments); // fallback
+    var t         = turnos[idx];
+    var cfg       = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
+    window.__pendingFinalizarId = id;
+    _mostrarModalFinalizarConServicio(t, cfg.servicios || []);
+  };
+})();
+</script>
 </body>
 </html>
