@@ -16485,6 +16485,81 @@ async function _syncFijosSupabase(){
     }
   };
 })();
+
+// Bug fix: "⇄ Cambiar negocio" para admin_externo en session restore.
+// Cuando Luna recarga la página, el flujo normal de autenticación restaura la sesión
+// pero NUNCA llama _iniciarSesionAdminExterno → window.__adminExternoTenants queda null
+// → btnCambiarNegocio se queda en display:none aunque tenga acceso a múltiples negocios.
+// Fix: parchear setupApp() para detectar admin_externo y cargar la lista de tenants.
+(function(){
+  if(typeof setupApp !== 'function') return;
+  var _origSetupApp = setupApp;
+  setupApp = function(){
+    var result = _origSetupApp.apply(this, arguments);
+    // Solo para admin_externo
+    var isAE = currentUser && currentUser.user_metadata && currentUser.user_metadata.rol === 'admin_externo';
+    if(!isAE) return result;
+    var btn = document.getElementById('btnCambiarNegocio');
+    if(!btn) return result;
+    // Si ya están cargados los tenants (login fresh), mostrar botón directamente
+    if(window.__adminExternoTenants && window.__adminExternoTenants.length > 1){
+      btn.style.display = 'flex';
+      return result;
+    }
+    // Session restore: cargar lista de tenants en background vía RPC
+    var email = (currentUser && currentUser.email) ? currentUser.email.toLowerCase() : '';
+    if(!email || typeof sb === 'undefined') return result;
+    (async function(){
+      try {
+        var res = await sb.rpc('get_admin_externo_tenants', { user_email: email });
+        var tenants = (res && res.data && res.data.length) ? res.data : [];
+        if(tenants.length > 1){
+          window.__adminExternoTenants = tenants;
+          var b = document.getElementById('btnCambiarNegocio');
+          if(b) b.style.display = 'flex';
+          console.log('[AE] btnCambiarNegocio mostrado —', tenants.length, 'negocios disponibles');
+        }
+      } catch(e){ console.warn('[AE] Error cargando lista de negocios:', e); }
+    })();
+    return result;
+  };
+})();
+
+// Bug fix: horario de apertura/cierre no se refleja en página pública.
+// Causa: _syncFijosSupabase hace READ→MERGE→WRITE. Si el READ ocurre antes de que
+// persistCfgToSupabase() escriba el nuevo horario, el WRITE posterior pisa el nuevo
+// valor con el dato viejo leído de Supabase. Race condition clásico.
+// Fix: reemplazar _syncFijosSupabase para que lea __turnosCfg desde localStorage
+// (fuente de verdad inmediata) en lugar de Supabase (potencialmente desactualizado).
+(function(){
+  if(typeof _syncFijosSupabase !== 'function') return;
+  _syncFijosSupabase = async function(){
+    if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return;
+    if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return;
+    try {
+      var rowId   = _cfgRowId(currentTenant.id);
+      var fijos   = getTurnosFijos();
+      var tc      = typeof getTurnosCfg   === 'function' ? getTurnosCfg()   : {};
+      var oc      = typeof getOnlineCfg   === 'function' ? getOnlineCfg()   : {};
+      var fichas  = typeof getFichasCli   === 'function' ? getFichasCli()   : undefined;
+      var slug    = typeof tenantSlug     === 'function' ? tenantSlug(currentTenant.nombre || '') : '';
+      var rowData = {
+        id: rowId,
+        __tipo: 'cfg',
+        __turnosCfg:  tc,
+        __onlineCfg:  oc,
+        __fichasCli:  fichas,
+        __turnosFijos: fijos,
+        __tenantName: currentTenant.nombre || '',
+        __rubro:      currentTenant.rubro  || '',
+        __slug:       slug
+      };
+      await sb.from('precios').update({ data: rowData })
+        .eq('id', rowId).eq('tenant_id', currentTenant.id);
+      console.log('[remu] syncFijos OK — apertura:', tc.apertura, '| fijos:', fijos.length);
+    } catch(e){ console.warn('[remu] syncFijos error:', e); }
+  };
+})();
 </script>
 </body>
 </html>
