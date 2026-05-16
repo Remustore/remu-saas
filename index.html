@@ -16427,6 +16427,39 @@ async function _syncFijosSupabase(){
   };
 })();
 
+// Fix: link de turnos online usa UUID en lugar de slug para evitar colisiones
+// entre tenants con nombres similares (ej: Rocaspana Peluquería vs Rocaspana Uñas).
+// resolveSlug() en b/index.html ya maneja UUIDs correctamente (Estrategia 1).
+(function(){
+  if(typeof rTurnosOnline !== 'function') return;
+  var _origRTO = rTurnosOnline;
+  rTurnosOnline = async function(){
+    var result = await _origRTO.apply(this, arguments);
+    var el = document.getElementById('turnosOnlineLink');
+    var tid = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id) ? currentTenant.id : '';
+    if(el && tid){
+      el.textContent = window.location.origin + '/b/' + tid;
+    }
+    return result;
+  };
+})();
+
+// Fix: _owS5 (pantalla de onboarding) también usa slug — reemplazar con UUID
+(function(){
+  if(typeof _owS5 !== 'function') return;
+  var _origOwS5 = _owS5;
+  _owS5 = function(){
+    var html = _origOwS5.apply(this, arguments);
+    var tid = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id) ? currentTenant.id : '';
+    if(!tid || !html) return html;
+    var slug = typeof tenantSlug === 'function' ? tenantSlug((currentTenant && currentTenant.nombre) || '') : '';
+    if(!slug) return html;
+    var oldLink = window.location.origin + '/b/' + slug;
+    var newLink = window.location.origin + '/b/' + tid;
+    return html.split(oldLink).join(newLink);
+  };
+})();
+
 // applyBranding: ignorar logos con ruta local file:// (solo funcionan en la compu donde se subió)
 (function(){
   if(typeof applyBranding !== 'function') return;
