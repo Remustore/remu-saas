@@ -207,6 +207,41 @@ function parseRows(rows){
   return {turnosCfg, onlineCfg, tenantNombre, tenantRubro};
 }
 
+/* ── Fix: resolveSlug Strategy 1 usa limit(30) — si el tenant tiene 31+ rows   ──
+   el cfgRow puede quedar fuera y parseRows usa apertura:'09:00' como default.
+   Reemplazar Strategy 1 sin límite para UUIDs.                                  */
+(function(){
+  if(typeof resolveSlug !== 'function') return;
+  var _origRS = resolveSlug;
+  resolveSlug = async function(slug){
+    if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(slug)){
+      var res = await sb.from('precios').select('tenant_id,data').eq('tenant_id', slug);
+      if(res.data && res.data.length) return { tenantId: slug, rows: res.data };
+    }
+    return _origRS.apply(this, arguments);
+  };
+})();
+
+/* ── Fix: parseRows — copiar apertura y cierre explícitamente desde __turnosCfg ──
+   El spread {...turnosCfg, ...d.__turnosCfg} puede no sobreescribir correctamente
+   si la clave existe pero tiene un valor que no gana la precedencia esperada.      */
+(function(){
+  if(typeof parseRows !== 'function') return;
+  var _origPR = parseRows;
+  parseRows = function(rows){
+    var result = _origPR.apply(this, arguments);
+    for(var i = 0; i < rows.length; i++){
+      var d = tryParseData(rows[i]);
+      if(d && (d.__tipo === 'cfg' || d.__turnosCfg) && d.__turnosCfg){
+        if(d.__turnosCfg.apertura) result.turnosCfg.apertura = d.__turnosCfg.apertura;
+        if(d.__turnosCfg.cierre)   result.turnosCfg.cierre   = d.__turnosCfg.cierre;
+        break;
+      }
+    }
+    return result;
+  };
+})();
+
 // ── Render principal ──────────────────────────────────────────────────────
 function renderBooking(){
   const cfg    = G.cfg    || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
