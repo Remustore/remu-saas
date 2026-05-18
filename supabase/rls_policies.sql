@@ -217,6 +217,17 @@ CREATE POLICY "turnos_solicitudes_tenant_manage" ON turnos_solicitudes
     tenant_id = (auth.jwt() -> 'user_metadata' ->> 'tenant_id')::uuid
   );
 
+-- admin_externo gestiona turnos_solicitudes de cualquier tenant asignado.
+-- Su JWT mantiene su propio tenant_id, no el del negocio activo,
+-- por lo que la política tenant_manage falla silenciosamente para ellos.
+DROP POLICY IF EXISTS "turnos_solicitudes_admin_externo_manage" ON turnos_solicitudes;
+CREATE POLICY "turnos_solicitudes_admin_externo_manage" ON turnos_solicitudes
+  FOR ALL USING (
+    (auth.jwt() -> 'user_metadata' ->> 'rol') = 'admin_externo'
+  ) WITH CHECK (
+    (auth.jwt() -> 'user_metadata' ->> 'rol') = 'admin_externo'
+  );
+
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- VERIFICACIÓN — ejecutá esto por separado para confirmar que RLS está activo

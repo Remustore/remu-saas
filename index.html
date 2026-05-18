@@ -16773,6 +16773,25 @@ async function _mFCS_sinCobro(){
         }
       }
     }
+    // Verificar que el UPDATE llegó a Supabase ANTES de abrir WhatsApp.
+    // .select('id') devuelve array vacío si 0 filas afectadas (RLS bloqueado o id inválido).
+    try {
+      var _updRes = await sb.from('turnos_solicitudes')
+        .update({ estado: 'confirmado' })
+        .eq('id', String(id))
+        .select('id');
+      if(_updRes.error || !_updRes.data || _updRes.data.length === 0){
+        if(typeof showToast === 'function')
+          showToast('⚠ No se pudo confirmar en Supabase. Verificá permisos.', 'warn');
+        if(typeof cargarSolicitudes === 'function') cargarSolicitudes();
+        return;
+      }
+    } catch(_e){
+      if(typeof showToast === 'function')
+        showToast('⚠ Error de red al confirmar turno.', 'warn');
+      return;
+    }
+    // UPDATE confirmado: llamar original (crea turno local + abre WA)
     return _origConf.apply(this, arguments);
   };
 })();
