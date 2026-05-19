@@ -17006,5 +17006,184 @@ async function _mFCS_sinCobro(){
 
 })();
 </script>
+<script>
+/* ── Bug 1: editPrecio — normalización de ids + fill directo del form
+   ── Bug 2: sync cross-device de estados (Supabase ↔ localStorage)
+   ── Bug 3: cierreDiario metodos salon desde getTurnos
+   ── Bug 4: comisión por empleado en cierre del día ── */
+(function(){
+  var _F = typeof fmt === 'function' ? fmt : function(n){ return '$'+Number(n).toLocaleString('es-AR'); };
+
+  /* ── 1a. rPrecios: normalizar items sin id ANTES de renderizar ── */
+  if(typeof rPrecios === 'function'){
+    var _rp3 = rPrecios;
+    rPrecios = function(){
+      var _pr = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+      var _t  = Date.now();
+      _pr.forEach(function(p, i){
+        if(p && p.id == null){
+          p.id = _t + i + 1;
+          if(typeof dbUpsert === 'function') dbUpsert('precios', p).catch(function(){});
+        }
+      });
+      return _rp3.apply(this, arguments);
+    };
+  }
+
+  /* ── 1b. editPrecio: fill directo del form sin delegar al original ── */
+  editPrecio = function(id){
+    var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+    var item = (window.__preciosIdx || {})[String(id)]
+            || precios.find(function(x){ return String(x.id) === String(id); });
+    if(!item){ if(typeof showToast==='function') showToast('⚠ Servicio no encontrado','warn'); return; }
+    if(item.id == null) item.id = id;
+    var el = document.getElementById('mPrecio');
+    if(!el) return;
+    var mt = el.querySelector('.mt2');
+    if(mt) mt.textContent = 'Editar Servicio';
+    if(typeof initPrCatSelect === 'function') initPrCatSelect(item.categoria || '');
+    var _s = function(eid, v){ var e = document.getElementById(eid); if(e) e.value = (v != null ? v : ''); };
+    _s('prId',   String(item.id));
+    _s('prNom',  item.nombre || '');
+    _s('prMod',  item.modelo || '');
+    _s('prPre',  item.precio != null ? item.precio : 0);
+    _s('prDisp', item.disponibilidad || 'disponible');
+    _s('prCat',  item.categoria || '');
+    _s('prNot',  item.notas || '');
+    var pd = document.getElementById('prDur');
+    if(pd) pd.value = item.duracion || 30;
+    el.classList.add('open');
+  };
+
+  /* ── 2a. _doEstadoTurno: sync estado a Supabase para turnos 'sb_*' ── */
+  if(typeof _doEstadoTurno === 'function'){
+    var _det = _doEstadoTurno;
+    _doEstadoTurno = async function(id, nuevoEstado, precioExtra, metodoExtra){
+      var r = await _det.apply(this, arguments);
+      var sid = String(id || '');
+      if(sid.startsWith('sb_') && typeof sb !== 'undefined' && sb
+         && typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id){
+        try {
+          await sb.from('turnos_solicitudes')
+            .update({ estado: nuevoEstado })
+            .eq('id', sid.slice(3))
+            .eq('tenant_id', currentTenant.id);
+        } catch(e){ console.warn('[det→sb]', e); }
+      }
+      return r;
+    };
+  }
+
+  /* ── 2b. Sync estados Supabase → localStorage (cross-device) ── */
+  async function _syncEstadosDeSupabase(){
+    if(typeof sb === 'undefined' || !sb) return;
+    if(typeof currentTenant === 'undefined' || !currentTenant || !currentTenant.id) return;
+    try {
+      var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[],empleados:[]};
+      var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
+      var res = await sb.from('turnos_solicitudes')
+        .select('*')
+        .eq('tenant_id', currentTenant.id)
+        .in('estado', ['confirmado','llego','en_proceso','terminado','no_vino'])
+        .gte('fecha', hoy);
+      if(res.error || !res.data || !res.data.length) return;
+      var locales = typeof getTurnos === 'function' ? getTurnos() : [];
+      var finals  = {terminado:1, no_vino:1, cancelado:1};
+      var changed = false;
+      res.data.forEach(function(s){
+        var h5 = (s.hora||'').substring(0,5);
+        var li = locales.findIndex(function(t){ return t.fecha===s.fecha && t.hora===h5 && t.cliente===s.nombre; });
+        if(li !== -1){
+          var lt = locales[li];
+          if(!finals[lt.estado] && lt.estado !== s.estado){ lt.estado = s.estado; changed = true; }
+          return;
+        }
+        if(finals[s.estado]) return;
+        var srv = null;
+        if(s.servicio_id && s.servicio_id !== '__aconfirmar__')
+          srv = (cfg.servicios||[]).find(function(x){ return String(x.id)===String(s.servicio_id); });
+        var emp = cfg.empleados && cfg.empleados[0];
+        locales.push({
+          id:'sb_'+s.id, cliente:s.nombre||'', tel:s.tel||'', fecha:s.fecha, hora:h5,
+          empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'', servicioId:s.servicio_id||'',
+          servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(srv?srv.nombre:(s.servicio_id||'Servicio')),
+          sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30, precio:srv?(srv.precio||0):0,
+          notas:s.servicio_id==='__aconfirmar__'?'Definir servicio al llegar el cliente':'Turno solicitado online',
+          estado:s.estado, creadoEn:s.created_at||new Date().toISOString()
+        });
+        changed = true;
+      });
+      if(changed && typeof saveTurnosLocal === 'function'){
+        saveTurnosLocal(locales);
+        if(typeof rTurnos === 'function') rTurnos();
+        if(typeof rCajas === 'function') rCajas();
+      }
+    } catch(e){ console.warn('[syncEstados]', e); }
+  }
+  window._syncEstadosDeSupabase = _syncEstadosDeSupabase;
+  var _lastSyncE = 0;
+  if(typeof rTurnos === 'function'){
+    var _rt3 = rTurnos;
+    rTurnos = function(){
+      var r = _rt3.apply(this, arguments);
+      var now = Date.now();
+      if(now - _lastSyncE > 30000){ _lastSyncE = now; _syncEstadosDeSupabase(); }
+      return r;
+    };
+  }
+  setTimeout(function(){ _syncEstadosDeSupabase(); }, 5000);
+
+  /* ── 3 + 4. cierreDiario: metodos salon + comisiones por empleado ── */
+  if(typeof cierreDiario === 'function'){
+    var _cd = cierreDiario;
+    cierreDiario = function(){
+      _cd.apply(this, arguments);
+      var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
+      var rub = (typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.rubro||'' : '').toLowerCase();
+      var esSalon = /barber|barbería|salon|belleza/i.test(rub);
+      var term = (typeof getTurnos === 'function' ? getTurnos() : [])
+        .filter(function(t){ return t.fecha===hoy && t.estado==='terminado' && (t.precio||0)>0; });
+
+      // Bug 3: metodos salon desde getTurnos (no S.ventas)
+      if(esSalon){
+        var mets = {};
+        term.forEach(function(t){ var m=t.metodo||'Efectivo'; mets[m]=(mets[m]||0)+(t.precio||0); });
+        var metEl = document.getElementById('cdMetodos');
+        if(metEl) metEl.innerHTML = Object.keys(mets).length
+          ? Object.entries(mets).map(function(kv){ return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.82rem;color:var(--tx2)">'+kv[0]+'</span><span style="font-size:.82rem;font-weight:600;color:var(--gld)">'+_F(kv[1])+'</span></div>'; }).join('')
+          : '<div style="font-size:.8rem;color:var(--mut);padding:6px 0">Sin operaciones registradas</div>';
+      }
+
+      // Bug 4: comisión por empleado
+      var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {empleados:[]};
+      var conCom = (cfg.empleados||[]).filter(function(e){ return (e.comision||0)>0; });
+      if(!conCom.length) return;
+      var totCom = 0;
+      var empRows = conCom.map(function(e){
+        var te  = term.filter(function(t){ return String(t.empleadoId)===String(e.id); });
+        var tot = te.reduce(function(a,t){ return a+(t.precio||0); }, 0);
+        var com = Math.round(tot*(e.comision||0)/100);
+        totCom += com;
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">'
+          +'<div><div style="font-size:.85rem;font-weight:600">'+e.nombre+'</div>'
+          +'<div style="font-size:.72rem;color:var(--tx2)">'+te.length+' servicio'+(te.length!==1?'s':'')+' · '+_F(tot)+' · '+e.comision+'%</div></div>'
+          +'<div style="font-size:.9rem;color:var(--gld);font-weight:700">'+_F(com)+'</div></div>';
+      }).join('');
+      var neto  = term.reduce(function(a,t){ return a+(t.precio||0); }, 0) - totCom;
+      var cdMet = document.getElementById('cdMetodos');
+      if(!cdMet) return;
+      var box = document.getElementById('_cdCom');
+      if(!box){ box=document.createElement('div'); box.id='_cdCom'; cdMet.parentNode.insertBefore(box, cdMet.nextSibling); }
+      box.innerHTML =
+        '<div style="font-size:.72rem;color:var(--gld);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin:14px 0 8px">💰 Comisiones del día</div>'
+        +empRows
+        +'<div style="display:flex;justify-content:space-between;align-items:baseline;padding:10px 14px;margin-top:8px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">'
+        +'<span style="font-size:.82rem;color:var(--tx2)">Para el local (neto)</span>'
+        +'<span style="font-family:var(--fh);font-size:1.3rem;font-weight:700;color:var(--ok)">'+_F(neto)+'</span></div>';
+    };
+  }
+
+})();
+</script>
 </body>
 </html>
