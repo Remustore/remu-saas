@@ -16854,5 +16854,54 @@ async function _mFCS_sinCobro(){
   };
 })();
 </script>
+<script>
+/* ── Fix: editPrecio / savePrecio — lookup por id inestable ── */
+(function(){
+  // 1. rPrecios mantiene mapa id→item tras cada render
+  if(typeof rPrecios === 'function'){
+    var _origRP = rPrecios;
+    rPrecios = function(){
+      var r = _origRP.apply(this, arguments);
+      var mapa = {};
+      ((typeof S !== 'undefined' && S.precios) || []).forEach(function(p){
+        if(p && p.id != null) mapa[String(p.id)] = p;
+      });
+      window.__preciosIdx   = mapa;
+      return r;
+    };
+  }
+
+  // 2. editPrecio: lookup robusto; normaliza items sin id antes de delegar al original
+  if(typeof editPrecio === 'function'){
+    var _origEP = editPrecio;
+    editPrecio = function(id){
+      var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+      var item = (window.__preciosIdx || {})[String(id)]
+              || precios.find(function(x){ return String(x.id) === String(id); });
+      if(item && item.id == null) item.id = id;
+      return _origEP.apply(this, arguments);
+    };
+  }
+
+  // 3. savePrecio: recuperar item si S.precios lo perdió por recarga de fondo
+  if(typeof savePrecio === 'function'){
+    var _origSP = savePrecio;
+    savePrecio = async function(){
+      var prIdVal = ((document.getElementById('prId') || {}).value || '').trim();
+      if(prIdVal){
+        var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+        var found = precios.some(function(p){ return String(p.id) === prIdVal; });
+        if(!found){
+          var rec = (window.__preciosIdx || {})[prIdVal];
+          if(rec) precios.push(rec);
+          else if(typeof showToast === 'function')
+            showToast('⚠ Servicio no encontrado — reintentá', 'warn');
+        }
+      }
+      return _origSP.apply(this, arguments);
+    };
+  }
+})();
+</script>
 </body>
 </html>
