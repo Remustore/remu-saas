@@ -16908,5 +16908,103 @@ async function _mFCS_sinCobro(){
   }
 })();
 </script>
+<script>
+/* ── Fix Bug 1: resyncTurnosToSupabase limpia bloqueados huérfanos antes de re-sync
+   Fix Bug 2: sync cross-device — turnos_solicitudes confirmados → localStorage ── */
+(function(){
+
+  /* Bug 1 — limpiar bloqueados no-fijo antes de cada resync desde localStorage */
+  if(typeof resyncTurnosToSupabase === 'function'){
+    var _origRSTS = resyncTurnosToSupabase;
+    resyncTurnosToSupabase = async function(){
+      if(typeof sb !== 'undefined' && sb && typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id){
+        try {
+          var _hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
+          await sb.from('turnos_solicitudes')
+            .delete()
+            .eq('tenant_id', currentTenant.id)
+            .eq('estado', 'bloqueado')
+            .gte('fecha', _hoy)
+            .filter('nombre', 'not.ilike', '__fijo__%');
+        } catch(e){ console.warn('[resync cleanup]', e); }
+      }
+      return _origRSTS.apply(this, arguments);
+    };
+  }
+
+  /* Bug 2 — sync confirmados Supabase → localStorage (cross-device) */
+  async function _syncConfirmadosDeSupabase(){
+    if(typeof sb === 'undefined' || !sb) return;
+    if(typeof currentTenant === 'undefined' || !currentTenant || !currentTenant.id) return;
+    try {
+      var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
+      var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
+      var res = await sb.from('turnos_solicitudes')
+        .select('*')
+        .eq('tenant_id', currentTenant.id)
+        .eq('estado', 'confirmado')
+        .gte('fecha', hoy);
+      if(res.error || !res.data || !res.data.length) return;
+
+      var locales = typeof getTurnos === 'function' ? getTurnos() : [];
+      var changed = false;
+
+      res.data.forEach(function(s){
+        var hora5 = (s.hora || '').substring(0, 5);
+        var yaExiste = locales.some(function(t){
+          return t.fecha === s.fecha && t.hora === hora5 && t.cliente === s.nombre;
+        });
+        if(yaExiste) return;
+        var srv = null;
+        if(s.servicio_id && s.servicio_id !== '__aconfirmar__')
+          srv = (cfg.servicios || []).find(function(x){ return String(x.id) === String(s.servicio_id); });
+        var emp = cfg.empleados && cfg.empleados[0];
+        locales.push({
+          id: 'sb_' + s.id,
+          cliente: s.nombre || '', tel: s.tel || '',
+          fecha: s.fecha, hora: hora5,
+          empleadoId: emp ? emp.id : '', empleadoNombre: emp ? emp.nombre : '',
+          servicioId: s.servicio_id || '',
+          servicioNombre: s.servicio_id === '__aconfirmar__' ? '📋 A confirmar'
+            : (srv ? srv.nombre : (s.servicio_id || 'Servicio')),
+          sector: srv ? (srv.sector || '') : '',
+          duracion: srv ? (srv.duracion || 30) : 30,
+          precio: srv ? (srv.precio || 0) : 0,
+          notas: s.servicio_id === '__aconfirmar__' ? 'Definir servicio al llegar el cliente'
+            : 'Turno solicitado online',
+          estado: 'confirmado',
+          creadoEn: s.created_at || new Date().toISOString()
+        });
+        changed = true;
+      });
+
+      if(changed && typeof saveTurnosLocal === 'function'){
+        saveTurnosLocal(locales);
+        if(typeof rTurnos === 'function') rTurnos();
+      }
+    } catch(e){ console.warn('[syncConfirmados]', e); }
+  }
+  window._syncConfirmadosDeSupabase = _syncConfirmadosDeSupabase;
+
+  // Throttle: sync Supabase→local max 1 vez cada 30 seg al renderizar la agenda
+  var _lastSync = 0;
+  if(typeof rTurnos === 'function'){
+    var _origRT_sb = rTurnos;
+    rTurnos = function(){
+      var r = _origRT_sb.apply(this, arguments);
+      var now = Date.now();
+      if(now - _lastSync > 30000){ _lastSync = now; _syncConfirmadosDeSupabase(); }
+      return r;
+    };
+  }
+
+  // Sync inicial al cargar: Bug 2 a los 4s, Bug 1 cleanup+resync a los 7s
+  setTimeout(function(){ _syncConfirmadosDeSupabase(); }, 4000);
+  setTimeout(function(){
+    if(typeof resyncTurnosToSupabase === 'function') resyncTurnosToSupabase();
+  }, 7000);
+
+})();
+</script>
 </body>
 </html>
