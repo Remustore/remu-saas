@@ -16876,6 +16876,11 @@ async function _mFCS_sinCobro(){
     var _origEP = editPrecio;
     editPrecio = function(id){
       var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+      console.log('[editPrecio] id recibido:', id, '| tipo:', typeof id);
+      console.log('[editPrecio] S.precios length:', precios.length);
+      console.log('[editPrecio] primer item:', JSON.stringify(precios[0]));
+      console.log('[editPrecio] item encontrado:', JSON.stringify(precios.find(function(x){ return String(x.id) === String(id); })));
+      console.log('[editPrecio] __preciosIdx keys:', Object.keys(window.__preciosIdx||{}).slice(0,5));
       var item = (window.__preciosIdx || {})[String(id)]
               || precios.find(function(x){ return String(x.id) === String(id); });
       if(item && item.id == null) item.id = id;
