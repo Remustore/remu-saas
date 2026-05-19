@@ -16736,6 +16736,8 @@ async function _mFCS_sinCobro(){
       do {
         _csQueued = false;
         await _origCS.apply(this, arguments);
+        var _sL = document.getElementById('solicitudesLista');
+        if(_sL) _sL.innerHTML = _sL.innerHTML.replace(/__aconfirmar__/g, '📋 A confirmar');
       } while(_csQueued);
     } finally {
       _csActive = false;
@@ -16791,8 +16793,64 @@ async function _mFCS_sinCobro(){
         showToast('⚠ Error de red al confirmar turno.', 'warn');
       return;
     }
+    // Caso especial "A confirmar": crear turno sin servicio definido
+    if(servicio === '__aconfirmar__'){
+      var _cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
+      var _emp = _cfg.empleados && _cfg.empleados[0];
+      var _ts  = typeof getTurnos === 'function' ? getTurnos() : [];
+      _ts.push({
+        id: Date.now().toString(),
+        cliente: nombre, tel: tel, fecha: fecha, hora: hora,
+        empleadoId: _emp ? _emp.id : '', empleadoNombre: _emp ? _emp.nombre : '',
+        servicioId: '__aconfirmar__', servicioNombre: '📋 A confirmar',
+        sector: '', duracion: 60, precio: 0,
+        notas: 'Definir servicio al llegar el cliente',
+        estado: 'confirmado', creadoEn: new Date().toISOString()
+      });
+      if(typeof saveTurnosLocal === 'function') saveTurnosLocal(_ts);
+      if(typeof showToast === 'function') showToast('Turno confirmado ✓');
+      if(typeof cargarSolicitudes === 'function') cargarSolicitudes();
+      if(typeof rTurnos === 'function') rTurnos();
+      if(tel){
+        var _neg = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.nombre)
+          ? currentTenant.nombre : 'el negocio';
+        var _msg = 'Hola ' + nombre + ' 👋\n\nTu turno en *' + _neg + '* fue *confirmado* ✅\n\n'
+          + '📅 *Fecha:* ' + fecha + '\n🕐 *Hora:* ' + hora + '\n🔧 *Servicio:* A confirmar\n\n¡Te esperamos!';
+        window.open('https://wa.me/549' + tel.replace(/\D/g,'') + '?text=' + encodeURIComponent(_msg), '_blank');
+      }
+      return;
+    }
     // UPDATE confirmado: llamar original (crea turno local + abre WA)
     return _origConf.apply(this, arguments);
+  };
+})();
+
+(function(){
+  if(typeof rTurnos !== 'function') return;
+  var _origRT = rTurnos;
+  rTurnos = function(){
+    var _r = _origRT.apply(this, arguments);
+    var listaEl = document.getElementById('turnosLista');
+    if(!listaEl) return _r;
+    var turnos = typeof getTurnos === 'function' ? getTurnos() : [];
+    var acIds = {};
+    turnos.forEach(function(t){ if(t.servicioId === '__aconfirmar__') acIds[String(t.id)] = true; });
+    if(!Object.keys(acIds).length) return _r;
+    listaEl.querySelectorAll('.card').forEach(function(card){
+      var eb = card.querySelector('[onclick^="editarTurno("]');
+      if(!eb) return;
+      var m = (eb.getAttribute('onclick')||'').match(/editarTurno\('([^']+)'\)/);
+      if(!m || !acIds[m[1]]) return;
+      if(card.querySelector('._acbadge')) return;
+      var nameLine = card.querySelector('[style*="font-weight:600;font-size:.95rem"]');
+      if(!nameLine) return;
+      var badge = document.createElement('span');
+      badge.className = '_acbadge';
+      badge.style.cssText = 'font-size:.65rem;font-weight:700;color:var(--wrn);background:rgba(201,148,76,.18);padding:2px 7px;border-radius:10px;margin-left:6px';
+      badge.textContent = '⚠ Definir servicio';
+      nameLine.appendChild(badge);
+    });
+    return _r;
   };
 })();
 </script>

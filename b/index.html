@@ -314,6 +314,30 @@ function renderBooking(){
   }
 }
 
+/* ── Servicio especial "A confirmar" — salones/barberías/manicurias ──────
+   Se agrega al final de la lista de servicios. El admin define el servicio
+   real cuando llega el cliente, a través del popup de finalización.         */
+(function(){
+  if(typeof renderBooking !== 'function') return;
+  var _origRB = renderBooking;
+  renderBooking = function(){
+    var rubro = ((G.tenant && G.tenant.rubro) || '').toLowerCase();
+    var esSalon = /sal[oó]n|belleza|peluq|manicur|u[nñ]as|barber|est[eé]tica|nail/i.test(rubro);
+    if(esSalon && G.cfg && Array.isArray(G.cfg.servicios)){
+      if(!G.cfg.servicios.some(function(s){ return s.id === '__aconfirmar__'; })){
+        G.cfg.servicios = G.cfg.servicios.concat([{
+          id: '__aconfirmar__',
+          nombre: '📋 A confirmar',
+          sector: '',
+          precio: 0,
+          duracion: 60
+        }]);
+      }
+    }
+    return _origRB.apply(this, arguments);
+  };
+})();
+
 // ── Cambios de servicio y fecha ───────────────────────────────────────────
 function onSrvChange(){
   const sel = document.getElementById('bServicio');
