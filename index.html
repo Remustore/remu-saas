@@ -4030,6 +4030,7 @@ async function delStock(id){
 function setSF(f,i){ sFilt=f; document.querySelectorAll('#stabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j)); rStock(); }
 
 function openRegistrarCompra(prodId){
+  openM('mCompra', null);
   const sel = document.getElementById('compProd');
   if(sel){
     sel.innerHTML = S.stock.map(s=>`<option value="${s.id}">${esc(s.nombre)} (stock: ${s.cantidad})</option>`).join('') || '<option value="">Sin productos registrados</option>';
@@ -4040,7 +4041,6 @@ function openRegistrarCompra(prodId){
   document.getElementById('compFecha').value = tod();
   document.getElementById('compNotas').value = '';
   autoFillCostoCompra();
-  openM('mCompra', null);
 }
 
 function autoFillCostoCompra(){
