@@ -4062,8 +4062,8 @@ async function saveCompra(){
   const snapStock = JSON.parse(JSON.stringify(S.stock));
   prod.cantidad += cant;
   await dbUpsert('stock', prod);
-  const idx = S.stock.findIndex(s=>s.id===prodId);
-  if(idx>-1) S.stock[idx].cantidad = prod.cantidad;
+  const stockFresh = await dbLoad('stock');
+  if(stockFresh && stockFresh.length) S.stock = stockFresh;
   registrarMovStock(prod.id, prod.nombre, cant, 'compra', notas||'Compra registrada');
   pushUndo('Registrar compra','stock',snapStock);
   if(precio>0){
