@@ -17033,16 +17033,21 @@ async function _mFCS_sinCobro(){
   }
 
   /* ── 1b. editPrecio: fill directo del form sin delegar al original ── */
-  editPrecio = function(id){
+  editPrecio = async function(id){
     var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
     var item = (window.__preciosIdx || {})[String(id)]
             || precios.find(function(x){ return String(x.id) === String(id); });
+    if(!item && typeof dbLoad === 'function'){
+      var fresh = await dbLoad('precios');
+      if(fresh && fresh.length){ S.precios = fresh; precios = fresh; }
+      item = precios.find(function(x){ return String(x.id) === String(id); });
+    }
     if(!item){ if(typeof showToast==='function') showToast('⚠ Servicio no encontrado','warn'); return; }
     if(item.id == null) item.id = id;
+    openM('mPrecio', null);
     var el = document.getElementById('mPrecio');
     if(!el) return;
-    var mt = el.querySelector('.mt2');
-    if(mt) mt.textContent = 'Editar Servicio';
+    el.querySelector('.mt2').textContent = 'Editar Servicio';
     if(typeof initPrCatSelect === 'function') initPrCatSelect(item.categoria || '');
     var _s = function(eid, v){ var e = document.getElementById(eid); if(e) e.value = (v != null ? v : ''); };
     _s('prId',   String(item.id));
@@ -17054,7 +17059,6 @@ async function _mFCS_sinCobro(){
     _s('prNot',  item.notas || '');
     var pd = document.getElementById('prDur');
     if(pd) pd.value = item.duracion || 30;
-    el.classList.add('open');
   };
 
   /* ── 2a. _doEstadoTurno: sync estado a Supabase para turnos 'sb_*' ── */
