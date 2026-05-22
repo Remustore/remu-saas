@@ -1484,6 +1484,7 @@ $$;</pre>
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
       <div class="pt">Gastos</div><div class="ps">Fijos, variables y stock del local</div>
+      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid-g"></div><div id="movCajaLista-g" style="margin-top:10px"></div></div>
       <div class="g2" id="gStats" style="margin-bottom:14px"></div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button class="btn bg" onclick="openM('mGasto',null)">+ Registrar gasto</button>
@@ -17195,6 +17196,22 @@ async function _mFCS_sinCobro(){
           /* cancelado: liberarSlotSupabase ya borró todo */
         }
       } catch(e){ console.warn('[_doEstadoTurno→sb]', e); }
+      return r;
+    };
+  }
+
+  /* ── L. rGastos: espeja Estado de cajas en sec-gastos ── */
+  if(typeof rGastos === 'function'){
+    var _rgOrig = rGastos;
+    rGastos = function(){
+      var r = _rgOrig.apply(this, arguments);
+      if(typeof rCajas === 'function') rCajas();
+      var g  = document.getElementById('cajasGrid');
+      var g2 = document.getElementById('cajasGrid-g');
+      if(g && g2) g2.innerHTML = g.innerHTML;
+      var m  = document.getElementById('movCajaLista');
+      var m2 = document.getElementById('movCajaLista-g');
+      if(m && m2) m2.innerHTML = m.innerHTML;
       return r;
     };
   }
