@@ -14720,15 +14720,6 @@ var _solBadgeInited = false;
   };
 })();
 
-// ── BUG 2: la fila cfg (__slug) no siempre existe → "Negocio no encontrado"
-//    Fix: llamar persistCfgToSupabase() después de guardar cualquier servicio.
-(function(){
-  var _orig = savePrecio;
-  savePrecio = async function(){
-    await _orig.apply(this, arguments);
-    if(typeof persistCfgToSupabase === 'function') persistCfgToSupabase().catch(function(){});
-  };
-})();
 
 // ── BUG 2+3: precargarServiciosTenant — el count guard cuenta la fila cfg como
 //    servicio real → si el tenant solo tiene cfg row (sin servicios), count=1 → return early
@@ -15059,25 +15050,6 @@ function _adaptarObjetivosModal(){
 })();
 </script>
 
-<script>
-// ── Garantía: persistCfgToSupabase awaited tras savePrecio ───────────────────
-//    El patch anterior (~línea 14722) llama persistCfgToSupabase() fire-and-forget
-//    con .catch(()=>{}) que traga errores. Este lo espera para que si el usuario
-//    abre la página pública inmediatamente después de guardar, el cfg row ya exista.
-(function(){
-  if(typeof savePrecio !== 'function') return;
-  var _spRobust = savePrecio;
-  savePrecio = async function(){
-    await _spRobust.apply(this, arguments);
-    if(typeof persistCfgToSupabase !== 'function') return;
-    try {
-      await persistCfgToSupabase();
-    } catch(e){
-      console.warn('[remu] persistCfgToSupabase falló tras savePrecio:', e);
-    }
-  };
-})();
-</script>
 <script>
 (function(){
   if(typeof enviarSolicitudTurno !== 'function') return;
@@ -16744,60 +16716,6 @@ async function _mFCS_sinCobro(){
 })();
 </script>
 <script>
-/* ── Fix: editPrecio / savePrecio — lookup por id inestable ── */
-(function(){
-  // 1. rPrecios mantiene mapa id→item tras cada render
-  if(typeof rPrecios === 'function'){
-    var _origRP = rPrecios;
-    rPrecios = function(){
-      var r = _origRP.apply(this, arguments);
-      var mapa = {};
-      ((typeof S !== 'undefined' && S.precios) || []).forEach(function(p){
-        if(p && p.id != null) mapa[String(p.id)] = p;
-      });
-      window.__preciosIdx   = mapa;
-      return r;
-    };
-  }
-
-  // 2. editPrecio: lookup robusto; normaliza items sin id antes de delegar al original
-  if(typeof editPrecio === 'function'){
-    var _origEP = editPrecio;
-    editPrecio = function(id){
-      var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
-      console.log('[editPrecio] id recibido:', id, '| tipo:', typeof id);
-      console.log('[editPrecio] S.precios length:', precios.length);
-      console.log('[editPrecio] primer item:', JSON.stringify(precios[0]));
-      console.log('[editPrecio] item encontrado:', JSON.stringify(precios.find(function(x){ return String(x.id) === String(id); })));
-      console.log('[editPrecio] __preciosIdx keys:', Object.keys(window.__preciosIdx||{}).slice(0,5));
-      var item = (window.__preciosIdx || {})[String(id)]
-              || precios.find(function(x){ return String(x.id) === String(id); });
-      if(item && item.id == null) item.id = id;
-      return _origEP.apply(this, arguments);
-    };
-  }
-
-  // 3. savePrecio: recuperar item si S.precios lo perdió por recarga de fondo
-  if(typeof savePrecio === 'function'){
-    var _origSP = savePrecio;
-    savePrecio = async function(){
-      var prIdVal = ((document.getElementById('prId') || {}).value || '').trim();
-      if(prIdVal){
-        var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
-        var found = precios.some(function(p){ return String(p.id) === prIdVal; });
-        if(!found){
-          var rec = (window.__preciosIdx || {})[prIdVal];
-          if(rec) precios.push(rec);
-          else if(typeof showToast === 'function')
-            showToast('⚠ Servicio no encontrado — reintentá', 'warn');
-        }
-      }
-      return _origSP.apply(this, arguments);
-    };
-  }
-})();
-</script>
-<script>
 /* ══════════════════════════════════════════════════════════════════
    SYNC TURNOS — Supabase como fuente de verdad.
    Reemplaza los 3 bloques de patches anteriores.
@@ -16806,7 +16724,7 @@ async function _mFCS_sinCobro(){
   'use strict';
   var _F = typeof fmt === 'function' ? fmt : function(n){ return '$'+Number(n).toLocaleString('es-AR'); };
 
-  /* ── A. rPrecios: normalizar items sin id ── */
+  /* ── A. rPrecios: normalizar ids + mantener índice ── */
   if(typeof rPrecios === 'function'){
     var _rpOrig = rPrecios;
     rPrecios = function(){
@@ -16818,7 +16736,11 @@ async function _mFCS_sinCobro(){
           if(typeof dbUpsert === 'function') dbUpsert('precios', p).catch(function(){});
         }
       });
-      return _rpOrig.apply(this, arguments);
+      var r = _rpOrig.apply(this, arguments);
+      var mapa = {};
+      pr.forEach(function(p){ if(p && p.id != null) mapa[String(p.id)] = p; });
+      window.__preciosIdx = mapa;
+      return r;
     };
   }
 
@@ -16850,6 +16772,28 @@ async function _mFCS_sinCobro(){
     var pd = document.getElementById('prDur');
     if(pd) pd.value = item.duracion || 30;
   };
+
+  /* ── B2. savePrecio: lookup robusto + await persistCfg ── */
+  if(typeof savePrecio === 'function'){
+    var _spOrig = savePrecio;
+    savePrecio = async function(){
+      var prIdVal = ((document.getElementById('prId') || {}).value || '').trim();
+      if(prIdVal){
+        var pr2 = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+        var found = pr2.some(function(p){ return String(p.id) === prIdVal; });
+        if(!found){
+          var rec = (window.__preciosIdx || {})[prIdVal];
+          if(rec) pr2.push(rec);
+          else { if(typeof showToast==='function') showToast('⚠ Servicio no encontrado — reintentá','warn'); return; }
+        }
+      }
+      await _spOrig.apply(this, arguments);
+      if(typeof persistCfgToSupabase === 'function'){
+        try { await persistCfgToSupabase(); }
+        catch(e){ console.warn('[savePrecio] persistCfg:', e); }
+      }
+    };
+  }
 
   /* ── C. getCajas: versión consolidada (reemplaza original + 2 patches) ──
      - Salon: servicios desde getTurnos() (Supabase-backed via _syncFromSupabase)
