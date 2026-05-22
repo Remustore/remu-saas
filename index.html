@@ -16733,7 +16733,6 @@ async function _mFCS_sinCobro(){
       pr.forEach(function(p, i){
         if(p && p.id == null){
           p.id = ts + i + 1;
-          if(typeof dbUpsert === 'function') dbUpsert('precios', p).catch(function(){});
         }
       });
       var r = _rpOrig.apply(this, arguments);
@@ -16773,27 +16772,61 @@ async function _mFCS_sinCobro(){
     if(pd) pd.value = item.duracion || 30;
   };
 
-  /* ── B2. savePrecio: lookup robusto + await persistCfg ── */
-  if(typeof savePrecio === 'function'){
-    var _spOrig = savePrecio;
-    savePrecio = async function(){
-      var prIdVal = ((document.getElementById('prId') || {}).value || '').trim();
-      if(prIdVal){
-        var pr2 = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
-        var found = pr2.some(function(p){ return String(p.id) === prIdVal; });
-        if(!found){
-          var rec = (window.__preciosIdx || {})[prIdVal];
-          if(rec) pr2.push(rec);
-          else { if(typeof showToast==='function') showToast('⚠ Servicio no encontrado — reintentá','warn'); return; }
-        }
-      }
-      await _spOrig.apply(this, arguments);
-      if(typeof persistCfgToSupabase === 'function'){
-        try { await persistCfgToSupabase(); }
-        catch(e){ console.warn('[savePrecio] persistCfg:', e); }
-      }
+  /* ── B2. savePrecio: UPDATE/INSERT explícito — sin upsert para evitar duplicados ── */
+  savePrecio = async function(){
+    var id = ((document.getElementById('prId')||{}).value||'').trim();
+    var n  = ((document.getElementById('prNom')||{}).value||'').trim();
+    if(!n){ alert('Ingresá el nombre del servicio'); return; }
+    var obj = {
+      nombre:         n,
+      modelo:         ((document.getElementById('prMod')||{}).value||''),
+      categoria:      ((document.getElementById('prCat')||{}).value||''),
+      precio:         parseFloat(((document.getElementById('prPre')||{}).value)||0)||0,
+      disponibilidad: ((document.getElementById('prDisp')||{}).value||'disponible'),
+      notas:          ((document.getElementById('prNot')||{}).value||''),
+      duracion:       parseInt(((document.getElementById('prDur')||{}).value)||30)||30
     };
-  }
+    var snap = JSON.parse(JSON.stringify((S&&S.precios)||[]));
+    var pr   = (S&&Array.isArray(S.precios)) ? S.precios : [];
+    if(id){
+      var item = (window.__preciosIdx||{})[id] || pr.find(function(p){ return String(p.id)===id; });
+      if(!item && typeof dbLoad==='function'){
+        var fr = await dbLoad('precios');
+        if(fr&&fr.length){ S.precios=fr; pr=fr; }
+        item = pr.find(function(p){ return String(p.id)===id; });
+      }
+      if(!item){ if(typeof showToast==='function') showToast('⚠ Servicio no encontrado — reintentá','warn'); return; }
+      var updated = Object.assign({}, item, obj);
+      var idx = pr.findIndex(function(p){ return String(p.id)===id; });
+      if(idx>-1) pr[idx]=updated; else pr.push(updated);
+      if(typeof setSyncing==='function') setSyncing();
+      try {
+        var res = await sb.from('precios')
+          .update({ data: updated, tenant_id: currentTenant.id })
+          .eq('id', Number(id)).eq('tenant_id', currentTenant.id);
+        if(res.error) throw res.error;
+        if(typeof setSynced==='function') setSynced();
+      } catch(e){ console.error('[savePrecio] update:', e); if(typeof setSyncErr==='function') setSyncErr(e?.message||''); }
+      if(typeof pushUndo==='function') pushUndo('Editar precio','precios',snap);
+    } else {
+      var nid  = Date.now();
+      var item = Object.assign({ id: nid }, obj);
+      pr.push(item);
+      if(typeof setSyncing==='function') setSyncing();
+      try {
+        var res = await sb.from('precios').insert({ id: nid, data: item, tenant_id: currentTenant.id });
+        if(res.error) throw res.error;
+        if(typeof setSynced==='function') setSynced();
+      } catch(e){ console.error('[savePrecio] insert:', e); if(typeof setSyncErr==='function') setSyncErr(e?.message||''); }
+      if(typeof pushUndo==='function') pushUndo('Nuevo precio','precios',snap);
+    }
+    if(typeof closeM==='function') closeM('mPrecio');
+    if(typeof rPrecios==='function') rPrecios();
+    if(typeof showToast==='function') showToast('Precio guardado ✓');
+    if(typeof persistCfgToSupabase==='function'){
+      try { await persistCfgToSupabase(); } catch(e){ console.warn('[savePrecio] persistCfg:',e); }
+    }
+  };
 
   /* ── C. getCajas: versión consolidada (reemplaza original + 2 patches) ──
      - Salon: servicios desde getTurnos() (Supabase-backed via _syncFromSupabase)
