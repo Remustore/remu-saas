@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -16910,128 +16910,31 @@ async function _mFCS_sinCobro(){
 })();
 </script>
 <script>
-/* ── Fix Bug 1: resyncTurnosToSupabase limpia bloqueados huérfanos antes de re-sync
-   Fix Bug 2: sync cross-device — turnos_solicitudes confirmados → localStorage ── */
+/* ══════════════════════════════════════════════════════════════════
+   SYNC TURNOS — Supabase como fuente de verdad.
+   Reemplaza los 3 bloques de patches anteriores.
+   ══════════════════════════════════════════════════════════════════ */
 (function(){
-
-  /* Bug 1 — limpiar bloqueados no-fijo antes de cada resync desde localStorage */
-  if(typeof resyncTurnosToSupabase === 'function'){
-    var _origRSTS = resyncTurnosToSupabase;
-    resyncTurnosToSupabase = async function(){
-      if(typeof sb !== 'undefined' && sb && typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id){
-        try {
-          var _hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
-          await sb.from('turnos_solicitudes')
-            .delete()
-            .eq('tenant_id', currentTenant.id)
-            .eq('estado', 'bloqueado')
-            .gte('fecha', _hoy)
-            .filter('nombre', 'not.ilike', '__fijo__%');
-        } catch(e){ console.warn('[resync cleanup]', e); }
-      }
-      return _origRSTS.apply(this, arguments);
-    };
-  }
-
-  /* Bug 2 — sync confirmados Supabase → localStorage (cross-device) */
-  async function _syncConfirmadosDeSupabase(){
-    if(typeof sb === 'undefined' || !sb) return;
-    if(typeof currentTenant === 'undefined' || !currentTenant || !currentTenant.id) return;
-    try {
-      var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
-      var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
-      var res = await sb.from('turnos_solicitudes')
-        .select('*')
-        .eq('tenant_id', currentTenant.id)
-        .eq('estado', 'confirmado')
-        .gte('fecha', hoy);
-      if(res.error || !res.data || !res.data.length) return;
-
-      var locales = typeof getTurnos === 'function' ? getTurnos() : [];
-      var changed = false;
-
-      res.data.forEach(function(s){
-        var hora5 = (s.hora || '').substring(0, 5);
-        var yaExiste = locales.some(function(t){
-          return t.fecha === s.fecha && t.hora === hora5 && t.cliente === s.nombre;
-        });
-        if(yaExiste) return;
-        var srv = null;
-        if(s.servicio_id && s.servicio_id !== '__aconfirmar__')
-          srv = (cfg.servicios || []).find(function(x){ return String(x.id) === String(s.servicio_id); });
-        var emp = cfg.empleados && cfg.empleados[0];
-        locales.push({
-          id: 'sb_' + s.id,
-          cliente: s.nombre || '', tel: s.tel || '',
-          fecha: s.fecha, hora: hora5,
-          empleadoId: emp ? emp.id : '', empleadoNombre: emp ? emp.nombre : '',
-          servicioId: s.servicio_id || '',
-          servicioNombre: s.servicio_id === '__aconfirmar__' ? '📋 A confirmar'
-            : (srv ? srv.nombre : (s.servicio_id || 'Servicio')),
-          sector: srv ? (srv.sector || '') : '',
-          duracion: srv ? (srv.duracion || 30) : 30,
-          precio: srv ? (srv.precio || 0) : 0,
-          notas: s.servicio_id === '__aconfirmar__' ? 'Definir servicio al llegar el cliente'
-            : 'Turno solicitado online',
-          estado: 'confirmado',
-          creadoEn: s.created_at || new Date().toISOString()
-        });
-        changed = true;
-      });
-
-      if(changed && typeof saveTurnosLocal === 'function'){
-        saveTurnosLocal(locales);
-        if(typeof rTurnos === 'function') rTurnos();
-      }
-    } catch(e){ console.warn('[syncConfirmados]', e); }
-  }
-  window._syncConfirmadosDeSupabase = _syncConfirmadosDeSupabase;
-
-  // Throttle: sync Supabase→local max 1 vez cada 30 seg al renderizar la agenda
-  var _lastSync = 0;
-  if(typeof rTurnos === 'function'){
-    var _origRT_sb = rTurnos;
-    rTurnos = function(){
-      var r = _origRT_sb.apply(this, arguments);
-      var now = Date.now();
-      if(now - _lastSync > 30000){ _lastSync = now; _syncConfirmadosDeSupabase(); }
-      return r;
-    };
-  }
-
-  // Sync inicial al cargar: Bug 2 a los 4s, Bug 1 cleanup+resync a los 7s
-  setTimeout(function(){ _syncConfirmadosDeSupabase(); }, 4000);
-  setTimeout(function(){
-    if(typeof resyncTurnosToSupabase === 'function') resyncTurnosToSupabase();
-  }, 7000);
-
-})();
-</script>
-<script>
-/* ── Bug 1: editPrecio — normalización de ids + fill directo del form
-   ── Bug 2: sync cross-device de estados (Supabase ↔ localStorage)
-   ── Bug 3: cierreDiario metodos salon desde getTurnos
-   ── Bug 4: comisión por empleado en cierre del día ── */
-(function(){
+  'use strict';
   var _F = typeof fmt === 'function' ? fmt : function(n){ return '$'+Number(n).toLocaleString('es-AR'); };
 
-  /* ── 1a. rPrecios: normalizar items sin id ANTES de renderizar ── */
+  /* ── A. rPrecios: normalizar items sin id ── */
   if(typeof rPrecios === 'function'){
-    var _rp3 = rPrecios;
+    var _rpOrig = rPrecios;
     rPrecios = function(){
-      var _pr = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
-      var _t  = Date.now();
-      _pr.forEach(function(p, i){
+      var pr = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
+      var ts = Date.now();
+      pr.forEach(function(p, i){
         if(p && p.id == null){
-          p.id = _t + i + 1;
+          p.id = ts + i + 1;
           if(typeof dbUpsert === 'function') dbUpsert('precios', p).catch(function(){});
         }
       });
-      return _rp3.apply(this, arguments);
+      return _rpOrig.apply(this, arguments);
     };
   }
 
-  /* ── 1b. editPrecio: fill directo del form sin delegar al original ── */
+  /* ── B. editPrecio: fill directo del form ── */
   editPrecio = async function(id){
     var precios = (typeof S !== 'undefined' && Array.isArray(S.precios)) ? S.precios : [];
     var item = (window.__preciosIdx || {})[String(id)]
@@ -17060,106 +16963,26 @@ async function _mFCS_sinCobro(){
     if(pd) pd.value = item.duracion || 30;
   };
 
-  /* ── 2a. _doEstadoTurno: sync estado a Supabase para turnos 'sb_*' ── */
-  if(typeof _doEstadoTurno === 'function'){
-    var _det = _doEstadoTurno;
-    _doEstadoTurno = async function(id, nuevoEstado, precioExtra, metodoExtra){
-      var r = await _det.apply(this, arguments);
-      var sid = String(id || '');
-      if(sid.startsWith('sb_') && typeof sb !== 'undefined' && sb
-         && typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id){
-        try {
-          await sb.from('turnos_solicitudes')
-            .update({ estado: nuevoEstado })
-            .eq('id', sid.slice(3))
-            .eq('tenant_id', currentTenant.id);
-        } catch(e){ console.warn('[det→sb]', e); }
-      }
-      return r;
-    };
-  }
-
-  /* ── 2b. Sync estados Supabase → localStorage (cross-device) ── */
-  async function _syncEstadosDeSupabase(){
-    if(typeof sb === 'undefined' || !sb) return;
-    if(typeof currentTenant === 'undefined' || !currentTenant || !currentTenant.id) return;
-    try {
-      var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[],empleados:[]};
-      var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
-      var res = await sb.from('turnos_solicitudes')
-        .select('*')
-        .eq('tenant_id', currentTenant.id)
-        .in('estado', ['confirmado','llego','en_proceso','terminado','no_vino'])
-        .gte('fecha', hoy);
-      if(res.error || !res.data || !res.data.length) return;
-      var locales = typeof getTurnos === 'function' ? getTurnos() : [];
-      var finals  = {terminado:1, no_vino:1, cancelado:1};
-      var changed = false;
-      res.data.forEach(function(s){
-        var h5 = (s.hora||'').substring(0,5);
-        var li = locales.findIndex(function(t){ return t.fecha===s.fecha && t.hora===h5 && t.cliente===s.nombre; });
-        if(li !== -1){
-          var lt = locales[li];
-          if(!finals[lt.estado] && lt.estado !== s.estado){ lt.estado = s.estado; changed = true; }
-          return;
-        }
-        if(finals[s.estado]) return;
-        var srv = null;
-        if(s.servicio_id && s.servicio_id !== '__aconfirmar__')
-          srv = (cfg.servicios||[]).find(function(x){ return String(x.id)===String(s.servicio_id); });
-        var emp = cfg.empleados && cfg.empleados[0];
-        locales.push({
-          id:'sb_'+s.id, cliente:s.nombre||'', tel:s.tel||'', fecha:s.fecha, hora:h5,
-          empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'', servicioId:s.servicio_id||'',
-          servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(srv?srv.nombre:(s.servicio_id||'Servicio')),
-          sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30, precio:srv?(srv.precio||0):0,
-          notas:s.servicio_id==='__aconfirmar__'?'Definir servicio al llegar el cliente':'Turno solicitado online',
-          estado:s.estado, creadoEn:s.created_at||new Date().toISOString()
-        });
-        changed = true;
-      });
-      if(changed && typeof saveTurnosLocal === 'function'){
-        saveTurnosLocal(locales);
-        if(typeof rTurnos === 'function') rTurnos();
-        if(typeof rCajas === 'function') rCajas();
-      }
-    } catch(e){ console.warn('[syncEstados]', e); }
-  }
-  window._syncEstadosDeSupabase = _syncEstadosDeSupabase;
-  var _lastSyncE = 0;
-  if(typeof rTurnos === 'function'){
-    var _rt3 = rTurnos;
-    rTurnos = function(){
-      var r = _rt3.apply(this, arguments);
-      var now = Date.now();
-      if(now - _lastSyncE > 30000){ _lastSyncE = now; _syncEstadosDeSupabase(); }
-      return r;
-    };
-  }
-  setTimeout(function(){ _syncEstadosDeSupabase(); }, 5000);
-
-  /* ── 3 + 4. cierreDiario: metodos salon + comisiones por empleado ── */
+  /* ── C. cierreDiario: métodos salón + comisiones por empleado ── */
   if(typeof cierreDiario === 'function'){
-    var _cd = cierreDiario;
+    var _cdOrig = cierreDiario;
     cierreDiario = function(){
-      _cd.apply(this, arguments);
+      _cdOrig.apply(this, arguments);
       var hoy = typeof tod === 'function' ? tod() : new Date().toISOString().slice(0,10);
       var rub = (typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.rubro||'' : '').toLowerCase();
       var esSalon = /barber|barbería|salon|belleza/i.test(rub);
       var term = (typeof getTurnos === 'function' ? getTurnos() : [])
         .filter(function(t){ return t.fecha===hoy && t.estado==='terminado' && (t.precio||0)>0; });
-
-      // Bug 3: metodos salon desde getTurnos (no S.ventas)
       if(esSalon){
         var mets = {};
         term.forEach(function(t){ var m=t.metodo||'Efectivo'; mets[m]=(mets[m]||0)+(t.precio||0); });
         var metEl = document.getElementById('cdMetodos');
         if(metEl) metEl.innerHTML = Object.keys(mets).length
-          ? Object.entries(mets).map(function(kv){ return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.82rem;color:var(--tx2)">'+kv[0]+'</span><span style="font-size:.82rem;font-weight:600;color:var(--gld)">'+_F(kv[1])+'</span></div>'; }).join('')
+          ? Object.entries(mets).map(function(kv){
+              return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.82rem;color:var(--tx2)">'+kv[0]+'</span><span style="font-size:.82rem;font-weight:600;color:var(--gld)">'+_F(kv[1])+'</span></div>';
+            }).join('')
           : '<div style="font-size:.8rem;color:var(--mut);padding:6px 0">Sin operaciones registradas</div>';
       }
-
-      // Bug 4: comisión por empleado
       var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {empleados:[]};
       var conCom = (cfg.empleados||[]).filter(function(e){ return (e.comision||0)>0; });
       if(!conCom.length) return;
@@ -17188,156 +17011,196 @@ async function _mFCS_sinCobro(){
     };
   }
 
-})();
-</script>
-<script>
-/* ── Sync turnos manuales → Supabase (cross-device)
-   Problema: los turnos creados desde el panel admin solo vivían en localStorage.
-   Fix: wrappear saveTurno y _doEstadoTurno para insertar/actualizar una fila
-        en turnos_solicitudes con el estado real (no 'bloqueado'), de modo que
-        _syncEstadosDeSupabase la levante en los demás dispositivos. ── */
-(function(){
-  if(typeof saveTurno !== 'function') return;
-  if(typeof sb === 'undefined') return;
+  /* ══ TURNOS — Supabase como fuente de verdad ════════════════════════ */
 
-  /* ── 1. saveTurno: sync al crear o editar un turno manual ── */
-  var _stOrig = saveTurno;
-  saveTurno = async function(_override){
-    /* Capturar todo ANTES de llamar al original (el modal se cierra adentro) */
-    var _id    = ((document.getElementById('turnoId')    || {}).value || '').trim();
-    var _cli   = ((document.getElementById('turnoCli')   || {}).value || '').trim();
-    var _tel   = ((document.getElementById('turnoTel')   || {}).value || '').trim();
-    var _fecha = ((document.getElementById('turnoFecha') || {}).value || '');
-    var _hora  = ((document.getElementById('turnoHora')  || {}).value || '').substring(0, 5);
-    var _est   = ((document.getElementById('turnoEstado') || {}).value || 'confirmado');
+  var _lastSync = 0;
+  var _syncing  = false;
 
-    /* Turno original (solo importa al editar para detectar cambio de slot) */
-    var _orig = (_id && typeof getTurnos === 'function')
-               ? getTurnos().find(function(t){ return String(t.id) === String(_id); })
-               : null;
-
-    await _stOrig.apply(this, arguments);
-
-    /* Verificar que el save fue exitoso (el modal se cierra; si sigue abierto, fue abortado) */
-    var _modal = document.getElementById('mTurno');
-    if(_modal && _modal.classList.contains('open')) return;
-
-    if(!currentTenant || !currentTenant.id) return;
-    if(!_cli || !_fecha || !_hora) return;
-    /* Estados terminales: liberarSlotSupabase ya borró la fila — nada que hacer acá */
-    if(_est === 'cancelado' || _est === 'terminado' || _est === 'no_vino') return;
-
-    /* Leer del localStorage para obtener empleadoId/servicioId reales
-       (el select puede estar vacío si se abrió con openM directamente) */
-    var _tSaved = typeof getTurnos === 'function' ? getTurnos() : [];
-    var _saved = _id
-      ? _tSaved.find(function(t){ return String(t.id) === String(_id); })
-      : _tSaved.find(function(t){ return t.fecha === _fecha && (t.hora||'').substring(0,5) === _hora && t.cliente === _cli; });
-    if(!_saved) return;
-    var _empN = _saved.empleadoId ? (parseInt(_saved.empleadoId) || null) : null;
-    var _srvN = _saved.servicioId || null;
-
+  /* ── D. _upsertTurnoSb: insert o update sync row en Supabase ── */
+  async function _upsertTurnoSb(turno, estado){
+    if(typeof sb==='undefined'||!sb||!currentTenant||!currentTenant.id) return;
+    if(!turno||!turno.fecha||!turno.hora||!turno.cliente) return;
     try {
-      /* Si se editó y el slot cambió, borrar el sync row del slot anterior */
-      if(_orig && (
-          _orig.fecha !== _fecha ||
-          (_orig.hora || '').substring(0, 5) !== _hora ||
-          _orig.cliente !== _cli
-        )){
-        await sb.from('turnos_solicitudes')
-          .delete()
-          .eq('tenant_id', currentTenant.id)
-          .eq('fecha', _orig.fecha)
-          .eq('hora', (_orig.hora || '').substring(0, 5))
-          .eq('nombre', _orig.cliente)
-          .neq('estado', 'bloqueado')
-          .neq('estado', 'pendiente');
-      }
-
-      /* Buscar si ya existe un sync row para este slot */
-      var _ex = await sb.from('turnos_solicitudes')
+      var h5   = (turno.hora||'').substring(0,5);
+      var empN = turno.empleadoId ? (parseInt(turno.empleadoId)||null) : null;
+      var srvN = turno.servicioId || null;
+      var ex   = await sb.from('turnos_solicitudes')
         .select('id')
         .eq('tenant_id', currentTenant.id)
-        .eq('fecha', _fecha)
-        .eq('hora', _hora)
-        .eq('nombre', _cli)
-        .neq('estado', 'bloqueado')
-        .neq('estado', 'pendiente')
+        .eq('fecha', turno.fecha).eq('hora', h5).eq('nombre', turno.cliente)
+        .neq('estado', 'bloqueado').neq('estado', 'pendiente')
         .limit(1);
-
-      if(_ex.data && _ex.data.length){
-        /* UPDATE row existente */
+      if(ex.data && ex.data.length){
         await sb.from('turnos_solicitudes')
-          .update({ estado: _est, empleado_id: _empN, servicio_id: _srvN })
-          .eq('id', _ex.data[0].id);
+          .update({ estado: estado, empleado_id: empN, servicio_id: srvN })
+          .eq('id', ex.data[0].id);
       } else {
-        /* INSERT nuevo sync row */
         await sb.from('turnos_solicitudes').insert({
-          tenant_id: currentTenant.id,
-          nombre:     _cli,
-          tel:        _tel,
-          servicio_id: _srvN,
-          empleado_id: _empN,
-          fecha:  _fecha,
-          hora:   _hora,
-          estado: _est,
+          tenant_id: currentTenant.id, nombre: turno.cliente, tel: turno.tel||'',
+          fecha: turno.fecha, hora: h5, estado: estado,
+          empleado_id: empN, servicio_id: srvN,
           created_at: new Date().toISOString()
         });
       }
-    } catch(e){ console.warn('[saveTurno→sb]', e); }
-  };
+    } catch(e){ console.warn('[upsertTurnoSb]', e); }
+  }
 
-  /* ── 2. _doEstadoTurno: sync cambio de estado para turnos manuales ── */
-  if(typeof _doEstadoTurno !== 'function') return;
-  var _detOrig = _doEstadoTurno;
-  _doEstadoTurno = async function(id, nuevoEstado, precioExtra, metodoExtra){
-    var r = await _detOrig.apply(this, arguments);
-
-    if(!currentTenant || !currentTenant.id) return r;
-    var sid = String(id || '');
-    /* Los sb_* ya los maneja el wrapper existente */
-    if(sid.startsWith('sb_')) return r;
-
-    var turno = typeof getTurnos === 'function'
-               ? getTurnos().find(function(t){ return String(t.id) === sid; })
-               : null;
-    if(!turno) return r;
-
-    var _fecha = turno.fecha;
-    var _hora  = (turno.hora || '').substring(0, 5);
-    var _cli   = turno.cliente;
-
+  /* ── E. _deleteTurnoSb: borrar sync row al cambiar slot ── */
+  async function _deleteTurnoSb(turno){
+    if(typeof sb==='undefined'||!sb||!currentTenant||!currentTenant.id) return;
+    if(!turno||!turno.fecha||!turno.hora||!turno.cliente) return;
     try {
-      if(nuevoEstado === 'terminado' || nuevoEstado === 'no_vino'){
-        /* liberarSlotSupabase ya borró el row. Insertar uno terminal
-           para que _syncEstadosDeSupabase lo levante en device B. */
-        await sb.from('turnos_solicitudes').insert({
-          tenant_id:   currentTenant.id,
-          nombre:      _cli,
-          tel:         turno.tel || '',
-          servicio_id: turno.servicioId || null,
-          empleado_id: turno.empleadoId ? (parseInt(turno.empleadoId) || null) : null,
-          fecha:  _fecha,
-          hora:   _hora,
-          estado: nuevoEstado,
-          created_at: new Date().toISOString()
-        });
-      } else if(nuevoEstado !== 'cancelado'){
-        /* Estado activo (llego, en_proceso, confirmado): actualizar sync row */
-        await sb.from('turnos_solicitudes')
-          .update({ estado: nuevoEstado })
-          .eq('tenant_id', currentTenant.id)
-          .eq('fecha', _fecha)
-          .eq('hora', _hora)
-          .eq('nombre', _cli)
-          .neq('estado', 'bloqueado')
-          .neq('estado', 'pendiente');
-      }
-      /* cancelado: liberarSlotSupabase ya limpió todo — no queda nada que sincronizar */
-    } catch(e){ console.warn('[_doEstadoTurno→sb]', e); }
+      await sb.from('turnos_solicitudes').delete()
+        .eq('tenant_id', currentTenant.id)
+        .eq('fecha', turno.fecha).eq('hora', (turno.hora||'').substring(0,5)).eq('nombre', turno.cliente)
+        .neq('estado', 'bloqueado').neq('estado', 'pendiente');
+    } catch(e){ console.warn('[deleteTurnoSb]', e); }
+  }
 
-    return r;
-  };
+  /* ── F. _syncFromSupabase: Supabase → localStorage (reemplaza _syncConfirmados + _syncEstados) ── */
+  async function _syncFromSupabase(){
+    if(_syncing) return;
+    if(typeof sb==='undefined'||!sb||!currentTenant||!currentTenant.id) return;
+    _syncing = true;
+    try {
+      var hoy = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
+      var cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[],empleados:[]};
+      var res = await sb.from('turnos_solicitudes').select('*')
+        .eq('tenant_id', currentTenant.id)
+        .in('estado', ['confirmado','llego','en_proceso','terminado','no_vino'])
+        .gte('fecha', hoy);
+      if(res.error||!res.data||!res.data.length) return;
+
+      var locales = typeof getTurnos==='function' ? getTurnos() : [];
+      var finals  = {terminado:1, no_vino:1, cancelado:1};
+      var changed = false;
+
+      res.data.forEach(function(s){
+        var h5 = (s.hora||'').substring(0,5);
+        var li = locales.findIndex(function(t){ return t.fecha===s.fecha && t.hora===h5 && t.cliente===s.nombre; });
+        if(li !== -1){
+          if(!finals[locales[li].estado] && locales[li].estado !== s.estado){
+            locales[li].estado = s.estado; changed = true;
+          }
+          return;
+        }
+        if(finals[s.estado]) return;
+        var srv = (s.servicio_id && s.servicio_id!=='__aconfirmar__')
+          ? (cfg.servicios||[]).find(function(x){ return String(x.id)===String(s.servicio_id); }) : null;
+        var emp = s.empleado_id
+          ? (cfg.empleados||[]).find(function(e){ return String(e.id)===String(s.empleado_id); })
+          : (cfg.empleados&&cfg.empleados[0]);
+        locales.push({
+          id:'sb_'+s.id, cliente:s.nombre||'', tel:s.tel||'',
+          fecha:s.fecha, hora:h5,
+          empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'',
+          servicioId:s.servicio_id||'',
+          servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(srv?srv.nombre:(s.servicio_id||'Servicio')),
+          sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30, precio:srv?(srv.precio||0):0,
+          notas:s.servicio_id==='__aconfirmar__'?'Definir servicio al llegar el cliente':'Turno solicitado online',
+          estado:s.estado, creadoEn:s.created_at||new Date().toISOString()
+        });
+        changed = true;
+      });
+
+      if(changed && typeof saveTurnosLocal==='function'){
+        saveTurnosLocal(locales);
+        if(typeof rTurnos==='function') rTurnos();
+        if(typeof rCajas==='function')  rCajas();
+      }
+    } catch(e){ console.warn('[syncFromSupabase]', e); }
+    finally { _syncing=false; _lastSync=Date.now(); }
+  }
+  window._syncEstadosDeSupabase    = _syncFromSupabase;
+  window._syncConfirmadosDeSupabase = _syncFromSupabase;
+
+  /* ── G. rTurnos: un solo wrapper, un solo throttle ── */
+  if(typeof rTurnos === 'function'){
+    var _rtOrig = rTurnos;
+    rTurnos = function(){
+      var r = _rtOrig.apply(this, arguments);
+      if(Date.now() - _lastSync > 30000) _syncFromSupabase();
+      return r;
+    };
+  }
+
+  /* ── H. resyncTurnosToSupabase: limpiar bloqueados huérfanos + resync ── */
+  if(typeof resyncTurnosToSupabase === 'function'){
+    var _rsOrig = resyncTurnosToSupabase;
+    resyncTurnosToSupabase = async function(){
+      if(sb && currentTenant && currentTenant.id){
+        try {
+          var hoy = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
+          await sb.from('turnos_solicitudes').delete()
+            .eq('tenant_id', currentTenant.id).eq('estado','bloqueado').gte('fecha', hoy)
+            .filter('nombre','not.ilike','__fijo__%');
+        } catch(e){ console.warn('[resync cleanup]', e); }
+      }
+      return _rsOrig.apply(this, arguments);
+    };
+  }
+
+  /* ── I. saveTurno: sync al crear/editar un turno manual ── */
+  if(typeof saveTurno === 'function'){
+    var _stOrig = saveTurno;
+    saveTurno = async function(){
+      var _id    = ((document.getElementById('turnoId')    ||{}).value||'').trim();
+      var _cli   = ((document.getElementById('turnoCli')   ||{}).value||'').trim();
+      var _fecha = ((document.getElementById('turnoFecha') ||{}).value||'');
+      var _hora  = ((document.getElementById('turnoHora')  ||{}).value||'').substring(0,5);
+      var _est   = ((document.getElementById('turnoEstado')||{}).value||'confirmado');
+      var _orig  = (_id && typeof getTurnos==='function')
+                  ? getTurnos().find(function(t){ return String(t.id)===String(_id); }) : null;
+
+      await _stOrig.apply(this, arguments);
+
+      var _modal = document.getElementById('mTurno');
+      if(_modal && _modal.classList.contains('open')) return;
+      if(!currentTenant||!currentTenant.id) return;
+      if(!_cli||!_fecha||!_hora) return;
+      if(_est==='cancelado'||_est==='terminado'||_est==='no_vino') return;
+
+      var _tAll  = typeof getTurnos==='function' ? getTurnos() : [];
+      var _saved = _id
+        ? _tAll.find(function(t){ return String(t.id)===String(_id); })
+        : _tAll.find(function(t){ return t.fecha===_fecha && (t.hora||'').substring(0,5)===_hora && t.cliente===_cli; });
+      if(!_saved) return;
+
+      if(_orig && (_orig.fecha!==_fecha||((_orig.hora||'').substring(0,5))!==_hora||_orig.cliente!==_cli)){
+        await _deleteTurnoSb(_orig);
+      }
+      await _upsertTurnoSb(_saved, _est);
+    };
+  }
+
+  /* ── J. _doEstadoTurno: un solo wrapper para sb_* y manuales ── */
+  if(typeof _doEstadoTurno === 'function'){
+    var _detOrig = _doEstadoTurno;
+    _doEstadoTurno = async function(id, nuevoEstado, precioExtra, metodoExtra){
+      var r = await _detOrig.apply(this, arguments);
+      if(!currentTenant||!currentTenant.id) return r;
+      var sid = String(id||'');
+      try {
+        if(sid.startsWith('sb_')){
+          await sb.from('turnos_solicitudes')
+            .update({ estado: nuevoEstado })
+            .eq('id', sid.slice(3)).eq('tenant_id', currentTenant.id);
+        } else {
+          var turno = typeof getTurnos==='function'
+            ? getTurnos().find(function(t){ return String(t.id)===sid; }) : null;
+          if(turno && nuevoEstado !== 'cancelado'){
+            await _upsertTurnoSb(turno, nuevoEstado);
+          }
+          /* cancelado: liberarSlotSupabase ya borró todo */
+        }
+      } catch(e){ console.warn('[_doEstadoTurno→sb]', e); }
+      return r;
+    };
+  }
+
+  /* ── K. Arranque: sync inicial ── */
+  setTimeout(_syncFromSupabase, 4000);
+  setTimeout(function(){ if(typeof resyncTurnosToSupabase==='function') resyncTurnosToSupabase(); }, 7000);
 
 })();
 </script>
