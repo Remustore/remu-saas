@@ -4066,13 +4066,12 @@ async function saveCompra(){
   if(stockFresh && stockFresh.length) S.stock = stockFresh;
   registrarMovStock(prod.id, prod.nombre, cant, 'compra', notas||'Compra registrada');
   pushUndo('Registrar compra','stock',snapStock);
-  if(precio>0){
-    const snapGastos = JSON.parse(JSON.stringify(S.gastos));
-    const gasto = { id: Date.now(), concepto: 'Compra: '+prod.nombre, tipo:'stock', monto:precio*cant, fecha, notas };
-    S.gastos.unshift(gasto);
-    await dbUpsert('gastos', gasto);
-    pushUndo('Gasto compra','gastos',snapGastos);
-  }
+  const snapGastos = JSON.parse(JSON.stringify(S.gastos));
+  const gasto = { id: Date.now(), concepto: 'Compra de stock: '+prod.nombre, tipo:'stock', monto:precio*cant, fecha, notas };
+  S.gastos.unshift(gasto);
+  await dbUpsert('gastos', gasto);
+  pushUndo('Gasto compra','gastos',snapGastos);
+  if(typeof rGastos === 'function') rGastos();
   closeM('mCompra');
   rStock();
   showToast(`Compra registrada ✓ (+${cant} ${prod.nombre})`);
@@ -17210,8 +17209,6 @@ async function _mFCS_sinCobro(){
     var _tel   = ((document.getElementById('turnoTel')   || {}).value || '').trim();
     var _fecha = ((document.getElementById('turnoFecha') || {}).value || '');
     var _hora  = ((document.getElementById('turnoHora')  || {}).value || '').substring(0, 5);
-    var _empId = ((document.getElementById('turnoEmpleado') || {}).value || '');
-    var _srvId = ((document.getElementById('turnoServicio') || {}).value || '');
     var _est   = ((document.getElementById('turnoEstado') || {}).value || 'confirmado');
 
     /* Turno original (solo importa al editar para detectar cambio de slot) */
@@ -17230,8 +17227,15 @@ async function _mFCS_sinCobro(){
     /* Estados terminales: liberarSlotSupabase ya borró la fila — nada que hacer acá */
     if(_est === 'cancelado' || _est === 'terminado' || _est === 'no_vino') return;
 
-    var _empN = _empId ? (parseInt(_empId) || null) : null;
-    var _srvN = _srvId || null;
+    /* Leer del localStorage para obtener empleadoId/servicioId reales
+       (el select puede estar vacío si se abrió con openM directamente) */
+    var _tSaved = typeof getTurnos === 'function' ? getTurnos() : [];
+    var _saved = _id
+      ? _tSaved.find(function(t){ return String(t.id) === String(_id); })
+      : _tSaved.find(function(t){ return t.fecha === _fecha && (t.hora||'').substring(0,5) === _hora && t.cliente === _cli; });
+    if(!_saved) return;
+    var _empN = _saved.empleadoId ? (parseInt(_saved.empleadoId) || null) : null;
+    var _srvN = _saved.servicioId || null;
 
     try {
       /* Si se editó y el slot cambió, borrar el sync row del slot anterior */
