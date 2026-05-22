@@ -17191,5 +17191,151 @@ async function _mFCS_sinCobro(){
 
 })();
 </script>
+<script>
+/* ── Sync turnos manuales → Supabase (cross-device)
+   Problema: los turnos creados desde el panel admin solo vivían en localStorage.
+   Fix: wrappear saveTurno y _doEstadoTurno para insertar/actualizar una fila
+        en turnos_solicitudes con el estado real (no 'bloqueado'), de modo que
+        _syncEstadosDeSupabase la levante en los demás dispositivos. ── */
+(function(){
+  if(typeof saveTurno !== 'function') return;
+  if(typeof sb === 'undefined') return;
+
+  /* ── 1. saveTurno: sync al crear o editar un turno manual ── */
+  var _stOrig = saveTurno;
+  saveTurno = async function(_override){
+    /* Capturar todo ANTES de llamar al original (el modal se cierra adentro) */
+    var _id    = ((document.getElementById('turnoId')    || {}).value || '').trim();
+    var _cli   = ((document.getElementById('turnoCli')   || {}).value || '').trim();
+    var _tel   = ((document.getElementById('turnoTel')   || {}).value || '').trim();
+    var _fecha = ((document.getElementById('turnoFecha') || {}).value || '');
+    var _hora  = ((document.getElementById('turnoHora')  || {}).value || '').substring(0, 5);
+    var _empId = ((document.getElementById('turnoEmpleado') || {}).value || '');
+    var _srvId = ((document.getElementById('turnoServicio') || {}).value || '');
+    var _est   = ((document.getElementById('turnoEstado') || {}).value || 'confirmado');
+
+    /* Turno original (solo importa al editar para detectar cambio de slot) */
+    var _orig = (_id && typeof getTurnos === 'function')
+               ? getTurnos().find(function(t){ return String(t.id) === String(_id); })
+               : null;
+
+    await _stOrig.apply(this, arguments);
+
+    /* Verificar que el save fue exitoso (el modal se cierra; si sigue abierto, fue abortado) */
+    var _modal = document.getElementById('mTurno');
+    if(_modal && _modal.classList.contains('open')) return;
+
+    if(!currentTenant || !currentTenant.id) return;
+    if(!_cli || !_fecha || !_hora) return;
+    /* Estados terminales: liberarSlotSupabase ya borró la fila — nada que hacer acá */
+    if(_est === 'cancelado' || _est === 'terminado' || _est === 'no_vino') return;
+
+    var _empN = _empId ? (parseInt(_empId) || null) : null;
+    var _srvN = _srvId || null;
+
+    try {
+      /* Si se editó y el slot cambió, borrar el sync row del slot anterior */
+      if(_orig && (
+          _orig.fecha !== _fecha ||
+          (_orig.hora || '').substring(0, 5) !== _hora ||
+          _orig.cliente !== _cli
+        )){
+        await sb.from('turnos_solicitudes')
+          .delete()
+          .eq('tenant_id', currentTenant.id)
+          .eq('fecha', _orig.fecha)
+          .eq('hora', (_orig.hora || '').substring(0, 5))
+          .eq('nombre', _orig.cliente)
+          .neq('estado', 'bloqueado')
+          .neq('estado', 'pendiente');
+      }
+
+      /* Buscar si ya existe un sync row para este slot */
+      var _ex = await sb.from('turnos_solicitudes')
+        .select('id')
+        .eq('tenant_id', currentTenant.id)
+        .eq('fecha', _fecha)
+        .eq('hora', _hora)
+        .eq('nombre', _cli)
+        .neq('estado', 'bloqueado')
+        .neq('estado', 'pendiente')
+        .limit(1);
+
+      if(_ex.data && _ex.data.length){
+        /* UPDATE row existente */
+        await sb.from('turnos_solicitudes')
+          .update({ estado: _est, empleado_id: _empN, servicio_id: _srvN })
+          .eq('id', _ex.data[0].id);
+      } else {
+        /* INSERT nuevo sync row */
+        await sb.from('turnos_solicitudes').insert({
+          tenant_id: currentTenant.id,
+          nombre:     _cli,
+          tel:        _tel,
+          servicio_id: _srvN,
+          empleado_id: _empN,
+          fecha:  _fecha,
+          hora:   _hora,
+          estado: _est,
+          created_at: new Date().toISOString()
+        });
+      }
+    } catch(e){ console.warn('[saveTurno→sb]', e); }
+  };
+
+  /* ── 2. _doEstadoTurno: sync cambio de estado para turnos manuales ── */
+  if(typeof _doEstadoTurno !== 'function') return;
+  var _detOrig = _doEstadoTurno;
+  _doEstadoTurno = async function(id, nuevoEstado, precioExtra, metodoExtra){
+    var r = await _detOrig.apply(this, arguments);
+
+    if(!currentTenant || !currentTenant.id) return r;
+    var sid = String(id || '');
+    /* Los sb_* ya los maneja el wrapper existente */
+    if(sid.startsWith('sb_')) return r;
+
+    var turno = typeof getTurnos === 'function'
+               ? getTurnos().find(function(t){ return String(t.id) === sid; })
+               : null;
+    if(!turno) return r;
+
+    var _fecha = turno.fecha;
+    var _hora  = (turno.hora || '').substring(0, 5);
+    var _cli   = turno.cliente;
+
+    try {
+      if(nuevoEstado === 'terminado' || nuevoEstado === 'no_vino'){
+        /* liberarSlotSupabase ya borró el row. Insertar uno terminal
+           para que _syncEstadosDeSupabase lo levante en device B. */
+        await sb.from('turnos_solicitudes').insert({
+          tenant_id:   currentTenant.id,
+          nombre:      _cli,
+          tel:         turno.tel || '',
+          servicio_id: turno.servicioId || null,
+          empleado_id: turno.empleadoId ? (parseInt(turno.empleadoId) || null) : null,
+          fecha:  _fecha,
+          hora:   _hora,
+          estado: nuevoEstado,
+          created_at: new Date().toISOString()
+        });
+      } else if(nuevoEstado !== 'cancelado'){
+        /* Estado activo (llego, en_proceso, confirmado): actualizar sync row */
+        await sb.from('turnos_solicitudes')
+          .update({ estado: nuevoEstado })
+          .eq('tenant_id', currentTenant.id)
+          .eq('fecha', _fecha)
+          .eq('hora', _hora)
+          .eq('nombre', _cli)
+          .neq('estado', 'bloqueado')
+          .neq('estado', 'pendiente');
+      }
+      /* cancelado: liberarSlotSupabase ya limpió todo — no queda nada que sincronizar */
+    } catch(e){ console.warn('[_doEstadoTurno→sb]', e); }
+
+    return r;
+  };
+
+})();
+</script>
 </body>
 </html>
