@@ -17193,6 +17193,26 @@ async function _mFCS_sinCobro(){
     };
   }
 
+  /* ── M. cierreDiario: extender comisiones a todos los rubros con empleados ── */
+  if(typeof cierreDiario === 'function'){
+    var _cdComOrig = cierreDiario;
+    cierreDiario = function(){
+      var _rub = (currentTenant&&currentTenant.rubro||'').toLowerCase();
+      var _yaSalon = /barber|barbería|salon|belleza/i.test(_rub);
+      if(!_yaSalon && typeof getTurnosCfg === 'function'){
+        var _cfg = getTurnosCfg();
+        var _tieneComisiones = (_cfg.empleados||[]).some(function(e){ return (e.comision||0) > 0; });
+        if(_tieneComisiones){
+          var _rubOrig = currentTenant.rubro;
+          currentTenant.rubro = 'salon ' + (_rubOrig||'');
+          try { return _cdComOrig.apply(this, arguments); }
+          finally { currentTenant.rubro = _rubOrig; }
+        }
+      }
+      return _cdComOrig.apply(this, arguments);
+    };
+  }
+
   /* ── K. Arranque: sync inicial ── */
   setTimeout(_syncFromSupabase, 4000);
   setTimeout(function(){ if(typeof resyncTurnosToSupabase==='function') resyncTurnosToSupabase(); }, 7000);
