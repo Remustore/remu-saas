@@ -15583,31 +15583,6 @@ async function _limpiarIpsViejas(){
 })();
 </script>
 <script>
-/* ── BUG 2 NOTIFICACIONES: canal duplicado remu_reservas_ + pedir permisos antes ── */
-/* renderAll crea remu_reservas_<tid> (solo badge) y loadAll crea remu_rt_<tid>      */
-/* (notificación + badge). Dos suscripciones al mismo postgres_changes causan         */
-/* que Supabase entregue el evento a solo uno de los dos canales de forma impredecible */
-(function(){
-  if(typeof _iniciarRealtimeReservas !== 'function') return;
-  var _origIRR = _iniciarRealtimeReservas;
-  _iniciarRealtimeReservas = function(tenantId){
-    // 1. Pedir permisos antes de arrancar Realtime
-    if(typeof pedirPermisoNotificaciones === 'function') pedirPermisoNotificaciones();
-    // 2. Eliminar canal legado remu_reservas_ para evitar suscripción duplicada
-    try {
-      var chs = (typeof sb !== 'undefined' && typeof sb.getChannels === 'function')
-        ? sb.getChannels() : [];
-      chs.forEach(function(ch){
-        if(ch.topic && ch.topic.indexOf('remu_reservas_') !== -1){
-          try { sb.removeChannel(ch); } catch(e){}
-        }
-      });
-    } catch(e){}
-    return _origIRR.apply(this, arguments);
-  };
-})();
-</script>
-<script>
 /* ── FIX: _clearTenantCache no debe borrar tokens de sesión Supabase (sb-*) ── */
 (function(){
   if(typeof _clearTenantCache !== 'function') return;
@@ -15853,225 +15828,6 @@ async function _syncFijosSupabase(){
   };
 })();
 </script>
-<script>
-/* ── BUG 2: _onNuevaReservaRealtime disparaba notif en eventos repetidos del canal RT ── */
-(function(){
-  if(typeof _onNuevaReservaRealtime !== 'function') return;
-  var _origONRR = _onNuevaReservaRealtime;
-  _onNuevaReservaRealtime = function(row){
-    var rowId = String(row.id || '');
-    if(rowId && _solicitudesNotifVistas instanceof Set){
-      if(_solicitudesNotifVistas.has(rowId)) return;
-      _solicitudesNotifVistas.add(rowId);
-    }
-    return _origONRR.apply(this, arguments);
-  };
-})();
-</script>
-<script>
-/* ── FIX: Realtime — reconexión automática si el canal WebSocket se cierra ── */
-/* Supabase cierra el socket con código 1000 (normal closure) tras inactividad  */
-/* y no reconecta el canal automáticamente. Watchdog cada 30s.                  */
-(function(){
-  var _rtWatchdog = null;
-  var _rtTenant   = '';
-  var _rtReconnects = 0;
-
-  function _watchdog(){
-    if(!_rtTenant || typeof currentTenant === 'undefined' || !currentTenant || currentTenant.id !== _rtTenant) return;
-    var needsReconnect = false;
-    try {
-      if(!_realtimeCh){
-        needsReconnect = true;
-      } else {
-        var st = _realtimeCh.state;
-        // 'joined'/'joining' → OK; 'closed'/'errored'/'leaving'/undefined → reconectar
-        if(!st || (st !== 'joined' && st !== 'joining')) needsReconnect = true;
-      }
-    } catch(e){ needsReconnect = true; }
-
-    if(needsReconnect){
-      _rtReconnects++;
-      console.log('[Realtime] Canal cerrado — reconectando (intento ' + _rtReconnects + ')');
-      try { _iniciarRealtimeReservas(_rtTenant); } catch(e){ console.warn('[Realtime] Error al reconectar:', e); }
-    }
-  }
-
-  if(typeof _iniciarRealtimeReservas === 'function'){
-    var _origIRR = _iniciarRealtimeReservas;
-    _iniciarRealtimeReservas = function(tenantId){
-      _rtTenant = tenantId || '';
-      _origIRR.apply(this, arguments);
-      if(!_rtWatchdog && _rtTenant){
-        _rtWatchdog = setInterval(_watchdog, 30000);
-        console.log('[Realtime] Watchdog de reconexión activo (cada 30s)');
-      }
-    };
-  }
-
-  if(typeof _detenerRealtimeReservas === 'function'){
-    var _origDRR = _detenerRealtimeReservas;
-    _detenerRealtimeReservas = function(){
-      _rtTenant = '';
-      if(_rtWatchdog){ clearInterval(_rtWatchdog); _rtWatchdog = null; }
-      return _origDRR.apply(this, arguments);
-    };
-  }
-})();
-</script>
-<script>
-/* ── DIAG: log de eventos Realtime y estado del canal ── */
-/* Intercepta sb.channel() durante _iniciarRealtimeReservas para añadir logs  */
-/* al callback de eventos (postgres_changes) y al callback de estado.         */
-(function(){
-  if(typeof _iniciarRealtimeReservas !== 'function') return;
-  var _origIRR = _iniciarRealtimeReservas;
-  _iniciarRealtimeReservas = function(tenantId){
-    if(!sb || typeof sb.channel !== 'function') return _origIRR.apply(this, arguments);
-    var _origSbCh = sb.channel.bind(sb);
-    sb.channel = function(name, opts){
-      var ch = _origSbCh(name, opts);
-      // Añadir log al callback del evento postgres_changes
-      var _origOn = ch.on.bind(ch);
-      ch.on = function(type, filter, callback){
-        if(type === 'postgres_changes' && typeof callback === 'function'){
-          var _cb = callback;
-          callback = function(payload){
-            var p = payload && payload.new ? payload.new : {};
-            console.log('[Realtime] evento recibido:'
-              , 'eventType=' + (payload.eventType||'?')
-              , '| estado canal=' + ch.state
-              , '| estado registro=' + (p.estado||'?')
-              , '| nombre=' + (p.nombre||'?')
-              , '| fecha=' + (p.fecha||'?'));
-            return _cb.apply(this, arguments);
-          };
-        }
-        return _origOn(type, filter, callback);
-      };
-      // Añadir log al callback de estado de suscripción
-      var _origSub = ch.subscribe.bind(ch);
-      ch.subscribe = function(statusCb){
-        return _origSub(function(status, err){
-          console.log('[Realtime] estado suscripción: ' + status
-            + (err ? ' — ' + JSON.stringify(err) : ''));
-          if(typeof statusCb === 'function') statusCb.apply(this, arguments);
-        });
-      };
-      return ch;
-    };
-    var result = _origIRR.apply(this, arguments);
-    sb.channel = _origSbCh; // restaurar
-    return result;
-  };
-})();
-</script>
-<script>
-/* ── FIX: Realtime — backoff + reconexión al renovar token JWT ── */
-/*                                                                           */
-/* Causa raíz: el socket cierra con "InvalidJWTToken: Token has expired".   */
-/* El canal queda muerto hasta que se reinicia manualmente.                  */
-/*                                                                           */
-/* Fix 1 — onAuthStateChange TOKEN_REFRESHED: recrear canal con token nuevo */
-/* Fix 2 — backoff en CLOSED/CHANNEL_ERROR/TIMED_OUT: 5s → 15s → 30s      */
-(function(){
-  if(typeof _iniciarRealtimeReservas !== 'function') return;
-
-  var DELAYS  = [5000, 15000, 30000];
-  var _bTimer = null;
-  var _bIdx   = 0;
-  var _bTenant = '';
-  var _authUnsub = null;
-
-  function _clearBackoff(){ if(_bTimer){ clearTimeout(_bTimer); _bTimer = null; } }
-
-  function _scheduleReconnect(tenantId){
-    _clearBackoff();
-    _bTenant = tenantId;
-    var delay = DELAYS[Math.min(_bIdx, DELAYS.length - 1)];
-    _bIdx = Math.min(_bIdx + 1, DELAYS.length - 1);
-    console.log('[Realtime] Reconexión en ' + (delay / 1000) + 's (intento ' + _bIdx + ')');
-    _bTimer = setTimeout(function(){
-      _bTimer = null;
-      if(_bTenant){
-        console.log('[Realtime] Reconectando por backoff...');
-        _iniciarRealtimeReservas(_bTenant);
-      }
-    }, delay);
-  }
-
-  var _origIRR = _iniciarRealtimeReservas;
-  _iniciarRealtimeReservas = function(tenantId){
-    _clearBackoff();
-    _bTenant = tenantId || '';
-
-    if(!sb || typeof sb.channel !== 'function') return _origIRR.apply(this, arguments);
-
-    // Interceptar sb.channel para inyectar backoff en el callback de suscripción
-    var _origSbCh = sb.channel.bind(sb);
-    sb.channel = function(name, opts){
-      var ch = _origSbCh(name, opts);
-      var _origSub = ch.subscribe.bind(ch);
-      ch.subscribe = function(statusCb){
-        return _origSub(function(status, err){
-          if(status === 'SUBSCRIBED'){
-            _bIdx = 0; // reset backoff al conectar con éxito
-            console.log('[Realtime] Conectado — backoff reseteado');
-          } else if(status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
-            var tid = _bTenant || (typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.id : '');
-            if(tid) _scheduleReconnect(tid);
-          }
-          if(typeof statusCb === 'function') statusCb.apply(this, arguments);
-        });
-      };
-      return ch;
-    };
-
-    var result = _origIRR.apply(this, arguments);
-    sb.channel = _origSbCh; // restaurar
-    return result;
-  };
-
-  // Fix 2: onAuthStateChange — recrear canal cuando el token JWT se renueva
-  function _setupAuthListener(){
-    if(!sb || !sb.auth || typeof sb.auth.onAuthStateChange !== 'function') return;
-    if(_authUnsub) return; // ya registrado
-    var _sub = sb.auth.onAuthStateChange(function(event, session){
-      if(event !== 'TOKEN_REFRESHED') return;
-      var tid = typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.id : '';
-      if(!tid) return;
-      console.log('[Realtime] TOKEN_REFRESHED — recreando canal con token renovado');
-      _clearBackoff();
-      _bIdx = 0;
-      _iniciarRealtimeReservas(tid);
-    });
-    _authUnsub = (_sub && typeof _sub.unsubscribe === 'function') ? _sub.unsubscribe : (_sub && _sub.data && _sub.data.subscription ? _sub.data.subscription.unsubscribe : null);
-  }
-
-  // Arrancar el listener cuando sb esté disponible
-  if(typeof sb !== 'undefined' && sb && sb.auth){
-    _setupAuthListener();
-  } else {
-    var _authSetupRetry = setInterval(function(){
-      if(typeof sb !== 'undefined' && sb && sb.auth){
-        clearInterval(_authSetupRetry);
-        _setupAuthListener();
-      }
-    }, 1000);
-  }
-
-  // Limpiar en logout
-  if(typeof _detenerRealtimeReservas === 'function'){
-    var _origDRR2 = _detenerRealtimeReservas;
-    _detenerRealtimeReservas = function(){
-      _clearBackoff();
-      _bTenant = '';
-      _bIdx = 0;
-      if(typeof _authUnsub === 'function'){ try{ _authUnsub(); }catch(e){} _authUnsub = null; }
-      return _origDRR2.apply(this, arguments);
-    };
-  }
-})();
 </script>
 <script>
 /* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
@@ -17196,6 +16952,151 @@ async function _mFCS_sinCobro(){
       return _cdComOrig.apply(this, arguments);
     };
   }
+
+  /* ── P. _iniciarRealtimeReservas: pedir permisos + eliminar canal duplicado legacy ── */
+  if(typeof _iniciarRealtimeReservas === 'function'){
+    var _irrPermOrig = _iniciarRealtimeReservas;
+    _iniciarRealtimeReservas = function(tenantId){
+      if(typeof pedirPermisoNotificaciones === 'function') pedirPermisoNotificaciones();
+      try {
+        var chs = (typeof sb !== 'undefined' && typeof sb.getChannels === 'function')
+          ? sb.getChannels() : [];
+        chs.forEach(function(ch){
+          if(ch.topic && ch.topic.indexOf('remu_reservas_') !== -1){
+            try { sb.removeChannel(ch); } catch(e){}
+          }
+        });
+      } catch(e){}
+      return _irrPermOrig.apply(this, arguments);
+    };
+  }
+
+  /* ── Q. _onNuevaReservaRealtime: dedup por _solicitudesNotifVistas ── */
+  if(typeof _onNuevaReservaRealtime === 'function'){
+    var _onrrOrig = _onNuevaReservaRealtime;
+    _onNuevaReservaRealtime = function(row){
+      var rowId = String(row.id || '');
+      if(rowId && _solicitudesNotifVistas instanceof Set){
+        if(_solicitudesNotifVistas.has(rowId)) return;
+        _solicitudesNotifVistas.add(rowId);
+      }
+      return _onrrOrig.apply(this, arguments);
+    };
+  }
+
+  /* ── R. _iniciarRealtimeReservas: watchdog de reconexión cada 30s ── */
+  (function(){
+    var _rtWatchdog = null;
+    var _rtTenant   = '';
+    var _rtReconnects = 0;
+    function _watchdog(){
+      if(!_rtTenant || typeof currentTenant === 'undefined' || !currentTenant || currentTenant.id !== _rtTenant) return;
+      var needsReconnect = false;
+      try {
+        if(!_realtimeCh){ needsReconnect = true; }
+        else { var st = _realtimeCh.state; if(!st || (st !== 'joined' && st !== 'joining')) needsReconnect = true; }
+      } catch(e){ needsReconnect = true; }
+      if(needsReconnect){
+        _rtReconnects++;
+        console.log('[Realtime] Canal cerrado — reconectando (intento ' + _rtReconnects + ')');
+        try { _iniciarRealtimeReservas(_rtTenant); } catch(e){ console.warn('[Realtime] Error al reconectar:', e); }
+      }
+    }
+    if(typeof _iniciarRealtimeReservas === 'function'){
+      var _irrWdOrig = _iniciarRealtimeReservas;
+      _iniciarRealtimeReservas = function(tenantId){
+        _rtTenant = tenantId || '';
+        _irrWdOrig.apply(this, arguments);
+        if(!_rtWatchdog && _rtTenant){
+          _rtWatchdog = setInterval(_watchdog, 30000);
+          console.log('[Realtime] Watchdog activo (cada 30s)');
+        }
+      };
+    }
+    if(typeof _detenerRealtimeReservas === 'function'){
+      var _drrWdOrig = _detenerRealtimeReservas;
+      _detenerRealtimeReservas = function(){
+        _rtTenant = '';
+        if(_rtWatchdog){ clearInterval(_rtWatchdog); _rtWatchdog = null; }
+        return _drrWdOrig.apply(this, arguments);
+      };
+    }
+  })();
+
+  /* ── S. _iniciarRealtimeReservas: backoff exponencial + reconexión por TOKEN_REFRESHED ── */
+  (function(){
+    var DELAYS   = [5000, 15000, 30000];
+    var _bTimer  = null;
+    var _bIdx    = 0;
+    var _bTenant = '';
+    var _authUnsub = null;
+    function _clearBackoff(){ if(_bTimer){ clearTimeout(_bTimer); _bTimer = null; } }
+    function _scheduleReconnect(tenantId){
+      _clearBackoff();
+      _bTenant = tenantId;
+      var delay = DELAYS[Math.min(_bIdx, DELAYS.length - 1)];
+      _bIdx = Math.min(_bIdx + 1, DELAYS.length - 1);
+      console.log('[Realtime] Reconexión en ' + (delay / 1000) + 's (intento ' + _bIdx + ')');
+      _bTimer = setTimeout(function(){
+        _bTimer = null;
+        if(_bTenant){ console.log('[Realtime] Reconectando por backoff...'); _iniciarRealtimeReservas(_bTenant); }
+      }, delay);
+    }
+    if(typeof _iniciarRealtimeReservas === 'function'){
+      var _irrBkOrig = _iniciarRealtimeReservas;
+      _iniciarRealtimeReservas = function(tenantId){
+        _clearBackoff();
+        _bTenant = tenantId || '';
+        if(!sb || typeof sb.channel !== 'function') return _irrBkOrig.apply(this, arguments);
+        var _origSbCh = sb.channel.bind(sb);
+        sb.channel = function(name, opts){
+          var ch = _origSbCh(name, opts);
+          var _origSub = ch.subscribe.bind(ch);
+          ch.subscribe = function(statusCb){
+            return _origSub(function(status, err){
+              if(status === 'SUBSCRIBED'){ _bIdx = 0; console.log('[Realtime] Conectado — backoff reseteado'); }
+              else if(status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT'){
+                var tid = _bTenant || (typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.id : '');
+                if(tid) _scheduleReconnect(tid);
+              }
+              if(typeof statusCb === 'function') statusCb.apply(this, arguments);
+            });
+          };
+          return ch;
+        };
+        var result = _irrBkOrig.apply(this, arguments);
+        sb.channel = _origSbCh;
+        return result;
+      };
+    }
+    function _setupAuthListener(){
+      if(!sb || !sb.auth || typeof sb.auth.onAuthStateChange !== 'function') return;
+      if(_authUnsub) return;
+      var _sub = sb.auth.onAuthStateChange(function(event, session){
+        if(event !== 'TOKEN_REFRESHED') return;
+        var tid = typeof currentTenant !== 'undefined' && currentTenant ? currentTenant.id : '';
+        if(!tid) return;
+        console.log('[Realtime] TOKEN_REFRESHED — recreando canal');
+        _clearBackoff(); _bIdx = 0; _iniciarRealtimeReservas(tid);
+      });
+      _authUnsub = (_sub && typeof _sub.unsubscribe === 'function') ? _sub.unsubscribe
+        : (_sub && _sub.data && _sub.data.subscription ? _sub.data.subscription.unsubscribe : null);
+    }
+    if(typeof sb !== 'undefined' && sb && sb.auth){ _setupAuthListener(); }
+    else {
+      var _authSetupRetry = setInterval(function(){
+        if(typeof sb !== 'undefined' && sb && sb.auth){ clearInterval(_authSetupRetry); _setupAuthListener(); }
+      }, 1000);
+    }
+    if(typeof _detenerRealtimeReservas === 'function'){
+      var _drrBkOrig = _detenerRealtimeReservas;
+      _detenerRealtimeReservas = function(){
+        _clearBackoff(); _bTenant = ''; _bIdx = 0;
+        if(typeof _authUnsub === 'function'){ try{ _authUnsub(); }catch(e){} _authUnsub = null; }
+        return _drrBkOrig.apply(this, arguments);
+      };
+    }
+  })();
 
   /* ── N. saveTaller: UPDATE explícito en edición — sin upsert para evitar duplicados ── */
   if(typeof saveTaller === 'function'){
