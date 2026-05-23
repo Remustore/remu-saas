@@ -14387,22 +14387,6 @@ function _renderServiciosOnline(){
   };
 })();
 
-(function(){
-  var _orig = confAv;
-  confAv = async function(){
-    var ns = document.getElementById('avEst')?.value;
-    if(ns === 'entregado'){
-      var r = (S.reparaciones||[]).find(function(x){ return x.id === avId; });
-      if(r && !(parseFloat(r.presupuesto) > 0)){
-        var avMetEl = document.getElementById('avMetodoBox');
-        if(avMetEl){ avMetEl.style.boxShadow='0 0 0 2px var(--bad)'; setTimeout(function(){ avMetEl.style.boxShadow=''; },2000); }
-        showToast('Ingresá el presupuesto antes de marcar como entregado','err');
-        return;
-      }
-    }
-    return _orig.apply(this, arguments);
-  };
-})();
 
 (function(){
   var _orig = saveTurno;
@@ -17210,6 +17194,46 @@ async function _mFCS_sinCobro(){
         }
       }
       return _cdComOrig.apply(this, arguments);
+    };
+  }
+
+  /* ── N. saveTaller: UPDATE explícito en edición — sin upsert para evitar duplicados ── */
+  if(typeof saveTaller === 'function'){
+    var _stOrig = saveTaller;
+    saveTaller = async function(){
+      var id = ((document.getElementById('tId')||{}).value||'').trim();
+      if(!id){ return _stOrig.apply(this, arguments); }
+      var idNum = Number(id);
+      await _stOrig.apply(this, arguments);
+      var updated = (S&&S.reparaciones) ? S.reparaciones.find(function(r){ return r.id===idNum; }) : null;
+      if(updated && typeof sb !== 'undefined' && currentTenant && currentTenant.id){
+        if(typeof setSyncing==='function') setSyncing();
+        try {
+          var res = await sb.from('reparaciones')
+            .update({ data: updated, tenant_id: currentTenant.id })
+            .eq('id', idNum).eq('tenant_id', currentTenant.id);
+          if(res.error) throw res.error;
+          if(typeof setSynced==='function') setSynced();
+        } catch(e){ console.error('[saveTaller] update:', e); if(typeof setSyncErr==='function') setSyncErr(e?.message||''); }
+      }
+    };
+  }
+
+  /* ── O. confAv: validar presupuesto antes de marcar entregado ── */
+  if(typeof confAv === 'function'){
+    var _caOrig = confAv;
+    confAv = async function(){
+      var ns = (document.getElementById('avEst')||{}).value;
+      if(ns === 'entregado'){
+        var r = (S&&S.reparaciones||[]).find(function(x){ return x.id === avId; });
+        if(r && !(parseFloat(r.presupuesto) > 0)){
+          var avMetEl = document.getElementById('avMetodoBox');
+          if(avMetEl){ avMetEl.style.boxShadow='0 0 0 2px var(--bad)'; setTimeout(function(){ avMetEl.style.boxShadow=''; },2000); }
+          if(typeof showToast==='function') showToast('Ingresá el presupuesto antes de marcar como entregado','err');
+          return;
+        }
+      }
+      return _caOrig.apply(this, arguments);
     };
   }
 
