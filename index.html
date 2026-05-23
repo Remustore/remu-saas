@@ -13729,78 +13729,6 @@ function rStockResumen(){
     '</div>';
 }
 
-(function(){
-  // Wrap rDash: llama rGananciaHoy después de renderizar
-  var _rDashOrig = rDash;
-  rDash = function(){
-    var r = _rDashOrig.apply(this, arguments);
-    setTimeout(rGananciaHoy, 10);
-    return r;
-  };
-
-  // Wrap rDivision: después de renderizar, colapsa detrás de "Ver detalle"
-  var _rDivisionOrig = rDivision;
-  rDivision = function(){
-    _rDivisionOrig.apply(this, arguments);
-    var card = document.getElementById('divisionCard');
-    if(!card || card.style.display==='none') return;
-    if(card.getAttribute('data-collapsible')) return; // ya colapsado
-    card.setAttribute('data-collapsible','1');
-    // Insertar botón antes de la card si no existe ya
-    var btn = document.getElementById('divisionToggleBtn');
-    if(!btn){
-      btn = document.createElement('button');
-      btn.id = 'divisionToggleBtn';
-      btn.className = 'btn bgh';
-      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
-      btn.textContent = '📊 Ver detalle de distribución';
-      btn.onclick = function(){
-        var collapsed = card.getAttribute('data-open') !== '1';
-        card.style.display = collapsed ? 'block' : 'none';
-        card.setAttribute('data-open', collapsed ? '1' : '0');
-        btn.textContent = collapsed ? '📊 Ocultar distribución' : '📊 Ver detalle de distribución';
-      };
-      card.parentNode.insertBefore(btn, card);
-    }
-    card.style.display = 'none';
-    card.setAttribute('data-open','0');
-  };
-
-  // Wrap rPanelDinero: después de renderizar, colapsa detrás de "Ver detalle"
-  var _rPanelDineroOrig = rPanelDinero;
-  rPanelDinero = function(){
-    _rPanelDineroOrig.apply(this, arguments);
-    var panel = document.getElementById('panelDinero');
-    if(!panel || panel.style.display==='none') return;
-    if(panel.getAttribute('data-collapsible')) return;
-    panel.setAttribute('data-collapsible','1');
-    var btn = document.getElementById('panelDineroToggleBtn');
-    if(!btn){
-      btn = document.createElement('button');
-      btn.id = 'panelDineroToggleBtn';
-      btn.className = 'btn bgh';
-      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
-      btn.textContent = '💡 Ver análisis 50/30/20';
-      btn.onclick = function(){
-        var collapsed = panel.getAttribute('data-open') !== '1';
-        panel.style.display = collapsed ? 'block' : 'none';
-        panel.setAttribute('data-open', collapsed ? '1' : '0');
-        btn.textContent = collapsed ? '💡 Ocultar análisis 50/30/20' : '💡 Ver análisis 50/30/20';
-      };
-      panel.parentNode.insertBefore(btn, panel);
-    }
-    panel.style.display = 'none';
-    panel.setAttribute('data-open','0');
-  };
-
-  // Wrap rStock: llama rStockResumen después de renderizar
-  var _rStockOrig = rStock;
-  rStock = function(){
-    var r = _rStockOrig.apply(this, arguments);
-    rStockResumen();
-    return r;
-  };
-})();
 </script>
 
 <!-- ── Acciones rápidas · Racha · Comparativa · Celebración meta ──────────
@@ -13969,129 +13897,6 @@ function checkMetaCelebration(){
   document.body.appendChild(modal);
 }
 
-// ── Wrap rGananciaHoy: agrega racha + comparativa debajo de la tarjeta ───
-(function(){
-  var _orig = rGananciaHoy;
-  rGananciaHoy = function(){
-    _orig.apply(this, arguments);
-    var card = document.getElementById('gananciaHoyCard');
-    if(!card || !card.innerHTML) return;
-
-    // Racha
-    var racha = _actualizarRacha();
-    var rachaHtml = '';
-    if(racha >= 2){
-      var llama = racha>=30?'🔥🔥🔥':racha>=14?'🔥🔥':'🔥';
-      rachaHtml =
-        '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bor)">' +
-          '<span style="font-size:1.1rem">'+llama+'</span>' +
-          '<span style="font-size:.82rem;color:var(--tx2)">Llevas <strong style="color:var(--gld)">'+racha+' días</strong> seguidos usando el sistema</span>' +
-        '</div>';
-    }
-
-    // Comparativa semana actual vs semana pasada
-    var compHtml = '';
-    try {
-      var ganEsta = _calcGananciaSemana(0);
-      var ganPasada = _calcGananciaSemana(1);
-      if(ganPasada === 0 && ganEsta <= 0){
-        // Sin datos suficientes para comparar — no mostrar nada
-      } else if(ganPasada === 0){
-        compHtml =
-          '<div style="font-size:.78rem;color:var(--tx2);margin-top:8px">📊 Primera semana con datos — ¡buen comienzo!</div>';
-      } else {
-        var dif = ganEsta - ganPasada;
-        var difPct = Math.round(dif / Math.abs(ganPasada) * 100);
-        var posMas = dif > 0;
-        var label;
-        if(Math.abs(difPct) > 200){
-          // Diferencia extrema: mostrar monto en vez de porcentaje
-          label = '<strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+
-                  (posMas?'+':'-')+(typeof fmt==='function'?fmt(Math.abs(dif)):Math.abs(dif))+
-                  '</strong> '+(posMas?'más':'menos');
-        } else {
-          label = '<strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+
-                  (posMas?'+':'')+difPct+'%</strong> '+(posMas?'más':'menos');
-        }
-        compHtml =
-          '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.8rem;color:var(--tx2)">' +
-            '<span>'+(posMas?'📈':'📉')+'</span>' +
-            '<span>Esta semana ganaste '+label+' que la semana pasada</span>' +
-          '</div>';
-      }
-    } catch(e){}
-
-    if(rachaHtml || compHtml){
-      card.innerHTML += rachaHtml + compHtml;
-    }
-  };
-})();
-
-// ── Corregir wrappers de rDivision/rPanelDinero (se re-colapsan en cada render) ──
-(function(){
-  var _prevDiv = rDivision;
-  rDivision = function(){
-    _prevDiv.apply(this, arguments);
-    var card = document.getElementById('divisionCard');
-    if(!card || card.style.display==='none') return;
-    if(!document.getElementById('divisionToggleBtn')){
-      var btn = document.createElement('button');
-      btn.id = 'divisionToggleBtn';
-      btn.className = 'btn bgh';
-      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
-      btn.textContent = '📊 Ver detalle de distribución';
-      btn.onclick = function(){
-        var open = card.getAttribute('data-open')==='1';
-        card.style.display = open?'none':'block';
-        card.setAttribute('data-open', open?'0':'1');
-        btn.textContent = open?'📊 Ver detalle de distribución':'📊 Ocultar distribución';
-      };
-      card.parentNode.insertBefore(btn, card);
-    }
-    if(card.getAttribute('data-open')!=='1'){
-      card.style.display='none';
-      var tb = document.getElementById('divisionToggleBtn');
-      if(tb) tb.textContent='📊 Ver detalle de distribución';
-    }
-  };
-
-  var _prevPan = rPanelDinero;
-  rPanelDinero = function(){
-    _prevPan.apply(this, arguments);
-    var panel = document.getElementById('panelDinero');
-    if(!panel || panel.style.display==='none') return;
-    if(!document.getElementById('panelDineroToggleBtn')){
-      var btn = document.createElement('button');
-      btn.id = 'panelDineroToggleBtn';
-      btn.className = 'btn bgh';
-      btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
-      btn.textContent = '💡 Ver análisis 50/30/20';
-      btn.onclick = function(){
-        var open = panel.getAttribute('data-open')==='1';
-        panel.style.display = open?'none':'block';
-        panel.setAttribute('data-open', open?'0':'1');
-        btn.textContent = open?'💡 Ver análisis 50/30/20':'💡 Ocultar análisis 50/30/20';
-      };
-      panel.parentNode.insertBefore(btn, panel);
-    }
-    if(panel.getAttribute('data-open')!=='1'){
-      panel.style.display='none';
-      var tb = document.getElementById('panelDineroToggleBtn');
-      if(tb) tb.textContent='💡 Ver análisis 50/30/20';
-    }
-  };
-})();
-
-// ── Wrap rDash: acciones rápidas + celebración meta ───────────────────────
-(function(){
-  var _prev = rDash;
-  rDash = function(){
-    var r = _prev.apply(this, arguments);
-    setTimeout(rAccionesRapidas, 20);
-    setTimeout(checkMetaCelebration, 600);
-    return r;
-  };
-})();
 </script>
 
 <!-- ── Alertas inteligentes + Ganancia neta de equipos ───────────────────
@@ -14163,38 +13968,6 @@ function rSmartAlerts(){
     '</div>';
   }).join('');
 }
-
-// ── Agregar línea de equipos hoy a gananciaHoyCard ────────────────────────
-(function(){
-  var _rGananciaHoyPrev = rGananciaHoy;
-  rGananciaHoy = function(){
-    _rGananciaHoyPrev.apply(this, arguments);
-    var card = document.getElementById('gananciaHoyCard');
-    if(!card || !card.innerHTML) return;
-    var hoy = tod();
-    var eqHoy = S.ventas.filter(function(v){ return v.fecha===hoy && v.tipo==='equipo'; });
-    if(!eqHoy.length) return;
-    var cantEq = eqHoy.length;
-    var ganEq  = eqHoy.reduce(function(a,v){ return a+(v.total||0)-(v.costo||0); }, 0);
-    var color  = ganEq>=0 ? 'var(--gld)' : 'var(--bad)';
-    card.innerHTML +=
-      '<div style="display:flex;align-items:center;justify-content:space-between;font-size:.82rem;'+
-      'margin-top:8px;padding-top:8px;border-top:1px solid var(--bor)">'+
-        '<span style="color:var(--tx2)">📱 Equipo'+(cantEq>1?'s':'')+' vendido'+(cantEq>1?'s':'')+' hoy ('+cantEq+')</span>'+
-        '<span style="color:'+color+';font-weight:600">'+(ganEq>=0?'':'-')+(typeof fmt==='function'?fmt(Math.abs(ganEq)):ganEq)+' ganancia neta</span>'+
-      '</div>';
-  };
-})();
-
-// ── Incluir rSmartAlerts en cada rDash ────────────────────────────────────
-(function(){
-  var _prev = rDash;
-  rDash = function(){
-    var r = _prev.apply(this, arguments);
-    setTimeout(rSmartAlerts, 30);
-    return r;
-  };
-})();
 
 // ── Fix eliminarServicioTurno: reemplaza confirm() por modal propio + toast ─
 // window.confirm() puede quedar bloqueado en PWAs instaladas (Android/iOS);
@@ -15828,7 +15601,6 @@ async function _syncFijosSupabase(){
   };
 })();
 </script>
-</script>
 <script>
 /* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
 
@@ -15873,47 +15645,6 @@ async function _syncFijosSupabase(){
       +bloque('📦','Accesorios',accHoy,obj.accCant||10,ingAccHoy,metaAccMonto)
       +bloque('📱','Equipos',eqHoy,obj.eqCant||1,ingEqHoy,0);
   };
-})();
-
-// _calcGananciaSemana y checkMetaCelebration: usan r.fecha (ingreso) en vez de r.fechaEnt (entrega)
-(function(){
-  // Copia manual sin Object.assign (mayor compatibilidad) para remapear fecha→fechaEnt
-  function remapReps(){
-    if(typeof S === 'undefined' || !S || !S.reparaciones) return [];
-    var reps = S.reparaciones;
-    var out  = [];
-    for(var i = 0; i < reps.length; i++){
-      var rep = reps[i];
-      if(rep.estado === 'entregado' && rep.fechaEnt){
-        var copy = {};
-        for(var k in rep){ if(Object.prototype.hasOwnProperty.call(rep, k)) copy[k] = rep[k]; }
-        copy.fecha = rep.fechaEnt;
-        out.push(copy);
-      } else {
-        out.push(rep);
-      }
-    }
-    return out;
-  }
-  function conRepsRemapeadas(fn){
-    if(typeof S === 'undefined' || !S) return fn();
-    var _bak = S.reparaciones;
-    S.reparaciones = remapReps();
-    try { return fn(); } finally { S.reparaciones = _bak; }
-  }
-  if(typeof _calcGananciaSemana === 'function'){
-    var _origCGS = _calcGananciaSemana;
-    _calcGananciaSemana = function(weekOffset){
-      var wo = weekOffset;
-      return conRepsRemapeadas(function(){ return _origCGS(wo); });
-    };
-  }
-  if(typeof checkMetaCelebration === 'function'){
-    var _origCMC = checkMetaCelebration;
-    checkMetaCelebration = function(){
-      return conRepsRemapeadas(function(){ return _origCMC(); });
-    };
-  }
 })();
 
 /* ── POLLING: reemplaza Realtime WebSocket por consulta cada 30s ── */
@@ -16952,6 +16683,123 @@ async function _mFCS_sinCobro(){
       return _cdComOrig.apply(this, arguments);
     };
   }
+
+  /* ── T. rDash: un único wrapper — rGananciaHoy + acciones + alertas + meta ── */
+  if(typeof rDash === 'function'){
+    var _rDashT = rDash;
+    rDash = function(){
+      var r = _rDashT.apply(this, arguments);
+      setTimeout(function(){ if(typeof rGananciaHoy==='function') rGananciaHoy(); }, 10);
+      setTimeout(function(){ if(typeof rAccionesRapidas==='function') rAccionesRapidas(); }, 20);
+      setTimeout(function(){ if(typeof rSmartAlerts==='function') rSmartAlerts(); }, 30);
+      setTimeout(function(){ if(typeof checkMetaCelebration==='function') checkMetaCelebration(); }, 600);
+      return r;
+    };
+  }
+
+  /* ── U. rGananciaHoy: racha + comparativa semanal + línea de equipos ── */
+  if(typeof rGananciaHoy === 'function'){
+    var _rGHU = rGananciaHoy;
+    rGananciaHoy = function(){
+      _rGHU.apply(this, arguments);
+      var card = document.getElementById('gananciaHoyCard');
+      if(!card || !card.innerHTML) return;
+      var racha = typeof _actualizarRacha==='function' ? _actualizarRacha() : 0;
+      var rachaHtml = '';
+      if(racha >= 2){
+        var llama = racha>=30?'🔥🔥🔥':racha>=14?'🔥🔥':'🔥';
+        rachaHtml = '<div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--bor)"><span style="font-size:1.1rem">'+llama+'</span><span style="font-size:.82rem;color:var(--tx2)">Llevas <strong style="color:var(--gld)">'+racha+' días</strong> seguidos usando el sistema</span></div>';
+      }
+      var compHtml = '';
+      try {
+        if(typeof _calcGananciaSemana==='function'){
+          var ganEsta=_calcGananciaSemana(0), ganPasada=_calcGananciaSemana(1);
+          if(ganPasada===0&&ganEsta<=0){}
+          else if(ganPasada===0){ compHtml='<div style="font-size:.78rem;color:var(--tx2);margin-top:8px">📊 Primera semana con datos — ¡buen comienzo!</div>'; }
+          else {
+            var dif=ganEsta-ganPasada, difPct=Math.round(dif/Math.abs(ganPasada)*100), posMas=dif>0;
+            var label=Math.abs(difPct)>200
+              ?'<strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+( posMas?'+':'-')+(typeof fmt==='function'?fmt(Math.abs(dif)):Math.abs(dif))+'</strong> '+(posMas?'más':'menos')
+              :'<strong style="color:'+(posMas?'var(--ok)':'var(--bad)')+'">'+( posMas?'+':'')+difPct+'%</strong> '+(posMas?'más':'menos');
+            compHtml='<div style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.8rem;color:var(--tx2)"><span>'+(posMas?'📈':'📉')+'</span><span>Esta semana ganaste '+label+' que la semana pasada</span></div>';
+          }
+        }
+      } catch(e){}
+      var eqHtml = '';
+      var hoy = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
+      var eqHoy = (S&&S.ventas||[]).filter(function(v){ return v.fecha===hoy && v.tipo==='equipo'; });
+      if(eqHoy.length){
+        var cantEq=eqHoy.length, ganEq=eqHoy.reduce(function(a,v){ return a+(v.total||0)-(v.costo||0); },0);
+        eqHtml='<div style="display:flex;align-items:center;justify-content:space-between;font-size:.82rem;margin-top:8px;padding-top:8px;border-top:1px solid var(--bor)"><span style="color:var(--tx2)">📱 Equipo'+(cantEq>1?'s':'')+' vendido'+(cantEq>1?'s':'')+' hoy ('+cantEq+')</span><span style="color:'+(ganEq>=0?'var(--gld)':'var(--bad)')+';font-weight:600">'+(ganEq>=0?'':'-')+(typeof fmt==='function'?fmt(Math.abs(ganEq)):Math.abs(ganEq))+' ganancia neta</span></div>';
+      }
+      if(rachaHtml||compHtml||eqHtml) card.innerHTML += rachaHtml + compHtml + eqHtml;
+    };
+  }
+
+  /* ── V. rDivision + rPanelDinero: colapso "Ver detalle" (versión unificada) ── */
+  function _mkCollapseWrap(origFn, cardId, btnId, showTxt, hideTxt){
+    return function(){
+      origFn.apply(this, arguments);
+      var card = document.getElementById(cardId);
+      if(!card || card.style.display==='none') return;
+      if(!document.getElementById(btnId)){
+        var btn = document.createElement('button');
+        btn.id = btnId; btn.className = 'btn bgh';
+        btn.style.cssText = 'width:100%;margin-bottom:6px;font-size:.78rem';
+        btn.textContent = showTxt;
+        btn.onclick = function(){
+          var open = card.getAttribute('data-open')==='1';
+          card.style.display = open ? 'none' : 'block';
+          card.setAttribute('data-open', open ? '0' : '1');
+          btn.textContent = open ? showTxt : hideTxt;
+        };
+        card.parentNode.insertBefore(btn, card);
+        card.style.display = 'none'; card.setAttribute('data-open','0');
+      } else if(card.getAttribute('data-open')!=='1'){
+        card.style.display = 'none';
+        var tb = document.getElementById(btnId);
+        if(tb) tb.textContent = showTxt;
+      }
+    };
+  }
+  if(typeof rDivision==='function')    rDivision    = _mkCollapseWrap(rDivision,    'divisionCard', 'divisionToggleBtn',    '📊 Ver detalle de distribución', '📊 Ocultar distribución');
+  if(typeof rPanelDinero==='function') rPanelDinero = _mkCollapseWrap(rPanelDinero, 'panelDinero',  'panelDineroToggleBtn', '💡 Ver análisis 50/30/20',       '💡 Ocultar análisis 50/30/20');
+
+  /* ── W. rStock → rStockResumen + _calcGananciaSemana + checkMetaCelebration (fechaEnt fix) ── */
+  if(typeof rStock==='function'){
+    var _rStockW = rStock;
+    rStock = function(){
+      var r = _rStockW.apply(this, arguments);
+      if(typeof rStockResumen==='function') rStockResumen();
+      return r;
+    };
+  }
+  (function(){
+    function _remapReps(){
+      if(typeof S==='undefined'||!S||!S.reparaciones) return [];
+      var out = [];
+      for(var i=0; i<S.reparaciones.length; i++){
+        var rep = S.reparaciones[i], copy = {};
+        for(var k in rep){ if(Object.prototype.hasOwnProperty.call(rep,k)) copy[k]=rep[k]; }
+        if(rep.estado==='entregado' && rep.fechaEnt) copy.fecha = rep.fechaEnt;
+        out.push(copy);
+      }
+      return out;
+    }
+    function _conRemap(fn){
+      if(typeof S==='undefined'||!S) return fn();
+      var bak = S.reparaciones; S.reparaciones = _remapReps();
+      try { return fn(); } finally { S.reparaciones = bak; }
+    }
+    if(typeof _calcGananciaSemana==='function'){
+      var _cgsBak = _calcGananciaSemana;
+      _calcGananciaSemana = function(wo){ return _conRemap(function(){ return _cgsBak(wo); }); };
+    }
+    if(typeof checkMetaCelebration==='function'){
+      var _cmcBak = checkMetaCelebration;
+      checkMetaCelebration = function(){ return _conRemap(function(){ return _cmcBak(); }); };
+    }
+  })();
 
   /* ── P. _iniciarRealtimeReservas: pedir permisos + eliminar canal duplicado legacy ── */
   if(typeof _iniciarRealtimeReservas === 'function'){
