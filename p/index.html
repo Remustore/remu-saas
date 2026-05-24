@@ -152,7 +152,7 @@ const CAT_KW = {
 // ── Resolución de slug → tenant (idéntica a b/index.html) ─────────────────
 async function resolveSlug(slug){
   if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(slug)){
-    const {data} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', slug).limit(30);
+    const {data} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', slug);
     if(data&&data.length) return { tenantId: slug, rows: data };
   }
   try {
@@ -194,7 +194,11 @@ function parseRows(rows){
   const cfgRow = rows.map(r=>({...r,_d:tryParseData(r)})).find(r=>r._d&&(r._d.__tipo==='cfg'||r._d.__turnosCfg));
   if(cfgRow){
     const d = cfgRow._d;
-    if(d.__turnosCfg) turnosCfg = {...turnosCfg, ...d.__turnosCfg};
+    if(d.__turnosCfg){
+      turnosCfg = {...turnosCfg, ...d.__turnosCfg};
+      if(d.__turnosCfg.apertura) turnosCfg.apertura = d.__turnosCfg.apertura;
+      if(d.__turnosCfg.cierre)   turnosCfg.cierre   = d.__turnosCfg.cierre;
+    }
     if(d.__onlineCfg) onlineCfg = {...onlineCfg, ...d.__onlineCfg};
     if(d.__tenantName) tenantNombre = d.__tenantName;
     if(d.__rubro)      tenantRubro  = d.__rubro;
