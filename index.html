@@ -14093,23 +14093,6 @@ function _renderServiciosOnline(){
   }, 0);
 }
 
-(function(){
-  var _rTurnosOnlineOrig = rTurnosOnline;
-  rTurnosOnline = async function(){
-    await _rTurnosOnlineOrig.apply(this, arguments);
-    _renderServiciosOnline();
-  };
-})();
-
-// Refrescar panel online cada vez que se guarda la config de servicios
-(function(){
-  var _rTurnosConfigOrig2 = rTurnosConfig;
-  rTurnosConfig = async function(){
-    var r = await _rTurnosConfigOrig2.apply(this, arguments);
-    setTimeout(_renderServiciosOnline, 50);
-    return r;
-  };
-})();
 </script>
 
 <!-- ── Checkbox de aceptación de T&C en el wizard de registro ─────────────
@@ -14758,51 +14741,21 @@ function _adaptarObjetivosModal(){
      Solo wrappers — no se modifican funciones existentes.
 ──────────────────────────────────────────────────────────────────────── -->
 <script>
-// ── BUGS 1+2 (nuevos tenants): la fila cfg en Supabase puede tener __slug
-//    incorrecto o __turnosCfg con horarios default porque persistCfgToSupabase()
-//    solo corre al guardar servicios o cuando la cfg row falta. Tras el registro,
-//    la cfg row YA existe (la creó precargar) pero con datos de fábrica.
-//    Fix: al primer renderAll de la sesión por tenant, forzar un sync
-//    localStorage → Supabase para que las páginas públicas vean datos reales.
-//
-// ── BUG 3 (nuevos tenants): las notificaciones push llegan solo cuando
-//    silentRefresh corre (cada 30s). Con Supabase Realtime el admin recibe
-//    la notificación en < 1 segundo tras cada reserva online.
-//    Fix: suscripción Realtime en INSERT de turnos_solicitudes → dispara
-//    refreshBadgeSolicitudes() inmediatamente.
+// Fix: al primer renderAll por tenant, sincronizar localStorage → Supabase
+// para que páginas públicas vean slug/horarios correctos.
 (function(){
-  var _orig = renderAll;
+  var _origRA = renderAll;
   var _syncedTenant = '';
-  var _realtimeSub = null;
-  var _realtimeTenant = '';
-
-  function _setupReservasRealtime(tid){
-    if(!sb || !tid || _realtimeTenant === tid) return;
-    _realtimeTenant = tid;
-    if(_realtimeSub){ try{ sb.removeChannel(_realtimeSub); }catch(e){} }
-    try{
-      _realtimeSub = sb.channel('remu_reservas_' + tid)
-        .on('postgres_changes', {event:'INSERT', schema:'public', table:'turnos_solicitudes',
-            filter:'tenant_id=eq.'+tid}, function(){
-          if(typeof refreshBadgeSolicitudes === 'function') refreshBadgeSolicitudes();
-        })
-        .subscribe();
-    }catch(e){}
-  }
-
   renderAll = function(){
-    _orig.apply(this, arguments);
+    _origRA.apply(this, arguments);
     if(!currentTenant || !currentTenant.id || currentRole !== 'admin') return;
     var tid = currentTenant.id;
-    // Sync cfg row una sola vez por sesión (corrige slug + horarios en Supabase)
     if(_syncedTenant !== tid){
       _syncedTenant = tid;
       setTimeout(function(){
         if(typeof persistCfgToSupabase === 'function') persistCfgToSupabase().catch(function(){});
       }, 1500);
     }
-    // Canal Realtime: notificaciones instantáneas de nuevas reservas
-    _setupReservasRealtime(tid);
   };
 })();
 </script>
@@ -14826,24 +14779,6 @@ function _adaptarObjetivosModal(){
 })();
 </script>
 <script>
-/* ── BUG 1: sync S.precios → turnosCfg.servicios antes de persistir en Supabase ── */
-(function(){
-  if(typeof persistCfgToSupabase !== 'function') return;
-  var _origP = persistCfgToSupabase;
-  persistCfgToSupabase = async function(){
-    if(currentTenant && currentTenant.id && typeof S !== 'undefined' && Array.isArray(S.precios)){
-      var svcs = S.precios
-        .filter(function(p){ return p && !p.__tipo && !p.__turnosCfg && p.nombre; })
-        .filter(function(p){ return (p.disponibilidad||'disponible') !== 'no_disponible'; })
-        .map(function(p){ return {id:p.id, nombre:p.nombre, sector:p.categoria||p.sector||'', duracion:parseInt(p.duracion)||30, precio:parseFloat(p.precio)||0}; });
-      var cfg = getTurnosCfg();
-      cfg.servicios = svcs;
-      localStorage.setItem(TURNOS_CFG_KEY + '_' + currentTenant.id, JSON.stringify(cfg));
-    }
-    return _origP.apply(this, arguments);
-  };
-})();
-
 /* ── BUG 1: persistCfgToSupabase también al eliminar un precio ── */
 (function(){
   if(typeof delPrecio !== 'function') return;
@@ -15380,15 +15315,22 @@ async function _syncFijosSupabase(){
   if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return;
   if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return;
   try {
-    var rowId = _cfgRowId(currentTenant.id);
-    var fijos = getTurnosFijos();
-    var res = await sb.from('precios').select('data').eq('id', rowId).single();
-    var existing = res && res.data && res.data.data;
-    if(existing){
-      var merged = Object.assign({}, existing, { __turnosFijos: fijos });
-      await sb.from('precios').update({ data: merged })
-        .eq('id', rowId).eq('tenant_id', currentTenant.id);
-    }
+    var rowId  = _cfgRowId(currentTenant.id);
+    var fijos  = getTurnosFijos();
+    var tc     = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {};
+    var oc     = typeof getOnlineCfg === 'function' ? getOnlineCfg() : {};
+    var fichas = typeof getFichasCli === 'function' ? getFichasCli() : undefined;
+    var slug   = typeof tenantSlug   === 'function' ? tenantSlug(currentTenant.nombre || '') : '';
+    var rowData = {
+      id: rowId, __tipo: 'cfg',
+      __turnosCfg: tc, __onlineCfg: oc, __fichasCli: fichas,
+      __turnosFijos: fijos,
+      __tenantName: currentTenant.nombre || '', __rubro: currentTenant.rubro || '',
+      __slug: slug
+    };
+    await sb.from('precios').update({ data: rowData })
+      .eq('id', rowId).eq('tenant_id', currentTenant.id);
+    console.log('[remu] syncFijos OK — apertura:', tc.apertura, '| fijos:', fijos.length);
   } catch(e){ console.warn('[remu] syncFijos error:', e); }
 }
 
@@ -15759,39 +15701,6 @@ async function _syncFijosSupabase(){
   };
 })();
 
-// Fix: link de turnos online usa UUID en lugar de slug para evitar colisiones
-// entre tenants con nombres similares (ej: Rocaspana Peluquería vs Rocaspana Uñas).
-// resolveSlug() en b/index.html ya maneja UUIDs correctamente (Estrategia 1).
-(function(){
-  if(typeof rTurnosOnline !== 'function') return;
-  var _origRTO = rTurnosOnline;
-  rTurnosOnline = async function(){
-    var result = await _origRTO.apply(this, arguments);
-    var el = document.getElementById('turnosOnlineLink');
-    var tid = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id) ? currentTenant.id : '';
-    if(el && tid){
-      el.textContent = window.location.origin + '/b/' + tid;
-    }
-    return result;
-  };
-})();
-
-// Fix: _owS5 (pantalla de onboarding) también usa slug — reemplazar con UUID
-(function(){
-  if(typeof _owS5 !== 'function') return;
-  var _origOwS5 = _owS5;
-  _owS5 = function(){
-    var html = _origOwS5.apply(this, arguments);
-    var tid = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id) ? currentTenant.id : '';
-    if(!tid || !html) return html;
-    var slug = typeof tenantSlug === 'function' ? tenantSlug((currentTenant && currentTenant.nombre) || '') : '';
-    if(!slug) return html;
-    var oldLink = window.location.origin + '/b/' + slug;
-    var newLink = window.location.origin + '/b/' + tid;
-    return html.split(oldLink).join(newLink);
-  };
-})();
-
 // applyBranding: ignorar logos con ruta local file:// (solo funcionan en la compu donde se subió)
 (function(){
   if(typeof applyBranding !== 'function') return;
@@ -15857,41 +15766,6 @@ async function _syncFijosSupabase(){
   };
 })();
 
-// Bug fix: horario de apertura/cierre no se refleja en página pública.
-// Causa: _syncFijosSupabase hace READ→MERGE→WRITE. Si el READ ocurre antes de que
-// persistCfgToSupabase() escriba el nuevo horario, el WRITE posterior pisa el nuevo
-// valor con el dato viejo leído de Supabase. Race condition clásico.
-// Fix: reemplazar _syncFijosSupabase para que lea __turnosCfg desde localStorage
-// (fuente de verdad inmediata) en lugar de Supabase (potencialmente desactualizado).
-(function(){
-  if(typeof _syncFijosSupabase !== 'function') return;
-  _syncFijosSupabase = async function(){
-    if(!currentTenant || !currentTenant.id || typeof sb === 'undefined') return;
-    if(typeof _cfgRowId !== 'function' || typeof getTurnosFijos !== 'function') return;
-    try {
-      var rowId   = _cfgRowId(currentTenant.id);
-      var fijos   = getTurnosFijos();
-      var tc      = typeof getTurnosCfg   === 'function' ? getTurnosCfg()   : {};
-      var oc      = typeof getOnlineCfg   === 'function' ? getOnlineCfg()   : {};
-      var fichas  = typeof getFichasCli   === 'function' ? getFichasCli()   : undefined;
-      var slug    = typeof tenantSlug     === 'function' ? tenantSlug(currentTenant.nombre || '') : '';
-      var rowData = {
-        id: rowId,
-        __tipo: 'cfg',
-        __turnosCfg:  tc,
-        __onlineCfg:  oc,
-        __fichasCli:  fichas,
-        __turnosFijos: fijos,
-        __tenantName: currentTenant.nombre || '',
-        __rubro:      currentTenant.rubro  || '',
-        __slug:       slug
-      };
-      await sb.from('precios').update({ data: rowData })
-        .eq('id', rowId).eq('tenant_id', currentTenant.id);
-      console.log('[remu] syncFijos OK — apertura:', tc.apertura, '| fijos:', fijos.length);
-    } catch(e){ console.warn('[remu] syncFijos error:', e); }
-  };
-})();
 </script>
 
 <script>
@@ -16983,6 +16857,57 @@ async function _mFCS_sinCobro(){
         }
       }
       return _caOrig.apply(this, arguments);
+    };
+  }
+
+  /* ── X. rTurnosOnline: UUID link + _renderServiciosOnline (unifica wraps 1+2) ── */
+  if(typeof rTurnosOnline === 'function'){
+    var _rTOX = rTurnosOnline;
+    rTurnosOnline = async function(){
+      var result = await _rTOX.apply(this, arguments);
+      var el = document.getElementById('turnosOnlineLink');
+      var tid = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id) ? currentTenant.id : '';
+      if(el && tid){ el.textContent = window.location.origin + '/b/' + tid; }
+      if(typeof _renderServiciosOnline === 'function') _renderServiciosOnline();
+      return result;
+    };
+  }
+  if(typeof rTurnosConfig === 'function'){
+    var _rTCX = rTurnosConfig;
+    rTurnosConfig = async function(){
+      var r = await _rTCX.apply(this, arguments);
+      setTimeout(function(){ if(typeof _renderServiciosOnline === 'function') _renderServiciosOnline(); }, 50);
+      return r;
+    };
+  }
+
+  /* ── X2. _owS5: UUID en pantalla de onboarding ── */
+  if(typeof _owS5 === 'function'){
+    var _owS5X = _owS5;
+    _owS5 = function(){
+      var html = _owS5X.apply(this, arguments);
+      var tid = (typeof currentTenant !== 'undefined' && currentTenant && currentTenant.id) ? currentTenant.id : '';
+      if(!tid || !html) return html;
+      var slug = typeof tenantSlug === 'function' ? tenantSlug((currentTenant && currentTenant.nombre) || '') : '';
+      if(!slug) return html;
+      return html.split(window.location.origin + '/b/' + slug).join(window.location.origin + '/b/' + tid);
+    };
+  }
+
+  /* ── Z. persistCfgToSupabase: sincronizar S.precios→servicios antes de persistir ── */
+  if(typeof persistCfgToSupabase === 'function'){
+    var _pCfgZ = persistCfgToSupabase;
+    persistCfgToSupabase = async function(){
+      if(currentTenant && currentTenant.id && typeof S !== 'undefined' && Array.isArray(S.precios)){
+        var svcs = S.precios
+          .filter(function(p){ return p && !p.__tipo && !p.__turnosCfg && p.nombre; })
+          .filter(function(p){ return (p.disponibilidad||'disponible') !== 'no_disponible'; })
+          .map(function(p){ return {id:p.id, nombre:p.nombre, sector:p.categoria||p.sector||'', duracion:parseInt(p.duracion)||30, precio:parseFloat(p.precio)||0}; });
+        var cfg = getTurnosCfg();
+        cfg.servicios = svcs;
+        localStorage.setItem(TURNOS_CFG_KEY + '_' + currentTenant.id, JSON.stringify(cfg));
+      }
+      return _pCfgZ.apply(this, arguments);
     };
   }
 
