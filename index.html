@@ -16914,6 +16914,77 @@ async function _mFCS_sinCobro(){
     };
   }
 
+  /* ── FIX-RTF: rTurnosFijos — no regenerar en cada render ── */
+  (function(){
+    var _insideRTF = false;
+    window._rTurnosFijosRendering = function(){ return _insideRTF; };
+    if(typeof rTurnosFijos === 'function'){
+      var _rtfOrig = rTurnosFijos;
+      rTurnosFijos = function(){
+        _insideRTF = true;
+        try { return _rtfOrig.apply(this, arguments); }
+        finally { _insideRTF = false; }
+      };
+    }
+  })();
+
+  /* ── FIX-GTF: generarTurnosDesdeFijos — fechas locales + await sincFijos ── */
+  (function(){
+    function _locDateFijo(d){
+      return d.getFullYear() + '-' +
+        String(d.getMonth()+1).padStart(2,'0') + '-' +
+        String(d.getDate()).padStart(2,'0');
+    }
+    if(typeof generarTurnosDesdeFijos === 'function'){
+      generarTurnosDesdeFijos = async function(fijos, syncSupabase){
+        if(typeof window._rTurnosFijosRendering === 'function' &&
+           window._rTurnosFijosRendering() && !syncSupabase) return 0;
+        var turnosExistentes = typeof getTurnos==='function' ? getTurnos() : [];
+        var cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[],empleados:[]};
+        var nuevos = [];
+        var hoyBase = new Date();
+        var limite = new Date(hoyBase);
+        limite.setMonth(limite.getMonth() + 6);
+        (fijos||[]).forEach(function(fijo){
+          if(!fijo.activo) return;
+          var diasHastaProximo = (fijo.dia - hoyBase.getDay() + 7) % 7;
+          var fechaIter = new Date(hoyBase);
+          fechaIter.setDate(hoyBase.getDate() + diasHastaProximo);
+          while(fechaIter <= limite){
+            var fechaStr = _locDateFijo(fechaIter);
+            var yaExiste = turnosExistentes.find(function(t){
+              return t.fecha===fechaStr && t.hora===fijo.hora && t.cliente===fijo.cliente;
+            });
+            if(!yaExiste){
+              var srv = (cfg.servicios||[]).find(function(s){ return s.nombre===fijo.servicio; }) || (cfg.servicios||[])[0];
+              var emp = (fijo.empleadoId ? (cfg.empleados||[]).find(function(e){ return String(e.id)===String(fijo.empleadoId); }) : null) || (cfg.empleados||[])[0];
+              nuevos.push({
+                id:'fijo_'+fijo.id+'_'+fechaStr,
+                cliente:fijo.cliente, tel:fijo.tel||'',
+                fecha:fechaStr, hora:fijo.hora,
+                empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'',
+                servicioId:srv?srv.id:0, servicioNombre:fijo.servicio,
+                sector:srv?srv.sector:'', duracion:fijo.duracion, precio:srv?srv.precio:0,
+                notas:'🔒 Turno fijo'+(fijo.notas?' — '+fijo.notas:''),
+                estado:'confirmado', esFijo:true, fijoId:fijo.id,
+                creadoEn:new Date().toISOString()
+              });
+            }
+            fechaIter.setDate(fechaIter.getDate()+7);
+          }
+        });
+        if(nuevos.length && typeof saveTurnosLocal==='function'){
+          saveTurnosLocal([...turnosExistentes, ...nuevos]);
+        }
+        if(syncSupabase && typeof sincronizarFijosSupabase==='function'){
+          try { await sincronizarFijosSupabase((fijos||[]).filter(function(f){ return f.activo; }),'crear'); }
+          catch(e){ console.warn('[fijosSync]', e); }
+        }
+        return nuevos.length;
+      };
+    }
+  })();
+
   /* ── K. Arranque: sync inicial ── */
   setTimeout(_syncFromSupabase, 4000);
   setTimeout(function(){ if(typeof resyncTurnosToSupabase==='function') resyncTurnosToSupabase(); }, 7000);
