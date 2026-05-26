@@ -13740,40 +13740,31 @@ function rAccionesRapidas(){
   var el = document.getElementById('dashQuickBtns');
   if(!el) return;
   var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
-  var esBarb = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+  var esBarb = /barber|salon|belleza|peluq|manicur/i.test(rub);
 
   var btnStyle = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 8px;font-size:.82rem;font-weight:600;border-radius:10px;cursor:pointer;border:1px solid var(--bor2);background:var(--sur);color:var(--tx2);transition:all .15s;';
-  var emStyle = 'font-size:1.5rem;line-height:1';
+  var emStyle  = 'font-size:1.5rem;line-height:1';
 
-  if(esBarb){
-    el.innerHTML =
-      '<div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Acciones rápidas</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
-        '<button style="'+btnStyle+'" onclick="go(\'turnos\');setTimeout(function(){openM(\'mTurno\',null)},300)" onmouseover="this.style.borderColor=\'var(--gld)\';this.style.color=\'var(--gld)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
-          '<span style="'+emStyle+'">➕</span>Turno rápido' +
-        '</button>' +
-        '<button style="'+btnStyle+'" onclick="openM(\'mVenta\',null);go(\'ventas\')" onmouseover="this.style.borderColor=\'var(--ok)\';this.style.color=\'var(--ok)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
-          '<span style="'+emStyle+'">💰</span>Cobrar servicio' +
-        '</button>' +
-        '<button style="'+btnStyle+'" onclick="go(\'clientes\')" onmouseover="this.style.borderColor=\'var(--inf)\';this.style.color=\'var(--inf)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
-          '<span style="'+emStyle+'">👤</span>Clientes' +
-        '</button>' +
-      '</div>';
-  } else {
-    el.innerHTML =
-      '<div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Acciones rápidas</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
-        '<button style="'+btnStyle+'" onclick="openM(\'mTaller\',null);go(\'taller\')" onmouseover="this.style.borderColor=\'var(--wrn)\';this.style.color=\'var(--wrn)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
-          '<span style="'+emStyle+'">🔧</span>Equipo nuevo' +
-        '</button>' +
-        '<button style="'+btnStyle+'" onclick="openM(\'mVenta\',null);go(\'ventas\')" onmouseover="this.style.borderColor=\'var(--ok)\';this.style.color=\'var(--ok)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
-          '<span style="'+emStyle+'">💰</span>Registrar venta' +
-        '</button>' +
-        '<button style="'+btnStyle+'" onclick="go(\'pedidos\');setTimeout(function(){openM(\'mPedido\',null)},300)" onmouseover="this.style.borderColor=\'var(--inf)\';this.style.color=\'var(--inf)\'" onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
-          '<span style="'+emStyle+'">📋</span>Pedido nuevo' +
-        '</button>' +
-      '</div>';
-  }
+  var btns = esBarb ? [
+    { em:'➕', lbl:'Turno rápido',    clr:'var(--gld)', action:"go('turnos');setTimeout(function(){openM('mTurno',null)},300)" },
+    { em:'💰', lbl:'Registrar cobro', clr:'var(--ok)',  action:"openM('mVenta',null);go('ventas')" },
+    { em:'👤', lbl:'Cliente nuevo',   clr:'var(--inf)', action:"go('clientes')" }
+  ] : [
+    { em:'🔧', lbl:'Equipo nuevo',    clr:'var(--wrn)', action:"openM('mTaller',null);go('taller')" },
+    { em:'💰', lbl:'Registrar venta', clr:'var(--ok)',  action:"openM('mVenta',null);go('ventas')" },
+    { em:'📋', lbl:'Pedido nuevo',    clr:'var(--inf)', action:"go('pedidos');setTimeout(function(){openM('mPedido',null)},300)" }
+  ];
+
+  el.innerHTML =
+    '<div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Acciones rápidas</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">' +
+    btns.map(function(b){
+      return '<button style="'+btnStyle+'" onclick="'+b.action+'" '+
+        'onmouseover="this.style.borderColor=\''+b.clr+'\';this.style.color=\''+b.clr+'\'" '+
+        'onmouseout="this.style.borderColor=\'var(--bor2)\';this.style.color=\'var(--tx2)\'">' +
+        '<span style="'+emStyle+'">'+b.em+'</span>'+b.lbl+'</button>';
+    }).join('') +
+    '</div>';
 }
 
 // ── Feature 2: Racha de uso ────────────────────────────────────────────────
@@ -16908,6 +16899,18 @@ async function _mFCS_sinCobro(){
         localStorage.setItem(TURNOS_CFG_KEY + '_' + currentTenant.id, JSON.stringify(cfg));
       }
       return _pCfgZ.apply(this, arguments);
+    };
+  }
+
+  /* ── Y. openM('mTurno',null) — no limpiar si el modal ya está abierto ── */
+  if(typeof openM === 'function'){
+    var _omGuard = openM;
+    openM = function(id, editId){
+      if(id === 'mTurno' && (editId === null || editId === undefined)){
+        var _modal = document.getElementById('mTurno');
+        if(_modal && _modal.classList.contains('open')) return;
+      }
+      return _omGuard.apply(this, arguments);
     };
   }
 
