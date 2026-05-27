@@ -6858,9 +6858,15 @@ async function liberarSlotSupabase(turno){
 }
 
 // Sincroniza turnos fijos como bloqueados en turnos_solicitudes (6 meses)
+function _fijosLocDate(d){
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+}
+
 async function sincronizarFijosSupabase(fijos, accion){
   if(!sb || !currentTenant?.id || !fijos?.length) return;
-  const todStr = tod();
+  const todStr = _fijosLocDate(new Date());
   try{
     if(accion === 'borrar'){
       for(const f of fijos){
@@ -6872,7 +6878,6 @@ async function sincronizarFijosSupabase(fijos, accion){
       }
       return;
     }
-    // accion === 'crear': borrar primero los futuros y reinsertar 6 meses
     const hoy = new Date();
     const limite = new Date(hoy);
     limite.setMonth(limite.getMonth() + 6);
@@ -6882,9 +6887,9 @@ async function sincronizarFijosSupabase(fijos, accion){
       await sb.from('turnos_solicitudes').delete()
         .eq('tenant_id', currentTenant.id)
         .eq('nombre', '__fijo__:' + fijo.id)
-        .eq('estado', 'bloqueado')
-        .gte('fecha', todStr);
+        .eq('estado', 'bloqueado');
       const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
+      const horaStr = String(fijo.hora || '').substring(0, 5);
       const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
       let fecha = new Date(hoy);
       fecha.setDate(hoy.getDate() + diasHasta);
@@ -6895,8 +6900,8 @@ async function sincronizarFijosSupabase(fijos, accion){
           tel: fijo.tel||'',
           servicio_id: null,
           empleado_id: empId,
-          fecha: fecha.toISOString().slice(0,10),
-          hora: fijo.hora,
+          fecha: _fijosLocDate(fecha),
+          hora: horaStr,
           estado: 'bloqueado',
           created_at: new Date().toISOString()
         });
@@ -15468,71 +15473,7 @@ async function _syncFijosSupabase(){
   };
 })();
 
-/* ── FIX 2: sincronizarFijosSupabase — fechas locales en lugar de UTC ── */
-/* Bug: fecha.toISOString().slice(0,10) usa UTC. En Argentina (UTC-3) después  */
-/* de las 21:00 locales el UTC ya es el día siguiente → bloques guardados      */
-/* un día tarde. Ej: jueves 22:00 local → UTC viernes → fecha = viernes.      */
-(function(){
-  if(typeof sincronizarFijosSupabase !== 'function') return;
 
-  function _locDate(d){
-    return d.getFullYear() + '-' +
-      String(d.getMonth()+1).padStart(2,'0') + '-' +
-      String(d.getDate()).padStart(2,'0');
-  }
-
-  sincronizarFijosSupabase = async function(fijos, accion){
-    if(!sb || !currentTenant?.id || !fijos?.length) return;
-    const todStr = _locDate(new Date());
-    try{
-      if(accion === 'borrar'){
-        for(const f of fijos){
-          await sb.from('turnos_solicitudes').delete()
-            .eq('tenant_id', currentTenant.id)
-            .eq('nombre', '__fijo__:' + f.id)
-            .eq('estado', 'bloqueado')
-            .gte('fecha', todStr);
-        }
-        return;
-      }
-      // accion === 'crear': borrar TODOS los bloqueados y reinsertar 6 meses
-      const hoy = new Date();
-      const limite = new Date(hoy);
-      limite.setMonth(limite.getMonth() + 6);
-      const rows = [];
-      for(const fijo of fijos){
-        if(!fijo.activo) continue;
-        // Delete por fijo sin filtro de fecha: limpia bloques con fecha incorrecta de versiones anteriores
-        await sb.from('turnos_solicitudes').delete()
-          .eq('tenant_id', currentTenant.id)
-          .eq('nombre', '__fijo__:' + fijo.id)
-          .eq('estado', 'bloqueado');
-        const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
-        const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
-        let fecha = new Date(hoy);
-        fecha.setDate(hoy.getDate() + diasHasta);
-        while(fecha <= limite){
-          rows.push({
-            tenant_id: currentTenant.id,
-            nombre: '__fijo__:' + fijo.id,
-            tel: fijo.tel||'',
-            servicio_id: null,
-            empleado_id: empId,
-            fecha: _locDate(fecha),
-            hora: fijo.hora,
-            estado: 'bloqueado',
-            created_at: new Date().toISOString()
-          });
-          fecha.setDate(fecha.getDate() + 7);
-        }
-      }
-      for(let i=0; i<rows.length; i+=100){
-        const { error } = await sb.from('turnos_solicitudes').insert(rows.slice(i, i+100));
-        if(error) console.warn('[fijos sync] insert error:', error.message);
-      }
-    }catch(e){ console.warn('[fijos sync]', e); }
-  };
-})();
 </script>
 <script>
 /* ── FIX: reparaciones — usar fechaEnt (entrega) no fecha (ingreso) ── */
