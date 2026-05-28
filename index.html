@@ -14156,6 +14156,7 @@ function _renderServiciosOnline(){
         return;
       }
     }
+    console.log('[S1] servicioId:', servicioId, '| raw value:', document.getElementById('turnoServicio')?.value);
     return _orig.apply(this, arguments);
   };
 })();
