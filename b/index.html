@@ -397,6 +397,11 @@ async function cargarSlots(){
     slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
   }
 
+  console.log('[slots] ocupados:', [...ocupados]);
+  console.log('[slots] bloqueos:', [...bloqueos]);
+  console.log('[slots] slotsNeeded:', slotsNeeded);
+  console.log('[slots] primer slot bloqueado:', slots.find(s=>s.ocu));
+
   if(!slots.length){
     wrap.className = 'msg-info';
     wrap.innerHTML = 'Sin horarios configurados para este día.';
