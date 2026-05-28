@@ -239,6 +239,7 @@ function renderBooking(){
 
     <label>Servicio</label>
     <select id="bServicio" onchange="onSrvChange()">
+      <option value="">— Elegí un servicio —</option>
       ${cfg.servicios.map(s=>`<option value="${s.id}" data-precio="${s.precio||0}" data-dur="${s.duracion||30}">${esc(s.sector?s.sector+': ':'')}${esc(s.nombre)} (${s.duracion||30} min)${s.precio>0?' — '+fmt(s.precio):''}</option>`).join('')}
     </select>
     <div class="precio-box" id="bPrecioBox">
