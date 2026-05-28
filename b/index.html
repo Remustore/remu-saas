@@ -376,23 +376,23 @@ async function cargarSlots(){
     }
   }
 
-  // Duración del servicio seleccionado
+  // Duración del servicio seleccionado — string comparison para IDs mixtos y '__aconfirmar__'
   const srvSel = document.getElementById('bServicio');
-  const srvId = srvSel ? parseInt(srvSel.value) : 0;
-  const srv = (cfg.servicios||[]).find(s=>s.id===srvId)||(cfg.servicios||[])[0];
-  const duracion = srv?.duracion||30;
+  const srvVal = srvSel ? String(srvSel.value || '') : '';
+  const srv    = (cfg.servicios||[]).find(s => String(s.id) === srvVal);
+  // Sin servicio válido: slotsNeeded=1, solo bloquea el slot exacto ocupado (sin cascada)
+  const slotsNeeded = srv ? Math.ceil((srv.duracion || 30) / 30) : 1;
 
   // Generar slots cada 30 min
   const ap = hhToMin(cfg.apertura||'09:00');
   const ci = hhToMin(cfg.cierre||'20:00');
   const slots = [];
-  const slotsNeeded = Math.ceil(duracion/30);
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    // Verificar que todos los slots necesarios (según duración) estén libres
+    // Slot M queda bloqueado si M + duración del servicio seleccionado pisa un slot ocupado
     let isOcu = false;
     for(let k=0; k<slotsNeeded; k++){
-      if(ocupados.has(minToHH(m+k*30))){ isOcu=true; break; }
+      if(ocupados.has(minToHH(m + k*30))){ isOcu=true; break; }
     }
     slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
   }
