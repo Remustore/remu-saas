@@ -6963,6 +6963,7 @@ function setEmpleadoFiltro(id, btn){
 }
 
 function openNuevoTurno(){
+  if(document.getElementById('mTurno')?.classList.contains('open')) return;
   const cfg = getTurnosCfg();
   // Fill empleados select
   const empSel = document.getElementById('turnoEmpleado');
