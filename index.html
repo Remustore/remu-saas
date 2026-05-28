@@ -7106,6 +7106,8 @@ async function verificarConflicto(){
 }
 
 async function saveTurno(_override){
+  console.log('[saveTurno] turnoCli value:', document.getElementById('turnoCli')?.value);
+  console.log('[saveTurno] turnoCli element:', document.getElementById('turnoCli'));
   const id = document.getElementById('turnoId').value;
   const cli = document.getElementById('turnoCli').value.trim();
   const tel = document.getElementById('turnoTel').value.trim();
