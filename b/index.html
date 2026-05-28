@@ -366,6 +366,7 @@ async function cargarSlots(){
     const emps = empId
       ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
       : cfg.empleados;
+    console.log('[slots] empleados y sus bloqueos:', JSON.stringify(emps.map(e=>({nombre:e.nombre, bloqueos:e.bloqueos}))));
     const ap = hhToMin(cfg.apertura||'09:00');
     const ci = hhToMin(cfg.cierre||'20:00');
     for(let m=ap; m<=ci; m+=30){
