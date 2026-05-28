@@ -380,6 +380,7 @@ async function cargarSlots(){
   const srvSel = document.getElementById('bServicio');
   const srvVal = srvSel ? String(srvSel.value || '') : '';
   const srv    = (cfg.servicios||[]).find(s => String(s.id) === srvVal);
+  console.log('[slots] srvVal:', srvVal, '| srv encontrado:', srv?.nombre, '| duracion:', srv?.duracion);
   // Sin servicio válido: slotsNeeded=1, solo bloquea el slot exacto ocupado (sin cascada)
   const slotsNeeded = srv ? Math.ceil((srv.duracion || 30) / 30) : 1;
 
