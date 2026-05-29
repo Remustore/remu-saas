@@ -330,14 +330,14 @@ function onFechaChange(){
 
 async function cargarSlots(){
   const fecha = document.getElementById('bFecha')?.value;
-  const wrap = document.getElementById('bSlotsWrap');
+  const wrap  = document.getElementById('bSlotsWrap');
   if(!fecha||!wrap) return;
-  // Reset hora
+
   const horaInput = document.getElementById('bHora');
   if(horaInput) horaInput.value = '';
 
-  const cfg = G.cfg;
-  const DIAS = cfg.dias&&cfg.dias.length>0 ? cfg.dias : [1,2,3,4,5,6];
+  const cfg    = G.cfg;
+  const DIAS   = cfg.dias&&cfg.dias.length>0 ? cfg.dias : [1,2,3,4,5,6];
   const diaSel = new Date(fecha+'T12:00:00').getDay();
   const nomDia = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
 
@@ -350,8 +350,6 @@ async function cargarSlots(){
   wrap.className = 'msg-info';
   wrap.innerHTML = 'Cargando horarios...';
 
-  // Slots ocupados de Supabase (confirmados + bloqueados + pendientes)
-  // 'pendiente' bloquea el slot inmediatamente para evitar doble reserva
   const {data: ocuData} = await sb.from('turnos_solicitudes')
     .select('hora,estado')
     .eq('tenant_id', G.tenantId)
@@ -361,13 +359,11 @@ async function cargarSlots(){
   const ocupados = new Set((ocuData||[]).map(s=>(s.hora||'').substring(0,5)));
   const bloqueos = new Set();
 
-  // Bloqueos por empleado
   const empId = document.getElementById('bEmpleado')?.value||'';
   if(cfg.empleados&&cfg.empleados.length){
     const emps = empId
       ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
       : cfg.empleados;
-    console.log('[slots] empleados y sus bloqueos:', JSON.stringify(emps.map(e=>({nombre:e.nombre, bloqueos:e.bloqueos}))));
     const ap = hhToMin(cfg.apertura||'09:00');
     const ci = hhToMin(cfg.cierre||'20:00');
     for(let m=ap; m<=ci; m+=30){
@@ -378,32 +374,21 @@ async function cargarSlots(){
     }
   }
 
-  // Duración del servicio seleccionado — string comparison para IDs mixtos y '__aconfirmar__'
-  const srvSel = document.getElementById('bServicio');
-  const srvVal = srvSel ? String(srvSel.value || '') : '';
-  const srv    = (cfg.servicios||[]).find(s => String(s.id) === srvVal);
-  console.log('[slots] srvVal:', srvVal, '| srv encontrado:', srv?.nombre, '| duracion:', srv?.duracion);
-  // Sin servicio válido: slotsNeeded=1, solo bloquea el slot exacto ocupado (sin cascada)
-  const slotsNeeded = srv ? Math.ceil((srv.duracion || 30) / 30) : 1;
+  const srvVal     = String(document.getElementById('bServicio')?.value||'');
+  const srv        = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
+  const slotsNeeded = srv ? Math.ceil((srv.duracion||30)/30) : 1;
 
-  // Generar slots cada 30 min
-  const ap = hhToMin(cfg.apertura||'09:00');
-  const ci = hhToMin(cfg.cierre||'20:00');
+  const ap    = hhToMin(cfg.apertura||'09:00');
+  const ci    = hhToMin(cfg.cierre||'20:00');
   const slots = [];
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    // Slot M queda bloqueado si M + duración del servicio seleccionado pisa un slot ocupado
     let isOcu = false;
     for(let k=0; k<slotsNeeded; k++){
-      if(ocupados.has(minToHH(m + k*30))){ isOcu=true; break; }
+      if(ocupados.has(minToHH(m+k*30))){ isOcu=true; break; }
     }
     slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
   }
-
-  console.log('[slots] ocupados:', [...ocupados]);
-  console.log('[slots] bloqueos:', [...bloqueos]);
-  console.log('[slots] slotsNeeded:', slotsNeeded);
-  console.log('[slots] primer slot bloqueado:', slots.find(s=>s.ocu));
 
   if(!slots.length){
     wrap.className = 'msg-info';
