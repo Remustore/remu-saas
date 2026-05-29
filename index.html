@@ -7106,36 +7106,42 @@ async function verificarConflicto(){
 }
 
 async function saveTurno(_override){
-  console.log('[saveTurno-orig] turnoCli:', document.getElementById('turnoCli')?.value, '| modal open:', document.getElementById('mTurno')?.classList.contains('open'));
-  const id = document.getElementById('turnoId').value;
-  const cli = document.getElementById('turnoCli').value.trim();
-  const tel = document.getElementById('turnoTel').value.trim();
-  const fecha = document.getElementById('turnoFecha').value;
-  const hora = document.getElementById('turnoHora').value;
-  const empleadoId = document.getElementById('turnoEmpleado').value;
-  const servicioId = parseInt(document.getElementById('turnoServicio').value);
-  const notas = document.getElementById('turnoNotas').value;
+  const cli        = (document.getElementById('turnoCli')?.value||'').trim();
+  const servicioVal = String(document.getElementById('turnoServicio')?.value||'').trim();
+  const fecha      = document.getElementById('turnoFecha')?.value||'';
+  const hora       = document.getElementById('turnoHora')?.value||'';
+  const empleadoId = document.getElementById('turnoEmpleado')?.value||'';
+  const id         = document.getElementById('turnoId')?.value||'';
+  const tel        = (document.getElementById('turnoTel')?.value||'').trim();
+  const notas      = document.getElementById('turnoNotas')?.value||'';
 
-  if(!cli) return alert('Ingresá el nombre del cliente');
-  if(!fecha||!hora) return alert('Ingresá fecha y hora');
-  if(!empleadoId) return alert('Seleccioná un empleado');
+  if(!cli){
+    showToast('Ingresá el nombre del cliente','err');
+    return;
+  }
+  if(!servicioVal){
+    const el = document.getElementById('turnoServicio');
+    if(el){ el.style.boxShadow='0 0 0 2px var(--bad)'; el.focus(); setTimeout(()=>{ el.style.boxShadow=''; },2000); }
+    showToast('Seleccioná un servicio','err');
+    return;
+  }
+  if(!fecha||!hora){ showToast('Ingresá fecha y hora','err'); return; }
+  if(!empleadoId){ showToast('Seleccioná un empleado','err'); return; }
 
-  const cfg = getTurnosCfg();
-  const srv = cfg.servicios.find(s=>s.id===servicioId);
-  const empleado = cfg.empleados.find(e=>e.id==empleadoId);
+  const cfg      = getTurnosCfg();
+  const srv      = cfg.servicios.find(s=>String(s.id)===servicioVal);
+  const empleado = cfg.empleados.find(e=>String(e.id)===String(empleadoId));
+  const turnos   = getTurnos();
 
-  const turnos = getTurnos();
-
-  // Validación de duplicados — solo al crear o cambiar hora/empleado, nunca con _override=true
   if(!_override){
     const durN = srv?.duracion||60;
     const [h,m] = hora.split(':').map(Number);
     const inicioN = h*60+m;
-    const finN = inicioN+durN;
+    const finN    = inicioN+durN;
     const conflicto = turnos.find(t=>{
       if(t.fecha!==fecha||['cancelado','no_vino'].includes(t.estado)) return false;
       if(String(t.empleadoId)!==String(empleadoId)) return false;
-      if(String(t.id)===String(id)) return false; // mismo turno editándose
+      if(String(t.id)===String(id)) return false;
       const srvT=cfg.servicios.find(s=>s.id==t.servicioId);
       const durT=srvT?.duracion||60;
       const [th,tm]=(t.hora||'00:00').split(':').map(Number);
@@ -7150,117 +7156,90 @@ async function saveTurno(_override){
       return;
     }
   }
-  const estado = document.getElementById('turnoEstado')?.value || 'confirmado';
-  const precioCobrado = parseFloat(document.getElementById('turnoPrecio')?.value || srv?.precio || 0);
-  // Preserve original data when editing
+
+  const estado        = document.getElementById('turnoEstado')?.value||'confirmado';
+  const precioCobrado = parseFloat(document.getElementById('turnoPrecio')?.value||srv?.precio||0);
   const turnoOriginal = id ? turnos.find(t=>t.id===id) : null;
+
   const obj = {
-    id: id || Date.now().toString(),
+    id: id||Date.now().toString(),
     cliente: cli, tel, fecha, hora,
     empleadoId, empleadoNombre: empleado?.nombre||'',
-    servicioId, servicioNombre: srv?.nombre||'',
-    sector: srv?.sector||'',
+    servicioId: srv?.id||servicioVal, servicioNombre: srv?.nombre||'',
+    sector:   srv?.sector||'',
     duracion: srv?.duracion||60,
     precio: precioCobrado,
     notas, estado,
-    esFijo: turnoOriginal?.esFijo || false,
-    fijoId: turnoOriginal?.fijoId || null,
-    creadoEn: turnoOriginal?.creadoEn || new Date().toISOString()
+    esFijo:   turnoOriginal?.esFijo||false,
+    fijoId:   turnoOriginal?.fijoId||null,
+    creadoEn: turnoOriginal?.creadoEn||new Date().toISOString()
   };
 
   if(id){
     const idx = turnos.findIndex(t=>String(t.id)===String(id));
-    if(idx>-1){
-      turnos[idx] = obj;
-    } else {
-      showToast('Error: turno no encontrado');
-      return;
-    }
+    if(idx>-1){ turnos[idx]=obj; } else { showToast('Error: turno no encontrado','err'); return; }
   } else {
     turnos.push(obj);
   }
-
   saveTurnosLocal(turnos);
 
-  // Si editando y fecha/hora/empleado cambió, borrar bloqueo anterior
-  if(id && turnoOriginal && (turnoOriginal.fecha !== obj.fecha || turnoOriginal.hora !== obj.hora || turnoOriginal.empleadoId !== obj.empleadoId)){
-    await sincronizarBloqueoManual(turnoOriginal, 'borrar');
+  if(id && turnoOriginal && (
+    turnoOriginal.fecha!==obj.fecha ||
+    turnoOriginal.hora!==obj.hora   ||
+    String(turnoOriginal.empleadoId)!==String(obj.empleadoId)
+  )){
+    await sincronizarBloqueoManual(turnoOriginal,'borrar');
   }
-  // Sincronizar bloqueo en Supabase para página pública
-  if(estado !== 'cancelado' && estado !== 'no_vino' && estado !== 'terminado'){
-    await sincronizarBloqueoManual(obj, 'crear');
+  if(estado!=='cancelado'&&estado!=='no_vino'&&estado!=='terminado'){
+    await sincronizarBloqueoManual(obj,'crear');
   } else {
     await liberarSlotSupabase(obj);
   }
 
-  // Si terminado, registrar venta — SOLO si el turno NO estaba ya terminado antes de este guardado.
-  // Esto previene crear venta doble cuando el usuario edita un turno que ya fue finalizado.
-  const yaEstabaTerminado = turnoOriginal && turnoOriginal.estado === 'terminado';
-  console.log('[guardarTurno] estado:', estado, '| yaEstabaTerminado:', yaEstabaTerminado, '| precioCobrado:', precioCobrado);
-  if(estado === 'terminado' && precioCobrado > 0 && !yaEstabaTerminado){
-    const rubTenantGT = (currentTenant?.rubro||'').toLowerCase();
-    const esSalonBarberGT = /barber|barbería|salon|belleza/i.test(rubTenantGT);
-    if(esSalonBarberGT){
-      // Para barberías/salones: el ingreso del turno vive SOLO en getTurnos() (localStorage).
-      // No crear venta en S.ventas — hacerlo causaría doble conteo con getTurnos() en todos los cálculos.
-      console.log('[guardarTurno] barbería/salon — ingreso vive en getTurnos(), no se crea venta en S.ventas');
-      showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado');
+  const yaEstabaTerminado = turnoOriginal&&turnoOriginal.estado==='terminado';
+  if(estado==='terminado'&&precioCobrado>0&&!yaEstabaTerminado){
+    const rub = (currentTenant?.rubro||'').toLowerCase();
+    if(/barber|barbería|salon|belleza/i.test(rub)){
+      showToast('✓ Turno terminado · '+fmt(precioCobrado)+' registrado');
     } else {
-      // Para talleres/otros rubros: registrar la venta en S.ventas normalmente
       const turnoIdStr = String(obj.id);
-      const yaExisteVenta = S.ventas.some(v => v.turnoId === turnoIdStr);
-      console.log('[guardarTurno] turnoId:', turnoIdStr, '| yaExisteVenta:', yaExisteVenta, '| S.ventas.length:', S.ventas.length);
-      if(!yaExisteVenta){
+      if(!S.ventas.some(v=>v.turnoId===turnoIdStr)){
         const venta = {
-          id: Date.now(),
-          turnoId: turnoIdStr,
-          tipo: 'servicio',
-          nombre: srv?.nombre || obj.servicioNombre || 'Servicio',
-          cantidad: 1,
-          precio: precioCobrado,
-          total: precioCobrado,
-          costo: 0,
-          metodo: obj.metodo || 'Efectivo',
-          fecha: fecha,
-          comPct: 0,
-          comision: 0
+          id: Date.now(), turnoId: turnoIdStr,
+          tipo:'servicio', nombre: srv?.nombre||obj.servicioNombre||'Servicio',
+          cantidad:1, precio:precioCobrado, total:precioCobrado,
+          costo:0, metodo: obj.metodo||'Efectivo', fecha,
+          comPct:0, comision:0
         };
         S.ventas.unshift(venta);
-        await dbUpsert('ventas', venta);
-        console.log('[guardarTurno] ✓ Venta creada:', venta.nombre, '$'+venta.total);
-        showToast('✓ Turno terminado · ' + fmt(precioCobrado) + ' registrado en ingresos');
-      } else {
-        console.log('[guardarTurno] ⚠ Venta ya existía para turnoId', turnoIdStr, '— no se duplica');
+        await dbUpsert('ventas',venta);
+        showToast('✓ Turno terminado · '+fmt(precioCobrado)+' registrado en ingresos');
       }
     }
   }
 
-  // Si el checkbox "recurrente" está marcado (solo disponible al crear), crear turno fijo
   const esFijoCheck = !id && document.getElementById('turnoEsFijo')?.checked;
   if(esFijoCheck){
-    const diaNum = new Date(fecha + 'T12:00:00').getDay(); // lunes=1..domingo=0
-    const fijoExistente = getTurnosFijos().find(f=>f.dia===diaNum && f.hora===hora && f.empleadoId==empleadoId);
+    const diaNum = new Date(fecha+'T12:00:00').getDay();
+    const fijoExistente = getTurnosFijos().find(f=>f.dia===diaNum&&f.hora===hora&&f.empleadoId==empleadoId);
     if(!fijoExistente){
       const nuevoFijo = {
-        id: 'rfijo_' + Date.now().toString(),
-        cliente: cli, tel, dia: diaNum, hora,
-        servicio: srv?.nombre||'Servicio',
-        duracion: srv?.duracion||60,
+        id:'rfijo_'+Date.now().toString(),
+        cliente:cli, tel, dia:diaNum, hora,
+        servicio:  srv?.nombre||'Servicio',
+        duracion:  srv?.duracion||60,
         empleadoId, empleadoNombre: empleado?.nombre||'',
-        notas, activo: true,
-        creadoEn: new Date().toISOString()
+        notas, activo:true, creadoEn:new Date().toISOString()
       };
       const fijos = getTurnosFijos();
       fijos.push(nuevoFijo);
       saveTurnosFijosLocal(fijos);
-      // Marcar el turno ya creado como fijo
-      obj.esFijo = true;
-      obj.fijoId = nuevoFijo.id;
-      const allTurnos = getTurnos();
-      const idx2 = allTurnos.findIndex(t=>t.id===obj.id);
-      if(idx2>-1) allTurnos[idx2] = obj;
+      obj.esFijo=true; obj.fijoId=nuevoFijo.id;
+      const allTurnos=getTurnos();
+      const idx2=allTurnos.findIndex(t=>t.id===obj.id);
+      if(idx2>-1) allTurnos[idx2]=obj;
       saveTurnosLocal(allTurnos);
-      generarTurnosDesdeFijos([nuevoFijo], true); // genera 6 meses + sync Supabase
+      generarTurnosDesdeFijos([nuevoFijo],true);
       showToast('✓ Turno agendado + turno fijo creado — bloqueado 6 meses online');
     } else {
       showToast('Turno agendado ✓ (ya existe un fijo similar para ese horario)');
@@ -7269,7 +7248,7 @@ async function saveTurno(_override){
 
   closeM('mTurno');
   rTurnos();
-  if(!esFijoCheck) showToast(id ? 'Turno actualizado ✓' : 'Turno agendado ✓');
+  if(!esFijoCheck) showToast(id?'Turno actualizado ✓':'Turno agendado ✓');
 }
 
 function cancelarTurno(id){
@@ -14141,24 +14120,6 @@ function _renderServiciosOnline(){
   };
 })();
 
-
-(function(){
-  var _orig = saveTurno;
-  saveTurno = async function(_override){
-    var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
-    if(cfg.servicios && cfg.servicios.length){
-      var val = String(document.getElementById('turnoServicio')?.value||'').trim();
-      if(!val){
-        var el = document.getElementById('turnoServicio');
-        if(el){ el.style.boxShadow='0 0 0 2px var(--bad)'; el.focus(); setTimeout(function(){ el.style.boxShadow=''; },2000); }
-        showToast('Seleccioná un servicio','err');
-        return;
-      }
-    }
-    return _orig.apply(this, arguments);
-  };
-})();
-
 // ── 2. Alertas de inconsistencia en dashboard ─────────────────────────────
 
 (function(){
@@ -16381,39 +16342,6 @@ async function _mFCS_sinCobro(){
         } catch(e){ console.warn('[resync cleanup]', e); }
       }
       return _rsOrig.apply(this, arguments);
-    };
-  }
-
-  /* ── I. saveTurno: sync al crear/editar un turno manual ── */
-  if(typeof saveTurno === 'function'){
-    var _stOrig = saveTurno;
-    saveTurno = async function(){
-      var _id    = ((document.getElementById('turnoId')    ||{}).value||'').trim();
-      var _cli   = ((document.getElementById('turnoCli')   ||{}).value||'').trim();
-      var _fecha = ((document.getElementById('turnoFecha') ||{}).value||'');
-      var _hora  = ((document.getElementById('turnoHora')  ||{}).value||'').substring(0,5);
-      var _est   = ((document.getElementById('turnoEstado')||{}).value||'confirmado');
-      var _orig  = (_id && typeof getTurnos==='function')
-                  ? getTurnos().find(function(t){ return String(t.id)===String(_id); }) : null;
-
-      await _stOrig.apply(this, arguments);
-
-      var _modal = document.getElementById('mTurno');
-      if(_modal && _modal.classList.contains('open')) return;
-      if(!currentTenant||!currentTenant.id) return;
-      if(!_cli||!_fecha||!_hora) return;
-      if(_est==='cancelado'||_est==='terminado'||_est==='no_vino') return;
-
-      var _tAll  = typeof getTurnos==='function' ? getTurnos() : [];
-      var _saved = _id
-        ? _tAll.find(function(t){ return String(t.id)===String(_id); })
-        : _tAll.find(function(t){ return t.fecha===_fecha && (t.hora||'').substring(0,5)===_hora && t.cliente===_cli; });
-      if(!_saved) return;
-
-      if(_orig && (_orig.fecha!==_fecha||((_orig.hora||'').substring(0,5))!==_hora||_orig.cliente!==_cli)){
-        await _deleteTurnoSb(_orig);
-      }
-      await _upsertTurnoSb(_saved, _est);
     };
   }
 
