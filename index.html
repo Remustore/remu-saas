@@ -7419,7 +7419,7 @@ function editarTurno(id){
     }else{if(fidelAlert)fidelAlert.style.display='none';}
   }
   updateDuracionTurno();
-  openM('mTurno', null);
+  document.getElementById('mTurno').classList.add('open');
 }
 
 function getEmpNotifs(){
@@ -14148,15 +14148,14 @@ function _renderServiciosOnline(){
   saveTurno = async function(_override){
     var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
     if(cfg.servicios && cfg.servicios.length){
-      var servicioId = parseInt(document.getElementById('turnoServicio')?.value||'0');
-      if(!servicioId){
+      var val = String(document.getElementById('turnoServicio')?.value||'').trim();
+      if(!val){
         var el = document.getElementById('turnoServicio');
         if(el){ el.style.boxShadow='0 0 0 2px var(--bad)'; el.focus(); setTimeout(function(){ el.style.boxShadow=''; },2000); }
         showToast('Seleccioná un servicio','err');
         return;
       }
     }
-    console.log('[S1] servicioId:', servicioId, '| raw value:', document.getElementById('turnoServicio')?.value);
     return _orig.apply(this, arguments);
   };
 })();
