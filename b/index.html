@@ -354,8 +354,7 @@ async function cargarSlots(){
     .select('hora,estado')
     .eq('tenant_id', G.tenantId)
     .eq('fecha', fecha)
-    .in('estado',['confirmado','bloqueado','pendiente']);
-
+    .in('estado',['confirmado','pendiente']);
   const ocupados = new Set((ocuData||[]).map(s=>(s.hora||'').substring(0,5)));
   const bloqueos = new Set();
 
