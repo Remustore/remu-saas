@@ -1300,6 +1300,18 @@ $$;</pre>
         <div id="fichasClientesList"></div>
       </div>
 
+      <!-- Sincronización online -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>🔄 Sincronización turnos online</h3></div>
+        <div style="font-size:.78rem;color:var(--tx2);margin-bottom:12px;line-height:1.6">
+          Si ves horarios bloqueados en el turnero público que no aparecen en el calendario, usá este botón para limpiar datos huérfanos y resincronizar desde el estado actual.
+        </div>
+        <button class="btn bg" onclick="limpiarYResyncTurnos(this)" style="font-size:.82rem">
+          🧹 Limpiar y resincronizar turnos online
+        </button>
+        <div id="resyncStatus" style="display:none;margin-top:10px;font-size:.78rem;padding:8px 12px;border-radius:8px"></div>
+      </div>
+
       <!-- Horarios -->
       <div class="card">
         <div class="ch"><h3>🕐 Horario del salón</h3></div>
@@ -6924,6 +6936,44 @@ async function resyncTurnosToSupabase(){
       await sincronizarBloqueoManual(t, 'crear');
     }
   } catch(e){ /* no crítico */ }
+}
+
+async function limpiarYResyncTurnos(btn){
+  if(!sb || !currentTenant?.id){ showToast('Sin conexión o sesión','err'); return; }
+  const status = document.getElementById('resyncStatus');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Limpiando...';
+  if(status){ status.style.display='block'; status.style.background='rgba(201,168,76,.08)'; status.style.color='#a89880'; status.style.border='1px solid rgba(201,168,76,.2)'; status.textContent='Eliminando bloqueados huérfanos...'; }
+  try {
+    const hoy = tod();
+    // 1. Borrar TODOS los bloqueados de hoy en adelante (fijos y manuales)
+    await sb.from('turnos_solicitudes')
+      .delete()
+      .eq('tenant_id', currentTenant.id)
+      .eq('estado', 'bloqueado')
+      .gte('fecha', hoy);
+
+    if(status) status.textContent = 'Resincroni­zando turnos confirmados...';
+
+    // 2. Recrear bloqueados desde turnos confirmados activos en localStorage
+    const turnos = getTurnos().filter(t =>
+      !['cancelado','no_vino','terminado'].includes(t.estado) && t.fecha >= hoy
+    );
+    for(const t of turnos) await sincronizarBloqueoManual(t, 'crear');
+
+    if(status) status.textContent = 'Resincronizando turnos fijos...';
+
+    // 3. Recrear bloqueados de turnos fijos activos
+    const fijosActivos = (typeof getTurnosFijos==='function' ? getTurnosFijos() : []).filter(f=>f.activo);
+    if(fijosActivos.length) await sincronizarFijosSupabase(fijosActivos, 'crear');
+
+    if(status){ status.style.background='rgba(76,175,125,.08)'; status.style.color='#4caf7d'; status.style.border='1px solid rgba(76,175,125,.25)'; status.textContent='✓ Listo. Los turnos online ahora reflejan el estado actual del calendario.'; }
+    showToast('Turnos online sincronizados ✓');
+  } catch(e){
+    if(status){ status.style.background='rgba(201,82,76,.08)'; status.style.color='#c9524c'; status.style.border='1px solid rgba(201,82,76,.25)'; status.textContent='Error: '+e.message; }
+    showToast('Error al sincronizar','err');
+  }
+  btn.disabled=false; btn.textContent=orig;
 }
 
 function saveTurnosLocal(turnos){
