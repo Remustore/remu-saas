@@ -333,214 +333,184 @@ async function cargarSlots(){
   const wrap  = document.getElementById('bSlotsWrap');
   if(!fecha||!wrap) return;
 
-  const horaInput = document.getElementById('bHora');
-  if(horaInput) horaInput.value = '';
+  document.getElementById('bHora').value = '';
 
   const cfg    = G.cfg;
-  const DIAS   = cfg.dias&&cfg.dias.length>0 ? cfg.dias : [1,2,3,4,5,6];
+  const DIAS   = cfg.dias&&cfg.dias.length ? cfg.dias : [1,2,3,4,5,6];
   const diaSel = new Date(fecha+'T12:00:00').getDay();
-  const nomDia = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
 
   if(!DIAS.includes(diaSel)){
-    wrap.className = 'cerrado-banner';
-    wrap.innerHTML = `❌ No atendemos los ${nomDia}s. Por favor elegí otro día.`;
+    const nomDia=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
+    wrap.className='cerrado-banner';
+    wrap.innerHTML=`❌ No atendemos los ${nomDia}s. Por favor elegí otro día.`;
     return;
   }
 
-  wrap.className = 'msg-info';
-  wrap.innerHTML = 'Cargando horarios...';
+  wrap.className='msg-info';
+  wrap.innerHTML='Cargando horarios...';
 
-  const {data: ocuData} = await sb.from('turnos_solicitudes')
+  const {data:rows} = await sb.from('turnos_solicitudes')
     .select('hora,estado,nombre')
-    .eq('tenant_id', G.tenantId)
-    .eq('fecha', fecha)
+    .eq('tenant_id',G.tenantId)
+    .eq('fecha',fecha)
     .in('estado',['confirmado','pendiente','bloqueado']);
-  const ocupados = new Set();
-  const bloqueos = new Set();
-  (ocuData||[]).forEach(s => {
-    const h = (s.hora||'').substring(0,5);
-    if(s.estado === 'bloqueado' && (s.nombre||'').startsWith('__fijo__')) {
-      ocupados.add(h); bloqueos.add(h); // turno fijo → "🚫 No disp."
-    } else {
-      ocupados.add(h); // confirmado/pendiente/__extra__/manual → "Reservado"
-    }
-  });
 
-  const empId = document.getElementById('bEmpleado')?.value||'';
-  if(cfg.empleados&&cfg.empleados.length){
-    const emps = empId
-      ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
-      : cfg.empleados;
-    const ap = hhToMin(cfg.apertura||'09:00');
-    const ci = hhToMin(cfg.cierre||'20:00');
-    for(let m=ap; m<=ci; m+=30){
-      const hora = minToHH(m);
-      if(emps.length&&emps.every(e=>esBloqueado(e.bloqueos||[],fecha,hora))){
-        ocupados.add(hora); bloqueos.add(hora);
-      }
+  const reservados = new Set();
+  const fijos      = new Set();
+  for(const r of (rows||[])){
+    const h = (r.hora||'').substring(0,5);
+    if(r.estado==='bloqueado' && (r.nombre||'').startsWith('__fijo__')){
+      fijos.add(h);
+    } else {
+      reservados.add(h);
     }
   }
 
-  const srvVal     = String(document.getElementById('bServicio')?.value||'');
-  const srv        = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
-  const slotsNeeded = srv ? Math.ceil((srv.duracion||30)/30) : 1;
+  const srvVal = String(document.getElementById('bServicio')?.value||'');
+  const srv    = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
+  const pasos  = srv ? Math.ceil((srv.duracion||30)/30) : 1;
 
-  const ap    = hhToMin(cfg.apertura||'09:00');
-  const ci    = hhToMin(cfg.cierre||'20:00');
+  const ap = hhToMin(cfg.apertura||'09:00');
+  const ci = hhToMin(cfg.cierre||'20:00');
   const slots = [];
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    let isOcu = false;
-    for(let k=0; k<slotsNeeded; k++){
-      if(ocupados.has(minToHH(m+k*30))){ isOcu=true; break; }
+    if(fijos.has(hora)){
+      slots.push({hora, blq:true, ocu:false});
+      continue;
     }
-    slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
+    let ocu = reservados.has(hora);
+    if(!ocu && pasos>1){
+      for(let k=1; k<pasos; k++){
+        const hk = minToHH(m+k*30);
+        if(reservados.has(hk)||fijos.has(hk)){ocu=true;break;}
+      }
+    }
+    slots.push({hora, blq:false, ocu});
   }
 
   if(!slots.length){
-    wrap.className = 'msg-info';
-    wrap.innerHTML = 'Sin horarios configurados para este día.';
+    wrap.className='msg-info';
+    wrap.innerHTML='Sin horarios configurados para este día.';
     return;
   }
 
-  wrap.className = '';
-  wrap.innerHTML = '';
-  const grid = document.createElement('div');
-  grid.className = 'slots-grid';
-  slots.forEach(s=>{
-    const d = document.createElement('div');
+  wrap.className=''; wrap.innerHTML='';
+  const grid=document.createElement('div');
+  grid.className='slots-grid';
+  for(const s of slots){
+    const d=document.createElement('div');
     if(s.blq){
-      d.className = 'slot blq';
-      d.innerHTML = `<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">🚫 No disp.</span>`;
+      d.className='slot blq';
+      d.innerHTML=`<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">🚫 No disp.</span>`;
     } else if(s.ocu){
-      d.className = 'slot ocu';
-      d.innerHTML = `<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">Reservado</span>`;
+      d.className='slot ocu';
+      d.innerHTML=`<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">Reservado</span>`;
     } else {
-      d.className = 'slot';
-      d.textContent = s.hora;
-      d.onclick = () => selSlot(s.hora, d);
+      d.className='slot';
+      d.textContent=s.hora;
+      d.dataset.hora=s.hora;
+      d.onclick=function(){
+        document.querySelectorAll('#bSlotsWrap .slot.sel').forEach(el=>el.classList.remove('sel'));
+        this.classList.add('sel');
+        document.getElementById('bHora').value=this.dataset.hora;
+        document.getElementById('bErr').style.display='none';
+      };
     }
     grid.appendChild(d);
-  });
+  }
   wrap.appendChild(grid);
 
-  const disp = slots.filter(s=>!s.ocu&&!s.blq).length;
-  const note = document.createElement('div');
-  note.style.cssText = 'font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
-  note.textContent = disp ? 'Tocá un horario para seleccionarlo' : 'Todos los horarios de este día están reservados';
+  const disp=slots.filter(s=>!s.ocu&&!s.blq).length;
+  const note=document.createElement('div');
+  note.style.cssText='font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
+  note.textContent=disp?'Tocá un horario para seleccionarlo':'Todos los horarios de este día están reservados';
   wrap.appendChild(note);
-}
-
-function selSlot(hora, el){
-  document.querySelectorAll('.slot.sel').forEach(d=>{ d.classList.remove('sel'); });
-  el.classList.add('sel');
-  document.getElementById('bHora').value = hora;
-  document.getElementById('bErr').style.display = 'none';
 }
 
 // ── Enviar solicitud ──────────────────────────────────────────────────────
 async function enviar(){
   const nombre = document.getElementById('bNombre')?.value.trim()||'';
   const tel    = document.getElementById('bTel')?.value.trim()||'';
-  const srvId  = document.getElementById('bServicio')?.value||null;
-  const empId  = document.getElementById('bEmpleado')?.value||null;
+  const srvId  = document.getElementById('bServicio')?.value||'';
+  const empId  = document.getElementById('bEmpleado')?.value||'';
   const fecha  = document.getElementById('bFecha')?.value||'';
   const hora   = document.getElementById('bHora')?.value||'';
   const btn    = document.getElementById('bBtn');
   const errEl  = document.getElementById('bErr');
 
   errEl.style.display='none';
-  const showErr = msg => { errEl.textContent=msg; errEl.style.display='block'; errEl.scrollIntoView({behavior:'smooth',block:'nearest'}); };
+  const showErr=msg=>{errEl.textContent=msg;errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'nearest'});};
 
-  if(!nombre){ showErr('Ingresá tu nombre.'); return; }
-  if(!tel||tel.replace(/\D/g,'').length<6){ showErr('Ingresá un número de WhatsApp válido.'); return; }
-  if(!fecha){ showErr('Elegí una fecha.'); return; }
-  if(!hora){ showErr('Seleccioná un horario disponible.'); return; }
-
+  if(!nombre){showErr('Ingresá tu nombre.');return;}
+  if(!tel||tel.replace(/\D/g,'').length<6){showErr('Ingresá un número de WhatsApp válido.');return;}
+  if(!fecha){showErr('Elegí una fecha.');return;}
+  if(!hora){showErr('Seleccioná un horario disponible.');return;}
   if(btn.disabled) return;
   btn.disabled=true; btn.textContent='Enviando...';
 
   try {
-    // Verificar que todos los slots necesarios siguen disponibles
-    const _srvId0 = document.getElementById('bServicio')?.value||null;
-    const _srv0 = (G.cfg.servicios||[]).find(s=>String(s.id)===String(_srvId0))||(G.cfg.servicios||[])[0]||{};
-    const _dur0 = _srv0.duracion||30;
-    const _sN = Math.ceil(_dur0/30);
-    const _horasN = Array.from({length:_sN},(_,k)=>minToHH(hhToMin(hora)+k*30));
-    const {data: previo} = await sb.from('turnos_solicitudes')
-      .select('id,estado').eq('tenant_id',G.tenantId).eq('fecha',fecha)
-      .in('hora',_horasN).in('estado',['confirmado','bloqueado']).limit(1);
+    const srv   = (G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId));
+    const dur   = srv ? (srv.duracion||30) : 30;
+    const pasos = Math.ceil(dur/30);
+    const horasReq = Array.from({length:pasos},(_,k)=>minToHH(hhToMin(hora)+k*30));
+
+    const {data:previo} = await sb.from('turnos_solicitudes')
+      .select('id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
+      .in('hora',horasReq).in('estado',['confirmado','bloqueado']).limit(1);
     if(previo&&previo.length){
       showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
       btn.disabled=false; btn.textContent='Reservar turno';
-      cargarSlots();
-      return;
+      cargarSlots(); return;
     }
 
-    // Insertar como "pendiente" — el admin confirma
-    const ts = new Date().toISOString();
-    const {data: ins, error: insErr} = await sb.from('turnos_solicitudes').insert({
-      tenant_id: G.tenantId,
-      nombre, tel,
-      servicio_id: srvId||null,
-      empleado_id: empId ? (parseInt(empId)||null) : null,
-      fecha, hora,
-      estado: 'pendiente',
-      created_at: ts
+    const ts=new Date().toISOString();
+    const {data:ins,error:insErr} = await sb.from('turnos_solicitudes').insert({
+      tenant_id:G.tenantId, nombre, tel,
+      servicio_id:srvId||null,
+      empleado_id:empId?(parseInt(empId)||null):null,
+      fecha, hora, estado:'pendiente', created_at:ts
     }).select('id').single();
-
     if(insErr) throw new Error(insErr.message||'Error al reservar');
 
-    // Bloquear slots adicionales si el servicio dura más de 30 min
-    if(_sN > 1){
-      const extras = [];
-      for(let k=1; k<_sN; k++){
-        extras.push({tenant_id:G.tenantId, nombre:'__extra__:'+(ins?.id||''), tel,
-          servicio_id:srvId||null, empleado_id:empId?(parseInt(empId)||null):null,
-          fecha, hora:minToHH(hhToMin(hora)+k*30), estado:'bloqueado', created_at:ts});
+    if(pasos>1){
+      const extras=[];
+      for(let k=1;k<pasos;k++){
+        extras.push({tenant_id:G.tenantId,nombre:'__extra__:'+(ins?.id||''),tel,
+          servicio_id:srvId||null,empleado_id:empId?(parseInt(empId)||null):null,
+          fecha,hora:minToHH(hhToMin(hora)+k*30),estado:'bloqueado',created_at:ts});
       }
       if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
     }
 
-    // Verificar race condition (otro cliente al mismo instante)
-    const {data: todos} = await sb.from('turnos_solicitudes')
+    const {data:todos} = await sb.from('turnos_solicitudes')
       .select('id,created_at,estado')
       .eq('tenant_id',G.tenantId).eq('fecha',fecha).eq('hora',hora)
       .in('estado',['confirmado','bloqueado','pendiente']);
-    const conflicto = (todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
+    const conflicto=(todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
     if(conflicto){
       await sb.from('turnos_solicitudes').delete().eq('id',ins.id);
       showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
       btn.disabled=false; btn.textContent='Reservar turno';
-      cargarSlots();
-      return;
+      cargarSlots(); return;
     }
 
-    // Éxito 🎉
-    const cfg = G.cfg;
-    const srvNombre = (cfg.servicios||[]).find(s=>String(s.id)===String(srvId))?.nombre||'el servicio';
-    const fechaFmt = new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+    const srvNombre=(G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId))?.nombre||'el servicio';
+    const fechaFmt=new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+    const profNombre=empId?((G.cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||''):'';
+    const rubroStr=(G.tenant?.rubro||'').toLowerCase();
+    const rubroEmoji=/barber|salon|belleza/i.test(rubroStr)?'✂️':/telefon|tecnico|técnico/i.test(rubroStr)?'🔧':'⭐';
+    const negWaTel=(G.online?.tel||'').replace(/\D/g,'');
+    const waConfMsg=encodeURIComponent('Hola! Reservé un turno para el '+fechaFmt+' a las '+hora+'. Quería consultarles algo.');
+    const waLink=negWaTel?'https://wa.me/549'+negWaTel+'?text='+waConfMsg:'';
+    const fechaCal=fecha.replace(/-/g,'');
+    const horaCal=hora.replace(':','');
+    const endHoraCal=minToHH(hhToMin(hora)+dur).replace(':','');
+    const gcalTitle=encodeURIComponent('Turno en '+(G.tenant?.nombre||'el negocio'));
+    const gcalDetails=encodeURIComponent(srvNombre+(profNombre?' — '+profNombre:'')+(G.tenant?.nombre?' | '+G.tenant.nombre:''));
+    const gcalLink='https://calendar.google.com/calendar/render?action=TEMPLATE&text='+gcalTitle+'&dates='+fechaCal+'T'+horaCal+'00/'+fechaCal+'T'+endHoraCal+'00&details='+gcalDetails;
 
-    // Datos adicionales para pantalla de confirmación
-    const profNombre = empId
-      ? ((cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||'')
-      : '';
-    const rubroStr = (G.tenant?.rubro||'').toLowerCase();
-    const rubroEmoji = rubroStr.includes('barber')||rubroStr.includes('salon')||rubroStr.includes('belleza') ? '✂️'
-      : rubroStr.includes('telefon')||rubroStr.includes('tecnico')||rubroStr.includes('técnico') ? '🔧'
-      : '⭐';
-    const negWaTel = (G.online?.tel||'').replace(/\D/g,'');
-    const waConfMsg = encodeURIComponent('Hola! Reservé un turno para el ' + fechaFmt + ' a las ' + hora + '. Quería consultarles algo.');
-    const waLink = negWaTel ? 'https://wa.me/549'+negWaTel+'?text='+waConfMsg : '';
-    const fechaCal = fecha.replace(/-/g,'');
-    const horaCal = hora.replace(':','');
-    const endMinCal = hhToMin(hora) + (_dur0||30);
-    const endHoraCal = minToHH(endMinCal).replace(':','');
-    const gcalTitle = encodeURIComponent('Turno en ' + (G.tenant?.nombre||'el negocio'));
-    const gcalDetails = encodeURIComponent(srvNombre + (profNombre?' — '+profNombre:'') + (G.tenant?.nombre?' | '+G.tenant.nombre:''));
-    const gcalLink = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+gcalTitle+'&dates='+fechaCal+'T'+horaCal+'00/'+fechaCal+'T'+endHoraCal+'00&details='+gcalDetails;
-
-    document.getElementById('mainCard').innerHTML = `
+    document.getElementById('mainCard').innerHTML=`
       <div style="text-align:center;padding:8px 0 20px">
         <div style="font-size:2.8rem;margin-bottom:8px">${rubroEmoji}</div>
         <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;color:#c9a84c;margin-bottom:3px">${esc(G.tenant?.nombre||'')}</div>
@@ -550,7 +520,6 @@ async function enviar(){
           <span style="font-size:.82rem;color:#4caf7d;font-weight:600">Solicitud enviada</span>
         </div>
       </div>
-
       <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:18px;margin-bottom:14px">
         <div style="display:flex;flex-direction:column;gap:0">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
@@ -567,26 +536,23 @@ async function enviar(){
             <span style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Hora</span>
             <span style="font-size:.88rem;color:#f5f0e8;font-weight:600">🕐 ${esc(hora)}</span>
           </div>
-          ${profNombre ? `
+          ${profNombre?`
           <div style="height:1px;background:#1e1e1e"></div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0">
             <span style="font-size:.7rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Profesional</span>
             <span style="font-size:.88rem;color:#f5f0e8;font-weight:600">${esc(profNombre)}</span>
-          </div>` : ''}
+          </div>`:''}
         </div>
       </div>
-
       <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:13px 15px;margin-bottom:14px;font-size:.83rem;color:#a89880;line-height:1.65">
         ¡Te esperamos, <strong style="color:#f5f0e8">${esc(nombre)}</strong>!
         El negocio confirmará tu turno por WhatsApp al <strong style="color:#f5f0e8">${esc(tel)}</strong>.
-        ${waLink ? `Ante cualquier consulta <a href="${waLink}" target="_blank" rel="noopener" style="color:#c9a84c;font-weight:600">escribinos por WhatsApp</a>.` : ''}
+        ${waLink?`Ante cualquier consulta <a href="${waLink}" target="_blank" rel="noopener" style="color:#c9a84c;font-weight:600">escribinos por WhatsApp</a>.`:''}
       </div>
-
       <a href="${gcalLink}" target="_blank" rel="noopener"
          style="display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:1px solid #2e2e2e;border-radius:10px;color:#a89880;font-size:.84rem;text-decoration:none;margin-bottom:14px">
         📅 Agregar al calendario
       </a>
-
       <button class="btn" style="margin-top:0;background:#1a1a1a;color:#c9a84c;border:1px solid rgba(201,168,76,.3)" onclick="location.reload()">Hacer otra reserva</button>
     `;
   } catch(e){

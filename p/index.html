@@ -501,171 +501,161 @@ async function cargarSlotsPanel(){
   const wrap  = document.getElementById('bkSlots');
   if(!fecha||!wrap) return;
 
-  // Reset hora seleccionada
-  const horaInput = document.getElementById('bkHora');
-  if(horaInput) horaInput.value = '';
+  document.getElementById('bkHora').value = '';
 
-  const cfg  = G.cfg;
-  const DIAS = cfg.dias&&cfg.dias.length ? cfg.dias : [1,2,3,4,5,6];
+  const cfg    = G.cfg;
+  const DIAS   = cfg.dias&&cfg.dias.length ? cfg.dias : [1,2,3,4,5,6];
   const diaSel = new Date(fecha+'T12:00:00').getDay();
-  const nomDia = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
 
   if(!DIAS.includes(diaSel)){
-    wrap.className = 'cerrado-banner';
-    wrap.innerHTML = `❌ No atendemos los ${nomDia}s. Por favor elegí otro día.`;
+    const nomDia=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
+    wrap.className='cerrado-banner';
+    wrap.innerHTML=`❌ No atendemos los ${nomDia}s. Por favor elegí otro día.`;
     return;
   }
 
-  wrap.className = 'msg-info';
-  wrap.innerHTML = 'Cargando horarios...';
+  wrap.className='msg-info';
+  wrap.innerHTML='Cargando horarios...';
 
-  const {data: ocuData} = await sb.from('turnos_solicitudes')
-    .select('hora,estado')
-    .eq('tenant_id', G.tenantId)
-    .eq('fecha', fecha)
-    .in('estado',['confirmado','bloqueado','pendiente']);
+  const {data:rows} = await sb.from('turnos_solicitudes')
+    .select('hora,estado,nombre')
+    .eq('tenant_id',G.tenantId)
+    .eq('fecha',fecha)
+    .in('estado',['confirmado','pendiente','bloqueado']);
 
-  const ocupados = new Set((ocuData||[]).map(s=>(s.hora||'').substring(0,5)));
-  const bloqueos = new Set();
-
-  const empId = document.getElementById('bkEmp')?.value||'';
-  if(cfg.empleados&&cfg.empleados.length){
-    const emps = empId
-      ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
-      : cfg.empleados;
-    const ap = hhToMin(cfg.apertura||'09:00');
-    const ci = hhToMin(cfg.cierre||'20:00');
-    for(let m=ap; m<=ci; m+=30){
-      const hora = minToHH(m);
-      if(emps.length&&emps.every(e=>esBloqueado(e.bloqueos||[],fecha,hora))){
-        ocupados.add(hora); bloqueos.add(hora);
-      }
+  const reservados = new Set();
+  const fijos      = new Set();
+  for(const r of (rows||[])){
+    const h = (r.hora||'').substring(0,5);
+    if(r.estado==='bloqueado' && (r.nombre||'').startsWith('__fijo__')){
+      fijos.add(h);
+    } else {
+      reservados.add(h);
     }
   }
 
-  const srvSel = document.getElementById('bkSrv');
-  const srvVal = srvSel ? String(srvSel.value || '') : '';
-  const srv    = (cfg.servicios||[]).find(s => String(s.id) === srvVal);
-  // Sin servicio válido: slotsNeeded=1, solo bloquea el slot exacto ocupado (sin cascada)
-  const slotsNeeded = srv ? Math.ceil((srv.duracion || 30) / 30) : 1;
+  const srvVal = String(document.getElementById('bkSrv')?.value||'');
+  const srv    = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
+  const pasos  = srv ? Math.ceil((srv.duracion||30)/30) : 1;
 
   const ap = hhToMin(cfg.apertura||'09:00');
   const ci = hhToMin(cfg.cierre||'20:00');
   const slots = [];
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    let isOcu = false;
-    for(let k=0;k<slotsNeeded;k++){
-      if(ocupados.has(minToHH(m + k*30))){ isOcu=true; break; }
+    if(fijos.has(hora)){
+      slots.push({hora, blq:true, ocu:false});
+      continue;
     }
-    slots.push({hora, blq:bloqueos.has(hora), ocu:isOcu});
+    let ocu = reservados.has(hora);
+    if(!ocu && pasos>1){
+      for(let k=1; k<pasos; k++){
+        const hk = minToHH(m+k*30);
+        if(reservados.has(hk)||fijos.has(hk)){ocu=true;break;}
+      }
+    }
+    slots.push({hora, blq:false, ocu});
   }
 
   if(!slots.length){
-    wrap.className = 'msg-info';
-    wrap.innerHTML = 'Sin horarios configurados para este día.';
+    wrap.className='msg-info';
+    wrap.innerHTML='Sin horarios configurados para este día.';
     return;
   }
 
-  wrap.className = '';
-  wrap.innerHTML = '';
-  const grid = document.createElement('div');
-  grid.className = 'slots-grid';
-  slots.forEach(s=>{
-    const d = document.createElement('div');
+  wrap.className=''; wrap.innerHTML='';
+  const grid=document.createElement('div');
+  grid.className='slots-grid';
+  for(const s of slots){
+    const d=document.createElement('div');
     if(s.blq){
-      d.className = 'slot blq';
-      d.innerHTML = `<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">🚫 No disp.</span>`;
+      d.className='slot blq';
+      d.innerHTML=`<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">🚫 No disp.</span>`;
     } else if(s.ocu){
-      d.className = 'slot ocu';
-      d.innerHTML = `<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">Reservado</span>`;
+      d.className='slot ocu';
+      d.innerHTML=`<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">Reservado</span>`;
     } else {
-      d.className = 'slot';
-      d.textContent = s.hora;
-      d.onclick = () => selSlotPanel(s.hora, d);
+      d.className='slot';
+      d.textContent=s.hora;
+      d.dataset.hora=s.hora;
+      d.onclick=function(){
+        document.querySelectorAll('#bkSlots .slot.sel').forEach(el=>el.classList.remove('sel'));
+        this.classList.add('sel');
+        document.getElementById('bkHora').value=this.dataset.hora;
+        document.getElementById('bkErr').style.display='none';
+      };
     }
     grid.appendChild(d);
-  });
+  }
   wrap.appendChild(grid);
 
-  const disp = slots.filter(s=>!s.ocu&&!s.blq).length;
-  const note = document.createElement('div');
-  note.style.cssText = 'font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
-  note.textContent = disp ? 'Tocá un horario para seleccionarlo' : 'Todos los horarios de este día están reservados';
+  const disp=slots.filter(s=>!s.ocu&&!s.blq).length;
+  const note=document.createElement('div');
+  note.style.cssText='font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
+  note.textContent=disp?'Tocá un horario para seleccionarlo':'Todos los horarios de este día están reservados';
   wrap.appendChild(note);
-}
-
-function selSlotPanel(hora, el){
-  document.querySelectorAll('#bkSlots .slot.sel').forEach(d=>d.classList.remove('sel'));
-  el.classList.add('sel');
-  document.getElementById('bkHora').value = hora;
-  document.getElementById('bkErr').style.display = 'none';
 }
 
 // ── Enviar reserva ────────────────────────────────────────────────────────
 async function enviarReserva(){
   const nombre = document.getElementById('bkNombre')?.value.trim()||'';
   const tel    = document.getElementById('bkTel')?.value.trim()||'';
-  const srvId  = document.getElementById('bkSrv')?.value||null;
-  const empId  = document.getElementById('bkEmp')?.value||null;
+  const srvId  = document.getElementById('bkSrv')?.value||'';
+  const empId  = document.getElementById('bkEmp')?.value||'';
   const fecha  = document.getElementById('bkFecha')?.value||'';
   const hora   = document.getElementById('bkHora')?.value||'';
   const btn    = document.getElementById('bkBtn');
   const errEl  = document.getElementById('bkErr');
 
-  errEl.style.display = 'none';
-  const showErr = msg => { errEl.textContent=msg; errEl.style.display='block'; errEl.scrollIntoView({behavior:'smooth',block:'nearest'}); };
+  errEl.style.display='none';
+  const showErr=msg=>{errEl.textContent=msg;errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'nearest'});};
 
-  if(!nombre){ showErr('Ingresá tu nombre.'); return; }
-  if(!tel||tel.replace(/\D/g,'').length<6){ showErr('Ingresá un número de WhatsApp válido.'); return; }
-  if(!fecha){ showErr('Elegí una fecha.'); return; }
-  if(!hora){ showErr('Seleccioná un horario disponible.'); return; }
+  if(!nombre){showErr('Ingresá tu nombre.');return;}
+  if(!tel||tel.replace(/\D/g,'').length<6){showErr('Ingresá un número de WhatsApp válido.');return;}
+  if(!fecha){showErr('Elegí una fecha.');return;}
+  if(!hora){showErr('Seleccioná un horario disponible.');return;}
   if(btn.disabled) return;
   btn.disabled=true; btn.textContent='Enviando...';
 
   try {
-    const _srv0   = (G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId)) || (G.cfg.servicios||[])[0] || {};
-    const _dur0   = _srv0.duracion||30;
-    const _sN     = Math.ceil(_dur0/30);
-    const _horasN = Array.from({length:_sN},(_,k)=>minToHH(hhToMin(hora)+k*30));
+    const srv   = (G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId));
+    const dur   = srv ? (srv.duracion||30) : 30;
+    const pasos = Math.ceil(dur/30);
+    const horasReq = Array.from({length:pasos},(_,k)=>minToHH(hhToMin(hora)+k*30));
 
-    // Verificar disponibilidad antes de insertar
-    const {data: previo} = await sb.from('turnos_solicitudes')
+    const {data:previo} = await sb.from('turnos_solicitudes')
       .select('id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
-      .in('hora',_horasN).in('estado',['confirmado','bloqueado']).limit(1);
+      .in('hora',horasReq).in('estado',['confirmado','bloqueado']).limit(1);
     if(previo&&previo.length){
       showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
       btn.disabled=false; btn.textContent='Confirmar reserva';
       cargarSlotsPanel(); return;
     }
 
-    // Insertar solicitud como "pendiente"
-    const ts = new Date().toISOString();
-    const {data: ins, error: insErr} = await sb.from('turnos_solicitudes').insert({
-      tenant_id: G.tenantId, nombre, tel,
-      servicio_id: srvId||null,
-      empleado_id: empId ? (parseInt(empId)||null) : null,
-      fecha, hora, estado: 'pendiente', created_at: ts
+    const ts=new Date().toISOString();
+    const {data:ins,error:insErr} = await sb.from('turnos_solicitudes').insert({
+      tenant_id:G.tenantId, nombre, tel,
+      servicio_id:srvId||null,
+      empleado_id:empId?(parseInt(empId)||null):null,
+      fecha, hora, estado:'pendiente', created_at:ts
     }).select('id').single();
     if(insErr) throw new Error(insErr.message||'Error al reservar');
 
-    // Bloquear slots adicionales si dura más de 30 min
-    if(_sN>1){
-      const extras = [];
-      for(let k=1;k<_sN;k++){
-        extras.push({tenant_id:G.tenantId, nombre:'__extra__:'+(ins?.id||''), tel,
-          servicio_id:srvId||null, empleado_id:empId?(parseInt(empId)||null):null,
-          fecha, hora:minToHH(hhToMin(hora)+k*30), estado:'bloqueado', created_at:ts});
+    if(pasos>1){
+      const extras=[];
+      for(let k=1;k<pasos;k++){
+        extras.push({tenant_id:G.tenantId,nombre:'__extra__:'+(ins?.id||''),tel,
+          servicio_id:srvId||null,empleado_id:empId?(parseInt(empId)||null):null,
+          fecha,hora:minToHH(hhToMin(hora)+k*30),estado:'bloqueado',created_at:ts});
       }
       if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
     }
 
-    // Race condition check
-    const {data: todos} = await sb.from('turnos_solicitudes')
+    const {data:todos} = await sb.from('turnos_solicitudes')
       .select('id,created_at,estado')
       .eq('tenant_id',G.tenantId).eq('fecha',fecha).eq('hora',hora)
       .in('estado',['confirmado','bloqueado','pendiente']);
-    const conflicto = (todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
+    const conflicto=(todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
     if(conflicto){
       await sb.from('turnos_solicitudes').delete().eq('id',ins.id);
       showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
@@ -673,21 +663,19 @@ async function enviarReserva(){
       cargarSlotsPanel(); return;
     }
 
-    // Éxito — mostrar confirmación
-    const srvNombre  = _srv0.nombre||'el servicio';
-    const fechaFmt   = new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
-    const profNombre = empId ? ((G.cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||'') : '';
+    const srvNombre=(G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId))?.nombre||'el servicio';
+    const fechaFmt=new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+    const profNombre=empId?((G.cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||''):'';
 
     cerrarReserva();
 
-    const confDiv = document.createElement('div');
-    confDiv.style.cssText = 'position:fixed;inset:0;background:#080808;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto';
-    confDiv.innerHTML = `
+    const confDiv=document.createElement('div');
+    confDiv.style.cssText='position:fixed;inset:0;background:#080808;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto';
+    confDiv.innerHTML=`
       <div style="background:#111;border:1px solid #1e1e1e;border-radius:16px;max-width:400px;width:100%;padding:28px 24px;text-align:center">
         <div style="font-size:2.8rem;margin-bottom:8px">✅</div>
         <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;color:#c9a84c;margin-bottom:4px">¡Reserva enviada!</div>
         <div style="font-size:.68rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:20px">El negocio confirmará tu turno</div>
-
         <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:14px;text-align:left">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
             <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Servicio</span>
@@ -701,18 +689,16 @@ async function enviarReserva(){
             <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Hora</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">🕐 ${esc(hora)}</span>
           </div>
-          ${profNombre ? `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0">
+          ${profNombre?`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0">
             <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Profesional</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(profNombre)}</span>
-          </div>` : ''}
+          </div>`:''}
         </div>
-
         <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:13px 15px;margin-bottom:16px;font-size:.83rem;color:#a89880;line-height:1.65;text-align:left">
           ¡Te esperamos, <strong style="color:#f5f0e8">${esc(nombre)}</strong>!
           Te confirmaremos al <strong style="color:#f5f0e8">${esc(tel)}</strong> por WhatsApp.
         </div>
-
-        <button onclick="this.closest('[style*=\"position:fixed\"]').remove()"
+        <button onclick="this.closest('[style*=\\"position:fixed\\"]').remove()"
           style="width:100%;padding:12px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:10px">
           Volver al catálogo
         </button>
