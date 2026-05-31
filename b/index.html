@@ -411,10 +411,13 @@ async function cargarSlots(){
       d.textContent=s.hora;
       d.dataset.hora=s.hora;
       d.onclick=function(){
+        console.log('[remu] slot click ->', this.dataset.hora);
         document.querySelectorAll('#bSlotsWrap .slot.sel').forEach(el=>el.classList.remove('sel'));
         this.classList.add('sel');
         document.getElementById('bHora').value=this.dataset.hora;
         document.getElementById('bErr').style.display='none';
+        const sel=document.getElementById('bHoraSelLabel');
+        if(sel){sel.textContent='✓ '+this.dataset.hora+' seleccionado';sel.style.display='block';}
       };
     }
     grid.appendChild(d);
@@ -426,6 +429,11 @@ async function cargarSlots(){
   note.style.cssText='font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
   note.textContent=disp?'Tocá un horario para seleccionarlo':'Todos los horarios de este día están reservados';
   wrap.appendChild(note);
+
+  const selLabel=document.createElement('div');
+  selLabel.id='bHoraSelLabel';
+  selLabel.style.cssText='display:none;font-size:.78rem;color:#4caf7d;font-weight:600;margin-top:6px;text-align:center';
+  wrap.appendChild(selLabel);
 }
 
 // ── Enviar solicitud ──────────────────────────────────────────────────────
@@ -438,6 +446,7 @@ async function enviar(){
   const hora   = document.getElementById('bHora')?.value||'';
   const btn    = document.getElementById('bBtn');
   const errEl  = document.getElementById('bErr');
+  console.log('[remu] enviar() → hora:', hora, '| fecha:', fecha, '| bHora raw:', document.getElementById('bHora')?.value);
 
   errEl.style.display='none';
   const showErr=msg=>{errEl.textContent=msg;errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'nearest'});};
