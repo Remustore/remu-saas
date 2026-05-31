@@ -478,7 +478,7 @@ async function enviar(){
       tenant_id:G.tenantId, nombre, tel,
       servicio_id:srvId||null,
       empleado_id:empId?(parseInt(empId)||null):null,
-      fecha, hora, estado:'pendiente', created_at:ts
+      fecha, hora, estado:'confirmado', created_at:ts
     }).select('id').single();
     if(insErr) throw new Error(insErr.message||'Error al reservar');
 

@@ -3754,6 +3754,28 @@ async function loadAll(){
         if(preciosNuevos) S.precios = preciosNuevos.filter(p=>!p.__turnosCfg && !p.__tipo);
       }
     }
+    // ── Cargar turnos admin desde Supabase (fuente única de verdad) ──────────
+    _turnosCache = null;
+    try {
+      const {data:sbT} = await sb.from('turnos_solicitudes').select('*')
+        .eq('tenant_id', currentTenant.id).eq('origen','admin')
+        .order('fecha').order('hora');
+      if(sbT && sbT.length>0){
+        _turnosCache = sbT.map(_mapSbTurno);
+        _saveTurnosLS(_turnosCache);
+      } else {
+        const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
+        _turnosCache = lsRaw ? JSON.parse(lsRaw) : [];
+        setTimeout(_migrateTurnosToSb, 4000);
+      }
+    } catch(e){
+      const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
+      _turnosCache = lsRaw ? JSON.parse(lsRaw) : [];
+      console.warn('[loadAll] turnos desde LS (fallback):', e.message);
+    }
+    _initTurnosRealtime(currentTenant.id);
+    // ─────────────────────────────────────────────────────────────────────────
+
     renderAll();
     setupCategoriasStock();
     _initVTipoSelect();
@@ -3761,9 +3783,6 @@ async function loadAll(){
     if(currentTenant?.modulos?.fidelUmbral) dbSetConfig('fidelUmbral', currentTenant.modulos.fidelUmbral);
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
-    // Sincronizar turnos manuales a Supabase (asegurar que página pública vea disponibilidad correcta)
-    const _rub = (currentTenant?.rubro||'').toLowerCase();
-    if(/barber|salon|belleza|peluq/i.test(_rub)) setTimeout(resyncTurnosToSupabase, 3000);
     // Onboarding wizard for fresh accounts
     const _owKey = 'onboarding_v1_' + (currentTenant?.id||'');
     if(!localStorage.getItem(_owKey)){
@@ -6803,8 +6822,112 @@ function saveTurnosConfig(){
   showToast('Configuración guardada ✓');
 }
 
+// ── Cache Supabase-first ──────────────────────────────────────────────────
+let _turnosCache = null;
+
+function _mapSbTurno(r){
+  return {
+    id:             r.ref_id || r.id,
+    _sbId:          r.id,
+    cliente:        r.nombre || '',
+    tel:            r.tel || '',
+    fecha:          r.fecha,
+    hora:           (r.hora||'').substring(0,5),
+    estado:         r.estado || 'confirmado',
+    servicioId:     r.servicio_id ? String(r.servicio_id) : '',
+    servicioNombre: r.servicio_nombre || '',
+    sector:         r.sector || '',
+    duracion:       r.duracion || 30,
+    precio:         parseFloat(r.precio)||0,
+    notas:          r.notas || '',
+    empleadoId:     r.empleado_id ? String(r.empleado_id) : '',
+    empleadoNombre: r.empleado_nombre || '',
+    metodo:         r.metodo || '',
+    esFijo:         r.es_fijo || false,
+    fijoId:         r.fijo_id || null,
+    creadoEn:       r.created_at || new Date().toISOString()
+  };
+}
+
+async function _upsertTurnoSb(obj){
+  if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
+  try {
+    await sb.from('turnos_solicitudes').upsert({
+      tenant_id:       currentTenant.id,
+      nombre:          obj.cliente||'',
+      tel:             obj.tel||'',
+      fecha:           obj.fecha,
+      hora:            obj.hora,
+      estado:          obj.estado||'confirmado',
+      servicio_id:     obj.servicioId||null,
+      empleado_id:     obj.empleadoId?(parseInt(obj.empleadoId)||null):null,
+      precio:          obj.precio||0,
+      notas:           obj.notas||'',
+      empleado_nombre: obj.empleadoNombre||'',
+      servicio_nombre: obj.servicioNombre||'',
+      duracion:        obj.duracion||30,
+      sector:          obj.sector||'',
+      metodo:          obj.metodo||'',
+      es_fijo:         obj.esFijo||false,
+      fijo_id:         obj.fijoId||null,
+      origen:          'admin',
+      ref_id:          String(obj.id),
+      created_at:      obj.creadoEn||new Date().toISOString()
+    }, {onConflict:'tenant_id,ref_id'});
+  } catch(e){ console.warn('[_upsertTurnoSb]', e.message); }
+}
+
+async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
+  if(!sb||!currentTenant?.id||!obj?.id) return;
+  try {
+    const upd = {estado: nuevoEstado};
+    if(nuevoEstado==='terminado'&&precio>0){upd.precio=precio; upd.metodo=metodo||'Efectivo';}
+    await sb.from('turnos_solicitudes').update(upd)
+      .eq('tenant_id', currentTenant.id).eq('ref_id', String(obj.id));
+  } catch(e){ console.warn('[_updateEstadoSb]', e.message); }
+}
+
+async function _reloadTurnosCache(){
+  if(!sb||!currentTenant?.id) return;
+  try {
+    const {data} = await sb.from('turnos_solicitudes').select('*')
+      .eq('tenant_id', currentTenant.id).eq('origen','admin')
+      .order('fecha').order('hora');
+    if(data){ _turnosCache=data.map(_mapSbTurno); _saveTurnosLS(_turnosCache); }
+  } catch(e){ console.warn('[_reloadTurnosCache]', e.message); }
+}
+
+function _saveTurnosLS(turnos){
+  try { localStorage.setItem(TURNOS_KEY+'_'+(currentTenant?.id||''), JSON.stringify(turnos)); } catch(e){}
+}
+
+async function _migrateTurnosToSb(){
+  if(!sb||!currentTenant?.id) return;
+  const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
+  if(!lsRaw) return;
+  const lsTurnos = JSON.parse(lsRaw).filter(t=>t.fecha&&t.hora&&t.id);
+  if(!lsTurnos.length) return;
+  try {
+    const {data:existing} = await sb.from('turnos_solicitudes')
+      .select('ref_id').eq('tenant_id',currentTenant.id).eq('origen','admin');
+    const refs = new Set((existing||[]).map(r=>r.ref_id));
+    const toMigrate = lsTurnos.filter(t=>!refs.has(String(t.id)));
+    for(const t of toMigrate) await _upsertTurnoSb(t);
+    if(toMigrate.length){ console.log('[remu] Migrados',toMigrate.length,'turnos → Supabase'); await _reloadTurnosCache(); }
+  } catch(e){ console.warn('[_migrateTurnosToSb]', e.message); }
+}
+
+function _initTurnosRealtime(tenantId){
+  if(!sb||!tenantId) return;
+  sb.channel('remu-turnos-'+tenantId)
+    .on('postgres_changes',{event:'*',schema:'public',table:'turnos_solicitudes',filter:'tenant_id=eq.'+tenantId},
+      ()=>{ _reloadTurnosCache().then(()=>{ if(typeof rTurnos==='function') rTurnos(); }); })
+    .subscribe();
+}
+
 function getTurnos(){
-  const raw = localStorage.getItem(TURNOS_KEY + '_' + (currentTenant?.id||''));
+  if(_turnosCache!==null) return _turnosCache;
+  const raw = localStorage.getItem(TURNOS_KEY+'_'+(currentTenant?.id||''));
   return raw ? JSON.parse(raw) : [];
 }
 
@@ -6859,13 +6982,13 @@ async function sincronizarBloqueoManual(turno, accion){
 async function liberarSlotSupabase(turno){
   if(!sb || !currentTenant?.id || !turno?.fecha || !turno?.hora) return;
   try {
-    // Eliminar TODOS los registros de ese slot (sin filtrar por empleado)
-    // para garantizar que el horario quede libre en la página pública
+    // Solo borra registros 'bloqueado' (fijos/extras), no toca confirmados/pendientes
     await sb.from('turnos_solicitudes')
       .delete()
       .eq('tenant_id', currentTenant.id)
       .eq('fecha', turno.fecha)
-      .eq('hora', turno.hora);
+      .eq('hora', turno.hora)
+      .eq('estado', 'bloqueado');
   } catch(e){ console.warn('[liberarSlot]', e); }
 }
 
@@ -6977,7 +7100,8 @@ async function limpiarYResyncTurnos(btn){
 }
 
 function saveTurnosLocal(turnos){
-  localStorage.setItem(TURNOS_KEY + '_' + (currentTenant?.id||''), JSON.stringify(turnos));
+  _turnosCache = turnos;
+  _saveTurnosLS(turnos);
 }
 
 function irHoyTurnos(){
@@ -7233,18 +7357,7 @@ async function saveTurno(_override){
   }
   saveTurnosLocal(turnos);
 
-  if(id && turnoOriginal && (
-    turnoOriginal.fecha!==obj.fecha ||
-    turnoOriginal.hora!==obj.hora   ||
-    String(turnoOriginal.empleadoId)!==String(obj.empleadoId)
-  )){
-    await sincronizarBloqueoManual(turnoOriginal,'borrar');
-  }
-  if(estado!=='cancelado'&&estado!=='no_vino'&&estado!=='terminado'){
-    await sincronizarBloqueoManual(obj,'crear');
-  } else {
-    await liberarSlotSupabase(obj);
-  }
+  await _upsertTurnoSb(obj);
 
   const yaEstabaTerminado = turnoOriginal&&turnoOriginal.estado==='terminado';
   if(estado==='terminado'&&precioCobrado>0&&!yaEstabaTerminado){
@@ -7302,13 +7415,13 @@ async function saveTurno(_override){
 }
 
 function cancelarTurno(id){
-  _confirmarModal('¿Eliminar este turno?', ()=>{
-  const turno = getTurnos().find(x=>String(x.id)===String(id));
-  const turnos = getTurnos().filter(x=>String(x.id)!==String(id));
-  saveTurnosLocal(turnos);
-  if(turno) liberarSlotSupabase(turno);
-  rTurnos();
-  showToast('Turno eliminado ✓');
+  _confirmarModal('¿Eliminar este turno?', async ()=>{
+    const turno = getTurnos().find(x=>String(x.id)===String(id));
+    const turnos = getTurnos().filter(x=>String(x.id)!==String(id));
+    saveTurnosLocal(turnos);
+    if(turno) await _updateEstadoSb(turno,'cancelado');
+    rTurnos();
+    showToast('Turno eliminado ✓');
   });
 }
 
@@ -7361,10 +7474,7 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   if(nuevoEstado === 'terminado' && _precio > 0){ _upd.precio = _precio; _upd.metodo = _metodo; }
   turnos[idx] = {...turnos[idx], ..._upd};
   saveTurnosLocal(turnos);
-  // Si el turno se finaliza, cancela o no vino, liberar el slot en Supabase
-  if(nuevoEstado === 'terminado' || nuevoEstado === 'no_vino' || nuevoEstado === 'cancelado'){
-    liberarSlotSupabase(turnoAntes);
-  }
+  await _updateEstadoSb(turnoAntes, nuevoEstado, _precio, _metodo);
   if(nuevoEstado === 'terminado'){
     const t = turnos[idx];
     const precio = _precio;
