@@ -351,12 +351,20 @@ async function cargarSlots(){
   wrap.innerHTML = 'Cargando horarios...';
 
   const {data: ocuData} = await sb.from('turnos_solicitudes')
-    .select('hora,estado')
+    .select('hora,estado,nombre')
     .eq('tenant_id', G.tenantId)
     .eq('fecha', fecha)
-    .in('estado',['confirmado','pendiente']);
-  const ocupados = new Set((ocuData||[]).map(s=>(s.hora||'').substring(0,5)));
+    .in('estado',['confirmado','pendiente','bloqueado']);
+  const ocupados = new Set();
   const bloqueos = new Set();
+  (ocuData||[]).forEach(s => {
+    const h = (s.hora||'').substring(0,5);
+    if(s.estado === 'bloqueado' && (s.nombre||'').startsWith('__fijo__')) {
+      ocupados.add(h); bloqueos.add(h); // turno fijo → "🚫 No disp."
+    } else {
+      ocupados.add(h); // confirmado/pendiente/__extra__/manual → "Reservado"
+    }
+  });
 
   const empId = document.getElementById('bEmpleado')?.value||'';
   if(cfg.empleados&&cfg.empleados.length){
