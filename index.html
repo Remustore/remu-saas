@@ -7052,12 +7052,16 @@ async function sincronizarFijosSupabase(fijos, accion){
 
 // Sincroniza todos los turnos manuales a Supabase al iniciar sesión
 async function resyncTurnosToSupabase(){
+  // Los turnos admin ahora viven directamente en turnos_solicitudes como 'confirmado'.
+  // Esta función solo limpia bloqueados no-fijo huérfanos de la arquitectura anterior.
   if(!sb || !currentTenant?.id) return;
   try {
-    const turnos = getTurnos().filter(t => t.estado !== 'cancelado' && t.estado !== 'no_vino' && t.estado !== 'terminado' && t.fecha >= tod());
-    for(const t of turnos){
-      await sincronizarBloqueoManual(t, 'crear');
-    }
+    await sb.from('turnos_solicitudes').delete()
+      .eq('tenant_id', currentTenant.id)
+      .eq('estado', 'bloqueado')
+      .gte('fecha', tod())
+      .not('nombre', 'ilike', '__fijo__%')
+      .not('nombre', 'ilike', '__extra__%');
   } catch(e){ /* no crítico */ }
 }
 
@@ -8617,6 +8621,8 @@ async function cargarSolicitudes(){
       .eq('tenant_id', currentTenant?.id||'')
       .gte('fecha', desdeStr)
       .not('estado', 'eq', 'cancelado')
+      .not('estado', 'eq', 'bloqueado')
+      .not('origen', 'eq', 'admin')
       .order('fecha', {ascending: false})
       .order('hora', {ascending: false})
       .limit(60);
