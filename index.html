@@ -1306,9 +1306,14 @@ $$;</pre>
         <div style="font-size:.78rem;color:var(--tx2);margin-bottom:12px;line-height:1.6">
           Si ves horarios bloqueados en el turnero público que no aparecen en el calendario, usá este botón para limpiar datos huérfanos y resincronizar desde el estado actual.
         </div>
-        <button class="btn bg" onclick="limpiarYResyncTurnos(this)" style="font-size:.82rem">
-          🧹 Limpiar y resincronizar turnos online
-        </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bg" onclick="limpiarYResyncTurnos(this)" style="font-size:.82rem">
+            🧹 Limpiar y resincronizar slots online
+          </button>
+          <button class="btn" onclick="migrarTurnosManual(this)" style="font-size:.82rem">
+            ☁ Migrar calendario a Supabase
+          </button>
+        </div>
         <div id="resyncStatus" style="display:none;margin-top:10px;font-size:.78rem;padding:8px 12px;border-radius:8px"></div>
       </div>
 
@@ -6851,39 +6856,56 @@ function _mapSbTurno(r){
 
 async function _upsertTurnoSb(obj){
   if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
+  const tid = currentTenant.id;
+  const ref = String(obj.id);
+  const payload = {
+    tenant_id:       tid,
+    nombre:          obj.cliente||'',
+    tel:             obj.tel||'',
+    fecha:           obj.fecha,
+    hora:            obj.hora,
+    estado:          obj.estado||'confirmado',
+    servicio_id:     obj.servicioId||null,
+    empleado_id:     obj.empleadoId?(parseInt(obj.empleadoId)||null):null,
+    precio:          obj.precio||0,
+    notas:           obj.notas||'',
+    empleado_nombre: obj.empleadoNombre||'',
+    servicio_nombre: obj.servicioNombre||'',
+    duracion:        obj.duracion||30,
+    sector:          obj.sector||'',
+    metodo:          obj.metodo||'',
+    es_fijo:         obj.esFijo||false,
+    fijo_id:         obj.fijoId||null,
+    origen:          'admin',
+    ref_id:          ref
+  };
   try {
-    await sb.from('turnos_solicitudes').upsert({
-      tenant_id:       currentTenant.id,
-      nombre:          obj.cliente||'',
-      tel:             obj.tel||'',
-      fecha:           obj.fecha,
-      hora:            obj.hora,
-      estado:          obj.estado||'confirmado',
-      servicio_id:     obj.servicioId||null,
-      empleado_id:     obj.empleadoId?(parseInt(obj.empleadoId)||null):null,
-      precio:          obj.precio||0,
-      notas:           obj.notas||'',
-      empleado_nombre: obj.empleadoNombre||'',
-      servicio_nombre: obj.servicioNombre||'',
-      duracion:        obj.duracion||30,
-      sector:          obj.sector||'',
-      metodo:          obj.metodo||'',
-      es_fijo:         obj.esFijo||false,
-      fijo_id:         obj.fijoId||null,
-      origen:          'admin',
-      ref_id:          String(obj.id),
-      created_at:      obj.creadoEn||new Date().toISOString()
-    }, {onConflict:'tenant_id,ref_id'});
-  } catch(e){ console.warn('[_upsertTurnoSb]', e.message); }
+    const {data:existing, error:selErr} = await sb.from('turnos_solicitudes')
+      .select('id').eq('tenant_id',tid).eq('ref_id',ref).maybeSingle();
+    if(selErr) throw selErr;
+    if(existing?.id){
+      const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id',existing.id);
+      if(error) throw error;
+    } else {
+      const {error} = await sb.from('turnos_solicitudes').insert(payload);
+      if(error) throw error;
+    }
+  } catch(e){ console.warn('[_upsertTurnoSb]', e.message, '| ref:', ref); }
 }
 
 async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
   if(!sb||!currentTenant?.id||!obj?.id) return;
+  const upd = {estado: nuevoEstado};
+  if(nuevoEstado==='terminado'&&precio>0){upd.precio=precio; upd.metodo=metodo||'Efectivo';}
   try {
-    const upd = {estado: nuevoEstado};
-    if(nuevoEstado==='terminado'&&precio>0){upd.precio=precio; upd.metodo=metodo||'Efectivo';}
-    await sb.from('turnos_solicitudes').update(upd)
-      .eq('tenant_id', currentTenant.id).eq('ref_id', String(obj.id));
+    const {data:ex} = await sb.from('turnos_solicitudes')
+      .select('id').eq('tenant_id',currentTenant.id).eq('ref_id',String(obj.id)).maybeSingle();
+    if(ex?.id){
+      await sb.from('turnos_solicitudes').update(upd).eq('id',ex.id);
+    } else {
+      // No existe aún en Supabase → hacer upsert completo
+      await _upsertTurnoSb({...obj, estado: nuevoEstado, precio: precio||obj.precio, metodo: metodo||obj.metodo});
+    }
   } catch(e){ console.warn('[_updateEstadoSb]', e.message); }
 }
 
@@ -6913,8 +6935,28 @@ async function _migrateTurnosToSb(){
     const refs = new Set((existing||[]).map(r=>r.ref_id));
     const toMigrate = lsTurnos.filter(t=>!refs.has(String(t.id)));
     for(const t of toMigrate) await _upsertTurnoSb(t);
-    if(toMigrate.length){ console.log('[remu] Migrados',toMigrate.length,'turnos → Supabase'); await _reloadTurnosCache(); }
-  } catch(e){ console.warn('[_migrateTurnosToSb]', e.message); }
+    if(toMigrate.length){ await _reloadTurnosCache(); rTurnos(); }
+    return toMigrate.length;
+  } catch(e){ console.warn('[_migrateTurnosToSb]', e.message); return 0; }
+}
+
+async function migrarTurnosManual(btn){
+  if(!sb||!currentTenant?.id){ showToast('Sin conexión','err'); return; }
+  const status = document.getElementById('resyncStatus');
+  const orig = btn.textContent;
+  btn.disabled=true; btn.textContent='Migrando...';
+  if(status){ status.style.display='block'; status.style.background='rgba(201,168,76,.08)'; status.style.color='#a89880'; status.style.border='1px solid rgba(201,168,76,.2)'; status.textContent='Leyendo calendario local...'; }
+  const n = await _migrateTurnosToSb();
+  if(status){
+    if(n > 0){
+      status.style.background='rgba(76,175,125,.08)'; status.style.color='#4caf7d'; status.style.border='1px solid rgba(76,175,125,.25)';
+      status.textContent='✓ '+n+' turno'+(n>1?'s':'')+' migrado'+(n>1?'s':'')+' a Supabase correctamente.';
+    } else {
+      status.style.background='rgba(201,168,76,.08)'; status.style.color='#a89880'; status.style.border='1px solid rgba(201,168,76,.2)';
+      status.textContent='No hay turnos nuevos para migrar. El calendario ya está sincronizado.';
+    }
+  }
+  btn.disabled=false; btn.textContent=orig;
 }
 
 function _initTurnosRealtime(tenantId){
