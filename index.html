@@ -6882,15 +6882,16 @@ async function _upsertTurnoSb(obj){
   try {
     if(obj._sbId){
       // Intentar con campos extendidos; si falla, reintentar sin ellos
+      const _isColErr = e => e && (e.message?.includes('does not exist') || e.message?.includes('Could not find') || e.message?.includes('column'));
       let {error} = await sb.from('turnos_solicitudes').update({...payload,...ext}).eq('id',obj._sbId);
-      if(error?.message?.includes('does not exist')){
+      if(_isColErr(error)){
         const r2 = await sb.from('turnos_solicitudes').update(payload).eq('id',obj._sbId);
         if(r2.error) throw r2.error;
       } else if(error) throw error;
     } else {
+      const _isColErr = e => e && (e.message?.includes('does not exist') || e.message?.includes('Could not find') || e.message?.includes('column'));
       let {data, error} = await sb.from('turnos_solicitudes').insert({...payload,...ext}).select('id').single();
-      if(error?.message?.includes('does not exist')){
-        // Columnas extendidas aún no disponibles — insertar solo base
+      if(_isColErr(error)){
         const r2 = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
         if(r2.error) throw r2.error;
         data = r2.data;
