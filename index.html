@@ -3761,22 +3761,20 @@ async function loadAll(){
     }
     // ── Cargar turnos admin desde Supabase (fuente única de verdad) ──────────
     _turnosCache = null;
-    try {
-      const {data:sbT} = await sb.from('turnos_solicitudes').select('*')
-        .eq('tenant_id', currentTenant.id).eq('origen','admin')
-        .order('fecha').order('hora');
-      if(sbT && sbT.length>0){
-        _turnosCache = sbT.map(_mapSbTurno);
-        _saveTurnosLS(_turnosCache);
-      } else {
-        const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
-        _turnosCache = lsRaw ? JSON.parse(lsRaw) : [];
-        setTimeout(_migrateTurnosToSb, 4000);
-      }
-    } catch(e){
+    const _sbIds = [..._getAdminSbIds()];
+    if(_sbIds.length){
+      try {
+        const {data:sbT, error:sbE} = await sb.from('turnos_solicitudes').select('*').in('id', _sbIds);
+        if(sbT && !sbE){
+          _turnosCache = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+          _saveTurnosLS(_turnosCache);
+        }
+      } catch(e){ console.warn('[loadAll] carga sb:', e.message); }
+    }
+    if(!_turnosCache){
       const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
       _turnosCache = lsRaw ? JSON.parse(lsRaw) : [];
-      console.warn('[loadAll] turnos desde LS (fallback):', e.message);
+      setTimeout(_migrateTurnosToSb, 4000);
     }
     _initTurnosRealtime(currentTenant.id);
     // ─────────────────────────────────────────────────────────────────────────
@@ -6854,10 +6852,14 @@ function _mapSbTurno(r){
   };
 }
 
+// Guarda en LS el set de UUIDs de Supabase que pertenecen a turnos admin
+function _getAdminSbIds(){ try{ return new Set(JSON.parse(localStorage.getItem('adm_sb_ids_'+(currentTenant?.id||''))||'[]')); }catch(e){ return new Set(); } }
+function _addAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.add(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
+function _removeAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.delete(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
+
 async function _upsertTurnoSb(obj){
   if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
   const tid = currentTenant.id;
-  const ref = String(obj.id);
   const payload = {
     tenant_id:       tid,
     nombre:          obj.cliente||'',
@@ -6875,22 +6877,27 @@ async function _upsertTurnoSb(obj){
     sector:          obj.sector||'',
     metodo:          obj.metodo||'',
     es_fijo:         obj.esFijo||false,
-    fijo_id:         obj.fijoId||null,
-    origen:          'admin',
-    ref_id:          ref
+    fijo_id:         obj.fijoId||null
   };
   try {
-    const {data:existing, error:selErr} = await sb.from('turnos_solicitudes')
-      .select('id').eq('tenant_id',tid).eq('ref_id',ref).maybeSingle();
-    if(selErr) throw selErr;
-    if(existing?.id){
-      const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id',existing.id);
+    if(obj._sbId){
+      // Ya tiene UUID de Supabase — actualizar directamente
+      const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', obj._sbId);
       if(error) throw error;
     } else {
-      const {error} = await sb.from('turnos_solicitudes').insert(payload);
+      // Nuevo registro — insertar y guardar el UUID devuelto
+      const {data, error} = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
       if(error) throw error;
+      if(data?.id){
+        obj._sbId = data.id;
+        _addAdminSbId(data.id);
+        if(_turnosCache){
+          const idx = _turnosCache.findIndex(t=>String(t.id)===String(obj.id));
+          if(idx!==-1){ _turnosCache[idx]._sbId = data.id; _saveTurnosLS(_turnosCache); }
+        }
+      }
     }
-  } catch(e){ console.warn('[_upsertTurnoSb]', e.message, '| ref:', ref); }
+  } catch(e){ console.warn('[_upsertTurnoSb]', e.message); }
 }
 
 async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
@@ -6898,24 +6905,26 @@ async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
   const upd = {estado: nuevoEstado};
   if(nuevoEstado==='terminado'&&precio>0){upd.precio=precio; upd.metodo=metodo||'Efectivo';}
   try {
-    const {data:ex} = await sb.from('turnos_solicitudes')
-      .select('id').eq('tenant_id',currentTenant.id).eq('ref_id',String(obj.id)).maybeSingle();
-    if(ex?.id){
-      await sb.from('turnos_solicitudes').update(upd).eq('id',ex.id);
+    if(obj._sbId){
+      await sb.from('turnos_solicitudes').update(upd).eq('id', obj._sbId);
     } else {
-      // No existe aún en Supabase → hacer upsert completo
-      await _upsertTurnoSb({...obj, estado: nuevoEstado, precio: precio||obj.precio, metodo: metodo||obj.metodo});
+      await _upsertTurnoSb({...obj, estado:nuevoEstado, precio:precio||obj.precio, metodo:metodo||obj.metodo});
     }
   } catch(e){ console.warn('[_updateEstadoSb]', e.message); }
 }
 
 async function _reloadTurnosCache(){
   if(!sb||!currentTenant?.id) return;
+  const sbIds = [..._getAdminSbIds()];
+  if(!sbIds.length) return;
   try {
-    const {data} = await sb.from('turnos_solicitudes').select('*')
-      .eq('tenant_id', currentTenant.id).eq('origen','admin')
-      .order('fecha').order('hora');
-    if(data){ _turnosCache=data.map(_mapSbTurno); _saveTurnosLS(_turnosCache); }
+    const {data, error} = await sb.from('turnos_solicitudes').select('*').in('id', sbIds);
+    if(error) throw error;
+    if(data){
+      const mapped = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+      _turnosCache = mapped;
+      _saveTurnosLS(mapped);
+    }
   } catch(e){ console.warn('[_reloadTurnosCache]', e.message); }
 }
 
@@ -6925,19 +6934,11 @@ function _saveTurnosLS(turnos){
 
 async function _migrateTurnosToSb(){
   if(!sb||!currentTenant?.id) return;
-  const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
-  if(!lsRaw) return;
-  const lsTurnos = JSON.parse(lsRaw).filter(t=>t.fecha&&t.hora&&t.id);
-  if(!lsTurnos.length) return;
-  try {
-    const {data:existing} = await sb.from('turnos_solicitudes')
-      .select('ref_id').eq('tenant_id',currentTenant.id).eq('origen','admin');
-    const refs = new Set((existing||[]).map(r=>r.ref_id));
-    const toMigrate = lsTurnos.filter(t=>!refs.has(String(t.id)));
-    for(const t of toMigrate) await _upsertTurnoSb(t);
-    if(toMigrate.length){ await _reloadTurnosCache(); rTurnos(); }
-    return toMigrate.length;
-  } catch(e){ console.warn('[_migrateTurnosToSb]', e.message); return 0; }
+  const cache = _turnosCache || [];
+  const toMigrate = cache.filter(t=>!t._sbId&&t.fecha&&t.hora&&t.id);
+  for(const t of toMigrate) await _upsertTurnoSb(t);
+  if(toMigrate.length){ await _reloadTurnosCache(); rTurnos(); }
+  return toMigrate.length;
 }
 
 async function migrarTurnosManual(btn){
