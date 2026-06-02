@@ -6860,7 +6860,7 @@ function _removeAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); co
 async function _upsertTurnoSb(obj){
   if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
   const tid = currentTenant.id;
-  // Payload base — siempre funciona con el schema original
+  const srvId = obj.servicioId ? (isNaN(parseInt(obj.servicioId)) ? null : String(obj.servicioId)) : null;
   const payload = {
     tenant_id:   tid,
     nombre:      obj.cliente||'',
@@ -6868,34 +6868,16 @@ async function _upsertTurnoSb(obj){
     fecha:       obj.fecha,
     hora:        obj.hora,
     estado:      obj.estado||'confirmado',
-    servicio_id: obj.servicioId||null,
+    servicio_id: srvId,
     empleado_id: obj.empleadoId?(parseInt(obj.empleadoId)||null):null
-  };
-  // Campos extendidos — se agregan si PostgREST ya los ve (detectado al vuelo)
-  const ext = {
-    precio:obj.precio||0, notas:obj.notas||'',
-    empleado_nombre:obj.empleadoNombre||'', servicio_nombre:obj.servicioNombre||'',
-    duracion:obj.duracion||30, sector:obj.sector||'', metodo:obj.metodo||'',
-    es_fijo:obj.esFijo||false, fijo_id:obj.fijoId||null,
-    origen:'admin', ref_id:String(obj.id)
   };
   try {
     if(obj._sbId){
-      // Intentar con campos extendidos; si falla, reintentar sin ellos
-      const _isColErr = e => e && (e.message?.includes('does not exist') || e.message?.includes('Could not find') || e.message?.includes('column'));
-      let {error} = await sb.from('turnos_solicitudes').update({...payload,...ext}).eq('id',obj._sbId);
-      if(_isColErr(error)){
-        const r2 = await sb.from('turnos_solicitudes').update(payload).eq('id',obj._sbId);
-        if(r2.error) throw r2.error;
-      } else if(error) throw error;
+      const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', obj._sbId);
+      if(error) throw error;
     } else {
-      const _isColErr = e => e && (e.message?.includes('does not exist') || e.message?.includes('Could not find') || e.message?.includes('column'));
-      let {data, error} = await sb.from('turnos_solicitudes').insert({...payload,...ext}).select('id').single();
-      if(_isColErr(error)){
-        const r2 = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
-        if(r2.error) throw r2.error;
-        data = r2.data;
-      } else if(error) throw error;
+      const {data, error} = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
+      if(error) throw error;
       if(data?.id){
         obj._sbId = data.id;
         _addAdminSbId(data.id);
