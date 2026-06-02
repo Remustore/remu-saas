@@ -6857,35 +6857,53 @@ function _getAdminSbIds(){ try{ return new Set(JSON.parse(localStorage.getItem('
 function _addAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.add(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
 function _removeAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.delete(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
 
+// Columnas extendidas — solo se incluyen si PostgREST ya las conoce
+const _SB_EXT_COLS = ['precio','notas','empleado_nombre','servicio_nombre','duracion','sector','metodo','es_fijo','fijo_id','origen','ref_id'];
+let _sbExtOk = null; // null=no chequeado, true=disponibles, false=no disponibles
+
+async function _checkSbExt(){
+  if(_sbExtOk !== null) return _sbExtOk;
+  try {
+    const {error} = await sb.from('turnos_solicitudes').select('ref_id').eq('tenant_id','00000000-0000-0000-0000-000000000000').limit(1);
+    _sbExtOk = !error;
+  } catch(e){ _sbExtOk = false; }
+  return _sbExtOk;
+}
+
 async function _upsertTurnoSb(obj){
   if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
   const tid = currentTenant.id;
+  const extOk = await _checkSbExt();
   const payload = {
-    tenant_id:       tid,
-    nombre:          obj.cliente||'',
-    tel:             obj.tel||'',
-    fecha:           obj.fecha,
-    hora:            obj.hora,
-    estado:          obj.estado||'confirmado',
-    servicio_id:     obj.servicioId||null,
-    empleado_id:     obj.empleadoId?(parseInt(obj.empleadoId)||null):null,
-    precio:          obj.precio||0,
-    notas:           obj.notas||'',
-    empleado_nombre: obj.empleadoNombre||'',
-    servicio_nombre: obj.servicioNombre||'',
-    duracion:        obj.duracion||30,
-    sector:          obj.sector||'',
-    metodo:          obj.metodo||'',
-    es_fijo:         obj.esFijo||false,
-    fijo_id:         obj.fijoId||null
+    tenant_id:   tid,
+    nombre:      obj.cliente||'',
+    tel:         obj.tel||'',
+    fecha:       obj.fecha,
+    hora:        obj.hora,
+    estado:      obj.estado||'confirmado',
+    servicio_id: obj.servicioId||null,
+    empleado_id: obj.empleadoId?(parseInt(obj.empleadoId)||null):null
   };
+  if(extOk){
+    Object.assign(payload, {
+      precio:          obj.precio||0,
+      notas:           obj.notas||'',
+      empleado_nombre: obj.empleadoNombre||'',
+      servicio_nombre: obj.servicioNombre||'',
+      duracion:        obj.duracion||30,
+      sector:          obj.sector||'',
+      metodo:          obj.metodo||'',
+      es_fijo:         obj.esFijo||false,
+      fijo_id:         obj.fijoId||null,
+      origen:          'admin',
+      ref_id:          String(obj.id)
+    });
+  }
   try {
     if(obj._sbId){
-      // Ya tiene UUID de Supabase — actualizar directamente
       const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', obj._sbId);
       if(error) throw error;
     } else {
-      // Nuevo registro — insertar y guardar el UUID devuelto
       const {data, error} = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
       if(error) throw error;
       if(data?.id){
