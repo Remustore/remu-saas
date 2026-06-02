@@ -6857,23 +6857,10 @@ function _getAdminSbIds(){ try{ return new Set(JSON.parse(localStorage.getItem('
 function _addAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.add(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
 function _removeAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.delete(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
 
-// Columnas extendidas — solo se incluyen si PostgREST ya las conoce
-const _SB_EXT_COLS = ['precio','notas','empleado_nombre','servicio_nombre','duracion','sector','metodo','es_fijo','fijo_id','origen','ref_id'];
-let _sbExtOk = null; // null=no chequeado, true=disponibles, false=no disponibles
-
-async function _checkSbExt(){
-  if(_sbExtOk !== null) return _sbExtOk;
-  try {
-    const {error} = await sb.from('turnos_solicitudes').select('ref_id').eq('tenant_id','00000000-0000-0000-0000-000000000000').limit(1);
-    _sbExtOk = !error;
-  } catch(e){ _sbExtOk = false; }
-  return _sbExtOk;
-}
-
 async function _upsertTurnoSb(obj){
   if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
   const tid = currentTenant.id;
-  const extOk = await _checkSbExt();
+  // Payload base — siempre funciona con el schema original
   const payload = {
     tenant_id:   tid,
     nombre:      obj.cliente||'',
@@ -6884,28 +6871,30 @@ async function _upsertTurnoSb(obj){
     servicio_id: obj.servicioId||null,
     empleado_id: obj.empleadoId?(parseInt(obj.empleadoId)||null):null
   };
-  if(extOk){
-    Object.assign(payload, {
-      precio:          obj.precio||0,
-      notas:           obj.notas||'',
-      empleado_nombre: obj.empleadoNombre||'',
-      servicio_nombre: obj.servicioNombre||'',
-      duracion:        obj.duracion||30,
-      sector:          obj.sector||'',
-      metodo:          obj.metodo||'',
-      es_fijo:         obj.esFijo||false,
-      fijo_id:         obj.fijoId||null,
-      origen:          'admin',
-      ref_id:          String(obj.id)
-    });
-  }
+  // Campos extendidos — se agregan si PostgREST ya los ve (detectado al vuelo)
+  const ext = {
+    precio:obj.precio||0, notas:obj.notas||'',
+    empleado_nombre:obj.empleadoNombre||'', servicio_nombre:obj.servicioNombre||'',
+    duracion:obj.duracion||30, sector:obj.sector||'', metodo:obj.metodo||'',
+    es_fijo:obj.esFijo||false, fijo_id:obj.fijoId||null,
+    origen:'admin', ref_id:String(obj.id)
+  };
   try {
     if(obj._sbId){
-      const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', obj._sbId);
-      if(error) throw error;
+      // Intentar con campos extendidos; si falla, reintentar sin ellos
+      let {error} = await sb.from('turnos_solicitudes').update({...payload,...ext}).eq('id',obj._sbId);
+      if(error?.message?.includes('does not exist')){
+        const r2 = await sb.from('turnos_solicitudes').update(payload).eq('id',obj._sbId);
+        if(r2.error) throw r2.error;
+      } else if(error) throw error;
     } else {
-      const {data, error} = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
-      if(error) throw error;
+      let {data, error} = await sb.from('turnos_solicitudes').insert({...payload,...ext}).select('id').single();
+      if(error?.message?.includes('does not exist')){
+        // Columnas extendidas aún no disponibles — insertar solo base
+        const r2 = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
+        if(r2.error) throw r2.error;
+        data = r2.data;
+      } else if(error) throw error;
       if(data?.id){
         obj._sbId = data.id;
         _addAdminSbId(data.id);
@@ -6913,6 +6902,7 @@ async function _upsertTurnoSb(obj){
           const idx = _turnosCache.findIndex(t=>String(t.id)===String(obj.id));
           if(idx!==-1){ _turnosCache[idx]._sbId = data.id; _saveTurnosLS(_turnosCache); }
         }
+        console.log('[remu] turno guardado en Supabase ✓', data.id);
       }
     }
   } catch(e){ console.warn('[_upsertTurnoSb]', e.message); }
