@@ -3759,23 +3759,24 @@ async function loadAll(){
         if(preciosNuevos) S.precios = preciosNuevos.filter(p=>!p.__turnosCfg && !p.__tipo);
       }
     }
-    // ── Cargar turnos admin desde Supabase (fuente única de verdad) ──────────
+    // ── Cargar turnos desde Supabase (fuente única, cross-device) ────────────
     _turnosCache = null;
-    const _sbIds = [..._getAdminSbIds()];
-    if(_sbIds.length){
-      try {
-        const {data:sbT, error:sbE} = await sb.from('turnos_solicitudes').select('*').in('id', _sbIds);
-        if(sbT && !sbE){
-          _turnosCache = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
-          _saveTurnosLS(_turnosCache);
-        }
-      } catch(e){ console.warn('[loadAll] carga sb:', e.message); }
-    }
+    try {
+      const {data:sbT, error:sbE} = await sb.from('turnos_solicitudes')
+        .select('*')
+        .eq('tenant_id', currentTenant.id)
+        .not('estado','eq','bloqueado')
+        .order('fecha').order('hora');
+      if(sbT && !sbE){
+        _turnosCache = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+        _saveTurnosLS(_turnosCache);
+      }
+    } catch(e){ console.warn('[loadAll] carga turnos sb:', e.message); }
     if(!_turnosCache){
       const lsRaw = localStorage.getItem(TURNOS_KEY+'_'+currentTenant.id);
       _turnosCache = lsRaw ? JSON.parse(lsRaw) : [];
-      setTimeout(_migrateTurnosToSb, 4000);
     }
+    setTimeout(_migrateTurnosToSb, 5000);
     _initTurnosRealtime(currentTenant.id);
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -6906,10 +6907,12 @@ async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
 
 async function _reloadTurnosCache(){
   if(!sb||!currentTenant?.id) return;
-  const sbIds = [..._getAdminSbIds()];
-  if(!sbIds.length) return;
   try {
-    const {data, error} = await sb.from('turnos_solicitudes').select('*').in('id', sbIds);
+    const {data, error} = await sb.from('turnos_solicitudes')
+      .select('*')
+      .eq('tenant_id', currentTenant.id)
+      .not('estado','eq','bloqueado')
+      .order('fecha').order('hora');
     if(error) throw error;
     if(data){
       const mapped = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
