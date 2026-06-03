@@ -6863,14 +6863,25 @@ async function _upsertTurnoSb(obj){
   const tid = currentTenant.id;
   const srvId = obj.servicioId ? (isNaN(parseInt(obj.servicioId)) ? null : String(obj.servicioId)) : null;
   const payload = {
-    tenant_id:   tid,
-    nombre:      obj.cliente||'',
-    tel:         obj.tel||'',
-    fecha:       obj.fecha,
-    hora:        obj.hora,
-    estado:      obj.estado||'confirmado',
-    servicio_id: srvId,
-    empleado_id: obj.empleadoId?(parseInt(obj.empleadoId)||null):null
+    tenant_id:       tid,
+    nombre:          obj.cliente||'',
+    tel:             obj.tel||'',
+    fecha:           obj.fecha,
+    hora:            obj.hora,
+    estado:          obj.estado||'confirmado',
+    servicio_id:     srvId,
+    empleado_id:     obj.empleadoId?(parseInt(obj.empleadoId)||null):null,
+    precio:          obj.precio||0,
+    notas:           obj.notas||'',
+    empleado_nombre: obj.empleadoNombre||'',
+    servicio_nombre: obj.servicioNombre||'',
+    duracion:        obj.duracion||30,
+    sector:          obj.sector||'',
+    metodo:          obj.metodo||'',
+    es_fijo:         obj.esFijo||false,
+    fijo_id:         obj.fijoId||null,
+    origen:          'admin',
+    ref_id:          String(obj.id)
   };
   try {
     if(obj._sbId){
