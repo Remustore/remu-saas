@@ -9030,7 +9030,8 @@ function _rwR(){
   const s = __rw.step;
   const pct = Math.min(s * 25, 100);
   const label = s <= 4 ? `Paso ${s} de 4` : '';
-  const body = s===1?_rwS1():s===2?_rwS2():s===3?_rwS3():s===4?_rwS4():_rwS5();
+  const body = s===1?_rwS1():s===2?_rwS2():s===3?_rwS3():s===4?_rwS4():s===6?_rwS6():_rwS5();
+  const center = s===5||s===6;
   scr.innerHTML = `
     <div style="min-height:100vh;color:#f5f0e8;display:flex;flex-direction:column;font-family:'Outfit',sans-serif">
       ${s<=4?`
@@ -9039,7 +9040,7 @@ function _rwR(){
           <span style="font-family:'Playfair Display',serif;font-size:.9rem;font-weight:700;color:#c9a84c;letter-spacing:1px">Remu Gestión</span>
           <span style="font-size:.72rem;color:#a89880">${label}</span>
         </div>`:''}
-      <div style="flex:1;display:flex;align-items:${s===5?'center':'flex-start'};justify-content:center;padding:${s===5?'20px':'32px 16px 56px'}">
+      <div style="flex:1;display:flex;align-items:${center?'center':'flex-start'};justify-content:center;padding:${center?'20px':'32px 16px 56px'}">
         <div style="width:100%;max-width:460px">${body}</div>
       </div>
     </div>`;
@@ -9243,9 +9244,9 @@ async function _rwFinish(btn){
     const {data:loginData, error:le} = await sb.auth.signInWithPassword({email, password:pass});
     if(!le && loginData?.session){
       await precargarServiciosTenant(tenantId, __rw.rubro, __rw.nombre);
-      localStorage.setItem('onboarding_v1_'+tenantId, '1'); // marcar wizard como hecho
-      btn.textContent='¡Todo listo! Entrando...';
-      setTimeout(()=>{ window.location.href='index.html'; }, 800);
+      localStorage.setItem('onboarding_v1_'+tenantId, '1');
+      __rw.tenantId = tenantId;
+      __rw.step = 6; _rwR(); // pantalla de éxito con links
       return;
     }
     // Sin auto-login → mostrar pantalla de confirmación de email
@@ -9254,6 +9255,51 @@ async function _rwFinish(btn){
     showErr(e.message||'Ocurrió un error. Intentá de nuevo.');
     btn.disabled=false; btn.textContent='Crear mi negocio →';
   }
+}
+
+// ── Paso 6: ¡Tu negocio está listo! — links públicos ─────────────────────
+function _rwS6(){
+  const slug = tenantSlug(__rw.nombre||'mi-negocio');
+  const base = window.location.origin;
+  const linkTurnos  = base + '/b/' + slug;
+  const linkPrecios = base + '/?precios=' + slug;
+  const waMsg = encodeURIComponent('¡Hola! Ahora podés sacar turno online acá: ' + linkTurnos);
+  const waLink = 'https://wa.me/?text=' + waMsg;
+  const _card = (icon, label, link) => `
+    <div style="background:#0a0a0a;border:1px solid #2a2a2a;border-radius:12px;padding:14px 16px;margin-bottom:10px">
+      <div style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">${icon} ${label}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="flex:1;background:#111;border:1px solid #1e1e1e;border-radius:7px;padding:8px 12px;font-size:.75rem;color:#c9a84c;word-break:break-all;font-family:monospace">${link}</div>
+        <button onclick="navigator.clipboard.writeText('${link}').then(()=>_rwToast('¡Link copiado!'))" style="flex-shrink:0;background:#c9a84c;color:#080808;border:none;border-radius:7px;padding:8px 12px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">Copiar</button>
+      </div>
+    </div>`;
+  return `<div style="text-align:center">
+    <div style="font-size:3rem;margin-bottom:8px">🎉</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${esc(__rw.nombre||'Tu negocio')} está listo</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:24px">Tu sistema está configurado y listo para recibir clientes</div>
+
+    ${_card('📅','Turnero online — compartí este link', linkTurnos)}
+    ${_card('🏷','Lista de precios pública', linkPrecios)}
+
+    <a href="${waLink}" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:10px;padding:13px;background:rgba(37,211,102,.12);border:1px solid rgba(37,211,102,.3);border-radius:10px;color:#25d366;text-decoration:none;font-size:.85rem;font-weight:600;margin-bottom:20px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
+      Compartir por WhatsApp
+    </a>
+
+    <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:20px;text-align:left">
+      <div style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Próximos pasos</div>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:.82rem;color:#f5f0e8">
+        <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#c9a84c;font-weight:700;flex-shrink:0">1.</span><span>Copiá el link de turneros y ponelo en la bio de Instagram del negocio</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#c9a84c;font-weight:700;flex-shrink:0">2.</span><span>Mandalo por WhatsApp a tus clientes habituales — van a poder sacar turno solos 24/7</span></div>
+        <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:#c9a84c;font-weight:700;flex-shrink:0">3.</span><span>En el panel agregá tu equipo, ajustá precios y configurá los horarios de atención</span></div>
+      </div>
+    </div>
+
+    <button onclick="window.location.href='index.html'" style="width:100%;padding:15px;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#080808;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;letter-spacing:.3px">
+      Ir al panel de gestión →
+    </button>
+    <div style="font-size:.7rem;color:#585044;margin-top:10px">30 días gratis · Sin tarjeta · Cancelás cuando querés</div>
+  </div>`;
 }
 
 // ── Paso 5: Éxito / confirmación por email ───────────────────────────────
