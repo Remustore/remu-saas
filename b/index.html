@@ -370,12 +370,28 @@ async function cargarSlots(){
   const srv    = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
   const pasos  = srv ? Math.ceil((srv.duracion||30)/30) : 1;
 
+  // Bloqueos de horario por empleado (configurados en el panel admin)
+  const empId = document.getElementById('bEmpleado')?.value||'';
+  const blqEmp = new Set();
+  if(cfg.empleados&&cfg.empleados.length){
+    const emps = empId
+      ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
+      : cfg.empleados;
+    if(emps.length){
+      const ap0=hhToMin(cfg.apertura||'09:00'), ci0=hhToMin(cfg.cierre||'20:00');
+      for(let m=ap0; m<=ci0; m+=30){
+        const h=minToHH(m);
+        if(emps.every(e=>esBloqueado(e.bloqueos||[],fecha,h))) blqEmp.add(h);
+      }
+    }
+  }
+
   const ap = hhToMin(cfg.apertura||'09:00');
   const ci = hhToMin(cfg.cierre||'20:00');
   const slots = [];
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    if(fijos.has(hora)){
+    if(fijos.has(hora)||blqEmp.has(hora)){
       slots.push({hora, blq:true, ocu:false});
       continue;
     }
@@ -383,7 +399,7 @@ async function cargarSlots(){
     if(!ocu && pasos>1){
       for(let k=1; k<pasos; k++){
         const hk = minToHH(m+k*30);
-        if(reservados.has(hk)||fijos.has(hk)){ocu=true;break;}
+        if(reservados.has(hk)||fijos.has(hk)||blqEmp.has(hk)){ocu=true;break;}
       }
     }
     slots.push({hora, blq:false, ocu});
