@@ -13440,7 +13440,7 @@ async function loadSaMetricas(){
   let precioMensual = 0;
   try {
     const { data: mpRow } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).single();
-    precioMensual = parseFloat(mpRow?.data?.precio || mpRow?.precio || 0) || 0;
+    precioMensual = parseFloat(mpRow?.data?.mp_precio || mpRow?.data?.precio || mpRow?.precio || 0) || 0;
   } catch(e){}
 
   const ingresoEst = conPago * precioMensual;
