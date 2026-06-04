@@ -713,6 +713,15 @@ textarea{resize:vertical;min-height:70px;}
               <input id="saEmoji" value="✨" placeholder="o escribí uno" style="width:60px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:6px 8px;border-radius:7px;font-size:1rem;outline:none;text-align:center">
             </div>
           </div>
+          <label>Plan</label>
+          <select id="saPlan" onchange="saActualizarPrecioPlan()" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:6px">
+            <option value="profesional">⭐ Profesional — $14.900/mes</option>
+            <option value="premium">🚀 Premium — $20.000/mes (incluye WA automático)</option>
+          </select>
+          <label>Precio mensual (ARS)</label>
+          <input id="saPrecioMensual" type="number" value="14900" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;">
+          <div style="font-size:.7rem;color:var(--tx2);margin-top:4px;margin-bottom:10px">💡 Podés editarlo para precio fundador u ofertas especiales</div>
+
           <label>Rol del usuario</label>
           <select id="saRol" onchange="toggleRolFields(this.value)" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;">
             <option value="admin">👑 Administrador — acceso completo</option>
@@ -2612,19 +2621,25 @@ async function crearTenant(){
   if(!nombre || !email || !pass){ showSaMsg('Completá todos los campos obligatorios', 'err'); return; }
   if(pass.length < 6){ showSaMsg('La contraseña debe tener al menos 6 caracteres', 'err'); return; }
 
+  const planSel = document.getElementById('saPlan')?.value || 'profesional';
+  const precioMens = parseInt(document.getElementById('saPrecioMensual')?.value) || 14900;
   const modulos = {
-    ventas:     document.getElementById('mVentas').checked,
-    stock:      document.getElementById('chkStock').checked,
-    equipos:    document.getElementById('mEquipos').checked,
-    taller:     document.getElementById('chkTaller').checked,
-    gastos:     document.getElementById('mGastos').checked,
-    analisis:   document.getElementById('mAnalisis').checked,
-    precios:    document.getElementById('mPrecios').checked,
-    inversores: document.getElementById('mInversores').checked,
-    color:      document.getElementById('saColor')?.value || '#c9a84c',
-    fuente:     document.getElementById('saFuente')?.value || 'playfair',
-    modo:       document.getElementById('saModo')?.value || 'dark',
-    emoji:      document.getElementById('saEmoji')?.value || '✨',
+    ventas:         document.getElementById('mVentas').checked,
+    stock:          document.getElementById('chkStock').checked,
+    equipos:        document.getElementById('mEquipos').checked,
+    taller:         document.getElementById('chkTaller').checked,
+    gastos:         document.getElementById('mGastos').checked,
+    analisis:       document.getElementById('mAnalisis').checked,
+    precios:        document.getElementById('mPrecios').checked,
+    inversores:     document.getElementById('mInversores').checked,
+    color:          document.getElementById('saColor')?.value || '#c9a84c',
+    fuente:         document.getElementById('saFuente')?.value || 'playfair',
+    modo:           document.getElementById('saModo')?.value || 'dark',
+    emoji:          document.getElementById('saEmoji')?.value || '✨',
+    plan:           planSel,
+    precio_mensual: precioMens,
+    pago_activo:    false,
+    trial_hasta:    new Date(Date.now()+30*24*60*60*1000).toISOString()
   };
 
   showSaMsg('Creando cliente...', 'ok');
@@ -2827,6 +2842,13 @@ async function loadTenants(){
         : `<span class="tenant-badge" style="background:rgba(201,82,76,.12);color:var(--bad);border:1px solid rgba(201,82,76,.2)">Trial vencido</span>`;
     const fechaReg = t.created_at ? new Date(t.created_at).toLocaleDateString('es-AR',{day:'numeric',month:'short',year:'numeric'}) : '—';
     const autoReg = mods.auto_registro ? '<span style="font-size:.65rem;color:var(--inf);background:rgba(76,142,201,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,142,201,.2)">auto</span>' : '';
+    const planBadge = mods.plan==='premium'
+      ? '<span style="font-size:.65rem;color:#c9a84c;background:rgba(201,168,76,.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(201,168,76,.25);font-weight:700">🚀 PREMIUM</span>'
+      : mods.precio_mensual && mods.precio_mensual !== 10900
+        ? `<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">$${Number(mods.precio_mensual).toLocaleString('es-AR')}/mes</span>`
+        : mods.precio_mensual===10900
+          ? '<span style="font-size:.65rem;color:var(--mut);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">💎 Fundador</span>'
+          : '';
     return `
     <div class="tenant-row" style="flex-direction:column;align-items:flex-start;gap:10px">
       <div style="display:flex;align-items:center;gap:10px;width:100%">
@@ -2839,6 +2861,7 @@ async function loadTenants(){
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-left:46px">
         ${trialLabel}
+        ${planBadge}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="activarPago('${t.id}')">✓ Marcar pagado</button>`:'<button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="desactivarPago(\''+t.id+'\')">Cancelar pago</button>'}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="extenderTrial('${t.id}')">+30 días trial</button>`:''}
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="gestionarUsuarios('${t.id}')">👥 ${(mods.usuarios||[]).length||1} usuario${((mods.usuarios||[]).length||1)!==1?'s':''}</button>
@@ -3271,11 +3294,26 @@ async function _cargarSoporteTel(){
   } catch(e){}
 }
 
+function saActualizarPrecioPlan(){
+  const plan = document.getElementById('saPlan')?.value;
+  const inp  = document.getElementById('saPrecioMensual');
+  if(!inp) return;
+  if(plan==='premium') inp.value = 20000;
+  else inp.value = 14900;
+}
+
 function _actualizarPrecioTrial(precio){
   const el = document.getElementById('trialPrecioDisplay');
   if(!el) return;
-  const fmt = precio.toLocaleString('es-AR');
-  el.innerHTML = `$${fmt} <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span>`;
+  const anual = precio * 10;
+  el.innerHTML = `
+    <div style="font-size:2rem;font-weight:800;color:#c9a84c;font-family:'Playfair Display',serif">
+      $${precio.toLocaleString('es-AR')} <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span>
+    </div>
+    <div style="margin-top:8px;padding:8px 12px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;font-size:.78rem;color:#c9a84c">
+      🎁 Plan anual: $${anual.toLocaleString('es-AR')} — pagás 10 meses, usás 12
+      <span style="color:#a89880;margin-left:4px">(ahorrás $${(precio*2).toLocaleString('es-AR')})</span>
+    </div>`;
 }
 
 async function showTrialScreen(diasVencido){
@@ -3323,13 +3361,16 @@ async function showTrialScreen(diasVencido){
   const waLink = document.getElementById('trialWaLink');
   if(waLink) waLink.href = `https://wa.me/${soporteTel}?text=${encodeURIComponent('Hola! Quiero activar mi suscripción de Remu Gestión — '+nombre)}`;
 
-  // Precio
-  const precioLocal = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
+  // Precio: tenant > localStorage > global config
+  const precioTenant = currentTenant?.modulos?.precio_mensual;
+  const precioLocal  = precioTenant || parseInt(localStorage.getItem('remu_mp_precio')) || 10900;
   _actualizarPrecioTrial(precioLocal);
   try {
     const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
     const cfg = data?.data;
-    if(cfg?.mp_precio){ const p=parseInt(cfg.mp_precio)||8000; localStorage.setItem('remu_mp_precio',String(p)); _actualizarPrecioTrial(p); }
+    const precioFinal = precioTenant || parseInt(cfg?.mp_precio) || 10900;
+    _actualizarPrecioTrial(precioFinal);
+    if(cfg?.mp_precio) localStorage.setItem('remu_mp_precio', String(cfg.mp_precio));
     if(cfg?.mp_link)   localStorage.setItem('remu_mp_link', cfg.mp_link);
     if(cfg?.soporte_tel) localStorage.setItem('remu_soporte_tel', cfg.soporte_tel);
   } catch(e){}
