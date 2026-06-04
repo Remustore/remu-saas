@@ -6924,7 +6924,6 @@ async function _upsertTurnoSb(obj){
           const idx = _turnosCache.findIndex(t=>String(t.id)===String(obj.id));
           if(idx!==-1){ _turnosCache[idx]._sbId = data.id; _saveTurnosLS(_turnosCache); }
         }
-        console.log('[remu] turno guardado en Supabase ✓', data.id);
       }
     }
   } catch(e){ console.warn('[_upsertTurnoSb]', e.message); }
