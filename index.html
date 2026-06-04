@@ -4501,24 +4501,30 @@ function sugerirGuia(val){
 function autocompleteCliTurno(val){
   const box = document.getElementById('turnoCliSugg');
   if(!box) return;
-  if(!val || val.length < 2){ box.style.display='none'; return; }
+  if(!val || val.length < 1){ box.style.display='none'; return; }
   const q = val.toLowerCase();
-  // Build unique client list from ventas, reparaciones, and existing turnos
   const clientes = new Map();
-  const addCli = (nombre, tel) => {
+  const addCli = (nombre, tel, servicio) => {
     if(!nombre) return;
-    const k = nombre.toLowerCase();
-    if(k.includes(q) && !clientes.has(nombre)){
-      clientes.set(nombre, tel||'');
-    }
+    if(!nombre.toLowerCase().includes(q)) return;
+    if(!clientes.has(nombre)) clientes.set(nombre, {tel:tel||'', servicio:''});
+    if(servicio && !clientes.get(nombre).servicio) clientes.get(nombre).servicio = servicio;
   };
-  (S.ventas||[]).forEach(v=>addCli(v.cliente, v.tel));
-  (S.reparaciones||[]).forEach(r=>addCli(r.cliente, r.tel));
-  if(getTurnos) getTurnos().forEach(t=>addCli(t.cliente, t.tel));
-  const lista = [...clientes.entries()].slice(0,7);
+  (S.ventas||[]).forEach(v=>addCli(v.cliente, v.tel, ''));
+  (S.reparaciones||[]).forEach(r=>addCli(r.cliente, r.tel, ''));
+  if(getTurnos) getTurnos()
+    .slice().sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora))
+    .forEach(t=>addCli(t.cliente, t.tel, t.servicioNombre||''));
+  const lista = [...clientes.entries()].slice(0,8);
   if(!lista.length){ box.style.display='none'; return; }
   box.style.display='block';
-  box.innerHTML = lista.map(([nombre, tel])=>`<div onclick="selCliTurno('${esc(nombre).replace(/'/g,'\\\'').replace(/"/g,'&quot;')}','${esc(tel||'').replace(/'/g,'\\\'').replace(/"/g,'&quot;')}')" style="padding:9px 12px;cursor:pointer;font-size:.83rem;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='var(--car)'" onmouseout="this.style.background=''"><span>${esc(nombre)}</span>${tel?`<span style="font-size:.72rem;color:var(--mut)">${esc(tel)}</span>`:''}</div>`).join('');
+  box.innerHTML = lista.map(([nombre, {tel, servicio}])=>`
+    <div onclick="selCliTurno('${esc(nombre).replace(/'/g,'\\\'').replace(/"/g,'&quot;')}','${esc(tel).replace(/'/g,'\\\'').replace(/"/g,'&quot;')}')"
+      style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--bor)"
+      onmouseover="this.style.background='var(--car)'" onmouseout="this.style.background=''">
+      <div style="font-size:.83rem;color:var(--tx)">${esc(nombre)}</div>
+      <div style="font-size:.72rem;color:var(--mut);margin-top:2px">${tel?esc(tel):''}${servicio?' · '+esc(servicio):''}</div>
+    </div>`).join('');
 }
 function selCliTurno(nombre, tel){
   const inp = document.getElementById('turnoCli');
@@ -4527,6 +4533,27 @@ function selCliTurno(nombre, tel){
   if(box) box.style.display='none';
   if(tel){ const telInp = document.getElementById('turnoTel'); if(telInp && !telInp.value) telInp.value = tel; }
   mostrarFichaLinkTurno(nombre);
+
+  // Pre-seleccionar servicio y empleado del último turno del cliente
+  const historial = (getTurnos ? getTurnos() : [])
+    .filter(t => (t.cliente||'').toLowerCase() === nombre.toLowerCase())
+    .sort((a,b) => (b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+  if(!historial.length) return;
+  const ultimo = historial[0];
+  if(ultimo.servicioId){
+    const srvSel = document.getElementById('turnoServicio');
+    if(srvSel){
+      const opt = [...srvSel.options].find(o=>String(o.value)===String(ultimo.servicioId));
+      if(opt){ srvSel.value = opt.value; updateDuracionTurno(); }
+    }
+  }
+  if(ultimo.empleadoId){
+    const empSel = document.getElementById('turnoEmpleado');
+    if(empSel){
+      const opt = [...empSel.options].find(o=>String(o.value)===String(ultimo.empleadoId));
+      if(opt) empSel.value = opt.value;
+    }
+  }
 }
 
 function mostrarFichaLinkTurno(nombre){
