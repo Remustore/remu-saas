@@ -539,36 +539,38 @@ textarea{resize:vertical;min-height:70px;}
 <div id="onboardingScreen" style="position:fixed;inset:0;background:#080808;z-index:9000;display:none;overflow-y:auto;font-family:'Outfit',sans-serif"></div>
 
 <!-- TRIAL VENCIDO -->
-<div id="trialScreen" style="position:fixed;inset:0;background:#080808;z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif">
-  <div style="max-width:460px;width:100%;text-align:center">
-    <div style="font-size:3rem;margin-bottom:16px">⏰</div>
-    <div style="font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:800;color:#c9a84c;margin-bottom:10px">Tu período de prueba terminó</div>
-    <div style="color:#a89880;font-size:.95rem;line-height:1.7;margin-bottom:28px">Los 30 días gratuitos finalizaron. Para seguir usando el sistema y no perder tus datos, activá tu suscripción.</div>
-    <div style="background:#141414;border:1px solid #242424;border-radius:14px;padding:24px;margin-bottom:20px;text-align:left">
-      <div style="font-size:.7rem;color:#e0d5c5;text-transform:uppercase;letter-spacing:1px;margin-bottom:16px">Tu plan</div>
+<div id="trialScreen" style="position:fixed;inset:0;background:#080808;z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif;overflow-y:auto">
+  <div style="max-width:460px;width:100%;text-align:center;padding:8px 0">
+    <div id="trialScreenIcon" style="font-size:3rem;margin-bottom:12px">⏰</div>
+    <div id="trialScreenTitle" style="font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:800;color:#c9a84c;margin-bottom:8px">Tu período de prueba terminó</div>
+    <div id="trialScreenSub" style="color:#a89880;font-size:.88rem;line-height:1.7;margin-bottom:20px"></div>
+    <!-- Datos del negocio (lo que tendrían que perder) -->
+    <div id="trialDataSummary" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:14px;margin-bottom:16px;text-align:left">
+      <div style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Tus datos guardados</div>
+      <div id="trialDataRows" style="display:flex;flex-direction:column;gap:7px;font-size:.82rem;color:#f5f0e8"></div>
+    </div>
+    <div style="background:#141414;border:1px solid #242424;border-radius:14px;padding:20px;margin-bottom:16px;text-align:left">
+      <div style="font-size:.7rem;color:#e0d5c5;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px">Plan completo</div>
       <div id="trialPrecioDisplay" style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c">… <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span></div>
-      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Todos tus datos guardados</div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones incluidas</div>
-        <div style="display:flex;align-items:center;gap:8px;font-size:.85rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Soporte por WhatsApp</div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:8px;font-size:.83rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Turnos online 24/7 para tus clientes</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:.83rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Todos tus datos seguros</div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:.83rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones y soporte incluidos</div>
       </div>
     </div>
-    <!-- Botón principal: Mercado Pago -->
     <button onclick="iniciarPagoMP()" id="btnPagarMP"
        style="display:block;width:100%;padding:15px;background:#009ee3;color:#fff;border-radius:10px;font-weight:700;font-size:1rem;border:none;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
       💳 Pagar con Mercado Pago →
     </button>
-    <!-- Se muestra después de hacer click en pagar -->
     <button onclick="confirmarPagoMP()" id="btnYaPague"
        style="display:none;width:100%;padding:13px;background:rgba(76,175,125,.15);color:#4caf7d;border:1px solid rgba(76,175,125,.3);border-radius:10px;font-weight:600;font-size:.9rem;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
       ✓ Ya pagué → Activar ahora
     </button>
-    <!-- Fallback WhatsApp -->
-    <a href="https://wa.me/5493472628087?text=Hola!%20Quiero%20activar%20mi%20suscripci%C3%B3n%20de%20Remu%20Gesti%C3%B3n" target="_blank"
+    <a id="trialWaLink" href="#" target="_blank"
        style="display:block;padding:11px;background:transparent;color:#a89880;border-radius:10px;font-size:.82rem;text-decoration:none;margin-bottom:8px;border:1px solid #242424">
       💬 Activar por WhatsApp
     </a>
-    <button onclick="doLogout()" style="background:none;border:none;color:#e0d5c5;font-size:.82rem;cursor:pointer;font-family:'Outfit',sans-serif">Cerrar sesión</button>
+    <button onclick="doLogout()" style="background:none;border:none;color:#585044;font-size:.78rem;cursor:pointer;font-family:'Outfit',sans-serif">Cerrar sesión</button>
   </div>
 </div>
 
@@ -3276,18 +3278,60 @@ function _actualizarPrecioTrial(precio){
   el.innerHTML = `$${fmt} <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span>`;
 }
 
-async function showTrialScreen(){
+async function showTrialScreen(diasVencido){
+  const suspendido = (diasVencido||0) > 7;
   document.getElementById('loadingScreen').style.display='none';
   document.getElementById('trialScreen').style.display='flex';
-  // Mostrar precio desde localStorage inmediatamente (sin esperar red)
+
+  // Texto según estado
+  const iconEl  = document.getElementById('trialScreenIcon');
+  const titleEl = document.getElementById('trialScreenTitle');
+  const subEl   = document.getElementById('trialScreenSub');
+  const nombre  = currentTenant?.nombre || 'tu negocio';
+
+  if(suspendido){
+    if(iconEl)  iconEl.textContent  = '🔒';
+    if(titleEl) titleEl.textContent = 'Cuenta suspendida';
+    if(subEl)   subEl.innerHTML     = `<strong style="color:#f5f0e8">${esc(nombre)}</strong> está suspendido hace ${Math.abs(diasVencido||0)} días.<br>Activá tu suscripción para recuperar el acceso completo.`;
+  } else {
+    if(iconEl)  iconEl.textContent  = '⏰';
+    if(titleEl) titleEl.textContent = 'Tu período de prueba terminó';
+    if(subEl)   subEl.innerHTML     = `Los 30 días gratuitos de <strong style="color:#f5f0e8">${esc(nombre)}</strong> finalizaron.<br>Activá para seguir sin perder nada.`;
+  }
+
+  // Datos del negocio (FOMO)
+  try {
+    const turnos   = typeof getTurnos === 'function' ? getTurnos().length : 0;
+    const clientes = new Set((typeof getTurnos === 'function' ? getTurnos() : []).map(t=>t.cliente).filter(Boolean)).size;
+    const stock    = (S?.stock||[]).length;
+    const rows = [];
+    if(turnos)   rows.push(`📅 ${turnos} turno${turnos!==1?'s':''} en el calendario`);
+    if(clientes) rows.push(`👥 ${clientes} cliente${clientes!==1?'s':''} registrados`);
+    if(stock)    rows.push(`📦 ${stock} ítem${stock!==1?'s':''} en stock`);
+    if(rows.length){
+      const box  = document.getElementById('trialDataSummary');
+      const cont = document.getElementById('trialDataRows');
+      if(box && cont){
+        box.style.display = 'block';
+        cont.innerHTML = rows.map(r=>`<div style="display:flex;align-items:center;gap:8px"><span style="color:#c9a84c">✓</span>${r}</div>`).join('');
+      }
+    }
+  } catch(e){}
+
+  // WA link dinámico
+  const soporteTel = localStorage.getItem('remu_soporte_tel') || '5493472628087';
+  const waLink = document.getElementById('trialWaLink');
+  if(waLink) waLink.href = `https://wa.me/${soporteTel}?text=${encodeURIComponent('Hola! Quiero activar mi suscripción de Remu Gestión — '+nombre)}`;
+
+  // Precio
   const precioLocal = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
   _actualizarPrecioTrial(precioLocal);
-  // Luego actualizar desde Supabase
   try {
     const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
     const cfg = data?.data;
     if(cfg?.mp_precio){ const p=parseInt(cfg.mp_precio)||8000; localStorage.setItem('remu_mp_precio',String(p)); _actualizarPrecioTrial(p); }
     if(cfg?.mp_link)   localStorage.setItem('remu_mp_link', cfg.mp_link);
+    if(cfg?.soporte_tel) localStorage.setItem('remu_soporte_tel', cfg.soporte_tel);
   } catch(e){}
 }
 
@@ -12826,7 +12870,12 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
         if(!mods.pago_activo && diasRestantes <= 0){
-          showTrialScreen();
+          const diasVencido = Math.abs(diasRestantes);
+          showTrialScreen(diasVencido);
+          // Auto-suspender en Supabase si vencio hace mas de 7 dias
+          if(diasVencido > 7 && currentTenant?.activo !== false){
+            try { await sb.from('tenants').update({activo:false}).eq('id', currentTenant.id); } catch(e){}
+          }
           return;
         }
         if(!mods.pago_activo && diasRestantes <= 7){
