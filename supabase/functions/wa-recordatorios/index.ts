@@ -109,7 +109,7 @@ Deno.serve(async () => {
       t.hora,
       negMap[t.tenant_id] || 'el salón'
     )
-    if(ok) enviados++ else fallidos++
+    if(ok){ enviados++ } else { fallidos++ }
   }
 
   console.log(`[wa-recordatorios] ${fecha} — enviados: ${enviados}, fallidos: ${fallidos}`)
