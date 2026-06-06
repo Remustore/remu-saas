@@ -85,6 +85,11 @@
 </div>
 
 <script>
+// Redirige a la página unificada /p/ que tiene precios + turnos
+(function(){
+  const slug = location.pathname.replace(/^\/b\/?/, '').replace(/\/$/, '') || new URLSearchParams(location.search).get('s') || '';
+  if(slug) { window.location.replace('/p/?s=' + encodeURIComponent(slug)); }
+})();
 // ── Config ────────────────────────────────────────────────────────────────
 const SURL = 'https://xycagqxhpwrbdurrjkdl.supabase.co';
 const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5Y2FncXhocHdyYmR1cnJqa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNDMxMTgsImV4cCI6MjA4ODgxOTExOH0.AfXJcUn2hNsLX8ooO1jwOF1ogTqDnSp1Up-Fv2tnKDQ';
