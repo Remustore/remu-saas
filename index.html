@@ -1282,7 +1282,7 @@ $$;</pre>
 
       <!-- Sectores y servicios -->
       <div class="card" style="margin-bottom:14px">
-        <div class="ch"><h3>✂ Sectores y servicios</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>
+        <div class="ch"><h3>✂ Sectores y servicios</h3><div style="display:flex;gap:6px"><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button><button class="btn bsm" id="btnSyncSvcs" onclick="sincronizarServiciosTurno()">☁ Sincronizar</button></div></div>
         <div id="serviciosTurnosList"></div>
       </div>
 
@@ -3827,9 +3827,9 @@ async function loadAll(){
       if(cfgRow){
         const tKey = TURNOS_CFG_KEY + '_' + tid;
         const oKey = ONLINE_CFG_KEY  + '_' + tid;
-        if(cfgRow.__turnosCfg)
+        if(cfgRow.__turnosCfg && !localStorage.getItem(tKey))
           localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
-        if(cfgRow.__onlineCfg)
+        if(cfgRow.__onlineCfg && !localStorage.getItem(oKey))
           localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
         if(cfgRow.__fichasCli){
           const fKey = 'fichasCli_' + tid;
@@ -8380,6 +8380,19 @@ async function eliminarServicioTurno(id){
     showToast('Servicio eliminado ✓');
   } catch(e) {
     showToast('Guardado local pero falló sync — reintentá', 'warn');
+  }
+}
+
+async function sincronizarServiciosTurno(){
+  const btn = document.getElementById('btnSyncSvcs');
+  if(btn) btn.disabled = true;
+  try {
+    await persistCfgToSupabase();
+    showToast('Servicios sincronizados con el servidor ✓');
+  } catch(e) {
+    showToast('Error al sincronizar: ' + e.message, 'warn');
+  } finally {
+    if(btn) btn.disabled = false;
   }
 }
 
