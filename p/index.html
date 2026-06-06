@@ -371,21 +371,6 @@ function parseRows(rows){
     if(d.__tenantName) tenantNombre = d.__tenantName;
     if(d.__rubro)      tenantRubro  = d.__rubro;
   }
-  const durMap = {};
-  (turnosCfg.servicios||[]).forEach(s=>{ durMap[norm(s.nombre||'')] = s.duracion||30; });
-  const itemsPrecios = rows
-    .map(r=>tryParseData(r))
-    .filter(d=>d&&!d.__tipo&&!d.__turnosCfg&&d.nombre)
-    .filter(p=>(p.disponibilidad||'disponible')!=='no_disponible');
-  if(itemsPrecios.length){
-    turnosCfg.servicios = itemsPrecios.map(p=>({
-      id: p.id, nombre: p.nombre,
-      categoria: p.categoria||p.sector||'',
-      precio: parseFloat(p.precio)||0,
-      duracion: durMap[norm(p.nombre||'')]||p.duracion||30,
-      notas: p.notas||''
-    }));
-  }
   return {turnosCfg, onlineCfg, tenantNombre, tenantRubro};
 }
 
