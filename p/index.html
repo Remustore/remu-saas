@@ -105,7 +105,7 @@ body{background:#080808;color:#f5f0e8;font-family:'Outfit',sans-serif;min-height
 <div class="bk-ov" id="bkOv" onclick="cerrarReserva()"></div>
 <div class="bk-pan" id="bkPan">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-    <span style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#c9a84c">Reservar turno</span>
+    <span id="bkPanTitle" style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:#c9a84c"></span>
     <button onclick="cerrarReserva()" style="background:none;border:none;color:#a89880;font-size:1.5rem;cursor:pointer;padding:4px;line-height:1">✕</button>
   </div>
   <div id="bkBody"></div>
@@ -120,6 +120,174 @@ const sb = supabase.createClient(SURL, SKEY);
 let G = { tenantId: null, cfg: null, online: null, tenant: null };
 let _allItems = [];
 let _filterCat = '';
+
+// ── i18n ──────────────────────────────────────────────────────────────────
+let _lang = 'es';
+const I18N = {
+  es: {
+    titulo:'Servicios y turnos',
+    bienvenido:'¡Bienvenido! 👋 Reservá tu turno de forma rápida y sencilla.',
+    notaSalon:'Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.',
+    notaTelefonia:'Trabajamos con transplante de IC y Flex para que tu equipo NO MARQUE CARTELES. ⏰ Tiempo: 2–3 días hábiles · 🔋 Baterías: con restablecimiento de fábrica.',
+    buscar:'Buscar servicio...',
+    sinServicios:'No se encontraron servicios',
+    preciosActualizados:'Precios actualizados en tiempo real',
+    compartir:'🔗 Compartir este link',
+    copiado:'¡Copiado! ✓',
+    consultar:'Consultar',
+    todosDias:'Todos los días',
+    todos:'Todos',
+    catCorte:'✂ Corte', catBarba:'🪒 Barba', catColoracion:'🎨 Coloración',
+    catTratamiento:'✨ Tratamientos', catOtros:'🔧 Otros',
+    catTintura:'🎨 Tintura', catManicuria:'💅 Manicuria', catMaquillaje:'💄 Maquillaje',
+    catLifting:'👁 Lifting', catDepilacion:'✨ Depilación',
+    catPantallas:'📱 Pantallas', catTapas:'🔲 Tapas', catBaterias:'🔋 Baterías',
+    catConectores:'🔌 Conectores', catCamaras:'📸 Cámaras',
+    reservarTurno:'Reservar turno',
+    lblServicio:'Servicio', lblNombre:'Tu nombre', lblWhatsapp:'WhatsApp',
+    lblProfesional:'Profesional', lblFecha:'Fecha', lblHorario:'Horario disponible',
+    placeholderNombre:'Nombre completo', sinPreferencia:'Sin preferencia',
+    eligeFecha:'Elegí una fecha para ver los horarios',
+    confirmarReserva:'Confirmar reserva',
+    sinCargo:'Sin cargo · El negocio confirmará tu turno por WhatsApp',
+    cargandoHorarios:'Cargando horarios...',
+    noAtendemos:'No atendemos los %ds. Por favor elegí otro día.',
+    sinHorarios:'Sin horarios configurados para este día.',
+    tocaHorario:'Tocá un horario para seleccionarlo',
+    todosReservados:'Todos los horarios de este día están reservados',
+    noDisp:'🚫 No disp.', reservado:'Reservado',
+    dias:['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'],
+    errNombre:'Ingresá tu nombre.',
+    errTel:'Ingresá un número de WhatsApp válido.',
+    errFecha:'Elegí una fecha.',
+    errHora:'Seleccioná un horario disponible.',
+    enviando:'Enviando...',
+    errOcupado:'Ese horario acaba de ser reservado. Por favor elegí otro.',
+    errReserva:'Error al enviar. Intentá de nuevo.',
+    reservaEnviada:'¡Reserva enviada!',
+    negocioConfirmara:'El negocio confirmará tu turno',
+    confServicio:'Servicio', confFecha:'Fecha', confHora:'Hora', confProfesional:'Profesional',
+    teEsperamos:'¡Te esperamos, %n! Te confirmaremos al %tel por WhatsApp.',
+    volverCatalogo:'Volver al catálogo',
+    otraReserva:'Hacer otra reserva',
+    linkInvalido:'Link inválido. Pedile el link correcto al negocio.',
+    negocioNoEncontrado:'Negocio no encontrado. Verificá el link.',
+    errorCargar:'Error al cargar: %e',
+    precioConsultar:'Precio a consultar',
+    minutos:'min',
+    reservar:'📅 Reservar',
+    negocioNoConfigurado:'Este negocio todavía no configuró sus servicios online.',
+  },
+  pt: {
+    titulo:'Serviços e agendamentos',
+    bienvenido:'Bem-vindo! 👋 Agende seu horário de forma rápida e fácil.',
+    notaSalon:'Os preços podem variar conforme a técnica e o comprimento. Consulte-nos para assessoria personalizada.',
+    notaTelefonia:'Trabalhamos com transplante de IC e Flex para que seu equipamento NÃO MARQUE CARTELAS. ⏰ Prazo: 2–3 dias úteis · 🔋 Baterias: com restauração de fábrica.',
+    buscar:'Buscar serviço...',
+    sinServicios:'Nenhum serviço encontrado',
+    preciosActualizados:'Preços atualizados em tempo real',
+    compartir:'🔗 Compartilhar este link',
+    copiado:'Copiado! ✓',
+    consultar:'Consultar',
+    todosDias:'Todos os dias',
+    todos:'Todos',
+    catCorte:'✂ Corte', catBarba:'🪒 Barba', catColoracion:'🎨 Coloração',
+    catTratamiento:'✨ Tratamentos', catOtros:'🔧 Outros',
+    catTintura:'🎨 Tintura', catManicuria:'💅 Manicure', catMaquillaje:'💄 Maquiagem',
+    catLifting:'👁 Lifting', catDepilacion:'✨ Depilação',
+    catPantallas:'📱 Telas', catTapas:'🔲 Tampas', catBaterias:'🔋 Baterias',
+    catConectores:'🔌 Conectores', catCamaras:'📸 Câmeras',
+    reservarTurno:'Agendar horário',
+    lblServicio:'Serviço', lblNombre:'Seu nome', lblWhatsapp:'WhatsApp',
+    lblProfesional:'Profissional', lblFecha:'Data', lblHorario:'Horário disponível',
+    placeholderNombre:'Nome completo', sinPreferencia:'Sem preferência',
+    eligeFecha:'Escolha uma data para ver os horários',
+    confirmarReserva:'Confirmar agendamento',
+    sinCargo:'Sem cobrança · O negócio confirmará seu horário por WhatsApp',
+    cargandoHorarios:'Carregando horários...',
+    noAtendemos:'Não atendemos às %ds. Por favor escolha outro dia.',
+    sinHorarios:'Sem horários configurados para este dia.',
+    tocaHorario:'Toque em um horário para selecioná-lo',
+    todosReservados:'Todos os horários deste dia estão reservados',
+    noDisp:'🚫 Indispon.', reservado:'Reservado',
+    dias:['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'],
+    errNombre:'Digite seu nome.',
+    errTel:'Digite um número de WhatsApp válido.',
+    errFecha:'Escolha uma data.',
+    errHora:'Selecione um horário disponível.',
+    enviando:'Enviando...',
+    errOcupado:'Esse horário acabou de ser reservado. Por favor escolha outro.',
+    errReserva:'Erro ao enviar. Tente novamente.',
+    reservaEnviada:'Agendamento enviado!',
+    negocioConfirmara:'O negócio confirmará seu horário',
+    confServicio:'Serviço', confFecha:'Data', confHora:'Hora', confProfesional:'Profissional',
+    teEsperamos:'Te esperamos, %n! Confirmaremos ao %tel pelo WhatsApp.',
+    volverCatalogo:'Voltar ao catálogo',
+    otraReserva:'Fazer outro agendamento',
+    linkInvalido:'Link inválido. Peça o link correto ao negócio.',
+    negocioNoEncontrado:'Negócio não encontrado. Verifique o link.',
+    errorCargar:'Erro ao carregar: %e',
+    precioConsultar:'Preço a consultar',
+    minutos:'min',
+    reservar:'📅 Agendar',
+    negocioNoConfigurado:'Este negócio ainda não configurou seus serviços online.',
+  },
+  en: {
+    titulo:'Services & bookings',
+    bienvenido:'Welcome! 👋 Book your appointment quickly and easily.',
+    notaSalon:'Prices may vary depending on technique and length. Contact us for personalized advice.',
+    notaTelefonia:'We work with IC and Flex transplants so your device does not trigger alarms. ⏰ Time: 2–3 business days · 🔋 Batteries: with factory reset.',
+    buscar:'Search service...',
+    sinServicios:'No services found',
+    preciosActualizados:'Prices updated in real time',
+    compartir:'🔗 Share this link',
+    copiado:'Copied! ✓',
+    consultar:'Contact us',
+    todosDias:'Every day',
+    todos:'All',
+    catCorte:'✂ Haircut', catBarba:'🪒 Beard', catColoracion:'🎨 Color',
+    catTratamiento:'✨ Treatments', catOtros:'🔧 Others',
+    catTintura:'🎨 Color', catManicuria:'💅 Nails', catMaquillaje:'💄 Makeup',
+    catLifting:'👁 Lifting', catDepilacion:'✨ Hair removal',
+    catPantallas:'📱 Screens', catTapas:'🔲 Back covers', catBaterias:'🔋 Batteries',
+    catConectores:'🔌 Connectors', catCamaras:'📸 Cameras',
+    reservarTurno:'Book appointment',
+    lblServicio:'Service', lblNombre:'Your name', lblWhatsapp:'WhatsApp',
+    lblProfesional:'Professional', lblFecha:'Date', lblHorario:'Available time',
+    placeholderNombre:'Full name', sinPreferencia:'No preference',
+    eligeFecha:'Pick a date to see available times',
+    confirmarReserva:'Confirm booking',
+    sinCargo:'Free of charge · The business will confirm your appointment via WhatsApp',
+    cargandoHorarios:'Loading times...',
+    noAtendemos:"We're closed on %ds. Please pick another day.",
+    sinHorarios:'No times configured for this day.',
+    tocaHorario:'Tap a time slot to select it',
+    todosReservados:'All time slots for this day are booked',
+    noDisp:'🚫 N/A', reservado:'Booked',
+    dias:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],
+    errNombre:'Please enter your name.',
+    errTel:'Please enter a valid WhatsApp number.',
+    errFecha:'Please pick a date.',
+    errHora:'Please select an available time.',
+    enviando:'Sending...',
+    errOcupado:'That time was just booked. Please pick another.',
+    errReserva:'Error sending. Please try again.',
+    reservaEnviada:'Booking sent!',
+    negocioConfirmara:'The business will confirm your appointment',
+    confServicio:'Service', confFecha:'Date', confHora:'Time', confProfesional:'Professional',
+    teEsperamos:"See you soon, %n! We'll confirm to %tel via WhatsApp.",
+    volverCatalogo:'Back to catalog',
+    otraReserva:'Book another',
+    linkInvalido:'Invalid link. Ask the business for the correct link.',
+    negocioNoEncontrado:'Business not found. Please check the link.',
+    errorCargar:'Error loading: %e',
+    precioConsultar:'Price on request',
+    minutos:'min',
+    reservar:'📅 Book',
+    negocioNoConfigurado:'This business has not yet configured its online services.',
+  }
+};
+function T(k){ return (I18N[_lang]||I18N.es)[k]??I18N.es[k]??k; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -149,7 +317,7 @@ const CAT_KW = {
   'otro':        /.*/
 };
 
-// ── Resolución de slug → tenant (idéntica a b/index.html) ─────────────────
+// ── Resolución de slug → tenant ───────────────────────────────────────────
 async function resolveSlug(slug){
   if(/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(slug)){
     const {data} = await sb.from('precios').select('tenant_id,data').eq('tenant_id', slug);
@@ -164,7 +332,6 @@ async function resolveSlug(slug){
       return { tenantId: tid, rows: all||[] };
     }
   } catch(e){}
-  // Orden descendente: tenants nuevos (IDs más grandes) aparecen primero.
   const {data: allRows} = await sb.from('precios')
     .select('tenant_id,data').order('id',{ascending:false}).limit(1000);
   if(allRows && allRows.length){
@@ -186,7 +353,7 @@ async function resolveSlug(slug){
   return null;
 }
 
-// ── Parseo de filas (idéntico a b/index.html) ─────────────────────────────
+// ── Parseo de filas ───────────────────────────────────────────────────────
 function parseRows(rows){
   let turnosCfg = {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
   let onlineCfg = {mensaje:'',insta:'',direccion:'',tel:''};
@@ -226,7 +393,7 @@ const _DIAS_C = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 function _fmtDias(dias){
   if(!dias||!dias.length) return '';
   const s=[...dias].sort((a,b)=>a-b);
-  if(s.length===7) return 'Todos los días';
+  if(s.length===7) return T('todosDias');
   const groups=[];let st=s[0],pr=s[0];
   for(let i=1;i<=s.length;i++){
     const d=s[i];
@@ -256,19 +423,19 @@ function renderPage(){
   const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
   const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
 
-  document.title = nombre + ' — Servicios y turnos';
+  document.title = nombre + ' — ' + T('titulo');
+  document.getElementById('bkPanTitle').textContent = T('reservarTurno');
 
   // Tabs por rubro
   const cats = esBarber
-    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'barba',l:'🪒 Barba'},{k:'coloracion',l:'🎨 Coloración'},{k:'tratamiento',l:'✨ Tratamientos'},{k:'otro',l:'🔧 Otros'}]
+    ? [{k:'',l:T('todos')},{k:'corte',l:T('catCorte')},{k:'barba',l:T('catBarba')},{k:'coloracion',l:T('catColoracion')},{k:'tratamiento',l:T('catTratamiento')},{k:'otro',l:T('catOtros')}]
     : esSalon
-    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'tintura',l:'🎨 Tintura'},{k:'manicuria',l:'💅 Manicuria'},{k:'maquillaje',l:'💄 Maquillaje'},{k:'lifting',l:'👁 Lifting'},{k:'depilacion',l:'✨ Depilación'}]
-    : [{k:'',l:'Todos'},{k:'pantalla',l:'📱 Pantallas'},{k:'tapa',l:'🔲 Tapas'},{k:'bateria',l:'🔋 Baterías'},{k:'conector',l:'🔌 Conectores'},{k:'camara',l:'📸 Cámaras'},{k:'otro',l:'🔧 Otros'}];
+    ? [{k:'',l:T('todos')},{k:'corte',l:T('catCorte')},{k:'tintura',l:T('catTintura')},{k:'manicuria',l:T('catManicuria')},{k:'maquillaje',l:T('catMaquillaje')},{k:'lifting',l:T('catLifting')},{k:'depilacion',l:T('catDepilacion')}]
+    : [{k:'',l:T('todos')},{k:'pantalla',l:T('catPantallas')},{k:'tapa',l:T('catTapas')},{k:'bateria',l:T('catBaterias')},{k:'conector',l:T('catConectores')},{k:'camara',l:T('catCamaras')},{k:'otro',l:T('catOtros')}];
 
   // Nota de precios
   const textoNota = oc.notaPrecios || (
-    (esBarber||esSalon) ? 'Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.'
-    : 'Trabajamos con transplante de IC y Flex para que tu equipo NO MARQUE CARTELES. ⏰ Tiempo: 2–3 días hábiles · 🔋 Baterías: con restablecimiento de fábrica.'
+    (esBarber||esSalon) ? T('notaSalon') : T('notaTelefonia')
   );
 
   // Deduplicar items
@@ -285,11 +452,9 @@ function renderPage(){
   const horasStr = (cfg.apertura && cfg.cierre) ? `${cfg.apertura} – ${cfg.cierre}` : '';
   const horarioStr = [diasStr, horasStr].filter(Boolean).join(' · ');
 
-  // Quitar loader e insertar HTML
   const loader = document.getElementById('pLoader');
   if(loader) loader.remove();
 
-  // Construir la página
   const pageDiv = document.createElement('div');
   pageDiv.innerHTML = `
     <!-- HEADER -->
@@ -304,7 +469,7 @@ function renderPage(){
 
     <!-- MENSAJE -->
     <div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">
-      ${esc(oc.mensaje||'¡Bienvenido! 👋 Reservá tu turno de forma rápida y sencilla.')}
+      ${esc(oc.mensaje||T('bienvenido'))}
     </div>
 
     <!-- CONTENIDO -->
@@ -318,7 +483,7 @@ function renderPage(){
       <!-- Búsqueda -->
       <div style="display:flex;align-items:center;background:#111;border:1px solid #222;border-radius:10px;padding:0 14px;margin-bottom:14px">
         <span style="color:#a89880;font-size:1.1rem;margin-right:8px">⌕</span>
-        <input id="pSrch" placeholder="Buscar servicio..." oninput="renderItems()"
+        <input id="pSrch" placeholder="${T('buscar')}" oninput="renderItems()"
           style="flex:1;background:none;border:none;color:#f5f0e8;padding:12px 0;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none"
           autocomplete="off">
       </div>
@@ -340,18 +505,18 @@ function renderPage(){
       <div id="pGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
       <div id="pEmpty" style="display:none;text-align:center;padding:48px 0;color:#a89880">
         <div style="font-size:2.5rem;margin-bottom:10px">🔍</div>
-        <div style="font-size:.88rem">No se encontraron servicios</div>
+        <div style="font-size:.88rem">${T('sinServicios')}</div>
       </div>
 
       <!-- Compartir -->
       <div style="margin-top:36px;display:flex;flex-direction:column;align-items:center;gap:12px">
         <button id="pShareBtn" onclick="compartir()"
           style="background:transparent;border:1px solid #2e2e2e;color:#a89880;padding:10px 22px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;cursor:pointer;transition:all .2s">
-          🔗 Compartir este link
+          ${T('compartir')}
         </button>
       </div>
       <div style="text-align:center;margin-top:24px;font-size:.62rem;color:#585044;letter-spacing:1.5px;text-transform:uppercase">
-        Precios actualizados en tiempo real
+        ${T('preciosActualizados')}
       </div>
     </div>
   `;
@@ -375,7 +540,7 @@ function renderPage(){
     document.body.insertAdjacentHTML('beforeend',
       `<a class="wa-btn" href="https://wa.me/549${waTel}?text=${waMsg}" target="_blank" rel="noopener">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-        Consultar
+        ${T('consultar')}
       </a>`
     );
   }
@@ -422,15 +587,15 @@ function renderItems(){
       <div>
         <div style="font-weight:600;font-size:.92rem;margin-bottom:4px;line-height:1.3">${esc(p.nombre)}</div>
         <div style="font-size:.77rem;color:#a89880">
-          ${p.duracion||30} min
-          ${p.precio>0 ? `· <span style="color:#c9a84c;font-weight:600;font-family:'Playfair Display',serif;font-size:1rem">${fmt(p.precio)}</span>` : '· <span style="color:#a89880">Precio a consultar</span>'}
+          ${p.duracion||30} ${T('minutos')}
+          ${p.precio>0 ? `· <span style="color:#c9a84c;font-weight:600;font-family:'Playfair Display',serif;font-size:1rem">${fmt(p.precio)}</span>` : `· <span style="color:#a89880">${T('precioConsultar')}</span>`}
         </div>
         ${p.notas ? `<div style="font-size:.72rem;color:#a89880;margin-top:4px;line-height:1.5">${esc(p.notas)}</div>` : ''}
       </div>
       <button onclick="abrirReserva(${JSON.stringify(p.id)})"
         style="margin-top:auto;padding:9px 14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;transition:background .15s;text-align:center"
         onmouseover="this.style.background='#e8c96a'" onmouseout="this.style.background='#c9a84c'">
-        📅 Reservar
+        ${T('reservar')}
       </button>
     </div>
   `).join('');
@@ -439,8 +604,8 @@ function renderItems(){
 function compartir(){
   navigator.clipboard.writeText(location.href).then(()=>{
     const btn = document.getElementById('pShareBtn');
-    if(btn){ btn.textContent='¡Copiado! ✓'; btn.style.color='#4caf7d'; btn.style.borderColor='#4caf7d'; }
-    setTimeout(()=>{ if(btn){ btn.textContent='🔗 Compartir este link'; btn.style.color='#a89880'; btn.style.borderColor='#2e2e2e'; }},2500);
+    if(btn){ btn.textContent=T('copiado'); btn.style.color='#4caf7d'; btn.style.borderColor='#4caf7d'; }
+    setTimeout(()=>{ if(btn){ btn.textContent=T('compartir'); btn.style.color='#a89880'; btn.style.borderColor='#2e2e2e'; }},2500);
   });
 }
 
@@ -449,7 +614,7 @@ function abrirReserva(srvId){
   const cfg = G.cfg || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
 
   if(!cfg.servicios.length){
-    alert('Este negocio todavía no configuró sus servicios online.');
+    alert(T('negocioNoConfigurado'));
     return;
   }
 
@@ -457,39 +622,38 @@ function abrirReserva(srvId){
   const hayEmpleados = cfg.empleados && cfg.empleados.length > 1;
 
   document.getElementById('bkBody').innerHTML = `
-    <label>Servicio</label>
+    <label>${T('lblServicio')}</label>
     <select id="bkSrv" onchange="onBkSrvChange()">
       ${cfg.servicios.map(s=>`<option value="${esc(String(s.id))}" data-dur="${s.duracion||30}">
-        ${esc(s.categoria?s.categoria+': ':'')}${esc(s.nombre)} (${s.duracion||30} min)${s.precio>0?' — '+fmt(s.precio):''}
+        ${esc(s.categoria?s.categoria+': ':'')}${esc(s.nombre)} (${s.duracion||30} ${T('minutos')})${s.precio>0?' — '+fmt(s.precio):''}
       </option>`).join('')}
     </select>
 
-    <label>Tu nombre</label>
-    <input id="bkNombre" placeholder="Nombre completo" autocomplete="name" autocorrect="off">
+    <label>${T('lblNombre')}</label>
+    <input id="bkNombre" placeholder="${T('placeholderNombre')}" autocomplete="name" autocorrect="off">
 
-    <label>WhatsApp</label>
+    <label>${T('lblWhatsapp')}</label>
     <input id="bkTel" type="tel" inputmode="numeric" placeholder="11 2345 6789" autocomplete="tel">
 
     ${hayEmpleados ? `
-    <label>Profesional</label>
+    <label>${T('lblProfesional')}</label>
     <select id="bkEmp" onchange="onBkFechaChange()">
-      <option value="">Sin preferencia</option>
+      <option value="">${T('sinPreferencia')}</option>
       ${cfg.empleados.map(e=>`<option value="${esc(String(e.id))}">${esc(e.nombre)}</option>`).join('')}
     </select>` : '<input type="hidden" id="bkEmp" value="">'}
 
-    <label>Fecha</label>
+    <label>${T('lblFecha')}</label>
     <input type="date" id="bkFecha" min="${minFecha}" onchange="onBkFechaChange()" style="color-scheme:dark">
 
-    <label>Horario disponible</label>
-    <div id="bkSlots" class="msg-info" style="text-align:center">Elegí una fecha para ver los horarios</div>
+    <label>${T('lblHorario')}</label>
+    <div id="bkSlots" class="msg-info" style="text-align:center">${T('eligeFecha')}</div>
     <input type="hidden" id="bkHora">
 
     <div id="bkErr" style="display:none" class="msg-err"></div>
-    <button class="bk-btn" id="bkBtn" onclick="enviarReserva()">Confirmar reserva</button>
-    <div style="text-align:center;margin-top:10px;font-size:.72rem;color:#a89880">Sin cargo · El negocio confirmará tu turno por WhatsApp</div>
+    <button class="bk-btn" id="bkBtn" onclick="enviarReserva()">${T('confirmarReserva')}</button>
+    <div style="text-align:center;margin-top:10px;font-size:.72rem;color:#a89880">${T('sinCargo')}</div>
   `;
 
-  // Pre-seleccionar servicio si vino de un card
   const srv = document.getElementById('bkSrv');
   if(srv && srvId !== null){
     for(let i=0;i<srv.options.length;i++){
@@ -497,7 +661,6 @@ function abrirReserva(srvId){
     }
   }
 
-  // Mostrar panel
   document.getElementById('bkOv').classList.add('vis');
   document.getElementById('bkPan').classList.add('vis');
   document.body.style.overflow = 'hidden';
@@ -554,14 +717,14 @@ async function cargarSlotsPanel(){
   const diaSel = new Date(fecha+'T12:00:00').getDay();
 
   if(!DIAS.includes(diaSel)){
-    const nomDia=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
+    const nomDia = T('dias')[diaSel];
     wrap.className='cerrado-banner';
-    wrap.innerHTML=`❌ No atendemos los ${nomDia}s. Por favor elegí otro día.`;
+    wrap.innerHTML=`❌ ${T('noAtendemos').replace('%d', nomDia)}`;
     return;
   }
 
   wrap.className='msg-info';
-  wrap.innerHTML='Cargando horarios...';
+  wrap.innerHTML=T('cargandoHorarios');
 
   const {data:rows} = await sb.from('turnos_solicitudes')
     .select('hora,estado,nombre')
@@ -620,7 +783,7 @@ async function cargarSlotsPanel(){
 
   if(!slots.length){
     wrap.className='msg-info';
-    wrap.innerHTML='Sin horarios configurados para este día.';
+    wrap.innerHTML=T('sinHorarios');
     return;
   }
 
@@ -631,10 +794,10 @@ async function cargarSlotsPanel(){
     const d=document.createElement('div');
     if(s.blq){
       d.className='slot blq';
-      d.innerHTML=`<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">🚫 No disp.</span>`;
+      d.innerHTML=`<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">${T('noDisp')}</span>`;
     } else if(s.ocu){
       d.className='slot ocu';
-      d.innerHTML=`<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">Reservado</span>`;
+      d.innerHTML=`<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">${T('reservado')}</span>`;
     } else {
       d.className='slot';
       d.textContent=s.hora;
@@ -653,7 +816,7 @@ async function cargarSlotsPanel(){
   const disp=slots.filter(s=>!s.ocu&&!s.blq).length;
   const note=document.createElement('div');
   note.style.cssText='font-size:.7rem;color:#a89880;margin-top:10px;text-align:center';
-  note.textContent=disp?'Tocá un horario para seleccionarlo':'Todos los horarios de este día están reservados';
+  note.textContent=disp ? T('tocaHorario') : T('todosReservados');
   wrap.appendChild(note);
 }
 
@@ -671,12 +834,12 @@ async function enviarReserva(){
   errEl.style.display='none';
   const showErr=msg=>{errEl.textContent=msg;errEl.style.display='block';errEl.scrollIntoView({behavior:'smooth',block:'nearest'});};
 
-  if(!nombre){showErr('Ingresá tu nombre.');return;}
-  if(!tel||tel.replace(/\D/g,'').length<6){showErr('Ingresá un número de WhatsApp válido.');return;}
-  if(!fecha){showErr('Elegí una fecha.');return;}
-  if(!hora){showErr('Seleccioná un horario disponible.');return;}
+  if(!nombre){showErr(T('errNombre'));return;}
+  if(!tel||tel.replace(/\D/g,'').length<6){showErr(T('errTel'));return;}
+  if(!fecha){showErr(T('errFecha'));return;}
+  if(!hora){showErr(T('errHora'));return;}
   if(btn.disabled) return;
-  btn.disabled=true; btn.textContent='Enviando...';
+  btn.disabled=true; btn.textContent=T('enviando');
 
   try {
     const srv   = (G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId));
@@ -688,8 +851,8 @@ async function enviarReserva(){
       .select('id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
       .in('hora',horasReq).in('estado',['confirmado','bloqueado']).limit(1);
     if(previo&&previo.length){
-      showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
-      btn.disabled=false; btn.textContent='Confirmar reserva';
+      showErr(T('errOcupado'));
+      btn.disabled=false; btn.textContent=T('confirmarReserva');
       cargarSlotsPanel(); return;
     }
 
@@ -700,7 +863,7 @@ async function enviarReserva(){
       empleado_id:empId?(parseInt(empId)||null):null,
       fecha, hora, estado:'confirmado', created_at:ts
     }).select('id').single();
-    if(insErr) throw new Error(insErr.message||'Error al reservar');
+    if(insErr) throw new Error(insErr.message||T('errReserva'));
 
     if(pasos>1){
       const extras=[];
@@ -719,13 +882,14 @@ async function enviarReserva(){
     const conflicto=(todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
     if(conflicto){
       await sb.from('turnos_solicitudes').delete().eq('id',ins.id);
-      showErr('Ese horario acaba de ser reservado. Por favor elegí otro.');
-      btn.disabled=false; btn.textContent='Confirmar reserva';
+      showErr(T('errOcupado'));
+      btn.disabled=false; btn.textContent=T('confirmarReserva');
       cargarSlotsPanel(); return;
     }
 
     const srvNombre=(G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId))?.nombre||'el servicio';
-    const fechaFmt=new Date(fecha+'T12:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
+    const loc = _lang==='pt'?'pt-BR':_lang==='en'?'en-US':'es-AR';
+    const fechaFmt=new Date(fecha+'T12:00:00').toLocaleDateString(loc,{weekday:'long',day:'numeric',month:'long'});
     const profNombre=empId?((G.cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||''):'';
 
     cerrarReserva();
@@ -736,45 +900,44 @@ async function enviarReserva(){
     confDiv.innerHTML=`
       <div style="background:#111;border:1px solid #1e1e1e;border-radius:16px;max-width:400px;width:100%;padding:28px 24px;text-align:center">
         <div style="font-size:2.8rem;margin-bottom:8px">✅</div>
-        <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;color:#c9a84c;margin-bottom:4px">¡Reserva enviada!</div>
-        <div style="font-size:.68rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:20px">El negocio confirmará tu turno</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${T('reservaEnviada')}</div>
+        <div style="font-size:.68rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:20px">${T('negocioConfirmara')}</div>
         <div style="background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:16px;margin-bottom:14px;text-align:left">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
-            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Servicio</span>
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">${T('confServicio')}</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(srvNombre)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #1e1e1e">
-            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Fecha</span>
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">${T('confFecha')}</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(fechaFmt)}</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0${profNombre?';border-bottom:1px solid #1e1e1e':''}">
-            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Hora</span>
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">${T('confHora')}</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">🕐 ${esc(hora)}</span>
           </div>
           ${profNombre?`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0">
-            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">Profesional</span>
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">${T('confProfesional')}</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(profNombre)}</span>
           </div>`:''}
         </div>
         <div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.15);border-radius:10px;padding:13px 15px;margin-bottom:16px;font-size:.83rem;color:#a89880;line-height:1.65;text-align:left">
-          ¡Te esperamos, <strong style="color:#f5f0e8">${esc(nombre)}</strong>!
-          Te confirmaremos al <strong style="color:#f5f0e8">${esc(tel)}</strong> por WhatsApp.
+          ${T('teEsperamos').replace('%n',`<strong style="color:#f5f0e8">${esc(nombre)}</strong>`).replace('%tel',`<strong style="color:#f5f0e8">${esc(tel)}</strong>`)}
         </div>
         <button onclick="document.getElementById('bkConf').remove()"
           style="width:100%;padding:12px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:10px">
-          Volver al catálogo
+          ${T('volverCatalogo')}
         </button>
         <button onclick="document.getElementById('bkConf').remove();abrirReserva(null)"
           style="width:100%;padding:11px;background:transparent;color:#a89880;border:1px solid #2e2e2e;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.85rem;cursor:pointer">
-          Hacer otra reserva
+          ${T('otraReserva')}
         </button>
       </div>
     `;
     document.body.appendChild(confDiv);
 
   } catch(e){
-    showErr(e.message||'Error al enviar. Intentá de nuevo.');
-    btn.disabled=false; btn.textContent='Confirmar reserva';
+    showErr(e.message||T('errReserva'));
+    btn.disabled=false; btn.textContent=T('confirmarReserva');
   }
 }
 
@@ -783,7 +946,6 @@ async function enviarReserva(){
   const params = new URLSearchParams(location.search);
   let slug = params.get('s') || '';
 
-  // Soporte para pathname directo /p/SLUG
   if(!slug){
     const m = location.pathname.match(/^\/p\/([^/?#]+)/);
     if(m) slug = decodeURIComponent(m[1]);
@@ -791,7 +953,7 @@ async function enviarReserva(){
 
   if(!slug){
     document.getElementById('pLoader').innerHTML =
-      '<div style="color:#e87070;text-align:center;padding:40px 20px">Link inválido. Pedile el link correcto al negocio.</div>';
+      '<div style="color:#e87070;text-align:center;padding:40px 20px">' + T('linkInvalido') + '</div>';
     return;
   }
 
@@ -799,7 +961,7 @@ async function enviarReserva(){
     const result = await resolveSlug(slug);
     if(!result){
       document.getElementById('pLoader').innerHTML =
-        '<div style="color:#e87070;text-align:center;padding:40px 20px">Negocio no encontrado. Verificá el link.</div>';
+        '<div style="color:#e87070;text-align:center;padding:40px 20px">' + T('negocioNoEncontrado') + '</div>';
       return;
     }
     const {turnosCfg, onlineCfg, tenantNombre, tenantRubro} = parseRows(result.rows);
@@ -808,6 +970,11 @@ async function enviarReserva(){
     G.online      = onlineCfg;
     G.tenantNombre = tenantNombre;
     G.tenantRubro  = tenantRubro;
+
+    // Aplicar idioma configurado por el negocio
+    const idiomaRaw = (onlineCfg.idioma||'es').toLowerCase().trim();
+    _lang = ['es','pt','en'].includes(idiomaRaw) ? idiomaRaw : 'es';
+    document.documentElement.lang = _lang==='pt'?'pt-BR':_lang;
 
     try {
       const {data:td} = await sb.from('tenants').select('*').eq('id',result.tenantId).single();
@@ -820,7 +987,7 @@ async function enviarReserva(){
     renderPage();
   } catch(e){
     document.getElementById('pLoader').innerHTML =
-      `<div style="color:#e87070;text-align:center;padding:40px 20px">Error al cargar: ${esc(e.message)}</div>`;
+      `<div style="color:#e87070;text-align:center;padding:40px 20px">${T('errorCargar').replace('%e', esc(e.message))}</div>`;
   }
 })();
 </script>

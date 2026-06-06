@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -1029,6 +1029,7 @@ $$;</pre>
       <div class="card"><div class="ch"><h3>⚠️ Alertas</h3></div><div id="alerts"></div></div>
       </div>
       <div class="card"><div class="ch"><h3>Consejos para tu negocio</h3></div><div id="cons"></div></div>
+      <div class="card" id="metricasTurnosCard" style="display:none;margin-top:14px"></div>
       <div id="dStats" class="g4" style="margin-top:14px"></div>
       
       <!-- DIVISION DE INGRESOS -->
@@ -1390,7 +1391,14 @@ $$;</pre>
         <label>Número de WhatsApp del negocio</label>
         <input id="onlineTel" type="tel" placeholder="Ej: 5493472628087" style="margin-bottom:4px">
         <div style="font-size:.72rem;color:var(--mut)">Ingresá tu número con código de país, ej: <strong>5493472628087</strong> (54 = Argentina, 9 = celular, luego el número sin 0 ni 15). Se usa en el botón "💬 Hablar con un asesor" de la página pública, recordatorios a clientes y avisos al equipo.</div>
-        <label style="margin-top:14px">Nota sobre precios (visible en lista pública)</label>
+        <label style="margin-top:14px">Idioma de la página pública</label>
+        <select id="onlineIdioma" style="margin-bottom:4px">
+          <option value="es">🇦🇷 Español</option>
+          <option value="pt">🇧🇷 Português</option>
+          <option value="en">🇺🇸 English</option>
+        </select>
+        <div style="font-size:.72rem;color:var(--mut);margin-bottom:10px">Define el idioma que verán tus clientes en la página de precios y reservas.</div>
+        <label>Nota sobre precios (visible en lista pública)</label>
         <input id="onlineNotaPrecios" placeholder="Los precios pueden variar según..." style="margin-bottom:4px">
         <div style="font-size:.72rem;color:var(--mut)">Este texto aparece en la parte superior de tu lista de precios pública. Dejalo vacío para usar el texto por defecto.</div>
         <label style="margin-top:14px">Logo del negocio <span style="font-weight:400">(JPG/PNG · máx. 500 KB)</span></label>
@@ -5674,6 +5682,7 @@ function rDash(){
   setTimeout(rPanelDinero, 150);
   setTimeout(rDashPareja, 200);
   setTimeout(rDivision, 150);
+  setTimeout(rMetricasTurnos, 250);
   const vm=filtrarDash(S.ventas,'fecha');
   const tV=vm.reduce((a,v)=>a+v.total,0),tC=vm.reduce((a,v)=>a+(v.costo||0),0);
   const tG=filtrarDash(S.gastos,'fecha').reduce((a,g)=>a+g.monto,0);
@@ -5740,6 +5749,92 @@ function rDash(){
   if(ganReal>0)cns.push({i:'🏦',t:'Resultado positivo',d:'Guardá un 20% del resultado neto como fondo de emergencia del negocio.'});
   if(!cns.length)cns.push({i:'💼',t:'Seguí cargando operaciones',d:`Con más datos el sistema te dará consejos personalizados para hacer crecer ${bizName}.`});
   document.getElementById('cons').innerHTML=cns.slice(0,4).map(c=>`<div class="co"><span class="coi">${c.i}</span><div class="cot"><strong>${c.t}</strong>${c.d}</div></div>`).join('');
+}
+
+async function rMetricasTurnos(){
+  const card = document.getElementById('metricasTurnosCard');
+  if(!card || !currentTenant) return;
+  const rub = (currentTenant.rubro||'').toLowerCase();
+  if(!/barber|salon|sal[oó]n|belleza|peluq|manicur|est[eé]tic/i.test(rub)){ card.style.display='none'; return; }
+  card.style.display='';
+
+  const desde = new Date(); desde.setDate(desde.getDate()-56);
+  const desdeStr = desde.toISOString().substring(0,10);
+  const { data: rows } = await sb.from('turnos_solicitudes')
+    .select('fecha,servicio_id')
+    .eq('tenant_id', currentTenant.id)
+    .eq('estado','confirmado')
+    .gte('fecha', desdeStr)
+    .not('nombre','like','__%');
+
+  if(!rows || !rows.length){
+    card.innerHTML=`<div class="ch"><h3>📊 Métricas de turnos</h3></div><div style="text-align:center;padding:20px;color:var(--tx2);font-size:.85rem">Sin turnos confirmados aún</div>`;
+    return;
+  }
+
+  // Turnos por semana (últimas 8)
+  const today = new Date();
+  const weeks = [];
+  for(let i=7;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i*7); weeks.push({k:_isoWeek(d),n:0}); }
+  rows.forEach(r=>{ const w=_isoWeek(new Date(r.fecha+'T12:00:00')); const e=weeks.find(x=>x.k===w); if(e) e.n++; });
+  const maxN = Math.max(...weeks.map(w=>w.n),1);
+  const bars = weeks.map((w,i)=>{
+    const pct=Math.round(w.n/maxN*100);
+    const cur=i===weeks.length-1;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex:1">
+      <div style="font-size:.65rem;color:var(--tx2);font-weight:${cur?700:400}">${w.n||''}</div>
+      <div style="width:100%;background:var(--car2);border-radius:3px 3px 0 0;height:52px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${pct}%;background:${cur?'var(--gld)':'rgba(201,168,76,.32)'};border-radius:3px 3px 0 0;min-height:${w.n?3:0}px"></div>
+      </div>
+      <div style="font-size:.55rem;color:var(--mut)">S${i+1}</div>
+    </div>`;
+  }).join('');
+
+  // Top servicios
+  const cfg = getTurnosCfg();
+  const svcCount={};
+  rows.forEach(r=>{ const k=r.servicio_id||'?'; svcCount[k]=(svcCount[k]||0)+1; });
+  const topSvcs = Object.entries(svcCount).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id,n])=>{
+    const s=cfg.servicios.find(x=>String(x.id)===String(id));
+    return {name:s?.nombre||'Sin nombre',n};
+  });
+  const topHtml = topSvcs.length
+    ? topSvcs.map((s,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bor)">
+        <span style="font-family:var(--fh);font-size:.88rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:14px">${i+1}</span>
+        <span style="flex:1;font-size:.78rem">${esc(s.name)}</span>
+        <span style="font-weight:600;color:var(--gld);font-size:.78rem">${s.n}</span>
+      </div>`).join('')
+    : `<div style="color:var(--tx2);font-size:.78rem">Sin datos</div>`;
+
+  // Ingresos estimados del mes
+  const mesActual = today.toISOString().substring(0,7);
+  const ingresos = rows.filter(r=>r.fecha.startsWith(mesActual)).reduce((sum,r)=>{
+    const s=cfg.servicios.find(x=>String(x.id)===String(r.servicio_id));
+    return sum+(s?.precio||0);
+  },0);
+
+  card.innerHTML=`<div class="ch"><h3>📊 Métricas de turnos</h3></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+      <div>
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Turnos por semana</div>
+        <div style="display:flex;gap:3px;align-items:flex-end;height:70px">${bars}</div>
+      </div>
+      <div>
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">🏆 Top servicios</div>
+        ${topHtml}
+      </div>
+    </div>
+    <div style="background:var(--car2);border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:.78rem;color:var(--tx2)">Ingresos estimados este mes</div>
+      <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;color:var(--ok)">${fmt(ingresos)}</div>
+    </div>`;
+}
+
+function _isoWeek(d){
+  const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  dt.setUTCDate(dt.getUTCDate()+4-(dt.getUTCDay()||7));
+  const y0=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
+  return dt.getUTCFullYear()+'-W'+String(Math.ceil((((dt-y0)/86400000)+1)/7)).padStart(2,'0');
 }
 
 // ═══ ANÁLISIS ═══
@@ -8697,7 +8792,7 @@ const ONLINE_CFG_KEY = 'turnosOnlineCfg';
 function getOnlineCfg(){
   const raw = localStorage.getItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''));
   if(raw){ try{ const p=JSON.parse(raw); if(p&&typeof p==='object') return p; }catch(e){} }
-  return {mensaje:'', insta:'', direccion:'', tel:''};
+  return {mensaje:'', insta:'', direccion:'', tel:'', idioma:'es'};
 }
 
 // Calcula el ID del row de configuración en Supabase (determinístico por tenant)
@@ -8755,6 +8850,7 @@ async function rTurnosOnline(){
     if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
     if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
     if(document.getElementById('onlineNotaPrecios')) document.getElementById('onlineNotaPrecios').value = cfg.notaPrecios||'';
+    if(document.getElementById('onlineIdioma')) document.getElementById('onlineIdioma').value = cfg.idioma||'es';
     const _logo = cfg.logo||'';
     if(document.getElementById('onlineLogo')) document.getElementById('onlineLogo').value = _logo;
     const _logoNombre = document.getElementById('onlineLogoNombre');
@@ -9000,7 +9096,8 @@ function saveOnlineConfig(){
     direccion: document.getElementById('onlineDireccion')?.value||'',
     tel: (document.getElementById('onlineTel')?.value||'').replace(/\D/g,''),
     notaPrecios: document.getElementById('onlineNotaPrecios')?.value||'',
-    logo: document.getElementById('onlineLogo')?.value||''
+    logo: document.getElementById('onlineLogo')?.value||'',
+    idioma: document.getElementById('onlineIdioma')?.value||'es'
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   persistCfgToSupabase();
@@ -9019,79 +9116,6 @@ function compartirLinkWA(){
 
 Hacé click acá: ${link}`;
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
-}
-
-function mostrarFormularioTurnoOnline(tenant, turnosCfgParam, onlineCfgParam){
-  let cfg = onlineCfgParam;
-  if(!cfg || typeof cfg !== 'object'){
-    try { cfg = JSON.parse(localStorage.getItem(ONLINE_CFG_KEY + '_' + tenant.id)||'{}'); } catch(e){ cfg = {}; }
-    if(!cfg || typeof cfg !== 'object') cfg = {};
-  }
-  const turnosCfg = turnosCfgParam || (()=>{const r=localStorage.getItem('turnosCfg_'+tenant.id);return r?JSON.parse(r):{servicios:[],empleados:[]};})();
-  
-  document.body.innerHTML = `
-    <div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif">
-      <div style="background:#141414;border:1px solid #242424;border-radius:16px;width:100%;max-width:420px;padding:24px">
-        ${cfg.logo?`<div style="text-align:center;margin-bottom:14px"><img src="${cfg.logo}" alt="Logo" style="max-height:72px;max-width:180px;object-fit:contain;border-radius:8px"></div>`:''}
-        <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;text-align:center;margin-bottom:4px">${esc(tenant.nombre)}</div>
-        <div style="text-align:center;font-size:.78rem;color:#a89880;margin-bottom:20px">${esc(cfg.mensaje||'Reservá tu turno online')}</div>
-        ${cfg.direccion?`<div style="text-align:center;font-size:.75rem;color:#a89880;margin-bottom:16px">📍 ${esc(cfg.direccion)}</div>`:''}
-
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Tu nombre</label>
-        <input id="onNombre" placeholder="Nombre completo" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">WhatsApp</label>
-        <input id="onTel" placeholder="11 2345 6789" type="tel" inputmode="numeric" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Servicio</label>
-        <select id="onServicio" onchange="mostrarPrecioServicio(this)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:8px">
-          ${turnosCfg.servicios.length?turnosCfg.servicios.map(s=>`<option value="${esc(String(s.id))}" data-precio="${parseFloat(s.precio)||0}" data-dur="${parseInt(s.duracion)||30}">${esc(s.sector)}: ${esc(s.nombre)} (${parseInt(s.duracion)||30} min)${s.precio>0?' — $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join(''):'<option value="">Sin servicios configurados</option>'}
-        </select>
-        <div id="onPrecioInfo" style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.2rem">💰</span>
-          <div id="onPrecioTxt" style="font-size:.85rem;color:#c9a84c;font-weight:600">Cargando precio...</div>
-        </div>
-
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Profesional</label>
-        <select id="onEmpleado" onchange="cargarHorasDisponibles(window.__onlineTenantId, window.__onlineTurnosCfg)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-          <option value="">Sin preferencia</option>
-          ${turnosCfg.empleados.map(e=>`<option value="${esc(String(e.id))}">${esc(e.nombre)}</option>`).join('')}
-        </select>
-        
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Fecha</label>
-        <input type="date" id="onFecha" onchange="cargarHorasDisponibles(window.__onlineTenantId, window.__onlineTurnosCfg)" style="width:100%;background:#080808;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 14px;border-radius:8px;font-family:'Outfit';font-size:.88rem;outline:none;margin-bottom:12px">
-        
-        <label style="font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Horarios disponibles</label>
-        <div id="onSlotsGrid" style="margin-bottom:16px">
-          <div style="color:#a89880;font-size:.8rem;text-align:center;padding:12px">Seleccioná una fecha para ver los horarios disponibles</div>
-        </div>
-        <input type="hidden" id="onHora">
-        
-        <button onclick="enviarSolicitudTurno('${tenant.id}')" style="width:100%;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-family:'Outfit';font-size:.9rem;font-weight:700;cursor:pointer">
-          Reservar turno
-        </button>
-        <div id="onMsg" style="margin-top:12px;text-align:center;font-size:.8rem;display:none"></div>
-        ${cfg.insta?`<div style="text-align:center;margin-top:16px;font-size:.78rem;color:#a89880">📸 ${cfg.insta}</div>`:''}
-      </div>
-    </div>
-    ${(()=>{
-      const waTel = (cfg.tel||'').replace(/\D/g,'');
-      const waMsg = encodeURIComponent('Hola! Quisiera consultar antes de reservar mi turno en ' + (tenant.nombre||'') + ' 😊');
-      const waHref = waTel ? 'https://wa.me/' + waTel + '?text=' + waMsg : 'https://api.whatsapp.com/send?text=' + waMsg;
-      return `<a href="${waHref}" target="_blank"
-         style="position:fixed;bottom:24px;right:20px;display:flex;align-items:center;gap:10px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:50px;font-family:'Outfit',sans-serif;font-weight:600;font-size:.88rem;box-shadow:0 4px 20px rgba(37,211,102,.5);z-index:999;transition:transform .15s"
-         onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>
-        💬 Hablar con un asesor
-      </a>`;
-    })()}
-  `;
-  // Store globals for use in onchange handlers
-  window.__onlineTenantId = tenant.id;
-  window.__onlineTurnosCfg = turnosCfg;
-  // Show price for the first selected service immediately
-  const srvSel = document.getElementById('onServicio');
-  if(srvSel) mostrarPrecioServicio(srvSel);
 }
 
 // ═══════════════════════════════════════════════════
@@ -9488,447 +9512,6 @@ async function buscarEstado(){
       ${r.estado==='listo'?`<div style="margin-top:10px;padding:8px 12px;background:rgba(76,175,125,.08);border-radius:6px;font-size:.78rem;color:#4caf7d">¡Tu equipo está listo! Pasá a buscarlo. <strong>Llevá tu comprobante.</strong></div>`:''}
     </div>
   `).join('');
-}
-
-// ═══════════════════════════════════════════════════
-// PÁGINA PÚBLICA DE PRECIOS  (?precios=TENANT_UUID)
-// ═══════════════════════════════════════════════════
-function mostrarPreciosPublicos(tenantId, items, cfg){
-  const tenantName = cfg.__tenantName || 'Precios';
-  let rubro = cfg.__rubro || '';
-
-  // Detectar rubro desde nombres de servicios si no está en cfg
-  if(!rubro && items.length){
-    const salonKw = /corte|tintura|manicur|lifting|depilac|barba|keratina|mechas|brushing/i;
-    const phoneKw  = /pantalla|bater[ií]a|conector|tapa|c[aá]mara|chip|flex/i;
-    const salonN = items.filter(p=>salonKw.test(p.nombre||'')).length;
-    const phoneN = items.filter(p=>phoneKw.test(p.nombre||'')).length;
-    if(salonN > phoneN) rubro = 'Salón de belleza';
-  }
-
-  const oc = cfg.__onlineCfg || {};
-  const rubroLC = rubro.toLowerCase();
-  const esBarber = /barber/i.test(rubroLC);
-  const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
-  const turnoLink = window.location.origin + '/b/' + (tenantId || tenantSlug(cfg.__tenantName||''));
-
-  const cats = esBarber
-    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'barba',l:'🪒 Barba'},{k:'coloracion',l:'🎨 Coloración'},{k:'tratamiento',l:'✨ Tratamientos'},{k:'otro',l:'🔧 Otros'}]
-    : esSalon
-    ? [{k:'',l:'Todos'},{k:'corte',l:'✂ Corte'},{k:'tintura',l:'🎨 Tintura'},{k:'manicuria',l:'💅 Manicuria'},{k:'maquillaje',l:'💄 Maquillaje'},{k:'lifting',l:'👁 Lifting'},{k:'depilacion',l:'✨ Depilación'}]
-    : [{k:'',l:'Todos'},{k:'pantalla',l:'📱 Pantallas'},{k:'tapa',l:'🔲 Tapas'},{k:'bateria',l:'🔋 Baterías'},{k:'conector',l:'🔌 Conectores'},{k:'camara',l:'📸 Cámaras'},{k:'otro',l:'🔧 Otros'}];
-
-  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
-  const textoNota = oc.notaPrecios || ((esBarber || esSalon) ? 'Los precios pueden variar según técnica y largo. Consultanos para asesoramiento personalizado.' : 'Trabajamos con transplante de IC y Flex para que tu equipo NO MARQUE CARTELES. ⏰ Tiempo: 2–3 días hábiles · 🔋 Baterías: con restablecimiento de fábrica.');
-  const notice = (esBarber || esSalon)
-    ? `<div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px 16px;font-size:.8rem;color:#a89880;line-height:1.6;margin-bottom:20px">${rubroIcon} ${esc(textoNota)}</div>`
-    : `<div style="background:rgba(201,82,76,.07);border-left:3px solid #c9524c;border-radius:8px;padding:14px 16px;font-size:.78rem;color:#a89880;line-height:1.7;margin-bottom:20px">⚠️ ${esc(textoNota)}</div>`;
-
-  // Pre-filtrar items por rubro para evitar mezcla de servicios
-  const phoneKw = /pantalla|tapa|bater[ií]a|conector|c[aá]mara|placa|puerto|flex|chip/i;
-  const salonKw = /corte|tintura|mechas|manicur|pedicur|lifting|depilac|maquillaje|tratamiento|keratina|brushing|permanente/i;
-  const itemsFiltradosBase = (esBarber || esSalon)
-    ? items.filter(p => !phoneKw.test(p.nombre||''))
-    : items.filter(p => !salonKw.test(p.nombre||''));
-  // Deduplicar por nombre: si hay duplicados (onboarding + manual), conservar el de mayor precio
-  const dedupMap = new Map();
-  itemsFiltradosBase.forEach(p => {
-    const key = (p.nombre||'').trim().toLowerCase();
-    const prev = dedupMap.get(key);
-    if(!prev || (p.precio||0) > (prev.precio||0)) dedupMap.set(key, p);
-  });
-  const itemsFiltrados = Array.from(dedupMap.values());
-  window.__preciosPublicItems = itemsFiltrados;
-  window.__preciosPublicCat = '';
-
-  document.body.innerHTML = `
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <div style="min-height:100vh;background:#080808;font-family:'Outfit',sans-serif;color:#f5f0e8;-webkit-font-smoothing:antialiased">
-
-      <!-- HEADER -->
-      <div style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
-        ${oc.logo?`<div style="margin-bottom:14px"><img src="${oc.logo}" alt="Logo" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:10px"></div>`:`<div style="font-size:2.2rem;margin-bottom:6px">${rubroIcon}</div>`}
-        <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(tenantName)}</div>
-        ${rubro ? `<div style="font-size:.66rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
-        ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
-        ${oc.direccion ? `<div style="font-size:.75rem;color:#a89880;margin-top:8px">📍 ${esc(oc.direccion)}</div>` : ''}
-      </div>
-      <div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">${esc(oc.mensaje||'¡Bienvenido! 👋 Reservá tu turno de forma rápida y sencilla. Elegí el servicio, el profesional y el horario que mejor te quede. ¡Nos alegra tenerte!')}</div>
-
-      <!-- CONTENT -->
-      <div style="max-width:720px;margin:0 auto;padding:24px 16px 48px">
-        ${notice}
-
-        <!-- Search -->
-        <div style="display:flex;align-items:center;background:#111;border:1px solid #222;border-radius:10px;padding:0 14px;margin-bottom:14px">
-          <span style="color:#a89880;font-size:1.1rem;margin-right:8px">⌕</span>
-          <input id="pubPQ" placeholder="Buscar servicio o modelo..." oninput="pubRender()" autocomplete="off"
-            style="flex:1;background:none;border:none;color:#f5f0e8;padding:12px 0;font-family:'Outfit';font-size:.88rem;outline:none">
-        </div>
-
-        <!-- Category tabs -->
-        <div id="pubCatTabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px">
-          ${cats.map((c,i)=>`<button data-cat="${esc(c.k)}" onclick="pubSetCat(this)"
-            style="padding:7px 15px;border-radius:20px;border:1px solid ${i===0?'#c9a84c':'#242424'};background:${i===0?'rgba(201,168,76,.15)':'transparent'};color:${i===0?'#c9a84c':'#a89880'};font-family:'Outfit';font-size:.78rem;cursor:pointer;white-space:nowrap">${c.l}</button>`).join('')}
-        </div>
-
-        <!-- Grid -->
-        <div id="pubGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px"></div>
-        <div id="pubEmpty" style="display:none;text-align:center;padding:48px 0;color:#a89880">
-          <div style="font-size:2.5rem;margin-bottom:10px">🔍</div>
-          <div style="font-size:.88rem">No se encontraron servicios</div>
-        </div>
-
-        <!-- CTA + Share -->
-        <div style="margin-top:36px;display:flex;flex-direction:column;align-items:center;gap:12px">
-          <a href="${esc(turnoLink)}" style="display:inline-flex;align-items:center;gap:8px;padding:13px 28px;background:#c9a84c;color:#080808;border-radius:10px;text-decoration:none;font-weight:700;font-size:.9rem;font-family:'Outfit'">
-            📅 Reservar turno online
-          </a>
-          <button id="pubShareBtn" onclick="navigator.clipboard.writeText(location.href).then(()=>{var b=document.getElementById('pubShareBtn');b.textContent='¡Copiado! ✓';b.style.borderColor='#4caf7d';b.style.color='#4caf7d';setTimeout(()=>{b.textContent='🔗 Compartir lista de precios';b.style.borderColor='#2e2e2e';b.style.color='#a89880';},2500)})"
-            style="background:transparent;border:1px solid #2e2e2e;color:#a89880;padding:10px 22px;border-radius:8px;font-family:'Outfit';font-size:.82rem;cursor:pointer;transition:all .2s">
-            🔗 Compartir lista de precios
-          </button>
-        </div>
-
-        <div style="text-align:center;margin-top:28px;font-size:.62rem;color:#e0d5c5;letter-spacing:1.5px;text-transform:uppercase">Precios actualizados en tiempo real</div>
-      </div>
-    </div>
-    ${oc.tel ? `<a href="https://wa.me/549${oc.tel.replace(/\D/g,'')}?text=${encodeURIComponent('Hola! Quisiera consultar sobre una reparación')}" target="_blank" rel="noopener"
-      style="position:fixed;bottom:22px;right:20px;display:flex;align-items:center;gap:9px;background:#25d366;color:#fff;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:600;padding:12px 20px;border-radius:50px;text-decoration:none;box-shadow:0 4px 18px rgba(37,211,102,.35);z-index:999;white-space:nowrap">
-      💬 Consultar por WhatsApp
-    </a>` : ''}
-  `;
-  pubRender();
-}
-
-function pubSetCat(btn){
-  window.__preciosPublicCat = btn.dataset.cat;
-  document.querySelectorAll('#pubCatTabs button').forEach(b=>{
-    const on = b === btn;
-    b.style.borderColor = on ? '#c9a84c' : '#242424';
-    b.style.background   = on ? 'rgba(201,168,76,.15)' : 'transparent';
-    b.style.color        = on ? '#c9a84c' : '#a89880';
-  });
-  pubRender();
-}
-
-function pubRender(){
-  const grid  = document.getElementById('pubGrid');
-  const empty = document.getElementById('pubEmpty');
-  if(!grid) return;
-  const q    = ((document.getElementById('pubPQ')||{}).value||'').toLowerCase();
-  const cat  = window.__preciosPublicCat||'';
-  const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  const pubCatKw = {
-    'corte':       /corte|degradado|capado|navaja|pelo|cabello/i,
-    'barba':       /barba|afeitado|contorno|bigote|perfil/i,
-    'coloracion':  /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
-    'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte/i,
-    'tratamiento': /tratamiento|keratina|brushing|hidrat|botox|permanente|alisado|briz/i,
-    'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
-    'lifting':     /lifting|pesta[ñn]/i,
-    'depilacion':  /depilac|cera|laser/i,
-    'pantalla':    /pantalla|display|lcd/i,
-    'bateria':     /bater[ií]a/i,
-    'tapa':        /tapa|back|trasera/i,
-    'conector':    /conector|carga|puerto/i,
-    'camara':      /c[aá]mara/i,
-    'otro':        /.*/
-  };
-  const items = (window.__preciosPublicItems||[]).filter(p=>{
-    if(!p || p.disponibilidad === 'no disponible') return false;
-    const matchQ = !q || norm(p.nombre).includes(norm(q)) || norm(p.modelo||'').includes(norm(q));
-    let matchC = !cat;
-    if(!matchC){
-      if(p.categoria && norm(p.categoria) === norm(cat)){ matchC = true; }
-      else {
-        const kw = pubCatKw[norm(cat)];
-        matchC = kw ? kw.test(p.nombre) : norm(p.nombre).includes(norm(cat));
-      }
-    }
-    return matchQ && matchC;
-  });
-  if(!items.length){
-    grid.style.display = 'none';
-    empty.style.display = 'block';
-    return;
-  }
-  grid.style.display = 'grid';
-  empty.style.display = 'none';
-  const fmt2 = n => '$'+Number(n).toLocaleString('es-AR');
-  grid.innerHTML = items.map(p=>`
-    <div style="background:#111;border:1px solid #1e1e1e;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:6px;position:relative">
-      ${p.disponibilidad==='consultar' ? `<div style="position:absolute;top:12px;right:12px;background:rgba(201,148,76,.15);color:#c9944c;border:1px solid rgba(201,148,76,.25);border-radius:20px;font-size:.6rem;padding:2px 8px;font-weight:600">Consultar</div>` : ''}
-      <div style="font-weight:600;font-size:.9rem;padding-right:${p.disponibilidad==='consultar'?'72px':'0'};line-height:1.3">${esc(p.nombre)}</div>
-      ${p.modelo ? `<div style="font-size:.72rem;color:#a89880">${esc(p.modelo)}</div>` : ''}
-      <div style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:700;color:#c9a84c;margin-top:6px">${p.precio > 0 ? fmt2(p.precio) : '<span style="font-size:.9rem;font-family:\'Outfit\',sans-serif;color:#a89880">A consultar</span>'}</div>
-      ${p.notas ? `<div style="font-size:.7rem;color:#a89880;line-height:1.5;margin-top:2px">${esc(p.notas)}</div>` : ''}
-    </div>
-  `).join('');
-}
-
-async function cargarHorasDisponibles(tenantId, turnosCfg){
-  const fecha = document.getElementById('onFecha')?.value;
-  const grid = document.getElementById('onSlotsGrid');
-  if(!grid || !fecha) return;
-
-  grid.innerHTML = '<div style="color:#a89880;font-size:.8rem;text-align:center;padding:12px">Cargando horarios...</div>';
-
-  // Get cfg
-  const cfg = turnosCfg || {servicios:[], empleados:[]};
-  const apertura = cfg.apertura || '09:00';
-  const cierre = cfg.cierre || '20:00';
-
-  // Verificar si el día de la semana está habilitado
-  const diasTrabajo = cfg.dias && cfg.dias.length > 0 ? cfg.dias : [1,2,3,4,5,6];
-  const diaSel = new Date(fecha+'T12:00:00').getDay();
-  if(!diasTrabajo.includes(diaSel)){
-    const nombDia = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diaSel];
-    grid.innerHTML = `<div style="background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:10px;padding:16px;text-align:center"><div style="font-size:1.1rem;margin-bottom:6px">❌</div><div style="font-size:.85rem;color:#f5c0be;font-weight:600">No atendemos los ${nombDia}s</div><div style="font-size:.75rem;color:#a89880;margin-top:4px">Por favor elegí otro día disponible</div></div>`;
-    return;
-  }
-
-  // Get occupied slots from Supabase solicitudes (confirmed + manual blocks only)
-  // Pendiente NO bloquea — el admin debe confirmar primero
-  const { data: solicitudes } = await sb.from('turnos_solicitudes')
-    .select('hora,empleado_id,estado')
-    .eq('tenant_id', tenantId)
-    .eq('fecha', fecha)
-    .in('estado', ['confirmado','bloqueado']);
-
-  const ocupados = new Set((solicitudes||[]).map(s=>(s.hora||'').substring(0,5)));
-  const bloqueadosDueno = new Set(); // slots bloqueados por el dueño (NO por clientes)
-
-  // Get turnos fijos bloqueados
-  const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
-  if(fijosRaw){
-    const fijos = JSON.parse(fijosRaw);
-    const diaSemana = new Date(fecha+'T00:00:00').getDay();
-    fijos.filter(f=>f.activo && f.dia===diaSemana).forEach(f=>{ ocupados.add(f.hora); bloqueadosDueno.add(f.hora); });
-  }
-
-  // Bloqueos de disponibilidad — aplica siempre
-  if(cfg.empleados && cfg.empleados.length > 0){
-    const empSelEl = document.getElementById('onEmpleado');
-    const empIdSel = (empSelEl?.value||'').trim();
-    // Con empleado específico: aplica solo sus bloqueos.
-    // Sin preferencia (vacío): un slot queda bloqueado si TODOS los empleados están bloqueados
-    const empsCheck = empIdSel
-      ? [cfg.empleados.find(e=>String(e.id)===String(empIdSel))].filter(Boolean)
-      : cfg.empleados;
-    if(empsCheck.length > 0){
-      const [ah2,am2]=(cfg.apertura||'09:00').split(':').map(Number);
-      const [ch2,cm2]=(cfg.cierre||'20:00').split(':').map(Number);
-      let cur2=ah2*60+am2;
-      while(cur2<=ch2*60+cm2){
-        const hh=String(Math.floor(cur2/60)).padStart(2,'0');
-        const mm2=String(cur2%60).padStart(2,'0');
-        const horaSlot=hh+':'+mm2;
-        if(empsCheck.every(e=>esBloqueadoEnFecha(e.bloqueos||[], fecha, horaSlot))){
-          ocupados.add(horaSlot);
-          bloqueadosDueno.add(horaSlot);
-        }
-        cur2+=30;
-      }
-    }
-  }
-
-  // Get duration of selected service
-  const srvSel = document.getElementById('onServicio');
-  const srvId = srvSel ? parseInt(srvSel.value) : 0;
-  const srv = cfg.servicios.find(s=>s.id===srvId) || cfg.servicios[0];
-  const duracion = srv?.duracion || 30;
-
-  // Generate slots every 30 min between apertura and cierre
-  const slots = [];
-  const [ah, am] = apertura.split(':').map(Number);
-  const [ch, cm] = cierre.split(':').map(Number);
-  let cur = ah*60+am;
-  const fin = ch*60+cm;
-
-  while(cur <= fin){
-    const h = String(Math.floor(cur/60)).padStart(2,'0');
-    const m = String(cur%60).padStart(2,'0');
-    const hora = h+':'+m;
-    slots.push({hora, ocupado: ocupados.has(hora), bloqueado: bloqueadosDueno.has(hora)});
-    cur += 30;
-  }
-
-  const disponibles = slots.filter(s=>!s.ocupado);
-
-  if(!disponibles.length && slots.length){
-    // Todos ocupados — mostrar todos como reservados
-  } else if(!slots.length){
-    grid.innerHTML = '<div style="color:#c9524c;font-size:.8rem;text-align:center;padding:12px">Sin horarios disponibles para este día</div>';
-    return;
-  }
-
-  grid.innerHTML = '<div style="display:flex;flex-wrap:wrap;gap:8px">' +
-    slots.map(s=>{
-      if(s.bloqueado) return `<div style="padding:8px 14px;border-radius:8px;background:rgba(201,82,76,.07);border:1px solid rgba(201,82,76,.25);font-size:.82rem;cursor:default;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;text-align:center">
-          <span style="color:#e0d5c5">${s.hora}</span>
-          <span style="font-size:.6rem;font-weight:700;color:#c9524c;text-transform:uppercase;letter-spacing:.5px;background:rgba(201,82,76,.15);padding:1px 6px;border-radius:10px">🚫 No disp.</span>
-        </div>`;
-      if(s.ocupado) return `<div style="padding:8px 14px;border-radius:8px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.25);font-size:.82rem;cursor:default;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;text-align:center">
-          <span style="color:#e0d5c5;text-decoration:line-through">${s.hora}</span>
-          <span style="font-size:.6rem;font-weight:700;color:#b8976a;text-transform:uppercase;letter-spacing:.5px;background:rgba(201,148,76,.18);padding:1px 6px;border-radius:10px">Reservado</span>
-        </div>`;
-      return `<div onclick="seleccionarSlot('${s.hora}',this)" style="padding:8px 14px;border-radius:8px;background:#080808;color:#a89880;font-size:.85rem;border:1px solid #2e2e2e;cursor:pointer;transition:all .15s;min-width:72px;text-align:center" onmouseover="this.style.borderColor='#b8976a';this.style.color='#c9a84c'" onmouseout="if(!this.dataset.sel){this.style.borderColor='#2e2e2e';this.style.color='#a89880'}">${s.hora}</div>`;
-    }).join('') + '</div>' +
-    (disponibles.length === 0 ? '<div style="font-size:.78rem;color:#c9524c;margin-top:10px;text-align:center">Todos los horarios de este día están reservados</div>' : '<div style="font-size:.7rem;color:#a89880;margin-top:10px">Tocá un horario disponible para seleccionarlo</div>');
-
-  // Reset hora hidden input
-  document.getElementById('onHora').value = '';
-}
-
-function mostrarMotivoOcupado(el){
-  const box = document.getElementById('motivoOcupado');
-  if(!box) return;
-  box.style.display = 'block';
-  box.innerHTML = '⏳ Este horario ya fue reservado por otro cliente. Por favor elegí otro horario disponible.';
-  // Scroll to message
-  box.scrollIntoView({behavior:'smooth', block:'nearest'});
-  // Auto hide after 4 seconds
-  setTimeout(()=>{ box.style.display='none'; }, 4000);
-}
-
-function mostrarPrecioServicio(sel){
-  const opt = sel.options[sel.selectedIndex];
-  const precio = parseFloat(opt?.getAttribute('data-precio')||0);
-  const txt = document.getElementById('onPrecioTxt');
-  if(txt){
-    txt.textContent = precio > 0
-      ? 'Precio: $' + precio.toLocaleString('es-AR')
-      : 'Precio a consultar';
-    txt.style.color = precio > 0 ? '#c9a84c' : '#a89880';
-  }
-  // Reload slots if date already selected
-  const fecha = document.getElementById('onFecha')?.value;
-  if(fecha) cargarHorasDisponibles(window.__onlineTenantId, window.__onlineTurnosCfg);
-}
-
-function seleccionarSlot(hora, el){
-  // Reset all slots
-  document.querySelectorAll('#onSlotsGrid div[onclick]').forEach(d=>{
-    d.style.background = '#080808';
-    d.style.color = '#a89880';
-    d.style.borderColor = '#2e2e2e';
-    d.style.fontWeight = 'normal';
-    d.dataset.sel = '';
-  });
-  // Highlight selected
-  el.style.background = '#b8976a';
-  el.style.color = '#080808';
-  el.style.fontWeight = '700';
-  el.dataset.sel = '1';
-  // Set hidden input
-  document.getElementById('onHora').value = hora;
-}
-
-async function enviarSolicitudTurno(tenantId){
-  const nombre = document.getElementById('onNombre')?.value.trim();
-  const tel = document.getElementById('onTel')?.value.trim();
-  const servicioId = document.getElementById('onServicio')?.value;
-  const empleadoId = document.getElementById('onEmpleado')?.value;
-  const fecha = document.getElementById('onFecha')?.value;
-  const hora = document.getElementById('onHora')?.value;
-  const msg = document.getElementById('onMsg');
-
-  if(!nombre||!tel||!fecha||!hora){
-    if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Completá todos los campos';}
-    return;
-  }
-
-  // Prevenir doble envío: deshabilitar botón durante el proceso
-  const submitBtn = document.querySelector('button[onclick*="enviarSolicitudTurno"]');
-  if(submitBtn){
-    if(submitBtn.disabled) return; // Ya hay un envío en curso
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Enviando...';
-  }
-
-  // Verificar si el slot ya está confirmado o bloqueado
-  const { data: existenteCliente } = await sb.from('turnos_solicitudes')
-    .select('id,estado')
-    .eq('tenant_id', tenantId)
-    .eq('fecha', fecha)
-    .eq('hora', hora)
-    .in('estado', ['confirmado','bloqueado'])
-    .limit(3);
-  if((existenteCliente||[]).length > 0){
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
-    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario ya está reservado. Por favor elegí otro horario disponible.';}
-    if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
-    return;
-  }
-
-  // Verificar turnos fijos del tenant
-  const fijosRaw = localStorage.getItem('turnosFijos_' + tenantId);
-  if(fijosRaw){
-    try {
-      const fijos = JSON.parse(fijosRaw);
-      const fechaObj = new Date(fecha + 'T00:00:00');
-      const diaSemana = fechaObj.getDay();
-      const fijoConflicto = fijos.find(f=>f.activo && f.dia===diaSemana && f.hora===hora);
-      if(fijoConflicto){
-        if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario está reservado. Por favor elegí otro.';}
-        return;
-      }
-    } catch(e){}
-  }
-
-  // Insertar directamente como confirmado
-  const tsInsert = new Date().toISOString();
-  const { data: inserted, error: insertErr } = await sb.from('turnos_solicitudes').insert({
-    tenant_id: tenantId,
-    nombre, tel, servicio_id: servicioId||null,
-    empleado_id: empleadoId ? (parseInt(empleadoId)||null) : null,
-    fecha, hora,
-    estado: 'confirmado',
-    created_at: tsInsert
-  }).select('id,created_at').single();
-
-  if(insertErr){
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
-    if(msg){msg.style.display='block';msg.style.color='#c9524c';msg.textContent='Error al reservar. Intentá de nuevo.';}
-    return;
-  }
-
-  // Detección de race condition: si en el mismo instante otro cliente reservó primero
-  const { data: existentes } = await sb.from('turnos_solicitudes')
-    .select('id,created_at,estado')
-    .eq('tenant_id', tenantId)
-    .eq('fecha', fecha)
-    .eq('hora', hora)
-    .in('estado', ['confirmado','bloqueado']);
-
-  const conflicto = (existentes||[]).some(t =>
-    t.id !== inserted.id && t.created_at <= tsInsert
-  );
-
-  if(conflicto){
-    // Otro llegó primero — eliminar nuestra reserva
-    await sb.from('turnos_solicitudes').delete().eq('id', inserted.id);
-    if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
-    if(msg){msg.style.display='block';msg.style.color='#e8976a';msg.textContent='Ese horario acaba de ser reservado. Por favor elegí otro.';}
-    if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
-    return;
-  }
-
-  if(msg){
-    msg.style.display='block';
-    msg.style.color='#4caf7d';
-    msg.textContent='✅ ¡Turno reservado! Nos vemos el ' + fecha + ' a las ' + hora + '.';
-    if(submitBtn){ submitBtn.disabled=true; submitBtn.textContent='✅ Reservado'; }
-    setTimeout(()=>{
-      document.getElementById('onNombre').value='';
-      document.getElementById('onTel').value='';
-      document.getElementById('onFecha').value='';
-      document.getElementById('onHora').value='';
-      if(submitBtn){ submitBtn.disabled=false; submitBtn.textContent='Reservar turno'; }
-      if(window.__onlineTurnosCfg) cargarHorasDisponibles(tenantId, window.__onlineTurnosCfg);
-    },3000);
-  }
 }
 
 function getCategorias(){
@@ -12800,73 +12383,6 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     return;
   }
 
-  // ── Página pública de turnos ──────────────────────────────────────────
-  // Si hay param ?turno= mostrar página de reserva sin login
-  const turnoParam = urlParams.get('turno');
-  if(turnoParam){
-    // Hide loading screen
-    document.getElementById('loadingScreen').style.display='none';
-    // Cargar configuración desde tabla precios (SELECT público garantizado por RLS)
-    let turnosCfg = {servicios:[], empleados:[], apertura:'09:00', cierre:'20:00', dias:[1,2,3,4,5,6]};
-    let onlineCfg  = {mensaje:'', insta:'', direccion:''};
-    let tenantNombre = '';
-    let tenantRubro  = '';
-
-    const { data: preciosData } = await sb.from('precios')
-      .select('data')
-      .eq('tenant_id', turnoParam);
-
-    if(preciosData){
-      const cfgRow = preciosData.find(p=>p.data?.__tipo==='cfg' || p.data?.__turnosCfg);
-      if(cfgRow){
-        if(cfgRow.data.__turnosCfg && typeof cfgRow.data.__turnosCfg === 'object') turnosCfg = cfgRow.data.__turnosCfg;
-        if(cfgRow.data.__onlineCfg && typeof cfgRow.data.__onlineCfg === 'object') onlineCfg = {mensaje:'',insta:'',direccion:'',...cfgRow.data.__onlineCfg};
-        if(cfgRow.data.__tenantName)  tenantNombre = cfgRow.data.__tenantName;
-        if(cfgRow.data.__rubro)       tenantRubro  = cfgRow.data.__rubro;
-      }
-      // Usar ítems del catálogo de precios (sección "Precios" de la app) para el selector de servicios.
-      // Solo se usan los items reales (no rows de configuración) con nombre definido.
-      const itemsPrecios = preciosData
-        .filter(p => p.data && !p.data.__tipo && !p.data.__turnosCfg && p.data.nombre)
-        .map(p => p.data)
-        .filter(p => (p.disponibilidad||'disponible') !== 'no_disponible');
-      if(itemsPrecios.length > 0){
-        // Combinar: los ítems del catálogo REEMPLAZAN a turnosCfg.servicios.
-        // Si el nombre coincide con un servicio de turnosCfg, se usa su duración; si no, 30 min por defecto.
-        const durMap = {};
-        (turnosCfg.servicios||[]).forEach(s=>{ durMap[(s.nombre||'').toLowerCase()] = s.duracion||30; });
-        turnosCfg = {
-          ...turnosCfg,
-          servicios: itemsPrecios.map(p=>({
-            id: p.id,
-            nombre: p.nombre,
-            sector: p.categoria || p.sector || '',
-            precio: parseFloat(p.precio)||0,
-            duracion: durMap[(p.nombre||'').toLowerCase()] || p.duracion || 30
-          }))
-        };
-      }
-    }
-
-    // Intentar leer tenant (puede fallar si RLS no lo permite para anon)
-    let tenant = null;
-    try {
-      const { data: td } = await sb.from('tenants').select('*').eq('id', turnoParam).single();
-      tenant = td;
-    } catch(e){}
-
-    // Fallback: construir tenant desde la info en precios cfg
-    if(!tenant && tenantNombre){
-      tenant = { id: turnoParam, nombre: tenantNombre, rubro: tenantRubro, activo: true };
-    }
-
-    if(tenant){
-      mostrarFormularioTurnoOnline(tenant, turnosCfg, onlineCfg);
-    } else {
-      document.body.innerHTML = '<div style="min-height:100vh;background:#080808;display:flex;align-items:center;justify-content:center;color:#fff;font-family:sans-serif">Link inválido o negocio no encontrado.</div>';
-    }
-    return;
-  }
 
   const { data: { session } } = await sb.auth.getSession();
   if(session){
@@ -14891,14 +14407,6 @@ function _filtrarSlotsPasados(){
   });
 }
 
-// Página pública: filtrar después de renderizar la grilla
-(function(){
-  var _orig = cargarHorasDisponibles;
-  cargarHorasDisponibles = async function(tenantId, cfg){
-    await _orig.apply(this, arguments);
-    _filtrarSlotsPasados();
-  };
-})();
 
 // Calendario interno (admin): advertencia si el horario elegido ya pasó
 (function(){
@@ -15075,24 +14583,6 @@ function _adaptarObjetivosModal(){
 })();
 </script>
 
-<script>
-(function(){
-  if(typeof enviarSolicitudTurno !== 'function') return;
-  var _eSTOrig = enviarSolicitudTurno;
-  enviarSolicitudTurno = async function(tenantId){
-    var nombre = document.getElementById('onNombre')?.value?.trim() || '';
-    var fecha  = document.getElementById('onFecha')?.value || '';
-    var hora   = document.getElementById('onHora')?.value || '';
-    await _eSTOrig.apply(this, arguments);
-    var submitBtn = document.querySelector('button[onclick*="enviarSolicitudTurno"]');
-    if(submitBtn && submitBtn.textContent.includes('Reservado')){
-      try {
-        _notifLocal('📅 Nuevo turno reservado', nombre + ' · ' + fecha + ' ' + hora, 'turnos');
-      } catch(e){}
-    }
-  };
-})();
-</script>
 <script>
 /* ── BUG 1: persistCfgToSupabase también al eliminar un precio ── */
 (function(){
