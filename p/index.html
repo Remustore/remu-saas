@@ -741,10 +741,10 @@ async function cargarSlotsPanel(){
     if(r.estado==='bloqueado'){
       if((r.nombre||'').startsWith('__fijo__')){
         fijosMin.add(hMin);
-      } else if((r.nombre||'').startsWith('__extra__')){
-        // Fila extra legacy: ignorar, el bloqueo se calcula desde la reserva principal
+      } else {
+        // __extra__ u otro bloqueado: marcar el slot (compatibilidad con reservas anteriores)
+        ocupadosMin.add(hMin);
       }
-      // bloqueado sin prefijo especial: ignorar (filas huérfanas)
     } else {
       // confirmado o pendiente: bloquear todos los slots que ocupa este turno
       ocupadosMin.add(hMin);
