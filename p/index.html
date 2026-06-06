@@ -727,28 +727,40 @@ async function cargarSlotsPanel(){
   wrap.innerHTML=T('cargandoHorarios');
 
   const {data:rows} = await sb.from('turnos_solicitudes')
-    .select('hora,estado,nombre')
+    .select('hora,estado,nombre,servicio_id')
     .eq('tenant_id',G.tenantId)
     .eq('fecha',fecha)
     .in('estado',['confirmado','pendiente','bloqueado']);
 
-  const reservados = new Set();
-  const fijos      = new Set();
+  // Construir set de minutos ocupados a partir de las reservas reales + duración del servicio
+  const ocupadosMin = new Set(); // minutos absolutos bloqueados
+  const fijosMin    = new Set(); // minutos de turnos fijos (no disponibles)
   for(const r of (rows||[])){
     const h = (r.hora||'').substring(0,5);
-    if(r.estado==='bloqueado' && (r.nombre||'').startsWith('__fijo__')){
-      fijos.add(h);
+    const hMin = hhToMin(h);
+    if(r.estado==='bloqueado'){
+      if((r.nombre||'').startsWith('__fijo__')){
+        fijosMin.add(hMin);
+      } else if((r.nombre||'').startsWith('__extra__')){
+        // Fila extra legacy: ignorar, el bloqueo se calcula desde la reserva principal
+      }
+      // bloqueado sin prefijo especial: ignorar (filas huérfanas)
     } else {
-      reservados.add(h);
+      // confirmado o pendiente: bloquear todos los slots que ocupa este turno
+      ocupadosMin.add(hMin);
+      const srvR = (cfg.servicios||[]).find(s=>String(s.id)===String(r.servicio_id));
+      const durR = srvR ? (srvR.duracion||30) : 30;
+      for(let k=30; k<durR; k+=30) ocupadosMin.add(hMin+k);
     }
   }
 
+  // Servicio que está seleccionando el cliente nuevo
   const srvVal = String(document.getElementById('bkSrv')?.value||'');
   const srv    = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
-  const pasos  = srv ? Math.ceil((srv.duracion||30)/30) : 1;
+  const durNuevo = srv ? (srv.duracion||30) : 30;
 
   const empId = document.getElementById('bkEmp')?.value||'';
-  const blqEmp = new Set();
+  const blqEmpMin = new Set();
   if(cfg.empleados&&cfg.empleados.length){
     const emps = empId
       ? [cfg.empleados.find(e=>String(e.id)===String(empId))].filter(Boolean)
@@ -756,8 +768,7 @@ async function cargarSlotsPanel(){
     if(emps.length){
       const ap0=hhToMin(cfg.apertura||'09:00'), ci0=hhToMin(cfg.cierre||'20:00');
       for(let m=ap0; m<=ci0; m+=30){
-        const h=minToHH(m);
-        if(emps.every(e=>esBloqueado(e.bloqueos||[],fecha,h))) blqEmp.add(h);
+        if(emps.every(e=>esBloqueado(e.bloqueos||[],fecha,minToHH(m)))) blqEmpMin.add(m);
       }
     }
   }
@@ -767,16 +778,17 @@ async function cargarSlotsPanel(){
   const slots = [];
   for(let m=ap; m<=ci; m+=30){
     const hora = minToHH(m);
-    if(fijos.has(hora)||blqEmp.has(hora)){
-      slots.push({hora, blq:true, ocu:false});
+    if(fijosMin.has(m)||blqEmpMin.has(m)){
+      slots.push({hora, blq:true, ocu:false, ocuDir:false, ocuConf:false});
       continue;
     }
-    const ocuDir = reservados.has(hora);
+    // ¿Este slot está directamente ocupado por una reserva existente?
+    const ocuDir = ocupadosMin.has(m);
+    // ¿El nuevo servicio seleccionado NO cabe si empezara aquí?
     let ocuConf = false;
-    if(!ocuDir && pasos>1){
-      for(let k=1; k<pasos; k++){
-        const hk = minToHH(m+k*30);
-        if(reservados.has(hk)||fijos.has(hk)||blqEmp.has(hk)){ocuConf=true;break;}
+    if(!ocuDir && durNuevo>30){
+      for(let k=30; k<durNuevo; k+=30){
+        if(ocupadosMin.has(m+k)||fijosMin.has(m+k)||blqEmpMin.has(m+k)){ocuConf=true;break;}
       }
     }
     slots.push({hora, blq:false, ocu:ocuDir||ocuConf, ocuDir, ocuConf});
