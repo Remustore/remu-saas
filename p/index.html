@@ -269,7 +269,7 @@ function renderPage(){
       <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(nombre)}</div>
       ${rubro ? `<div style="font-size:.66rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
       ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
-      ${oc.direccion ? `<div style="font-size:.75rem;color:#a89880;margin-top:8px">📍 ${esc(oc.direccion)}</div>` : ''}
+      ${oc.direccion ? `<a href="https://maps.google.com/?q=${encodeURIComponent(oc.direccion)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.75rem;color:#a89880;margin-top:8px;text-decoration:none;border-bottom:1px dotted rgba(168,152,128,.4);padding-bottom:1px" onmouseover="this.style.color='#c9a84c'" onmouseout="this.style.color='#a89880'">📍 ${esc(oc.direccion)}</a>` : ''}
     </div>
 
     <!-- MENSAJE -->
