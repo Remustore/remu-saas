@@ -771,14 +771,15 @@ async function cargarSlotsPanel(){
       slots.push({hora, blq:true, ocu:false});
       continue;
     }
-    let ocu = reservados.has(hora);
-    if(!ocu && pasos>1){
+    const ocuDir = reservados.has(hora);
+    let ocuConf = false;
+    if(!ocuDir && pasos>1){
       for(let k=1; k<pasos; k++){
         const hk = minToHH(m+k*30);
-        if(reservados.has(hk)||fijos.has(hk)||blqEmp.has(hk)){ocu=true;break;}
+        if(reservados.has(hk)||fijos.has(hk)||blqEmp.has(hk)){ocuConf=true;break;}
       }
     }
-    slots.push({hora, blq:false, ocu});
+    slots.push({hora, blq:false, ocu:ocuDir||ocuConf, ocuDir, ocuConf});
   }
 
   if(!slots.length){
@@ -795,9 +796,12 @@ async function cargarSlotsPanel(){
     if(s.blq){
       d.className='slot blq';
       d.innerHTML=`<span style="color:#a89880;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-blq">${T('noDisp')}</span>`;
-    } else if(s.ocu){
+    } else if(s.ocuDir){
       d.className='slot ocu';
       d.innerHTML=`<span style="color:#c8b88a;text-decoration:line-through">${s.hora}</span><span class="slot-tag tag-ocu">${T('reservado')}</span>`;
+    } else if(s.ocuConf){
+      d.className='slot blq';
+      d.innerHTML=`<span style="color:#585044;text-decoration:line-through">${s.hora}</span>`;
     } else {
       d.className='slot';
       d.textContent=s.hora;
