@@ -977,7 +977,7 @@ async function enviarReserva(){
     document.documentElement.lang = _lang==='pt'?'pt-BR':_lang;
 
     try {
-      const {data:td} = await sb.from('tenants').select('*').eq('id',result.tenantId).single();
+      const {data:td} = await sb.from('tenants').select('*').eq('id',result.tenantId).maybeSingle();
       G.tenant = td;
     } catch(e){}
     if(!G.tenant && tenantNombre){
