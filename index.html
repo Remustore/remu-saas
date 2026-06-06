@@ -2009,6 +2009,11 @@ $$;</pre>
 </select></div><div><label>Monto ($)</label><input type="number" id="gMon" placeholder="0"></div></div>
 <div class="fr"><div><label>Fecha</label><input type="date" id="gFec"></div></div>
 <div id="gFijosExtra" style="display:none">
+  <div class="fr"><div><label>Frecuencia</label><select id="gFrec" onchange="_onGastoFrecChange()">
+    <option value="mensual">🔄 Mensual (se repite)</option>
+    <option value="cuotas">💳 En cuotas</option>
+    <option value="unico">1️⃣ Pago único</option>
+  </select></div><div id="gCuotasBox" style="display:none"><label>Nro. de cuotas</label><input type="number" id="gCuotas" placeholder="Ej: 12" min="2" max="60"></div></div>
   <div class="fr"><div><label>Próxima revisión (en meses)</label><input type="number" id="gRevision" placeholder="Ej: 3 (opcional)" min="1" max="24"></div></div>
 </div>
 <div class="fr full"><div><label>Notas</label><textarea id="gNot" placeholder="Opcional..."></textarea></div></div>
@@ -4037,6 +4042,9 @@ function fillModalEdit(modal, id){
     document.getElementById('gRevision').value=g.revision||'';
     const esFijo = FIJO_TIPOS_M.has(g.tipo);
     document.getElementById('gFijosExtra').style.display = esFijo ? 'block' : 'none';
+    if(document.getElementById('gFrec')){ document.getElementById('gFrec').value = g.frecuencia||'mensual'; }
+    if(document.getElementById('gCuotas') && g.cuotas) document.getElementById('gCuotas').value = g.cuotas;
+    _onGastoFrecChange();
     document.getElementById('mGastoTitulo').textContent = esFijo ? 'Editar Gasto Fijo' : 'Editar Gasto';
     const hist = g.historial||[];
     if(hist.length){
@@ -5185,6 +5193,13 @@ function _onGastoTipoChange(){
   const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
   const tipo = document.getElementById('gTip').value;
   document.getElementById('gFijosExtra').style.display = FIJO_TIPOS_M.has(tipo) ? 'block' : 'none';
+  _onGastoFrecChange();
+}
+
+function _onGastoFrecChange(){
+  const frec = document.getElementById('gFrec')?.value || 'mensual';
+  const cuotasBox = document.getElementById('gCuotasBox');
+  if(cuotasBox) cuotasBox.style.display = frec === 'cuotas' ? '' : 'none';
 }
 
 async function saveGasto(){
@@ -5200,7 +5215,9 @@ async function saveGasto(){
     const d=new Date();d.setMonth(d.getMonth()+revision);
     revisionFecha=d.toISOString().slice(0,10);
   }
-  const obj={concepto:c,tipo,monto:nuevoMonto,fecha:document.getElementById('gFec').value||tod(),notas:document.getElementById('gNot').value,revision:revision||null,revisionFecha};
+  const frecuencia = document.getElementById('gFrec')?.value || 'mensual';
+  const nCuotas = frecuencia === 'cuotas' ? (parseInt(document.getElementById('gCuotas')?.value)||2) : null;
+  const obj={concepto:c,tipo,monto:nuevoMonto,fecha:document.getElementById('gFec').value||tod(),notas:document.getElementById('gNot').value,revision:revision||null,revisionFecha,frecuencia,cuotas:nCuotas};
   if(id){
     const i=S.gastos.findIndex(g=>g.id===parseInt(id));
     if(i>-1){
@@ -5235,14 +5252,30 @@ function rGastos(){
   const hoy=tod();
   const en30=new Date();en30.setDate(en30.getDate()+30);const en30s=en30.toISOString().slice(0,10);
   const FIJO_TIPOS = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
-  // Fijos: todos (sin filtro fecha) — son recurrentes mensuales
-  const fijos    = S.gastos.filter(g=>FIJO_TIPOS.has(g.tipo));
+  function _cuotaInfo(g){
+    if(!g.fecha||!g.cuotas) return {n:1,activa:false};
+    const ini=new Date(g.fecha+'T12:00:00'),hoyD=new Date();
+    const diff=(hoyD.getFullYear()-ini.getFullYear())*12+(hoyD.getMonth()-ini.getMonth());
+    return {n:diff+1, activa:diff>=0&&diff<g.cuotas};
+  }
+  const allFijos = S.gastos.filter(g=>FIJO_TIPOS.has(g.tipo));
+  // Fijos activos este mes según su frecuencia
+  const fijos = allFijos.filter(g=>{
+    const frec=g.frecuencia||'mensual';
+    if(frec==='mensual') return true;
+    if(frec==='unico') return g.fecha&&g.fecha.startsWith(m);
+    if(frec==='cuotas') return _cuotaInfo(g).activa;
+    return true;
+  });
   // Variables y stock: solo este mes
   const gm       = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
   const variables= gm.filter(g=>g.tipo==='variable');
   const stocks   = gm.filter(g=>g.tipo==='stock');
-  // Stats: fijos = suma de todos los activos (sin filtro mes); variables/stock = solo mes actual
-  const tF = fijos.reduce((a,g)=>a+g.monto,0);
+  // Stats: monto mensual según frecuencia
+  const tF = fijos.reduce((a,g)=>{
+    if((g.frecuencia||'mensual')==='cuotas'&&g.cuotas) return a+Math.round(g.monto/g.cuotas);
+    return a+g.monto;
+  },0);
   const tV = variables.reduce((a,g)=>a+g.monto,0);
   const tS = stocks.reduce((a,g)=>a+g.monto,0);
   const tM = tF + tV + tS;
@@ -5253,8 +5286,8 @@ function rGastos(){
     <div class="stat"><div class="sl">Stock / Compras</div><div class="sv">${fmt(tS)}</div></div>`;
   const tc={fijo:'brd',variable:'byw',stock:'bbl',servicios:'brd',personal:'brd',herramientas:'brd',marketing:'brd',mejoras:'brd',inversion:'brd'};
 
-  // Avisos de revisión próxima
-  const proximos = fijos.filter(g=>g.revisionFecha && g.revisionFecha<=en30s);
+  // Avisos de revisión próxima (sobre todos los fijos registrados, no solo los activos este mes)
+  const proximos = allFijos.filter(g=>g.revisionFecha && g.revisionFecha<=en30s);
   let avisoHtml='';
   if(proximos.length){
     avisoHtml=`<div style="background:rgba(201,168,76,.12);border:1px solid var(--gold);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:.85rem">
@@ -5263,9 +5296,18 @@ function rGastos(){
   }
 
   function _filaFijo(g){
+    const frec=g.frecuencia||'mensual';
+    let periodoTxt='Mensual', montoDisplay=fmt(g.monto);
+    if(frec==='unico'){ periodoTxt='Pago único'; }
+    else if(frec==='cuotas'&&g.cuotas){
+      const {n}=_cuotaInfo(g);
+      const montoMes=Math.round(g.monto/g.cuotas);
+      montoDisplay=fmt(montoMes);
+      periodoTxt=`Cuota ${n}/${g.cuotas}<br><span style="font-size:.65rem;color:var(--mut)">Total: ${fmt(g.monto)}</span>`;
+    }
     const rev=g.revisionFecha?`<br><span style="font-size:.68rem;color:${g.revisionFecha<=en30s?'var(--gold)':'var(--mut)'}">Revisión: ${fD(g.revisionFecha)}</span>`:'';
     const hist=g.historial&&g.historial.length?`<br><span style="font-size:.68rem;color:var(--mut)">${g.historial.length} cambio${g.historial.length!==1?'s':''}</span>`:'';
-    return `<tr><td><strong>${esc(g.concepto)}</strong>${rev}${hist}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td style="color:var(--mut);font-size:.75rem">Mensual</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`;
+    return `<tr><td><strong>${esc(g.concepto)}</strong>${rev}${hist}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${montoDisplay}</strong></td><td style="color:var(--mut);font-size:.75rem">${periodoTxt}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`;
   }
   function _filaG(g){
     return `<tr><td><strong>${esc(g.concepto)}</strong>${g.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(g.notas)}</span>`:''}</td><td><span class="bx ${tc[g.tipo]||'bgx'}">${esc(g.tipo)}</span></td><td><strong>${fmt(g.monto)}</strong></td><td>${fD(g.fecha)}</td><td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mGasto',${g.id})">✎</button><button class="btn bd bsm" onclick="delGasto(${g.id})">✕</button></td></tr>`;
@@ -5275,7 +5317,7 @@ function rGastos(){
     const filas=items.length?items.map(_filaFijo).join(''):`<tr><td colspan="5" style="text-align:center;color:var(--mut);padding:10px 0">Sin gastos fijos registrados</td></tr>`;
     return `<div class="card" style="margin-bottom:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-        <div><span style="font-size:1rem;font-weight:600">🔒 Gastos Fijos</span><br><span style="font-size:.75rem;color:var(--mut)">Se repiten automáticamente cada mes</span></div>
+        <div><span style="font-size:1rem;font-weight:600">🔒 Gastos Fijos</span><br><span style="font-size:.75rem;color:var(--mut)">Mensuales, en cuotas y pagos únicos</span></div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="font-size:.85rem;color:var(--mut)">Total mensual: <strong style="color:var(--bad)">${fmt(subtotal)}</strong></span>
           <button class="btn bg bsm" onclick="abrirNuevoGastoFijo()">+ Registrar</button>
