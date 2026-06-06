@@ -8331,21 +8331,25 @@ async function rTurnosConfig(){
   rFichasClientes();
 }
 
-function agregarServicioTurno(){
+async function agregarServicioTurno(){
   const nombre = prompt('Nombre del servicio:');
   if(!nombre) return;
-  const sector = prompt('Sector (Peluquería / Manicuria / Maquillaje / Estética):') || 'Peluquería';
+  const sector = prompt('Sector (ej: otro, tratamiento, manicuria):') || 'otro';
   const duracion = parseInt(prompt('Duración en minutos:') || '60');
   const precio = parseFloat(prompt('Precio ($) — podés dejarlo en 0:') || '0');
   const cfg = getTurnosCfg();
   cfg.servicios.push({id:Date.now(), nombre, sector, duracion, precio});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
   rTurnosConfig();
-  showToast('Servicio agregado ✓');
+  try {
+    await persistCfgToSupabase();
+    showToast('Servicio agregado ✓');
+  } catch(e) {
+    showToast('Guardado local pero falló sync — reintentá', 'warn');
+  }
 }
 
-function editarServicioTurno(id){
+async function editarServicioTurno(id){
   const cfg = getTurnosCfg();
   const s = cfg.servicios.find(x=>x.id===id);
   if(!s) return;
@@ -8356,18 +8360,27 @@ function editarServicioTurno(id){
   const precio = parseFloat(prompt('Precio ($):', s.precio) || s.precio);
   s.nombre=nombre; s.sector=sector; s.duracion=duracion; s.precio=precio;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
   rTurnosConfig();
-  showToast('Servicio actualizado ✓');
+  try {
+    await persistCfgToSupabase();
+    showToast('Servicio actualizado ✓');
+  } catch(e) {
+    showToast('Guardado local pero falló sync — reintentá', 'warn');
+  }
 }
 
-function eliminarServicioTurno(id){
+async function eliminarServicioTurno(id){
   if(!confirm('¿Eliminar este servicio?')) return;
   const cfg = getTurnosCfg();
   cfg.servicios = cfg.servicios.filter(s=>s.id!==id);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
   rTurnosConfig();
+  try {
+    await persistCfgToSupabase();
+    showToast('Servicio eliminado ✓');
+  } catch(e) {
+    showToast('Guardado local pero falló sync — reintentá', 'warn');
+  }
 }
 
 // Envía WA con el listado completo de turnos del día a cada empleado
@@ -8851,12 +8864,11 @@ async function persistCfgToSupabase(){
   const rowId = _cfgRowId(currentTenant.id);
   const row = {
     id: rowId,
-    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __fichasCli: getFichasCli(), __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: tenantSlug(currentTenant.nombre||'') },
+    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: tenantSlug(currentTenant.nombre||'') },
     tenant_id: currentTenant.id
   };
-  try {
-    await sb.from('precios').upsert(row, { onConflict: 'id' });
-  } catch(e) { console.error('persistCfg error', e); }
+  const { error } = await sb.from('precios').upsert(row, { onConflict: 'id' });
+  if(error) throw new Error(error.message);
 }
 
 async function rTurnosOnline(){
@@ -16644,22 +16656,6 @@ async function _mFCS_sinCobro(){
     };
   }
 
-  /* ── Z. persistCfgToSupabase: sincronizar S.precios→servicios antes de persistir ── */
-  if(typeof persistCfgToSupabase === 'function'){
-    var _pCfgZ = persistCfgToSupabase;
-    persistCfgToSupabase = async function(){
-      if(currentTenant && currentTenant.id && typeof S !== 'undefined' && Array.isArray(S.precios)){
-        var svcs = S.precios
-          .filter(function(p){ return p && !p.__tipo && !p.__turnosCfg && p.nombre; })
-          .filter(function(p){ return (p.disponibilidad||'disponible') !== 'no_disponible'; })
-          .map(function(p){ return {id:p.id, nombre:p.nombre, sector:p.categoria||p.sector||'', duracion:parseInt(p.duracion)||30, precio:parseFloat(p.precio)||0}; });
-        var cfg = getTurnosCfg();
-        cfg.servicios = svcs;
-        localStorage.setItem(TURNOS_CFG_KEY + '_' + currentTenant.id, JSON.stringify(cfg));
-      }
-      return _pCfgZ.apply(this, arguments);
-    };
-  }
 
   /* ── Y. openM('mTurno',null) — no limpiar si el modal ya está abierto ── */
   if(typeof openM === 'function'){
