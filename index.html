@@ -9002,7 +9002,7 @@ async function refreshBadgeSolicitudes(){
 
 async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
   const cfg = getTurnosCfg();
-  const srv = cfg.servicios.find(s=>s.nombre===servicio) || cfg.servicios[0];
+  const srv = cfg.servicios.find(s=>String(s.id)===String(servicio)) || cfg.servicios.find(s=>s.nombre===servicio) || cfg.servicios[0];
   const emp = cfg.empleados[0];
   const duracion = srv?.duracion || 30;
 
