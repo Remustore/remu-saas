@@ -221,6 +221,30 @@ function parseRows(rows){
   return {turnosCfg, onlineCfg, tenantNombre, tenantRubro};
 }
 
+// ── Helpers de display ────────────────────────────────────────────────────
+const _DIAS_C = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+function _fmtDias(dias){
+  if(!dias||!dias.length) return '';
+  const s=[...dias].sort((a,b)=>a-b);
+  if(s.length===7) return 'Todos los días';
+  const groups=[];let st=s[0],pr=s[0];
+  for(let i=1;i<=s.length;i++){
+    const d=s[i];
+    if(d===pr+1){pr=d;continue;}
+    groups.push(st===pr?_DIAS_C[st]:_DIAS_C[st]+'–'+_DIAS_C[pr]);
+    if(d!==undefined){st=d;pr=d;}
+  }
+  return groups.join(', ');
+}
+function _countCat(catKey){
+  if(!catKey) return _allItems.length;
+  return _allItems.filter(p=>{
+    if(norm(p.categoria||'')===norm(catKey)) return true;
+    const kw=CAT_KW[norm(catKey)];
+    return kw&&kw.test(p.nombre||'');
+  }).length;
+}
+
 // ── Render principal ──────────────────────────────────────────────────────
 function renderPage(){
   const cfg = G.cfg || {servicios:[],empleados:[],apertura:'09:00',cierre:'20:00',dias:[1,2,3,4,5,6]};
@@ -256,6 +280,11 @@ function renderPage(){
   });
   _allItems = Array.from(dedupMap.values());
 
+  // Horarios
+  const diasStr = _fmtDias(cfg.dias);
+  const horasStr = (cfg.apertura && cfg.cierre) ? `${cfg.apertura} – ${cfg.cierre}` : '';
+  const horarioStr = [diasStr, horasStr].filter(Boolean).join(' · ');
+
   // Quitar loader e insertar HTML
   const loader = document.getElementById('pLoader');
   if(loader) loader.remove();
@@ -264,12 +293,13 @@ function renderPage(){
   const pageDiv = document.createElement('div');
   pageDiv.innerHTML = `
     <!-- HEADER -->
-    <div style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
+    <div id="pMainHdr" style="background:linear-gradient(180deg,#0f0f0f 0%,#080808 100%);border-bottom:1px solid #1e1e1e;padding:30px 20px 24px;text-align:center">
       ${oc.logo ? `<img src="${oc.logo}" alt="Logo" style="max-height:80px;max-width:200px;object-fit:contain;border-radius:10px;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto">` : `<div style="font-size:2.2rem;margin-bottom:6px">${rubroIcon}</div>`}
       <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#c9a84c;letter-spacing:2px;line-height:1.2">${esc(nombre)}</div>
       ${rubro ? `<div style="font-size:.66rem;color:#a89880;letter-spacing:3px;text-transform:uppercase;margin-top:6px">${esc(rubro)}</div>` : ''}
       ${oc.insta ? `<a href="https://instagram.com/${encodeURIComponent((oc.insta||'').replace('@',''))}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;margin-top:10px;color:#c9a84c;text-decoration:none;font-size:.82rem;border:1px solid rgba(201,168,76,.3);padding:5px 12px;border-radius:20px">📸 @${esc((oc.insta||'').replace('@',''))}</a>` : ''}
       ${oc.direccion ? `<a href="https://maps.google.com/?q=${encodeURIComponent(oc.direccion)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.75rem;color:#a89880;margin-top:8px;text-decoration:none;border-bottom:1px dotted rgba(168,152,128,.4);padding-bottom:1px" onmouseover="this.style.color='#c9a84c'" onmouseout="this.style.color='#a89880'">📍 ${esc(oc.direccion)}</a>` : ''}
+      ${horarioStr ? `<div style="font-size:.72rem;color:#a89880;margin-top:8px;display:flex;align-items:center;justify-content:center;gap:5px">🕐 ${esc(horarioStr)}</div>` : ''}
     </div>
 
     <!-- MENSAJE -->
@@ -293,12 +323,17 @@ function renderPage(){
           autocomplete="off">
       </div>
 
-      <!-- Tabs -->
+      <!-- Tabs con contadores -->
       <div id="pTabs" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:20px">
-        ${cats.map((c,i)=>`<button data-cat="${esc(c.k)}" onclick="setCat(this)"
-          style="padding:7px 15px;border-radius:20px;border:1px solid ${i===0?'#c9a84c':'#242424'};background:${i===0?'rgba(201,168,76,.15)':'transparent'};color:${i===0?'#c9a84c':'#a89880'};font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;white-space:nowrap;transition:all .15s">
-          ${esc(c.l)}
-        </button>`).join('')}
+        ${cats.map((c,i)=>{
+          const n=_countCat(c.k);
+          if(c.k && n===0) return '';
+          const active=i===0;
+          return `<button data-cat="${esc(c.k)}" onclick="setCat(this)"
+            style="padding:7px 15px;border-radius:20px;border:1px solid ${active?'#c9a84c':'#242424'};background:${active?'rgba(201,168,76,.15)':'transparent'};color:${active?'#c9a84c':'#a89880'};font-family:'Outfit',sans-serif;font-size:.78rem;cursor:pointer;white-space:nowrap;transition:all .15s;display:inline-flex;align-items:center;gap:5px">
+            ${esc(c.l)}<span style="font-size:.65rem;opacity:.7">${n}</span>
+          </button>`;
+        }).join('')}
       </div>
 
       <!-- Grilla de servicios -->
@@ -321,6 +356,17 @@ function renderPage(){
     </div>
   `;
   document.body.insertBefore(pageDiv, document.getElementById('bkOv'));
+
+  // Sticky header
+  const sticky = document.createElement('div');
+  sticky.id = 'pSticky';
+  sticky.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:80;background:rgba(8,8,8,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #1e1e1e;padding:10px 20px;text-align:center;transform:translateY(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1)';
+  sticky.innerHTML = `<span style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:800;color:#c9a84c;letter-spacing:1.5px">${esc(nombre)}</span>`;
+  document.body.insertBefore(sticky, pageDiv);
+  window.addEventListener('scroll', ()=>{
+    const hdrH = document.getElementById('pMainHdr')?.offsetHeight || 150;
+    sticky.style.transform = window.scrollY > hdrH ? 'translateY(0)' : 'translateY(-100%)';
+  }, {passive:true});
 
   // WA flotante
   const waTel = (oc.tel||'').replace(/\D/g,'');
@@ -685,6 +731,7 @@ async function enviarReserva(){
     cerrarReserva();
 
     const confDiv=document.createElement('div');
+    confDiv.id='bkConf';
     confDiv.style.cssText='position:fixed;inset:0;background:#080808;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;overflow-y:auto';
     confDiv.innerHTML=`
       <div style="background:#111;border:1px solid #1e1e1e;border-radius:16px;max-width:400px;width:100%;padding:28px 24px;text-align:center">
@@ -713,11 +760,11 @@ async function enviarReserva(){
           ¡Te esperamos, <strong style="color:#f5f0e8">${esc(nombre)}</strong>!
           Te confirmaremos al <strong style="color:#f5f0e8">${esc(tel)}</strong> por WhatsApp.
         </div>
-        <button onclick="this.closest('[style*=\\"position:fixed\\"]').remove()"
+        <button onclick="document.getElementById('bkConf').remove()"
           style="width:100%;padding:12px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:10px">
           Volver al catálogo
         </button>
-        <button onclick="abrirReserva(null)"
+        <button onclick="document.getElementById('bkConf').remove();abrirReserva(null)"
           style="width:100%;padding:11px;background:transparent;color:#a89880;border:1px solid #2e2e2e;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.85rem;cursor:pointer">
           Hacer otra reserva
         </button>
