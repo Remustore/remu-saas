@@ -12775,6 +12775,9 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 
 // Verificar sesión existente
 (async()=>{
+  if(document.readyState==='loading'){
+    await new Promise(r=>document.addEventListener('DOMContentLoaded',r,{once:true}));
+  }
   const urlParams = new URLSearchParams(window.location.search);
 
   // ── Auto-registro ──────────────────────────────────────────────────────
