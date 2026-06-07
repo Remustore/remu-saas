@@ -2151,6 +2151,13 @@ function esc(v){
     .replace(/'/g,'&#39;');
 }
 
+// Detecta si el rubro corresponde a un negocio de turnos (salón, barbería, peluquería,
+// manicura, estética, spa, maquillaje, pestañas, etc.) — lista única para todo el panel.
+function esNegocioTurnos(rubro){
+  const r = (rubro||'').toLowerCase();
+  return /salon|salón|belleza|peluq|barber|manicur|uña|una|estetic|estétic|spa|maquilla|pestañ|nail/.test(r);
+}
+
 // ═══ ESTADO GLOBAL ═══
 let currentUser = null;    // usuario Supabase Auth
 let currentTenant = null;  // objeto tenant { id, nombre, rubro, modulos }
@@ -2405,7 +2412,7 @@ function setupApp(){
   document.getElementById('sbSub').textContent = r;
   // Adaptar botones de acceso rápido según rubro
   const rubroQ = (currentTenant?.rubro||'').toLowerCase();
-  const esNoTaller = rubroQ.includes('barberia')||rubroQ.includes('barbería')||rubroQ.includes('salon')||rubroQ.includes('belleza');
+  const esNoTaller = esNegocioTurnos(rubroQ);
   const quickBtns = document.getElementById('dashQuickBtns');
   if(quickBtns && esNoTaller){
     quickBtns.innerHTML = `
@@ -5731,7 +5738,7 @@ function rDash(){
   const tG=filtrarDash(S.gastos,'fecha').reduce((a,g)=>a+g.monto,0);
   const repA=S.reparaciones.filter(r=>r.estado!=='entregado').length,eqD=S.equipos.filter(e=>e.estado==='disponible').length;
   const rubD=(currentTenant?.rubro||'').toLowerCase();
-  const esBarberiaD=rubD.includes('barberia')||rubD.includes('barbería')||rubD.includes('salon')||rubD.includes('belleza');
+  const esBarberiaD=esNegocioTurnos(rubD);
   // Para barberías/salones: ingresos de servicio desde getTurnos() (localStorage, sin duplicados).
   // S.ventas puede tener duplicados históricos → no usar para servicios en barberías.
   const tVProducto = esBarberiaD ? vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0) : 0;
@@ -6157,7 +6164,7 @@ function getCajas(){
 function rCajas(){
   const c=getCajas();
   const rubro2 = (currentTenant?.rubro||'').toLowerCase();
-  const esSalonCaja = rubro2.includes('salon')||rubro2.includes('belleza')||rubro2.includes('barberia')||rubro2.includes('barbería');
+  const esSalonCaja = esNegocioTurnos(rubro2);
   const items = esSalonCaja
     ? [{k:'servicio',l:'✂ Servicios',obj:0},{k:'accesorios',l:'🛍 Productos',obj:0},{k:'general',l:'💼 General',obj:0}]
     : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
@@ -6323,10 +6330,9 @@ async function guardarCierreDiario(resetear){
 function rObjetivos(){
   const obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esSalon = rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq');
-  const esBarberia = rubro.includes('barberia')||rubro.includes('barbería');
+  const esSalon = esNegocioTurnos(rubro);
   const esDeco = rubro.includes('deco')||rubro.includes('perfum');
-  
+
   // Día actual
   const hoyStr = tod();
   const periodoLabel = 'Hoy, ' + fD(hoyStr);
@@ -6337,7 +6343,7 @@ function rObjetivos(){
     return`<div class="stat"><div class="sl">${emoji} ${titulo}</div><div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px"><div style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:${color}">${actual}</div><div style="font-size:.78rem;color:var(--mut)">/ ${meta} hoy</div></div><div class="pb"><div class="pf" style="width:${pct}%;background:${pct>=100?'linear-gradient(90deg,var(--ok),#6fd4a0)':pct>=60?'linear-gradient(90deg,var(--wrn),#e8c96a)':'linear-gradient(90deg,var(--bad),#e07070)'}"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px;font-size:.7rem"><span style="color:var(--mut)">${pct}% logrado</span><span style="color:var(--gld);font-weight:600">${fmt(monto)}</span></div>${metaMonto>0?`<div style="font-size:.68rem;color:var(--mut);margin-top:2px">Meta: ${fmt(metaMonto)}</div>`:''}</div>`;
   }
 
-  if(esSalon || esBarberia){
+  if(esSalon){
     // Turnos del día como objetivo principal
     const turnosHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoyStr&&t.estado!=='cancelado').length : 0;
     const turnosTermHoy = getTurnos ? getTurnos().filter(t=>t.fecha===hoyStr&&t.estado==='terminado').length : 0;
@@ -6577,7 +6583,7 @@ function exportarExcel(){
 
   const label   = getFiltLabel();
   const rub     = (currentTenant?.rubro||'').toLowerCase();
-  const esSalon = /barber|barbería|salon|belleza/i.test(rub);
+  const esSalon = esNegocioTurnos(rub);
   const vFilt   = filtrarPorRango(S.ventas, 'fecha');
   const gFilt   = filtrarPorRango(S.gastos, 'fecha');
   const tFilt   = esSalon && typeof getTurnos==='function'
@@ -6675,7 +6681,7 @@ function exportarPDF(){
   const label   = getFiltLabel();
   const negocio = currentTenant?.nombre || 'Mi Negocio';
   const rub     = (currentTenant?.rubro||'').toLowerCase();
-  const esSalon = /barber|barbería|salon|belleza/i.test(rub);
+  const esSalon = esNegocioTurnos(rub);
 
   const vFilt = filtrarPorRango(S.ventas, 'fecha');
   const gFilt = filtrarPorRango(S.gastos, 'fecha');
@@ -10066,7 +10072,7 @@ function rGrafico7Dias(){
   if(!el) return;
 
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esTurnos = /barberia|barbería|salon|belleza/i.test(rubro);
+  const esTurnos = esNegocioTurnos(rubro);
 
   // Para barberías: los ingresos viven en getTurnos() — esta card no aporta datos útiles
   const card7d = el.closest('.card');
@@ -10167,7 +10173,7 @@ function rGraficoDias(){
   const desde = hace30.toISOString().slice(0,10);
   
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
+  const esTurnos = esNegocioTurnos(rubro);
 
   const porDia = [0,0,0,0,0,0,0]; // Dom=0 ... Sab=6
 
@@ -10484,7 +10490,7 @@ function rDivision(){
   
   // Only show for Remu (not salon/barberia)
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esRemu = rubro.includes('telefon')||rubro.includes('tecnico')||rubro.includes('técnico')||rubro.includes('remu')||(!rubro.includes('salon')&&!rubro.includes('barberia')&&!rubro.includes('barbería')&&!rubro.includes('belleza'));
+  const esRemu = !esNegocioTurnos(rubro);
 
   if(!esRemu){ card.style.display='none'; return; }
   card.style.display='block';
@@ -10722,7 +10728,7 @@ function rComisionesMes(){
 // ═══ ESTADÍSTICAS CLIENTES FRECUENTES ═══
 function getClientesFrecuentes(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
+  const esTurnos = esNegocioTurnos(rubro);
   
   const stats = {};
   
@@ -10769,7 +10775,7 @@ function generarResumenMesPDF(){
   
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esTelefonia = rubro.includes('telefon')||rubro.includes('tecnico');
-  const esTurnos = rubro.includes('barberia')||rubro.includes('barbería')||rubro.includes('salon')||rubro.includes('belleza');
+  const esTurnos = esNegocioTurnos(rubro);
   
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -13545,7 +13551,7 @@ function rGananciaHoy(){
   var card = document.getElementById('gananciaHoyCard');
   if(!card) return;
   var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
-  var esBarberia = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+  var esBarberia = esNegocioTurnos(rub);
   var F = typeof fmt==='function' ? fmt : function(n){ return '$'+n; };
   // Etiqueta del período activo
   var periodo = typeof getDFiltLabel==='function' ? getDFiltLabel() : 'Hoy';
@@ -13726,7 +13732,7 @@ function _calcGananciaSemana(weekOffset){
   if(!fechas.length) return 0;
 
   var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
-  var esBarb = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+  var esBarb = esNegocioTurnos(rub);
 
   var ing = 0;
   if(esBarb){
@@ -13779,7 +13785,7 @@ function checkMetaCelebration(){
   if(localStorage.getItem(key)) return;
 
   var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
-  var esBarb = rub.includes('barberia')||rub.includes('barbería')||rub.includes('salon')||rub.includes('belleza');
+  var esBarb = esNegocioTurnos(rub);
   var totalHoy = 0;
   if(esBarb){
     if(typeof getTurnos==='function')
@@ -14571,7 +14577,7 @@ function _adaptarObjetivosModal(){
   set('objEqCant',  obj.eqCant);  set('objEqPre',  obj.eqPre);
 
   var r = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
-  var esSalon = /salon|belleza|peluq|barber/i.test(r);
+  var esSalon = esNegocioTurnos(r);
   var modal = document.getElementById('mObjetivos');
   if(!modal) return;
   var labels = modal.querySelectorAll('label');
@@ -15990,7 +15996,7 @@ async function _mFCS_sinCobro(){
     var cajas = {servicio:0, accesorios:0, equipos:0, general:0};
     var hoy = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
     var rub = (currentTenant&&currentTenant.rubro||'').toLowerCase();
-    var esSalon = /barber|barbería|salon|belleza/i.test(rub);
+    var esSalon = esNegocioTurnos(rub);
     if(esSalon){
       (typeof getTurnos==='function' ? getTurnos() : [])
         .filter(function(t){ return t.fecha===hoy && t.estado==='terminado'; })
@@ -16026,7 +16032,7 @@ async function _mFCS_sinCobro(){
   cierreDiario = function(){
     var hoy = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
     var rub = (currentTenant&&currentTenant.rubro||'').toLowerCase();
-    var esSalon = /barber|barbería|salon|belleza/i.test(rub);
+    var esSalon = esNegocioTurnos(rub);
     var ventasHoy = (S.ventas||[]).filter(function(v){ return v.fecha===hoy; });
     var repsHoy   = (S.reparaciones||[]).filter(function(r){ return r.estado==='entregado'&&r.fechaEnt===hoy; });
     var turnosHoy = typeof getTurnos==='function'
