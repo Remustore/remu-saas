@@ -1281,9 +1281,12 @@ $$;</pre>
         <button class="btn bsm" onclick="go('turnos')">← Volver</button>
       </div>
 
+      <div id="preciosLinkBox" style="margin-bottom:14px"></div>
+
       <!-- Sectores y servicios -->
       <div class="card" style="margin-bottom:14px">
         <div class="ch"><h3>✂ Sectores y servicios</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>
+        <div style="font-size:.74rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">📌 Estos son los servicios que tus clientes ven y pueden reservar online (con precio y duración) en tu página pública — el link está arriba.</div>
         <div id="serviciosTurnosList"></div>
       </div>
 
@@ -1616,8 +1619,7 @@ $$;</pre>
 
     <!-- PRECIOS -->
     <div class="sec" id="sec-precios">
-      <div class="pt">Lista de Precios</div><div class="ps" id="preciosSub">Servicios visibles para clientes</div>
-      <div id="preciosLinkBox" style="margin-bottom:14px"></div>
+      <div class="pt">Lista de Precios</div><div class="ps" id="preciosSub">Catálogo interno — no se muestra a tus clientes</div>
       <div id="preciosNotice" style="margin-bottom:14px"></div>
       <div class="card">
         <div style="margin-bottom:12px">
@@ -5430,11 +5432,7 @@ function setupPreciosTabs(){
   // Dynamic notice
   const notice = document.getElementById('preciosNotice');
   if(notice){
-    if(esSalon){
-      notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">' + rubroIcon + ' Lista de servicios de ' + (currentTenant?.nombre||'el salón') + '</strong><br>Los precios pueden variar según el largo, tipo de cabello y técnica aplicada. Consultanos para presupuestos personalizados.</div>';
-    } else {
-      notice.innerHTML = '<div style="background:var(--gld2);border-left:3px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">⚠️ Importante — Leer antes de contratar</strong><br>Nuestra prioridad es entregar trabajos con <strong>transplante de IC y Flex</strong> logrando que tu equipo <strong>NO MARQUE CARTELES</strong>. Si se daña por golpe quedará marcando <strong style="color:var(--wrn)">PIEZA DESCONOCIDA</strong>.<br><br>⏰ <strong>Tiempo de reparación:</strong> 2 a 3 días hábiles · 🔋 <strong>Baterías:</strong> con restablecimiento de fábrica o pre-programada.</div>';
-    }
+    notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">' + rubroIcon + ' Catálogo interno</strong><br>Esta lista es para tu referencia y respaldo — <strong>tus clientes no la ven</strong>. Para que vean tus servicios y puedan reservar turno online, configuralos en <strong>Turnos → Configurar → Sectores y servicios</strong>.</div>';
   }
   
   rPreciosLink();
@@ -5479,9 +5477,9 @@ function rPreciosLink(){
   window.__preciosPublicLink = link;
   box.innerHTML = `<div style="background:var(--gld2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
     <div style="min-width:0">
-      <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">🔗 Página de precios y turnos</div>
+      <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">🔗 Tu página pública</div>
       <div style="font-size:.76rem;color:var(--gld);word-break:break-all;line-height:1.4">${esc(link)}</div>
-      <div style="font-size:.66rem;color:var(--mut);margin-top:3px">Compartí este link — tus clientes ven precios y reservan turno sin registrarse</div>
+      <div style="font-size:.66rem;color:var(--mut);margin-top:3px">Acá ven los servicios que configurás abajo (con precio y duración) y reservan turno sin registrarse — compartí el link</div>
     </div>
     <div style="display:flex;gap:6px;flex-shrink:0">
       <button class="btn bg bsm" onclick="navigator.clipboard.writeText(window.__preciosPublicLink).then(()=>showToast('Link copiado ✓'))">Copiar</button>
@@ -5491,21 +5489,6 @@ function rPreciosLink(){
 }
 
 function rPrecios(){
-  // Init link banner
-  const box = document.getElementById('preciosLinkBox');
-  if(box && currentTenant && !box.innerHTML){
-    const pLink = window.location.origin + window.location.pathname + '?precios=' + tenantSlug(currentTenant.nombre||'');
-    box.innerHTML = `<div style="background:var(--gld3);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <div style="flex:1;min-width:180px">
-        <div style="font-size:.72rem;color:var(--gld);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:3px">🌐 Lista pública de precios</div>
-        <div style="font-size:.75rem;color:var(--tx2)">Tus clientes ven esta lista. Actualizala y compartila.</div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a href="${esc(pLink)}" target="_blank" style="font-size:.78rem;padding:6px 14px;background:var(--gld2);border:1px solid rgba(201,168,76,.3);color:var(--gld);border-radius:6px;text-decoration:none;white-space:nowrap">Ver como cliente →</a>
-        <button onclick="navigator.clipboard.writeText('${esc(pLink)}').then(()=>showToast('Link copiado ✓'))" style="font-size:.78rem;padding:6px 14px;background:transparent;border:1px solid var(--bor2);color:var(--tx2);border-radius:6px;cursor:pointer;white-space:nowrap">🔗 Copiar link</button>
-      </div>
-    </div>`;
-  }
   // Update section title/icon based on rubro
   if(currentTenant && !document.getElementById('sec-precios').dataset.rubroIconInit){
     document.getElementById('sec-precios').dataset.rubroIconInit = '1';
@@ -5514,7 +5497,7 @@ function rPrecios(){
     const ptEl = document.querySelector('#sec-precios .pt');
     const psEl = document.querySelector('#sec-precios .ps');
     if(ptEl) ptEl.textContent = rubroIconI + ' Lista de Precios';
-    if(psEl) psEl.textContent = /barber/i.test(rubI) ? 'Servicios y precios de tu barbería' : /salon|belleza|peluq|manicur/i.test(rubI) ? 'Servicios y precios de tu salón' : 'Servicios visibles para clientes';
+    if(psEl) psEl.textContent = 'Catálogo interno — no se muestra a tus clientes';
   }
   // Adapt tabs to rubro
   const prTabs = document.getElementById('prTabs');
