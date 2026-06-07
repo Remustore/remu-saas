@@ -10829,7 +10829,8 @@ function getClientesFrecuentes(){
 // ═══ RESUMEN MENSUAL PDF ═══
 function generarResumenMesPDF(){
   const m = mes();
-  const mNombre = new Date(m+'-01').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  const [mAnio, mMes] = m.split('-').map(Number);
+  const mNombre = new Date(mAnio, mMes-1, 1).toLocaleDateString('es-AR',{month:'long',year:'numeric'});
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esTelefonia = rubro.includes('telefon')||rubro.includes('tecnico');
   const esTurnos = esNegocioTurnos(rubro);
@@ -10846,7 +10847,9 @@ function generarResumenMesPDF(){
 
   // Para barberías/salones: el ingreso del turno vive en getTurnos() (tT);
   // las ventas tipo:'servicio' se excluyen de tV para no duplicarlo (igual que exportarPDF/rDash).
-  const tV = (esTurnos ? ventas.filter(v=>v.tipo!=='servicio') : ventas).reduce((a,v)=>a+v.total,0);
+  const ventasShow = esTurnos ? ventas.filter(v=>v.tipo!=='servicio') : ventas;
+  const tV = ventasShow.reduce((a,v)=>a+v.total,0);
+  const tC = ventasShow.reduce((a,v)=>a+(v.costo||0),0);
   const tG = gastos.reduce((a,g)=>a+g.monto,0);
   const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
   const totalCostosRep = reps.reduce((a,r)=>a+(r.costoRep||0)+(r.flete||0),0);
@@ -10854,9 +10857,9 @@ function generarResumenMesPDF(){
   const totalIngresos = tV + tR + tT;
   const comisiones = rComisionesMes();
   const totalComisiones = comisiones.reduce((a,c)=>a+(c.comision||0),0);
-  // Ganancia neta real: descuenta también las comisiones de empleados y los costos de reparación
-  // (repuestos + flete), igual que el cierre de caja diario / dashboard.
-  const ganancia = totalIngresos - tG - totalComisiones - totalCostosRep;
+  // Ganancia neta real: descuenta costo de mercadería, comisiones de empleados y costos de
+  // reparación (repuestos + flete), igual que el cierre de caja diario / dashboard.
+  const ganancia = totalIngresos - tC - tG - totalComisiones - totalCostosRep;
 
   const clientesFrecuentes = getClientesFrecuentes().slice(0,5);
 
