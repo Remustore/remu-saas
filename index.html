@@ -6685,17 +6685,25 @@ function exportarPDF(){
   const tC = vShow.reduce((a,v)=>a+(v.costo||0),0);
   const tG = gFilt.reduce((a,g)=>a+g.monto,0);
   const tT = tFilt.reduce((a,t)=>a+(t.precio||0),0);
-  const totCom = tFilt.reduce((a,t)=>a+(t.comision||0),0);
+  const fN = n=>'$'+(n||0).toLocaleString('es-AR');
+
+  // Comisiones recalculadas en vivo según el % vigente por empleado
+  // (igual que cierreDiario/rGananciaHoy/rDash/rComisionesMes): el campo
+  // t.comision queda grabado al cerrar el turno y puede no reflejar el % actual.
+  const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
+  const empMap = {}, empPctMap = {};
+  (cfg.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; empPctMap[String(e.id)]=e.comision||0; });
+  const comTurno = t=>{ const p=empPctMap[String(t.empleadoId)]||0; return p>0?Math.round((t.precio||0)*p/100):0; };
+  const totCom = tFilt.reduce((a,t)=>a+comTurno(t),0);
   const totalIng = tT + tV;
   const neto = totalIng - tC - tG - totCom;
-  const fN = n=>'$'+(n||0).toLocaleString('es-AR');
 
   let turnosRows = '';
   if(tFilt.length){
-    const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
-    const empMap = {};
-    (cfg.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; });
-    turnosRows = tFilt.map(t=>`<tr><td>${t.fecha}</td><td>${t.cliente||''}</td><td>${t.servicioNombre||''}</td><td>${empMap[String(t.empleadoId)]||''}</td><td>${fN(t.precio||0)}</td><td style="color:#c9524c">${t.comision?fN(t.comision)+' ('+t.comPct+'%)':'-'}</td><td>${t.metodo||''}</td></tr>`).join('');
+    turnosRows = tFilt.map(t=>{
+      const _com = comTurno(t), _pct = empPctMap[String(t.empleadoId)]||0;
+      return `<tr><td>${t.fecha}</td><td>${t.cliente||''}</td><td>${t.servicioNombre||''}</td><td>${empMap[String(t.empleadoId)]||''}</td><td>${fN(t.precio||0)}</td><td style="color:#c9524c">${_com>0?fN(_com)+' ('+_pct+'%)':'-'}</td><td>${t.metodo||''}</td></tr>`;
+    }).join('');
   }
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
