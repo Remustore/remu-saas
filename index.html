@@ -6914,7 +6914,10 @@ function rComparativa(){
   function calcMes(m){
     const v = S.ventas.filter(x=>x.fecha&&x.fecha.startsWith(m));
     const g = S.gastos.filter(x=>x.fecha&&x.fecha.startsWith(m));
-    const r = S.reparaciones.filter(x=>x.estado==='entregado'&&x.fecha&&x.fecha.startsWith(m));
+    const r = S.reparaciones
+      .filter(x=>x.estado==='entregado')
+      .map(x=>x.fechaEnt?x:{...x,fechaEnt:x.fecha})
+      .filter(x=>x.fechaEnt&&x.fechaEnt.startsWith(m));
     const vShow = esBarberiaCmp ? v.filter(x=>x.tipo!=='servicio') : v;
     const turnosM = esBarberiaCmp && typeof getTurnos==='function'
       ? getTurnos().filter(t=>t.estado==='terminado'&&t.fecha&&t.fecha.startsWith(m)) : [];
@@ -6924,10 +6927,11 @@ function rComparativa(){
     const tC = vShow.reduce((a,x)=>a+(x.costo||0),0);
     const tG = g.reduce((a,x)=>a+x.monto,0);
     const tR = r.reduce((a,x)=>a+(x.presupuesto||0),0);
+    const totalCostosRepM = r.reduce((a,x)=>a+(x.costoRep||0)+(x.flete||0),0);
     const ingresos = tV+tR+tT;
-    const neto = ingresos-tC-tG-totalComisionesM;
+    const neto = ingresos-tC-tG-totalComisionesM-totalCostosRepM;
     const mg = ingresos>0 ? Math.round(neto/ingresos*100) : 0;
-    return { tV, tC, tG, tR, tT, totalComisionesM, neto, mg, nVentas:v.length, nRep:r.length };
+    return { tV, tC, tG, tR, tT, totalComisionesM, totalCostosRepM, neto, mg, nVentas:v.length, nRep:r.length };
   }
 
   const d1 = calcMes(m1);
@@ -6947,6 +6951,7 @@ function rComparativa(){
     ['💰 Ventas productos', d1.tV, d2.tV],
     ['🔧 Ingresos taller', d1.tR, d2.tR],
     ['📦 Costo mercadería', d1.tC, d2.tC],
+    ['🔩 Costo repuestos + flete', d1.totalCostosRepM, d2.totalCostosRepM],
     ['💸 Gastos operativos', d1.tG, d2.tG],
     ['📊 Resultado neto', d1.neto, d2.neto],
   ];
