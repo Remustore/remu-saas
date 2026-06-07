@@ -6581,20 +6581,25 @@ function exportarExcel(){
     ? filtrarPorRango(getTurnos().filter(t=>t.estado==='terminado'), 'fecha') : [];
   const wb = XLSX.utils.book_new();
 
+  // Comisiones recalculadas en vivo según el % vigente por empleado
+  // (igual que cierreDiario/rGananciaHoy/rDash/exportarPDF): t.comision
+  // queda grabado al cerrar el turno y puede no reflejar el % actual.
+  const cfgXl = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
+  const empMap = {}, empPctMapXl = {};
+  (cfgXl.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; empPctMapXl[String(e.id)]=e.comision||0; });
+  const comTurnoXl = t=>{ const p=empPctMapXl[String(t.empleadoId)]||0; return p>0?Math.round((t.precio||0)*p/100):0; };
+
   // Hoja Turnos (solo salon)
   if(tFilt.length){
-    const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
-    const empMap = {};
-    (cfg.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; });
     const turnosData = [
       ['Fecha','Cliente','Servicio','Empleado','Precio','Comisión','Neto local','Método de pago'],
       ...tFilt.map(t=>{
-        const com = t.comision||0;
+        const com = comTurnoXl(t);
         return [t.fecha, t.cliente||'', t.servicioNombre||'', empMap[String(t.empleadoId)]||'', t.precio||0, com, (t.precio||0)-com, t.metodo||''];
       })
     ];
     const tTotal = tFilt.reduce((a,t)=>a+(t.precio||0),0);
-    const tCom   = tFilt.reduce((a,t)=>a+(t.comision||0),0);
+    const tCom   = tFilt.reduce((a,t)=>a+comTurnoXl(t),0);
     turnosData.push(['','','','','TOTAL',tTotal,tCom,tTotal-tCom,'']);
     const ws0 = XLSX.utils.aoa_to_sheet(turnosData);
     ws0['!cols'] = [{wch:12},{wch:25},{wch:25},{wch:20},{wch:12},{wch:12},{wch:12},{wch:18}];
@@ -6643,7 +6648,7 @@ function exportarExcel(){
   const tC   = vShow.reduce((a,v)=>a+(v.costo||0),0);
   const tG   = gFilt.reduce((a,g)=>a+g.monto,0);
   const tT   = tFilt.reduce((a,t)=>a+(t.precio||0),0);
-  const tComR= tFilt.reduce((a,t)=>a+(t.comision||0),0);
+  const tComR= tFilt.reduce((a,t)=>a+comTurnoXl(t),0);
   const totalIng = tT + tVv;
   const neto = totalIng - tC - tG - tComR;
   const resData = [
@@ -6854,17 +6859,30 @@ function rComparativa(){
   const m2 = m2Input.value;
   if(!m1 || !m2){ el.innerHTML = '<div style="color:var(--mut);padding:16px">Seleccioná los dos períodos</div>'; return; }
 
+  // Para salones/barberías: el ingreso por servicio vive en getTurnos() (no en S.ventas);
+  // S.ventas tipo:'servicio' se excluye para no duplicar (igual que rDash/exportarPDF/generarResumenMesPDF).
+  const esBarberiaCmp = esNegocioTurnos((currentTenant?.rubro||'').toLowerCase());
+  const cfgCmp = esBarberiaCmp && typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
+  const empPctCmp = {};
+  (cfgCmp.empleados||[]).forEach(e=>{ empPctCmp[String(e.id)] = e.comision||0; });
+
   function calcMes(m){
     const v = S.ventas.filter(x=>x.fecha&&x.fecha.startsWith(m));
     const g = S.gastos.filter(x=>x.fecha&&x.fecha.startsWith(m));
     const r = S.reparaciones.filter(x=>x.estado==='entregado'&&x.fecha&&x.fecha.startsWith(m));
-    const tV = v.reduce((a,x)=>a+x.total,0);
-    const tC = v.reduce((a,x)=>a+(x.costo||0),0);
+    const vShow = esBarberiaCmp ? v.filter(x=>x.tipo!=='servicio') : v;
+    const turnosM = esBarberiaCmp && typeof getTurnos==='function'
+      ? getTurnos().filter(t=>t.estado==='terminado'&&t.fecha&&t.fecha.startsWith(m)) : [];
+    const tT = turnosM.reduce((a,t)=>a+(t.precio||0),0);
+    const totalComisionesM = turnosM.reduce((a,t)=>{ const p=empPctCmp[String(t.empleadoId)]||0; return a+(p>0?Math.round((t.precio||0)*p/100):0); }, 0);
+    const tV = vShow.reduce((a,x)=>a+x.total,0);
+    const tC = vShow.reduce((a,x)=>a+(x.costo||0),0);
     const tG = g.reduce((a,x)=>a+x.monto,0);
     const tR = r.reduce((a,x)=>a+(x.presupuesto||0),0);
-    const neto = tV+tR-tC-tG;
-    const mg = (tV+tR)>0 ? Math.round(neto/(tV+tR)*100) : 0;
-    return { tV, tC, tG, tR, neto, mg, nVentas:v.length, nRep:r.length };
+    const ingresos = tV+tR+tT;
+    const neto = ingresos-tC-tG-totalComisionesM;
+    const mg = ingresos>0 ? Math.round(neto/ingresos*100) : 0;
+    return { tV, tC, tG, tR, tT, totalComisionesM, neto, mg, nVentas:v.length, nRep:r.length };
   }
 
   const d1 = calcMes(m1);
@@ -6873,7 +6891,14 @@ function rComparativa(){
   function fmtMes(m){ const [y,mo]=m.split('-'); const nombres=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']; return nombres[parseInt(mo)-1]+' '+y; }
   function diff(a,b){ const d=b-a; const pct=a>0?Math.round((b-a)/a*100):0; const col=d>=0?'var(--ok)':'var(--bad)'; return `<span style="color:${col};font-size:.75rem">${d>=0?'+':''}${pct}%</span>`; }
 
-  const rows = [
+  const rows = esBarberiaCmp ? [
+    ['💰 Ventas productos', d1.tV, d2.tV],
+    ['✂ Turnos', d1.tT, d2.tT],
+    ['📦 Costo mercadería', d1.tC, d2.tC],
+    ['🧑‍💼 Comisiones empleados', d1.totalComisionesM, d2.totalComisionesM],
+    ['💸 Gastos operativos', d1.tG, d2.tG],
+    ['📊 Resultado neto', d1.neto, d2.neto],
+  ] : [
     ['💰 Ventas productos', d1.tV, d2.tV],
     ['🔧 Ingresos taller', d1.tR, d2.tR],
     ['📦 Costo mercadería', d1.tC, d2.tC],
@@ -6893,7 +6918,7 @@ function rComparativa(){
           </tr>
         </thead>
         <tbody>
-          ${rows.map((r,i)=>`<tr style="border-top:1px solid var(--bor)${i===4?';font-weight:700':''}">
+          ${rows.map((r,i)=>`<tr style="border-top:1px solid var(--bor)${i===rows.length-1?';font-weight:700':''}">
             <td style="padding:10px 8px;font-size:.82rem">${r[0]}</td>
             <td style="padding:10px 8px;text-align:right;font-size:.82rem">${fmt(r[1])}</td>
             <td style="padding:10px 8px;text-align:right;font-size:.82rem;color:var(--gld)">${fmt(r[2])}</td>
