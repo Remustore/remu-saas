@@ -5734,10 +5734,12 @@ function rDash(){
   const totalComisionesD = turnosTermFiltD.reduce((a,t)=>{ const p=empPctMapD[String(t.empleadoId)]||0; return a+(p>0?Math.round((t.precio||0)*p/100):0); }, 0);
   const repEntregadas = !esBarberiaD ? filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado').map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha}),'fechaEnt') : [];
   const tR = repEntregadas.reduce((a,r)=>a+(r.presupuesto||0),0);
+  // Costos de reparación (repuestos + flete) — igual que rGananciaHoy/cierreDiario, nunca se registran como S.gastos
+  const totalCostosRepD = repEntregadas.reduce((a,r)=>a+(r.costoRep||0)+(r.flete||0),0);
   const totalMesReal = esBarberiaD ? tVProducto + tTurnosMes : tV + tR;
   console.log('[rDash] esBarberiaD:', esBarberiaD, '| tTurnosMes (getTurnos):', tTurnosMes, '| tVProducto:', tVProducto, '| totalMesReal:', totalMesReal, '| S.ventas servicio (puede tener dups):', vm.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0));
-  // Resultado neto real: ingresos - costo de mercadería - gastos operativos - comisiones de empleados
-  const ganReal = totalMesReal - tC - tG - totalComisionesD;
+  // Resultado neto real: ingresos - costo de mercadería - gastos operativos - comisiones de empleados - costos de reparación
+  const ganReal = totalMesReal - tC - tG - totalComisionesD - totalCostosRepD;
   const filtLabel = getDFiltLabel();
   const opCount = vm.length + repEntregadas.length;
   const stat4 = esBarberiaD
@@ -5754,7 +5756,8 @@ function rDash(){
     ?`<div class="fi2"><span>Turnos y ventas</span><span style="color:var(--ok);font-weight:600">${fmt(totalMesReal)}</span></div>`
     :tR>0?`<div class="fi2"><span>Ventas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Ingresos taller</span><span style="color:var(--ok);font-weight:600">${fmt(tR)}</span></div>`:`<div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>`;
   const comisionesLineaFlujo = totalComisionesD>0 ? `<div class="fi2"><span>Comisiones empleados</span><span style="color:var(--bad);font-weight:600">- ${fmt(totalComisionesD)}</span></div>` : '';
-  document.getElementById('flujo').innerHTML=`${flujoIngs}${comisionesLineaFlujo}<div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
+  const costosRepLineaFlujo = totalCostosRepD>0 ? `<div class="fi2"><span>Costos de reparación</span><span style="color:var(--bad);font-weight:600">- ${fmt(totalCostosRepD)}</span></div>` : '';
+  document.getElementById('flujo').innerHTML=`${flujoIngs}${comisionesLineaFlujo}${costosRepLineaFlujo}<div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
   const cnt={};S.ventas.forEach(v=>{cnt[v.nombre]=(cnt[v.nombre]||0)+v.cantidad;});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topS').innerHTML=top.length?top.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${n}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} uds</div></div>`).join(''):emp('📉','Sin ventas registradas');
@@ -6579,6 +6582,11 @@ function exportarExcel(){
   const gFilt   = filtrarPorRango(S.gastos, 'fecha');
   const tFilt   = esSalon && typeof getTurnos==='function'
     ? filtrarPorRango(getTurnos().filter(t=>t.estado==='terminado'), 'fecha') : [];
+  // Para talleres/reparaciones: ingreso real = trabajos entregados (presupuesto), filtrados por fecha de entrega
+  // (igual que rDash/rGananciaHoy/cierreDiario/exportarPDF) — no por fecha de ingreso.
+  const repFilt = !esSalon
+    ? filtrarPorRango(S.reparaciones.filter(r=>r.estado==='entregado').map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha}), 'fechaEnt')
+    : [];
   const wb = XLSX.utils.book_new();
 
   // Comisiones recalculadas en vivo según el % vigente por empleado
@@ -6604,6 +6612,24 @@ function exportarExcel(){
     const ws0 = XLSX.utils.aoa_to_sheet(turnosData);
     ws0['!cols'] = [{wch:12},{wch:25},{wch:25},{wch:20},{wch:12},{wch:12},{wch:12},{wch:18}];
     XLSX.utils.book_append_sheet(wb, ws0, 'Turnos');
+  }
+
+  // Hoja Reparaciones / Trabajos (solo taller, entregados en el período)
+  if(repFilt.length){
+    const repData = [
+      ['Entrega','Cliente','Equipo','Presupuesto','Costo repuesto','Flete','Ganancia','Método de pago'],
+      ...repFilt.map(r=>{
+        const costoFlete = (r.costoRep||0)+(r.flete||0);
+        return [r.fechaEnt||r.fecha||'', r.cliente||'', r.equipo||'', r.presupuesto||0, r.costoRep||0, r.flete||0, (r.presupuesto||0)-costoFlete, r.metodoPago||''];
+      })
+    ];
+    const rTotal = repFilt.reduce((a,r)=>a+(r.presupuesto||0),0);
+    const rCosto = repFilt.reduce((a,r)=>a+(r.costoRep||0),0);
+    const rFlete = repFilt.reduce((a,r)=>a+(r.flete||0),0);
+    repData.push(['','','TOTAL',rTotal,rCosto,rFlete,rTotal-rCosto-rFlete,'']);
+    const wsRep = XLSX.utils.aoa_to_sheet(repData);
+    wsRep['!cols'] = [{wch:12},{wch:25},{wch:25},{wch:14},{wch:14},{wch:12},{wch:12},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsRep, 'Reparaciones');
   }
 
   // Hoja Ventas (para salon: solo no-servicios)
@@ -6649,19 +6675,26 @@ function exportarExcel(){
   const tG   = gFilt.reduce((a,g)=>a+g.monto,0);
   const tT   = tFilt.reduce((a,t)=>a+(t.precio||0),0);
   const tComR= tFilt.reduce((a,t)=>a+comTurnoXl(t),0);
-  const totalIng = tT + tVv;
-  const neto = totalIng - tC - tG - tComR;
+  const tR   = repFilt.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const totalCostosRep = repFilt.reduce((a,r)=>a+(r.costoRep||0)+(r.flete||0),0);
+  const totalIng = tT + tVv + tR;
+  const neto = totalIng - tC - tG - tComR - totalCostosRep;
   const resData = [
     ['RESUMEN FINANCIERO — ' + label], [''],
     ['Concepto', 'Monto'],
-    ...(esSalon && tT>0  ? [['Ingresos por servicios/turnos', tT]] : [['Ingresos por ventas', tVv]]),
-    ...(esSalon && tVv>0 ? [['Ingresos por productos', tVv]] : (esSalon ? [] : [['Costo de mercadería', -tC]])),
+    ...(esSalon && tT>0  ? [['Ingresos por servicios/turnos', tT]] : []),
+    ...(!esSalon && tR>0 ? [['Ingresos por reparaciones/trabajos', tR]] : []),
+    ...(!esSalon && tR>0 ? [['Costo repuestos + flete', -totalCostosRep]] : []),
+    ...(esSalon && tVv>0 ? [['Ingresos por productos', tVv]] : []),
+    ...(!esSalon ? [['Ingresos por ventas', tVv], ['Costo de mercadería', -tC]] : []),
     ...(esSalon && tComR>0 ? [['Comisiones empleados', -tComR]] : []),
     ['Gastos operativos', -tG],
     ['Resultado neto', neto],
     ['Margen neto %', totalIng>0 ? Math.round(neto/totalIng*100)+'%' : '0%'],
     [''],
-    ...(esSalon && tT>0 ? [['Turnos facturados', tFilt.length]] : [['Cantidad de ventas', vFilt.length]]),
+    ...(esSalon && tT>0 ? [['Turnos facturados', tFilt.length]]
+       : (!esSalon && tR>0 ? [['Trabajos entregados', repFilt.length]]
+       : [['Cantidad de ventas', vFilt.length]])),
     ['Cantidad de gastos', gFilt.length],
   ];
   const ws4 = XLSX.utils.aoa_to_sheet(resData);
@@ -6683,6 +6716,11 @@ function exportarPDF(){
   const gFilt = filtrarPorRango(S.gastos, 'fecha');
   const tFilt = esSalon && typeof getTurnos==='function'
     ? filtrarPorRango(getTurnos().filter(t=>t.estado==='terminado'), 'fecha') : [];
+  // Para talleres/reparaciones: ingreso real = trabajos entregados (presupuesto), filtrados por fecha de entrega
+  // (igual que rDash/rGananciaHoy/cierreDiario) — no por fecha de ingreso, para no contar trabajos sin terminar.
+  const repFilt = !esSalon
+    ? filtrarPorRango(S.reparaciones.filter(r=>r.estado==='entregado').map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha}), 'fechaEnt')
+    : [];
 
   // Para salon: excluir ventas tipo servicio (ya están en turnos)
   const vShow = esSalon ? vFilt.filter(v=>v.tipo!=='servicio') : vFilt;
@@ -6690,6 +6728,8 @@ function exportarPDF(){
   const tC = vShow.reduce((a,v)=>a+(v.costo||0),0);
   const tG = gFilt.reduce((a,g)=>a+g.monto,0);
   const tT = tFilt.reduce((a,t)=>a+(t.precio||0),0);
+  const tR = repFilt.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const totalCostosRep = repFilt.reduce((a,r)=>a+(r.costoRep||0)+(r.flete||0),0);
   const fN = n=>'$'+(n||0).toLocaleString('es-AR');
 
   // Comisiones recalculadas en vivo según el % vigente por empleado
@@ -6700,8 +6740,8 @@ function exportarPDF(){
   (cfg.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; empPctMap[String(e.id)]=e.comision||0; });
   const comTurno = t=>{ const p=empPctMap[String(t.empleadoId)]||0; return p>0?Math.round((t.precio||0)*p/100):0; };
   const totCom = tFilt.reduce((a,t)=>a+comTurno(t),0);
-  const totalIng = tT + tV;
-  const neto = totalIng - tC - tG - totCom;
+  const totalIng = tT + tV + tR;
+  const neto = totalIng - tC - tG - totCom - totalCostosRep;
 
   let turnosRows = '';
   if(tFilt.length){
@@ -6734,7 +6774,7 @@ function exportarPDF(){
 
   <div class="summary">
     <div class="scard"><div class="val">${fN(totalIng)}</div><div class="lbl">Ingresos</div></div>
-    <div class="scard"><div class="val" style="color:#c9524c">${fN(totCom>0?totCom:tC+tG)}</div><div class="lbl">${totCom>0?'Comisiones empleados':'Costos + Gastos'}</div></div>
+    <div class="scard"><div class="val" style="color:#c9524c">${fN(totCom>0?totCom:tC+tG+totalCostosRep)}</div><div class="lbl">${totCom>0?'Comisiones empleados':'Costos + Gastos'}</div></div>
     <div class="scard"><div class="val" style="color:${neto>=0?'green':'red'}">${fN(neto)}</div><div class="lbl">Resultado neto</div></div>
   </div>
 
@@ -6742,6 +6782,11 @@ function exportarPDF(){
   <table><tr><th>Fecha</th><th>Cliente</th><th>Servicio</th><th>Empleado</th><th>Precio</th><th>Comisión</th><th>Pago</th></tr>
   ${turnosRows}
   <tr class="total"><td colspan="4">TOTAL</td><td>${fN(tT)}</td><td style="color:#c9524c">${totCom>0?fN(totCom):'-'}</td><td></td></tr></table>`:''}
+
+  ${repFilt.length?`<h2>🔧 Reparaciones / Trabajos (${repFilt.length})</h2>
+  <table><tr><th>Entrega</th><th>Cliente</th><th>Equipo</th><th>Presupuesto</th><th>Costo+Flete</th><th>Ganancia</th><th>Pago</th></tr>
+  ${repFilt.map(r=>`<tr><td>${r.fechaEnt||r.fecha||''}</td><td>${r.cliente||''}</td><td>${r.equipo||''}</td><td>${fN(r.presupuesto||0)}</td><td style="color:#c9524c">${fN((r.costoRep||0)+(r.flete||0))}</td><td style="color:green">${fN((r.presupuesto||0)-(r.costoRep||0)-(r.flete||0))}</td><td>${r.metodoPago||''}</td></tr>`).join('')}
+  <tr class="total"><td colspan="3">TOTAL</td><td>${fN(tR)}</td><td style="color:#c9524c">${fN(totalCostosRep)}</td><td style="color:green">${fN(tR-totalCostosRep)}</td><td></td></tr></table>`:''}
 
   ${vShow.length?`<h2>💰 Ventas (${vShow.length})</h2>
   <table><tr><th>Fecha</th><th>Producto</th><th>Cant.</th><th>Precio</th><th>Total</th><th>Pago</th></tr>
@@ -10786,7 +10831,12 @@ function generarResumenMesPDF(){
 
   const ventas = S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
   const gastos = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
-  const reps = S.reparaciones.filter(r=>r.fecha&&r.fecha.startsWith(m));
+  // Reparaciones: ingreso real = trabajos entregados (presupuesto), filtrados por fecha de entrega
+  // (igual que rDash/rGananciaHoy/cierreDiario/exportarPDF) — no por fecha de ingreso.
+  const reps = S.reparaciones
+    .filter(r=>r.estado==='entregado')
+    .map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha})
+    .filter(r=>r.fechaEnt&&r.fechaEnt.startsWith(m));
   const turnos = getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(m)&&t.estado==='terminado') : [];
 
   // Para barberías/salones: el ingreso del turno vive en getTurnos() (tT);
@@ -10794,12 +10844,14 @@ function generarResumenMesPDF(){
   const tV = (esTurnos ? ventas.filter(v=>v.tipo!=='servicio') : ventas).reduce((a,v)=>a+v.total,0);
   const tG = gastos.reduce((a,g)=>a+g.monto,0);
   const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
+  const totalCostosRep = reps.reduce((a,r)=>a+(r.costoRep||0)+(r.flete||0),0);
   const tT = turnos.reduce((a,t)=>a+(t.precio||0),0);
   const totalIngresos = tV + tR + tT;
   const comisiones = rComisionesMes();
   const totalComisiones = comisiones.reduce((a,c)=>a+(c.comision||0),0);
-  // Ganancia neta real: descuenta también las comisiones de empleados (igual que el cierre de caja diario)
-  const ganancia = totalIngresos - tG - totalComisiones;
+  // Ganancia neta real: descuenta también las comisiones de empleados y los costos de reparación
+  // (repuestos + flete), igual que el cierre de caja diario / dashboard.
+  const ganancia = totalIngresos - tG - totalComisiones - totalCostosRep;
 
   const clientesFrecuentes = getClientesFrecuentes().slice(0,5);
 
@@ -10839,7 +10891,7 @@ ${tV>0?`<h3>Ventas de productos</h3>
 <p>${ventas.length} operaciones · Total: <strong>${fmt(tV)}</strong></p>`:''}
 
 ${tR>0?`<h3>Reparaciones</h3>
-<p>${reps.length} trabajos · Total: <strong>${fmt(tR)}</strong></p>`:''}
+<p>${reps.length} trabajos entregados · Facturado: <strong>${fmt(tR)}</strong> · Costo repuestos+flete: <strong style="color:#c9524c">${fmt(totalCostosRep)}</strong> · Ganancia: <strong style="color:#2d9e5f">${fmt(tR-totalCostosRep)}</strong></p>`:''}
 
 ${tT>0?`<h3>Servicios / Turnos</h3>
 <p>${turnos.length} servicios · Total: <strong>${fmt(tT)}</strong></p>`:''}
@@ -16083,6 +16135,8 @@ async function _mFCS_sinCobro(){
     var gastosHoy = (S.gastos||[]).filter(function(g){ return g.fecha===hoy; });
     var totalVentas = ventasHoy.reduce(function(a,v){ return a+(v.total||0); }, 0);
     var totalReps   = repsHoy.reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
+    // Costos de reparación (repuestos + flete) — nunca se registran como gasto aparte (S.gastos), por eso se descuentan acá
+    var totalCostosRep = repsHoy.reduce(function(a,r){ return a+(r.costoRep||0)+(r.flete||0); }, 0);
     var totalSalon  = turnosHoy.reduce(function(a,t){ return a+(t.precio||0); }, 0);
     var totalGastos = gastosHoy.reduce(function(a,g){ return a+(g.monto||0); }, 0);
     // Comisiones calculadas ANTES del neto para que totalNeto sea correcto
@@ -16106,7 +16160,7 @@ async function _mFCS_sinCobro(){
           +empRows2+'</div>';
       }
     }
-    var totalNeto = (esSalon ? totalSalon - totCom : totalVentas+totalReps) - totalGastos;
+    var totalNeto = (esSalon ? totalSalon - totCom : totalVentas+totalReps-totalCostosRep) - totalGastos;
     var porMetodo = {};
     if(esSalon){
       turnosHoy.forEach(function(t){ var m=t.metodo||'Efectivo'; porMetodo[m]=(porMetodo[m]||0)+(t.precio||0); });
@@ -16159,6 +16213,11 @@ async function _mFCS_sinCobro(){
         +'<div style="font-size:.72rem;color:var(--tx2)">Comisiones empleados</div>'
         +'<div style="font-size:.82rem;font-weight:600;color:var(--bad)">- '+_F(totCom)+'</div></div>';
     }
+    if(!esSalon && totalCostosRep > 0){
+      html += '<div style="display:flex;justify-content:space-between;padding:3px 0">'
+        +'<div style="font-size:.72rem;color:var(--tx2)">Costos de reparación</div>'
+        +'<div style="font-size:.82rem;font-weight:600;color:var(--bad)">- '+_F(totalCostosRep)+'</div></div>';
+    }
     html += '<div style="display:flex;justify-content:space-between;padding:3px 0">'
       +'<div style="font-size:.72rem;color:var(--tx2)">Gastos del día</div>'
       +'<div style="font-size:.82rem;font-weight:600;color:var(--bad)">- '+_F(totalGastos)+'</div></div>'
@@ -16167,7 +16226,7 @@ async function _mFCS_sinCobro(){
       +'<div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:'+(totalNeto>=0?'var(--gld)':'var(--bad)')+'">'+_F(totalNeto)+'</div></div></div>';
     if(histHtml) html += '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bor)"><div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Cierres anteriores</div>'+histHtml+'</div>';
     html += '</div>';
-    window.__cierreDiarioData = { total: totalNeto, comisiones: totCom, metodos: porMetodo, fecha: hoy, hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) };
+    window.__cierreDiarioData = { total: totalNeto, comisiones: totCom, costosRep: totalCostosRep, metodos: porMetodo, fecha: hoy, hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) };
     var overlay = document.getElementById('cierreOverlay');
     if(!overlay){
       overlay = document.createElement('div'); overlay.id = 'cierreOverlay';
