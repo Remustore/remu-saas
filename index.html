@@ -4208,6 +4208,7 @@ async function saveCompra(){
   if(cant<1) return alert('La cantidad debe ser mayor a 0');
   const snapStock = JSON.parse(JSON.stringify(S.stock));
   prod.cantidad += cant;
+  if(precio>0) prod.costo = precio;
   await dbUpsert('stock', prod);
   const stockFresh = await dbLoad('stock');
   if(stockFresh && stockFresh.length) S.stock = stockFresh;
