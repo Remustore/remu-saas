@@ -7653,7 +7653,7 @@ async function saveTurno(_override){
   const yaEstabaTerminado = turnoOriginal&&turnoOriginal.estado==='terminado';
   if(estado==='terminado'&&precioCobrado>0&&!yaEstabaTerminado){
     const rub = (currentTenant?.rubro||'').toLowerCase();
-    if(/barber|barbería|salon|belleza/i.test(rub)){
+    if(esNegocioTurnos(rub)){
       showToast('✓ Turno terminado · '+fmt(precioCobrado)+' registrado');
     } else {
       const turnoIdStr = String(obj.id);
@@ -7772,7 +7772,7 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
     const metodo = _metodo;
     if(precio > 0){
       const rubTenantDE = (currentTenant?.rubro||'').toLowerCase();
-      const esSalonBarberDE = /barber|barbería|salon|belleza/i.test(rubTenantDE);
+      const esSalonBarberDE = esNegocioTurnos(rubTenantDE);
       if(esSalonBarberDE){
         // Para barberías/salones: el ingreso vive SOLO en getTurnos() — no crear venta en S.ventas
         console.log('[_doEstadoTurno] barbería/salon — ingreso en getTurnos(), no se crea venta en S.ventas');
@@ -10740,27 +10740,27 @@ function getClientesFrecuentes(){
 function generarResumenMesPDF(){
   const m = mes();
   const mNombre = new Date(m+'-01').toLocaleDateString('es-AR',{month:'long',year:'numeric'});
+  const rubro = (currentTenant?.rubro||'').toLowerCase();
+  const esTelefonia = rubro.includes('telefon')||rubro.includes('tecnico');
+  const esTurnos = esNegocioTurnos(rubro);
+
   const ventas = S.ventas.filter(v=>v.fecha&&v.fecha.startsWith(m));
   const gastos = S.gastos.filter(g=>g.fecha&&g.fecha.startsWith(m));
   const reps = S.reparaciones.filter(r=>r.fecha&&r.fecha.startsWith(m));
   const turnos = getTurnos ? getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(m)&&t.estado==='terminado') : [];
-  
-  const tV = ventas.reduce((a,v)=>a+v.total,0);
+
+  // Para barberías/salones: el ingreso del turno vive en getTurnos() (tT);
+  // las ventas tipo:'servicio' se excluyen de tV para no duplicarlo (igual que exportarPDF/rDash).
+  const tV = (esTurnos ? ventas.filter(v=>v.tipo!=='servicio') : ventas).reduce((a,v)=>a+v.total,0);
   const tG = gastos.reduce((a,g)=>a+g.monto,0);
   const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
   const tT = turnos.reduce((a,t)=>a+(t.precio||0),0);
-  // Para barberías/salones, los turnos ya están incluidos en tV como ventas tipo:'servicio'.
-  // Sumar tT causaría doble conteo. Solo agregarlo en rubros sin turnos (talleres, etc).
-  const totalIngresos = esTurnos ? tV + tR : tV + tR + tT;
+  const totalIngresos = tV + tR + tT;
   const ganancia = totalIngresos - tG;
-  
+
   const comisiones = rComisionesMes();
   const clientesFrecuentes = getClientesFrecuentes().slice(0,5);
-  
-  const rubro = (currentTenant?.rubro||'').toLowerCase();
-  const esTelefonia = rubro.includes('telefon')||rubro.includes('tecnico');
-  const esTurnos = esNegocioTurnos(rubro);
-  
+
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -14609,7 +14609,7 @@ function _adaptarObjetivosModal(){
   var _orig = saveObjetivos;
   saveObjetivos = async function(){
     var r = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
-    if(/salon|belleza|peluq|barber/i.test(r)){
+    if(esNegocioTurnos(r)){
       var el = document.getElementById('objAccCant');
       if(el) el.value = '1';
     }
@@ -15351,7 +15351,7 @@ async function _syncFijosSupabase(){
   var _orig = rObjetivos;
   rObjetivos = function(){
     var rub = (currentTenant&&currentTenant.rubro?currentTenant.rubro:'').toLowerCase();
-    if(/barber|barbería|salon|belleza|peluq/i.test(rub)) return _orig.apply(this, arguments);
+    if(esNegocioTurnos(rub)) return _orig.apply(this, arguments);
     _orig.apply(this, arguments);
     var hoyStr = typeof tod==='function' ? tod() : new Date().toISOString().slice(0,10);
     var obj = S.objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
@@ -16301,26 +16301,6 @@ async function _mFCS_sinCobro(){
       var m2 = document.getElementById('movCajaLista-g');
       if(m && m2) m2.innerHTML = m.innerHTML;
       return r;
-    };
-  }
-
-  /* ── M. cierreDiario: extender comisiones a todos los rubros con empleados ── */
-  if(typeof cierreDiario === 'function'){
-    var _cdComOrig = cierreDiario;
-    cierreDiario = function(){
-      var _rub = (currentTenant&&currentTenant.rubro||'').toLowerCase();
-      var _yaSalon = /barber|barbería|salon|belleza/i.test(_rub);
-      if(!_yaSalon && typeof getTurnosCfg === 'function'){
-        var _cfg = getTurnosCfg();
-        var _tieneComisiones = (_cfg.empleados||[]).some(function(e){ return (e.comision||0) > 0; });
-        if(_tieneComisiones){
-          var _rubOrig = currentTenant.rubro;
-          currentTenant.rubro = 'salon ' + (_rubOrig||'');
-          try { return _cdComOrig.apply(this, arguments); }
-          finally { currentTenant.rubro = _rubOrig; }
-        }
-      }
-      return _cdComOrig.apply(this, arguments);
     };
   }
 
