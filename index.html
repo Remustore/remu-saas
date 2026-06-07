@@ -5726,12 +5726,18 @@ function rDash(){
   // Para barberías/salones: ingresos de servicio desde getTurnos() (localStorage, sin duplicados).
   // S.ventas puede tener duplicados históricos → no usar para servicios en barberías.
   const tVProducto = esBarberiaD ? vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0) : 0;
-  const tTurnosMes = esBarberiaD && getTurnos ? filtrarDash(getTurnos().filter(t=>t.estado==='terminado'),'fecha').reduce((a,t)=>a+(t.precio||0),0) : 0;
+  const turnosTermFiltD = esBarberiaD && getTurnos ? filtrarDash(getTurnos().filter(t=>t.estado==='terminado'),'fecha') : [];
+  const tTurnosMes = turnosTermFiltD.reduce((a,t)=>a+(t.precio||0),0);
+  // Comisiones de empleados sobre los turnos del período (igual que cierreDiario / rGananciaHoy)
+  const cfgComD = esBarberiaD && typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
+  const empPctMapD = {}; (cfgComD.empleados||[]).forEach(e=>{ empPctMapD[String(e.id)] = e.comision||0; });
+  const totalComisionesD = turnosTermFiltD.reduce((a,t)=>{ const p=empPctMapD[String(t.empleadoId)]||0; return a+(p>0?Math.round((t.precio||0)*p/100):0); }, 0);
   const repEntregadas = !esBarberiaD ? filtrarDash(S.reparaciones.filter(r=>r.estado==='entregado').map(r=>r.fechaEnt?r:{...r,fechaEnt:r.fecha}),'fechaEnt') : [];
   const tR = repEntregadas.reduce((a,r)=>a+(r.presupuesto||0),0);
   const totalMesReal = esBarberiaD ? tVProducto + tTurnosMes : tV + tR;
   console.log('[rDash] esBarberiaD:', esBarberiaD, '| tTurnosMes (getTurnos):', tTurnosMes, '| tVProducto:', tVProducto, '| totalMesReal:', totalMesReal, '| S.ventas servicio (puede tener dups):', vm.filter(v=>v.tipo==='servicio').reduce((a,v)=>a+v.total,0));
-  const ganReal = totalMesReal - tG;
+  // Resultado neto real: ingresos - costo de mercadería - gastos operativos - comisiones de empleados
+  const ganReal = totalMesReal - tC - tG - totalComisionesD;
   const filtLabel = getDFiltLabel();
   const opCount = vm.length + repEntregadas.length;
   const stat4 = esBarberiaD
@@ -5743,11 +5749,12 @@ function rDash(){
   document.getElementById('mPct').textContent=pct+'%';document.getElementById('mVal').textContent=fmt(meta);document.getElementById('mVen').textContent=fmt(totalMesReal);
   // Para barberías: usar totalMesReal (que viene de getTurnos()) en lugar de tV (que incluye ventas de servicio de S.ventas)
   const ingresoFlujo = esBarberiaD ? totalMesReal : tV;
-  const mg=ingresoFlujo>0?Math.round((ingresoFlujo-tC)/ingresoFlujo*100):0;
+  const mg=ingresoFlujo>0?Math.round(ganReal/ingresoFlujo*100):0;
   const flujoIngs=esBarberiaD
     ?`<div class="fi2"><span>Turnos y ventas</span><span style="color:var(--ok);font-weight:600">${fmt(totalMesReal)}</span></div>`
     :tR>0?`<div class="fi2"><span>Ventas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div><div class="fi2"><span>Ingresos taller</span><span style="color:var(--ok);font-weight:600">${fmt(tR)}</span></div>`:`<div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>`;
-  document.getElementById('flujo').innerHTML=`${flujoIngs}<div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
+  const comisionesLineaFlujo = totalComisionesD>0 ? `<div class="fi2"><span>Comisiones empleados</span><span style="color:var(--bad);font-weight:600">- ${fmt(totalComisionesD)}</span></div>` : '';
+  document.getElementById('flujo').innerHTML=`${flujoIngs}${comisionesLineaFlujo}<div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div><div class="fi2"><span>Costo mercadería</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div><div class="gl"></div><div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div><div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
   const cnt={};S.ventas.forEach(v=>{cnt[v.nombre]=(cnt[v.nombre]||0)+v.cantidad;});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topS').innerHTML=top.length?top.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${n}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} uds</div></div>`).join(''):emp('📉','Sin ventas registradas');
@@ -10756,9 +10763,11 @@ function generarResumenMesPDF(){
   const tR = reps.reduce((a,r)=>a+(r.presupuesto||0),0);
   const tT = turnos.reduce((a,t)=>a+(t.precio||0),0);
   const totalIngresos = tV + tR + tT;
-  const ganancia = totalIngresos - tG;
-
   const comisiones = rComisionesMes();
+  const totalComisiones = comisiones.reduce((a,c)=>a+(c.comision||0),0);
+  // Ganancia neta real: descuenta también las comisiones de empleados (igual que el cierre de caja diario)
+  const ganancia = totalIngresos - tG - totalComisiones;
+
   const clientesFrecuentes = getClientesFrecuentes().slice(0,5);
 
   const html = `<!DOCTYPE html>
@@ -13550,6 +13559,7 @@ function rGananciaHoy(){
   var ventasFilt = typeof filtrarDash==='function' ? filtrarDash(S.ventas, 'fecha') : S.ventas.filter(function(v){ return v.fecha===tod(); });
   var gastosFilt = typeof filtrarDash==='function' ? filtrarDash(S.gastos, 'fecha') : S.gastos.filter(function(g){ return g.fecha===tod(); });
 
+  var comisiones = 0;
   if(esBarberia){
     // Servicios desde getTurnos filtrados por período (sin duplicados con S.ventas)
     if(typeof getTurnos==='function'){
@@ -13557,6 +13567,16 @@ function rGananciaHoy(){
         ? filtrarDash(getTurnos(), 'fecha').filter(function(t){ return t.estado==='terminado'; })
         : getTurnos().filter(function(t){ return t.fecha===tod() && t.estado==='terminado'; });
       turnosFilt.forEach(function(t){ vendido += t.precio||0; });
+      // Comisiones de empleados sobre los turnos del período (igual que cierreDiario)
+      if(typeof getTurnosCfg === 'function'){
+        var _cfgGH = getTurnosCfg();
+        var _empPctGH = {};
+        (_cfgGH.empleados||[]).forEach(function(e){ _empPctGH[String(e.id)] = e.comision||0; });
+        turnosFilt.forEach(function(t){
+          var _pct = _empPctGH[String(t.empleadoId)] || 0;
+          if(_pct > 0) comisiones += Math.round((t.precio||0) * _pct / 100);
+        });
+      }
     }
     // Productos/equipos del período
     ventasFilt.filter(function(v){ return v.tipo!=='servicio'; })
@@ -13587,8 +13607,9 @@ function rGananciaHoy(){
   }
 
   var gastos   = gastosFilt.reduce(function(a,g){ return a+g.monto; }, 0);
-  var ganNeta  = vendido - cogs - gastos;
+  var ganNeta  = vendido - cogs - gastos - comisiones;
   var colorN   = ganNeta >= 0 ? 'var(--ok)' : 'var(--bad)';
+  var ganNetaTxt = (ganNeta>=0?'':'-')+F(Math.abs(ganNeta));
 
   var row = function(icon, lbl, val, color, bold, sep){
     return '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;'+(sep?'border-top:1px solid var(--bor);padding-top:7px;margin-top:4px':'')+'">' +
@@ -13604,16 +13625,21 @@ function rGananciaHoy(){
     : '';
 
   var cogsLabel = esBarberia ? 'Costo mercadería' : 'Costos (mercadería + repuestos/comisiones)';
+  var ganNetaRow = '<div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;border-top:1px solid var(--bor);padding-top:7px;margin-top:4px">' +
+      '<span style="color:var(--tx2)">💵 Ganancia neta</span>' +
+      '<span style="color:'+colorN+';font-weight:700">'+ganNetaTxt+'</span>' +
+    '</div>';
   card.innerHTML =
     '<div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">'+titulo+'</div>' +
     '<div style="font-family:var(--fh);font-size:clamp(1.6rem,5vw,2.2rem);font-weight:800;color:'+colorN+';line-height:1.1;margin-bottom:12px">' +
-      (ganNeta>=0?'':'-')+F(Math.abs(ganNeta)) +
+      ganNetaTxt +
     '</div>' +
     '<div style="display:flex;flex-direction:column;gap:6px">' +
       row('📥','Ingresos del período', vendido, 'var(--ok)',  false, false) +
       row('📦', cogsLabel,             cogs,    'var(--wrn)', false, false) +
+      (comisiones>0 ? row('🧑‍💼','Comisiones empleados', comisiones, 'var(--bad)', false, false) : '') +
       row('📤','Gastos operativos',    gastos,  'var(--bad)', false, false) +
-      row('💵','Ganancia neta',  Math.abs(ganNeta), colorN, true, true) +
+      ganNetaRow +
     '</div>' +
     aviso;
 }
