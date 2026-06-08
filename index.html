@@ -10339,11 +10339,13 @@ function guardarTurnoFijo(){
   if(!cli) return alert('Ingresá el nombre del cliente');
   if(!hora) return alert('Ingresá la hora');
 
-  // Verificar que no haya otro fijo en el mismo día/hora
+  // Verificar que no haya otro fijo con el MISMO profesional en el mismo día/hora
+  // (igual que verificarConflicto() para turnos normales — sin filtrar por empleado, dos
+  // clientes de barberos distintos en la misma franja se rechazaban como si chocaran).
   const fijos = getTurnosFijos();
-  const conflicto = fijos.find(f => f.dia===dia && f.hora===hora && f.id!==(id||''));
+  const conflicto = fijos.find(f => f.dia===dia && f.hora===hora && f.id!==(id||'') && String(f.empleadoId)===String(empleadoIdFijo));
   if(conflicto){
-    return alert(`⚠ Ya hay un turno fijo de ${conflicto.cliente} los ${DIAS_NOMBRES[dia]} a las ${hora}`);
+    return alert(`⚠ ${conflicto.empleadoNombre||'Este profesional'} ya tiene un turno fijo de ${conflicto.cliente} los ${DIAS_NOMBRES[dia]} a las ${hora}`);
   }
 
   const cfg2 = getTurnosCfg();
