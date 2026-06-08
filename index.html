@@ -7255,7 +7255,13 @@ async function _reloadTurnosCache(){
       .order('fecha').order('hora');
     if(error) throw error;
     if(data){
-      const mapped = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+      const remoto = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+      const refIdsRemotos = new Set(remoto.map(t=>String(t.id)));
+      // Conservar turnos guardados localmente que aún no terminaron de sincronizarse a Supabase
+      // (sin _sbId y sin aparecer todavía en el remoto): un evento realtime disparado por OTRO
+      // turno no debe borrar de la vista uno recién creado que sigue "en vuelo" hacia el servidor.
+      const pendientes = (_turnosCache||[]).filter(t=>!t._sbId && !refIdsRemotos.has(String(t.id)));
+      const mapped = [...remoto, ...pendientes];
       _turnosCache = mapped;
       _saveTurnosLS(mapped);
     }
