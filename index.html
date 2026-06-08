@@ -7893,6 +7893,9 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
     showToast(labels[nuevoEstado] || 'Estado actualizado');
   }
   rTurnos();
+  // Si el cierre de caja está abierto, refrescarlo para actualizar la lista de "turnos por confirmar" y los totales
+  const cierreOv = document.getElementById('cierreOverlay');
+  if(cierreOv && cierreOv.style.display !== 'none' && typeof cierreDiario === 'function') cierreDiario();
 }
 
 function editarTurno(id){
@@ -16140,6 +16143,34 @@ async function _mFCS_sinCobro(){
     var repsHoy   = (S.reparaciones||[]).filter(function(r){ return r.estado==='entregado'&&r.fechaEnt===hoy; });
     var turnosHoy = typeof getTurnos==='function'
                     ? getTurnos().filter(function(t){ return t.fecha===hoy&&t.estado==='terminado'; }) : [];
+
+    // Turnos de hoy cuyo horario ya pasó y siguen sin resolver (no marcados Terminado/No vino):
+    // se muestran arriba del cierre para confirmarlos en un toque, en el mismo momento de cerrar caja.
+    var pendHtml = '';
+    if(esSalon && typeof getTurnos==='function'){
+      var ahoraD = new Date();
+      var estadosFinales = {terminado:1, no_vino:1, cancelado:1};
+      var turnosPend = getTurnos().filter(function(t){
+        if(t.fecha!==hoy || estadosFinales[t.estado]) return false;
+        var hm = (t.hora||'00:00').split(':').map(Number);
+        var fin = new Date(ahoraD.getFullYear(), ahoraD.getMonth(), ahoraD.getDate(), hm[0]||0, (hm[1]||0)+(t.duracion||60));
+        return fin <= ahoraD;
+      }).sort(function(a,b){ return (a.hora||'').localeCompare(b.hora||''); });
+      if(turnosPend.length){
+        pendHtml = '<div style="margin-bottom:16px;padding:12px;border-radius:10px;border:1px solid var(--gld);background:rgba(201,168,76,.06)">'
+          +'<div style="font-size:.72rem;font-weight:700;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">⏰ '+turnosPend.length+' turno'+(turnosPend.length!==1?'s':'')+' por confirmar</div>'
+          +turnosPend.map(function(t){
+            return '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bor);flex-wrap:wrap">'
+              +'<div style="min-width:0"><div style="font-size:.82rem;font-weight:600">'+esc(t.hora||'')+' · '+esc(t.cliente||'')+'</div>'
+              +'<div style="font-size:.7rem;color:var(--tx2)">'+esc(t.servicioNombre||'')+(t.precio>0?' · '+_F(t.precio):'')+'</div></div>'
+              +'<div style="display:flex;gap:5px;flex-shrink:0">'
+              +'<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="cambiarEstadoTurno(\''+t.id+'\',\'terminado\')">✓ Se realizó</button>'
+              +'<button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno(\''+t.id+'\',\'no_vino\')">❌ No vino</button>'
+              +'</div></div>';
+          }).join('')
+          +'</div>';
+      }
+    }
     var gastosHoy = (S.gastos||[]).filter(function(g){ return g.fecha===hoy; });
     var totalVentas = ventasHoy.reduce(function(a,v){ return a+(v.total||0); }, 0);
     var totalReps   = repsHoy.reduce(function(a,r){ return a+(r.presupuesto||0); }, 0);
@@ -16187,6 +16218,7 @@ async function _mFCS_sinCobro(){
     var html = '<div style="padding:16px">'
       +'<div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;margin-bottom:4px">📋 Cierre del día — '+fD2(hoy)+'</div>'
       +'<div style="font-size:.75rem;color:var(--tx2);margin-bottom:16px">'+esc((currentTenant&&currentTenant.nombre)||'')+'</div>'
+      +pendHtml
       +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">';
     if(esSalon){
       html += '<div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">'
