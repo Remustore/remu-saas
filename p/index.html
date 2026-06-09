@@ -424,13 +424,9 @@ function renderPage(){
     (esBarber||esSalon) ? T('notaSalon') : T('notaTelefonia')
   );
 
-  // Deduplicar items
+  // Deduplicar por id (evita filas repetidas exactas, pero permite servicios con nombres similares)
   const dedupMap = new Map();
-  cfg.servicios.forEach(p=>{
-    const key = norm(p.nombre||'');
-    const prev = dedupMap.get(key);
-    if(!prev || (p.precio||0) > (prev.precio||0)) dedupMap.set(key, p);
-  });
+  cfg.servicios.forEach(p=>{ if(!dedupMap.has(String(p.id))) dedupMap.set(String(p.id), p); });
   _allItems = Array.from(dedupMap.values());
 
   // Horarios
