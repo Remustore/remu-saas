@@ -14071,13 +14071,27 @@ function rSmartAlerts(){
 function eliminarTurnoAdmin(id){
   if(typeof _confirmarModal !== 'function') return;
   _confirmarModal('¿Eliminar este turno? Esta acción no se puede deshacer.', function(){
-    var k = TURNOS_KEY + '_' + (currentTenant ? currentTenant.id : '');
     try {
-      var arr = JSON.parse(localStorage.getItem(k) || '[]');
-      arr = arr.filter(function(t){ return t.id !== id; });
-      localStorage.setItem(k, JSON.stringify(arr));
+      var todos = typeof getTurnos === 'function' ? getTurnos() : [];
+      var turno = todos.find(function(t){ return String(t.id) === String(id); });
+      var restantes = todos.filter(function(t){ return String(t.id) !== String(id); });
+      if(typeof saveTurnosLocal === 'function') saveTurnosLocal(restantes);
       if(typeof rTurnos === 'function') rTurnos();
       if(typeof showToast === 'function') showToast('Turno eliminado ✓');
+      // Borrar de Supabase
+      if(turno && sb && currentTenant && currentTenant.id){
+        if(turno._sbId){
+          sb.from('turnos_solicitudes').delete().eq('id', turno._sbId).then(function(){});
+        } else if(turno.fecha && turno.hora && turno.cliente){
+          sb.from('turnos_solicitudes').delete()
+            .eq('tenant_id', currentTenant.id)
+            .eq('fecha', turno.fecha)
+            .eq('hora', (turno.hora||'').substring(0,5))
+            .eq('nombre', turno.cliente)
+            .neq('estado','bloqueado')
+            .then(function(){});
+        }
+      }
     } catch(e) {
       if(typeof showToast === 'function') showToast('Error al eliminar');
     }
