@@ -1285,8 +1285,8 @@ $$;</pre>
 
       <!-- Sectores y servicios -->
       <div class="card" style="margin-bottom:14px">
-        <div class="ch"><h3>✂ Sectores y servicios</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>
-        <div style="font-size:.74rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">📌 Estos son los servicios que tus clientes ven y pueden reservar online (con precio y duración) en tu página pública — el link está arriba.</div>
+        <div class="ch"><h3>✂ Sectores y servicios</h3><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="sincronizarPreciosTurno()">🔄 Sincronizar precios</button><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div></div>
+        <div style="font-size:.74rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">📌 Estos son los servicios que tus clientes ven y pueden reservar online (con precio y duración) en tu página pública — el link está arriba. <strong>Los precios se cargan y editan en "Lista de Precios"</strong>; si los cambiás ahí, tocá "🔄 Sincronizar precios" para que se reflejen acá.</div>
         <div id="serviciosTurnosList"></div>
       </div>
 
@@ -5587,7 +5587,7 @@ function setupPreciosTabs(){
   // Dynamic notice
   const notice = document.getElementById('preciosNotice');
   if(notice){
-    notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">' + rubroIcon + ' Catálogo interno</strong><br>Esta lista es para tu referencia y respaldo — <strong>tus clientes no la ven</strong>. Para que vean tus servicios y puedan reservar turno online, configuralos en <strong>Turnos → Configurar → Sectores y servicios</strong>.</div>';
+    notice.innerHTML = '<div style="background:var(--gld2);border:1px solid var(--gld);border-radius:8px;padding:12px 16px;font-size:.78rem;color:var(--tx2);line-height:1.6"><strong style="color:var(--gld)">' + rubroIcon + ' Catálogo interno</strong><br><strong>Acá se cargan y editan los precios de cada servicio</strong> — tus clientes no ven esta lista. Para que se vean en tu página de turnos online, andá a <strong>Turnos → Configurar → Sectores y servicios</strong> y tocá "🔄 Sincronizar precios" después de modificar un precio acá.</div>';
   }
   
   rPreciosLink();
@@ -8575,19 +8575,33 @@ async function rTurnosConfig(){
   rFichasClientes();
 }
 
+// El precio es un dato único que vive en "Lista de Precios" — acá solo se busca por nombre
+function _precioDesdeCatalogo(nombre){
+  const n = (nombre||'').trim().toLowerCase();
+  const match = (S.precios||[]).find(p=>(p.nombre||'').trim().toLowerCase()===n);
+  return match ? (parseFloat(match.precio)||0) : null;
+}
+
 async function agregarServicioTurno(){
   const nombre = prompt('Nombre del servicio:');
   if(!nombre) return;
   const sector = prompt('Sector (ej: otro, tratamiento, manicuria):') || 'otro';
   const duracion = parseInt(prompt('Duración en minutos:') || '60');
-  const precio = parseFloat(prompt('Precio ($) — podés dejarlo en 0:') || '0');
   const cfg = getTurnosCfg();
-  cfg.servicios.push({id:Date.now(), nombre, sector, duracion, precio});
+  const precioCat = _precioDesdeCatalogo(nombre);
+  cfg.servicios.push({id:Date.now(), nombre, sector, duracion, precio: precioCat || 0});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  // Si no existe en Lista de Precios, lo creamos ahí para que el precio se cargue en un solo lugar
+  if(precioCat===null){
+    const item={id:Date.now()+1, nombre, categoria:sector, duracion, precio:0, disponibilidad:'disponible'};
+    S.precios.push(item);
+    await dbUpsert('precios', item);
+    if(typeof rPrecios==='function') rPrecios();
+  }
   rTurnosConfig();
   try {
     await persistCfgToSupabase();
-    showToast('Servicio agregado ✓');
+    showToast(precioCat===null ? 'Servicio agregado ✓ — cargá el precio en "Lista de Precios"' : 'Servicio agregado ✓');
   } catch(e) {
     showToast('Guardado local pero falló sync — reintentá', 'warn');
   }
@@ -8601,13 +8615,32 @@ async function editarServicioTurno(id){
   if(!nombre) return;
   const sector = prompt('Sector:', s.sector) || s.sector;
   const duracion = parseInt(prompt('Duración (min):', s.duracion) || s.duracion);
-  const precio = parseFloat(prompt('Precio ($):', s.precio) || s.precio);
-  s.nombre=nombre; s.sector=sector; s.duracion=duracion; s.precio=precio;
+  s.nombre=nombre; s.sector=sector; s.duracion=duracion;
+  // El precio se edita solo desde "Lista de Precios" — acá se reflejan los cambios automáticamente
+  const precioCat = _precioDesdeCatalogo(nombre);
+  if(precioCat!==null) s.precio = precioCat;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   rTurnosConfig();
   try {
     await persistCfgToSupabase();
     showToast('Servicio actualizado ✓');
+  } catch(e) {
+    showToast('Guardado local pero falló sync — reintentá', 'warn');
+  }
+}
+
+async function sincronizarPreciosTurno(){
+  const cfg = getTurnosCfg();
+  let actualizados = 0;
+  cfg.servicios.forEach(s=>{
+    const precioCat = _precioDesdeCatalogo(s.nombre);
+    if(precioCat!==null && precioCat!==s.precio){ s.precio = precioCat; actualizados++; }
+  });
+  localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
+  rTurnosConfig();
+  try {
+    await persistCfgToSupabase();
+    showToast(actualizados ? `✓ ${actualizados} precio(s) actualizados desde Lista de Precios` : 'Los precios ya estaban al día ✓');
   } catch(e) {
     showToast('Guardado local pero falló sync — reintentá', 'warn');
   }
@@ -14283,7 +14316,7 @@ function _renderServiciosOnline(){
     }
     var cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
     var F = typeof fmt === 'function' ? fmt : function(n){ return '$'+n; };
-    container.innerHTML = '<div class="ch"><h3>✂ Servicios disponibles</h3><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div>' +
+    container.innerHTML = '<div class="ch"><h3>✂ Servicios disponibles</h3><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="sincronizarPreciosTurno()">🔄 Sincronizar precios</button><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div></div>' +
       (cfg.servicios.length ? cfg.servicios.map(function(s){
         return '<div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">' +
           '<div><span class="bx bg2" style="margin-right:6px">' + (s.sector||'') + '</span>' +
