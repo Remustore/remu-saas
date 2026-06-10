@@ -4072,7 +4072,7 @@ document.querySelectorAll('.mb').forEach(m=>m.addEventListener('click',e=>{ if(e
 function chkWA(){ document.getElementById('waH').style.display = document.getElementById('avEst').value==='listo'?'flex':'none'; }
 
 // ═══ UTILS ═══
-const tod = ()=>new Date().toISOString().split('T')[0];
+const tod = ()=>{ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const fmt = n=>'$'+Number(n||0).toLocaleString('es-AR');
 const fD = d=>{ if(!d) return '—'; const p=d.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
 const mes = ()=>new Date().toISOString().slice(0,7);
