@@ -5086,14 +5086,24 @@ function _leerItemsPedido(){
 function _onPedTipoChange(){
   const tipo = document.getElementById('pedTipo').value;
   const lbl = document.getElementById('pedNombreLbl');
-  const telWrap = document.getElementById('pedTelWrap');
+  const telLbl = document.querySelector('#pedTelWrap label');
   if(tipo==='proveedor'){
     lbl.textContent = 'Proveedor';
-    telWrap.style.display = 'none';
+    if(telLbl) telLbl.textContent = 'WhatsApp del proveedor (sin 0, sin 15)';
   } else {
     lbl.textContent = 'Nombre del cliente';
-    telWrap.style.display = '';
+    if(telLbl) telLbl.textContent = 'WhatsApp (sin 0, sin 15)';
   }
+}
+
+function enviarPedidoWA(id){
+  const p = S.pedidos.find(x => String(x.id) === String(id));
+  if(!p || !p.tel) return;
+  const items = _pedidoItems(p);
+  const lineas = items.map(it=>`• ${it.nombre}${(it.cantidad||1)>1?' x'+it.cantidad:''}${it.precio>0?' — '+fmt(it.precio*(it.cantidad||1)):''}`).join('\n');
+  const negocio = currentTenant?.nombre || '';
+  const msg = `Hola! Te paso un pedido${negocio?' de '+negocio:''}:\n\n${lineas}\n\nGracias!`;
+  window.open(`https://wa.me/${p.tel}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function rPedidos(){
@@ -5132,12 +5142,17 @@ function rPedidos(){
     if(esProveedor && p.estado==='entregado') ei.label = '✅ Recibido';
     const waHref = p.tel ? `<a href="https://wa.me/${p.tel}" target="_blank" style="color:var(--ok);text-decoration:none">📱 ${esc(p.tel)}</a>` : '';
     const btnFinal = esProveedor ? '✅ Recibido' : '✅ Entregado';
+    const btnEnviarWA = (esProveedor && p.tel)
+      ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="enviarPedidoWA('${p.id}')">📲 Enviar pedido</button>`
+      : '';
     const btns = p.estado === 'pendiente'
-      ? `<button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="marcarPedidoLlego('${p.id}')">📦 Llegó</button>
+      ? `${btnEnviarWA}
+         <button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="marcarPedidoLlego('${p.id}')">📦 Llegó</button>
          <button class="btn be bsm" onclick="editarPedido('${p.id}')">✎</button>
          <button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`
       : p.estado === 'llego'
-      ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="marcarPedidoEntregado('${p.id}')">${btnFinal}</button>
+      ? `${btnEnviarWA}
+         <button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="marcarPedidoEntregado('${p.id}')">${btnFinal}</button>
          <button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`
       : `<button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`;
 
