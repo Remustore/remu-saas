@@ -16205,9 +16205,12 @@ async function _mFCS_sinCobro(){
     if(esSalon){
       var cfg2 = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
       var conCom2 = (cfg2.empleados||[]).filter(function(e){ return (e.comision||0)>0; });
+      var unicoEmp2 = (cfg2.empleados||[]).length===1;
       if(conCom2.length){
         var empRows2 = conCom2.map(function(e){
-          var te  = turnosHoy.filter(function(t){ return String(t.empleadoId)===String(e.id); });
+          // Si el negocio tiene un solo empleado, todos los turnos le pertenecen
+          // (turnos online sin profesional asignado no quedan sin atribuir)
+          var te  = unicoEmp2 ? turnosHoy : turnosHoy.filter(function(t){ return String(t.empleadoId)===String(e.id); });
           var tot = te.reduce(function(a,t){ return a+(t.precio||0); }, 0);
           var com = Math.round(tot*(e.comision||0)/100);
           totCom += com;

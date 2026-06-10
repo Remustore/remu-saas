@@ -823,7 +823,10 @@ async function enviarReserva(){
   const nombre = document.getElementById('bkNombre')?.value.trim()||'';
   const tel    = document.getElementById('bkTel')?.value.trim()||'';
   const srvId  = document.getElementById('bkSrv')?.value||'';
-  const empId  = document.getElementById('bkEmp')?.value||'';
+  let empId    = document.getElementById('bkEmp')?.value||'';
+  if(!empId && G.cfg.empleados && G.cfg.empleados.length===1){
+    empId = String(G.cfg.empleados[0].id);
+  }
   const fecha  = document.getElementById('bkFecha')?.value||'';
   const hora   = document.getElementById('bkHora')?.value||'';
   const btn    = document.getElementById('bkBtn');
