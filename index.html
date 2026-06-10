@@ -1947,16 +1947,26 @@ $$;</pre>
 <div class="mb" id="mPedido"><div class="md"><div class="mh"><div class="mt2" id="mPedidoTitle">📋 Nuevo pedido</div><button class="xbtn" onclick="closeM('mPedido')">✕</button></div>
 <div class="mc">
   <input type="hidden" id="pedId">
+  <div class="fr full">
+    <div><label>Tipo de pedido</label>
+      <select id="pedTipo" onchange="_onPedTipoChange()">
+        <option value="cliente">🛍️ Encargo de cliente</option>
+        <option value="proveedor">📦 Pedido a proveedor (reposición de stock)</option>
+      </select>
+    </div>
+  </div>
   <div class="fr">
-    <div><label>Nombre del cliente</label><input id="pedNombre" placeholder="Ej: Juan Pérez"></div>
-    <div><label>WhatsApp (sin 0, sin 15)</label><input id="pedTel" type="tel" placeholder="Ej: 3472628087"></div>
+    <div><label id="pedNombreLbl">Nombre del cliente</label><input id="pedNombre" placeholder="Ej: Juan Pérez"></div>
+    <div id="pedTelWrap"><label>WhatsApp (sin 0, sin 15)</label><input id="pedTel" type="tel" placeholder="Ej: 3472628087"></div>
   </div>
   <div class="fr full">
-    <div><label>Producto pedido</label><input id="pedProducto" placeholder="Ej: Funda iPhone 14, cable USB-C..."></div>
+    <label>Ítems del pedido</label>
+    <div id="pedItemsList"></div>
+    <button type="button" class="btn bsm" style="margin-top:6px" onclick="agregarItemPedido()">+ Agregar ítem</button>
   </div>
   <div class="fr">
-    <div><label>Precio estimado ($)</label><input type="number" id="pedPrecio" placeholder="0" min="0"></div>
     <div><label>Fecha del pedido</label><input type="date" id="pedFecha"></div>
+    <div style="text-align:right"><label>Total estimado</label><div id="pedTotalDisplay" style="font-weight:700;font-size:1.1rem;color:var(--gld);padding-top:6px">$0</div></div>
   </div>
   <div><label>Notas (opcional)</label><input id="pedNotas" placeholder="Proveedor, color, modelo específico..."></div>
 </div>
@@ -5016,6 +5026,75 @@ function rTaller(){
 
 // ═══ PEDIDOS (Taller) ═══
 let _pedFiltro = 'todos';
+let _pedItemsCount = 0;
+
+// Devuelve la lista de ítems de un pedido. Compatibilidad con pedidos viejos
+// que solo tenían un campo "producto"+"precio" (sin lista de ítems).
+function _pedidoItems(p){
+  if(p.items && p.items.length) return p.items;
+  return [{nombre:p.producto||'', cantidad:1, precio:p.precio||0}];
+}
+function _pedidoTotal(p){
+  return _pedidoItems(p).reduce((a,it)=>a+(it.cantidad||1)*(it.precio||0), 0);
+}
+
+function _pedItemRowHtml(idx, nombre, cantidad, precio){
+  return `<div class="ped-item-row" data-idx="${idx}" style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+    <input class="ped-item-nombre" placeholder="Producto" value="${esc(nombre||'')}" oninput="_recalcTotalPedido()" style="flex:3">
+    <input type="number" class="ped-item-cant" placeholder="Cant" value="${cantidad||1}" min="1" oninput="_recalcTotalPedido()" style="flex:1;min-width:55px">
+    <input type="number" class="ped-item-precio" placeholder="Precio c/u" value="${precio||0}" min="0" oninput="_recalcTotalPedido()" style="flex:1.5;min-width:80px">
+    <button type="button" class="btn bd bsm" onclick="quitarItemPedido(${idx})">✕</button>
+  </div>`;
+}
+
+function agregarItemPedido(nombre, cantidad, precio){
+  const cont = document.getElementById('pedItemsList');
+  const idx = _pedItemsCount++;
+  cont.insertAdjacentHTML('beforeend', _pedItemRowHtml(idx, nombre, cantidad, precio));
+  _recalcTotalPedido();
+}
+
+function quitarItemPedido(idx){
+  const row = document.querySelector(`.ped-item-row[data-idx="${idx}"]`);
+  if(row) row.remove();
+  if(!document.querySelectorAll('.ped-item-row').length) agregarItemPedido();
+  _recalcTotalPedido();
+}
+
+function _recalcTotalPedido(){
+  let total = 0;
+  document.querySelectorAll('.ped-item-row').forEach(row=>{
+    const cant = parseFloat(row.querySelector('.ped-item-cant').value)||0;
+    const precio = parseFloat(row.querySelector('.ped-item-precio').value)||0;
+    total += cant*precio;
+  });
+  const disp = document.getElementById('pedTotalDisplay');
+  if(disp) disp.textContent = fmt(total);
+}
+
+function _leerItemsPedido(){
+  const items = [];
+  document.querySelectorAll('.ped-item-row').forEach(row=>{
+    const nombre = (row.querySelector('.ped-item-nombre').value||'').trim();
+    const cantidad = parseFloat(row.querySelector('.ped-item-cant').value)||1;
+    const precio = parseFloat(row.querySelector('.ped-item-precio').value)||0;
+    if(nombre) items.push({nombre, cantidad, precio});
+  });
+  return items;
+}
+
+function _onPedTipoChange(){
+  const tipo = document.getElementById('pedTipo').value;
+  const lbl = document.getElementById('pedNombreLbl');
+  const telWrap = document.getElementById('pedTelWrap');
+  if(tipo==='proveedor'){
+    lbl.textContent = 'Proveedor';
+    telWrap.style.display = 'none';
+  } else {
+    lbl.textContent = 'Nombre del cliente';
+    telWrap.style.display = '';
+  }
+}
 
 function rPedidos(){
   const todos = S.pedidos;
@@ -5048,29 +5127,37 @@ function rPedidos(){
   };
 
   el.innerHTML = filtered.map(p => {
-    const ei = EI[p.estado] || EI.pendiente;
+    const esProveedor = p.tipo === 'proveedor';
+    const ei = Object.assign({}, EI[p.estado] || EI.pendiente);
+    if(esProveedor && p.estado==='entregado') ei.label = '✅ Recibido';
     const waHref = p.tel ? `<a href="https://wa.me/${p.tel}" target="_blank" style="color:var(--ok);text-decoration:none">📱 ${esc(p.tel)}</a>` : '';
+    const btnFinal = esProveedor ? '✅ Recibido' : '✅ Entregado';
     const btns = p.estado === 'pendiente'
       ? `<button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="marcarPedidoLlego('${p.id}')">📦 Llegó</button>
          <button class="btn be bsm" onclick="editarPedido('${p.id}')">✎</button>
          <button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`
       : p.estado === 'llego'
-      ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="marcarPedidoEntregado('${p.id}')">✅ Entregado</button>
+      ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="marcarPedidoEntregado('${p.id}')">${btnFinal}</button>
          <button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`
       : `<button class="btn bd bsm" onclick="eliminarPedido('${p.id}')">✕</button>`;
+
+    const items = _pedidoItems(p);
+    const itemsHtml = items.map(it=>`<div>📦 ${esc(it.nombre)}${(it.cantidad||1)>1?' ×'+it.cantidad:''}${it.precio>0?' — '+fmt(it.precio*(it.cantidad||1)):''}</div>`).join('');
+    const total = _pedidoTotal(p);
 
     return `<div class="card" style="margin-bottom:10px;border-left:3px solid ${ei.bdr}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
             <span style="font-weight:700;font-size:.95rem">${esc(p.nombre)}</span>
+            ${esProveedor ? `<span style="padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;background:rgba(201,168,76,.12);color:var(--gld);border:1px solid rgba(201,168,76,.3)">📦 Proveedor</span>` : ''}
             <span style="padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;background:${ei.bg};color:${ei.color};border:1px solid ${ei.bdr}">${ei.label}</span>
           </div>
-          <div style="font-size:.88rem;color:var(--tx);margin-bottom:5px">📦 ${esc(p.producto)}</div>
+          <div style="font-size:.88rem;color:var(--tx);margin-bottom:5px">${itemsHtml}</div>
           <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:.78rem;color:var(--tx2)">
             ${waHref ? `<span>${waHref}</span>` : ''}
             <span>📅 ${fD(p.fecha)}</span>
-            ${p.precio > 0 ? `<span style="color:var(--gld);font-weight:600">${fmt(p.precio)}</span>` : ''}
+            ${total > 0 ? `<span style="color:var(--gld);font-weight:600">${fmt(total)}</span>` : ''}
             ${p.notas ? `<span style="color:var(--mut)">💬 ${esc(p.notas)}</span>` : ''}
           </div>
         </div>
@@ -5089,37 +5176,43 @@ function setPedFiltro(filtro, btn){
 
 function abrirNuevoPedido(){
   document.getElementById('pedId').value       = '';
+  document.getElementById('pedTipo').value     = 'cliente';
   document.getElementById('pedNombre').value   = '';
   document.getElementById('pedTel').value      = '';
-  document.getElementById('pedProducto').value = '';
-  document.getElementById('pedPrecio').value   = '';
   document.getElementById('pedFecha').value    = tod();
   document.getElementById('pedNotas').value    = '';
+  document.getElementById('pedItemsList').innerHTML = '';
+  _pedItemsCount = 0;
+  agregarItemPedido();
+  _onPedTipoChange();
   document.getElementById('mPedidoTitle').textContent = '📋 Nuevo pedido';
   openM('mPedido');
 }
 
 async function guardarPedido(){
-  const id       = document.getElementById('pedId').value;
-  const nombre   = (document.getElementById('pedNombre').value||'').trim();
-  const telRaw   = (document.getElementById('pedTel').value||'').replace(/\D/g,'');
-  const tel      = telRaw ? (telRaw.startsWith('54') ? telRaw : telRaw.startsWith('0') ? '54' + telRaw.slice(1) : '54' + telRaw) : '';
-  const producto = (document.getElementById('pedProducto').value||'').trim();
-  const precio   = parseFloat(document.getElementById('pedPrecio').value||'0')||0;
-  const fecha    = document.getElementById('pedFecha').value || tod();
-  const notas    = (document.getElementById('pedNotas').value||'').trim();
+  const id     = document.getElementById('pedId').value;
+  const tipo   = document.getElementById('pedTipo').value || 'cliente';
+  const nombre = (document.getElementById('pedNombre').value||'').trim();
+  const telRaw = (document.getElementById('pedTel').value||'').replace(/\D/g,'');
+  const tel    = telRaw ? (telRaw.startsWith('54') ? telRaw : telRaw.startsWith('0') ? '54' + telRaw.slice(1) : '54' + telRaw) : '';
+  const fecha  = document.getElementById('pedFecha').value || tod();
+  const notas  = (document.getElementById('pedNotas').value||'').trim();
+  const items  = _leerItemsPedido();
 
-  if(!nombre)  { showToast('Ingresá el nombre del cliente'); return; }
-  if(!producto){ showToast('Ingresá el producto pedido'); return; }
+  if(!nombre){ showToast(tipo==='proveedor' ? 'Ingresá el nombre del proveedor' : 'Ingresá el nombre del cliente'); return; }
+  if(!items.length){ showToast('Agregá al menos un ítem'); return; }
+
+  const precio   = items.reduce((a,it)=>a+(it.cantidad||1)*(it.precio||0), 0);
+  const producto = items.map(it=>it.nombre).join(', ');
 
   if(id){
     const idx = S.pedidos.findIndex(p => String(p.id) === String(id));
     if(idx >= 0){
-      S.pedidos[idx] = { ...S.pedidos[idx], nombre, tel, producto, precio, fecha, notas };
+      S.pedidos[idx] = { ...S.pedidos[idx], tipo, nombre, tel, items, producto, precio, fecha, notas };
       await dbUpsertPedido(S.pedidos[idx]);
     }
   } else {
-    const item = { id: Date.now(), nombre, tel, producto, precio, fecha, notas, estado:'pendiente', created_at: new Date().toISOString() };
+    const item = { id: Date.now(), tipo, nombre, tel, items, producto, precio, fecha, notas, estado:'pendiente', created_at: new Date().toISOString() };
     S.pedidos.unshift(item);
     await dbUpsertPedido(item);
   }
@@ -5132,12 +5225,15 @@ function editarPedido(id){
   const p = S.pedidos.find(x => String(x.id) === String(id));
   if(!p) return;
   document.getElementById('pedId').value       = p.id;
+  document.getElementById('pedTipo').value     = p.tipo||'cliente';
   document.getElementById('pedNombre').value   = p.nombre||'';
   document.getElementById('pedTel').value      = p.tel||'';
-  document.getElementById('pedProducto').value = p.producto||'';
-  document.getElementById('pedPrecio').value   = p.precio||'';
   document.getElementById('pedFecha').value    = p.fecha||tod();
   document.getElementById('pedNotas').value    = p.notas||'';
+  document.getElementById('pedItemsList').innerHTML = '';
+  _pedItemsCount = 0;
+  _pedidoItems(p).forEach(it=>agregarItemPedido(it.nombre, it.cantidad, it.precio));
+  _onPedTipoChange();
   document.getElementById('mPedidoTitle').textContent = '✎ Editar pedido';
   document.getElementById('mPedido').classList.add('open');
 }
@@ -5152,7 +5248,8 @@ async function marcarPedidoLlego(id){
 
   if(p.tel){
     const negocio = currentTenant?.nombre || 'la tienda';
-    const msg = `Hola ${p.nombre}! Te avisamos que tu pedido de ${p.producto} llegó a ${negocio}. Pasá cuando quieras a retirarlo! 📦`;
+    const itemsTxt = _pedidoItems(p).map(it=>it.nombre).join(', ');
+    const msg = `Hola ${p.nombre}! Te avisamos que tu pedido (${itemsTxt}) llegó a ${negocio}. Pasá cuando quieras a retirarlo! 📦`;
     setTimeout(() => window.open(`https://wa.me/${p.tel}?text=${encodeURIComponent(msg)}`, '_blank'), 400);
     showToast('¡Llegó! Abriendo WhatsApp…');
   } else {
@@ -5160,27 +5257,69 @@ async function marcarPedidoLlego(id){
   }
 }
 
+// Encargo de cliente entregado: se registra como venta (suma a Ventas/caja)
+// y descuenta stock SOLO si el ítem ya existe en el inventario con stock suficiente.
+// Si no hay match (era una compra especial que nunca se cargó al stock), no se toca el inventario.
+async function _entregarPedidoCliente(p){
+  const items = _pedidoItems(p);
+  items.forEach((it,i)=>{
+    if(!it.nombre) return;
+    const cantidad = it.cantidad||1;
+    let costo = 0;
+    const match = (S.stock||[]).find(s=>(s.nombre||'').trim().toLowerCase()===it.nombre.trim().toLowerCase());
+    if(match && match.cantidad >= cantidad){
+      match.cantidad -= cantidad;
+      match.vendidos = (match.vendidos||0) + cantidad;
+      costo = (match.costo||0) * cantidad;
+      dbUpsert('stock', match);
+      registrarMovStock(match.id, match.nombre, -cantidad, 'venta', 'Pedido entregado: '+p.nombre);
+    }
+    const venta = {id:Date.now()+i, tipo:'producto', nombre:it.nombre, cantidad, precio:it.precio||0, total:cantidad*(it.precio||0), costo, metodo:'Efectivo', fecha:tod(), comPct:0, comision:0};
+    S.ventas.unshift(venta);
+    dbUpsert('ventas', venta);
+  });
+  if(typeof rVentas==='function') rVentas();
+  if(typeof rStock==='function') rStock();
+}
+
+// Pedido a proveedor recibido: los ítems se suman al stock (o se crean si no existían).
+async function _recibirPedidoProveedor(p){
+  const items = _pedidoItems(p);
+  items.forEach(it=>{
+    if(!it.nombre) return;
+    const cantidad = it.cantidad||1;
+    const match = (S.stock||[]).find(s=>(s.nombre||'').trim().toLowerCase()===it.nombre.trim().toLowerCase());
+    if(match){
+      match.cantidad = (match.cantidad||0) + cantidad;
+      if(it.precio>0) match.costo = it.precio;
+      dbUpsert('stock', match);
+      registrarMovStock(match.id, match.nombre, cantidad, 'ajuste', 'Recibido de proveedor: '+p.nombre);
+    } else {
+      const nuevo = {id:Date.now()+Math.floor(Math.random()*1000), nombre:it.nombre, categoria:'General', cantidad, minimo:3, precio:0, costo:it.precio||0, vendidos:0, notas:'Agregado desde pedido a proveedor'};
+      S.stock.push(nuevo);
+      dbUpsert('stock', nuevo);
+      registrarMovStock(nuevo.id, nuevo.nombre, cantidad, 'ajuste', 'Recibido de proveedor: '+p.nombre);
+    }
+  });
+  if(typeof rStock==='function') rStock();
+}
+
 async function marcarPedidoEntregado(id){
   const p = S.pedidos.find(x => String(x.id) === String(id));
   if(!p) return;
   p.estado = 'entregado';
   p.fechaEntregado = tod();
-  await dbUpsertPedido(p);
-  rPedidos();
-  showToast('Pedido entregado ✓');
 
-  // Sumar a la caja del día automáticamente
-  if(p.precio > 0){
-    if(!S.movCaja) S.movCaja = [];
-    S.movCaja.push({
-      id: Date.now(),
-      caja: 'accesorios',
-      tipo: 'ingreso',
-      monto: p.precio,
-      fecha: tod(),
-      concepto: `Pedido entregado: ${p.producto} — ${p.nombre}`
-    });
-    try { await dbSetConfig('movCaja', S.movCaja); } catch(e){}
+  if(p.tipo === 'proveedor'){
+    await _recibirPedidoProveedor(p);
+    await dbUpsertPedido(p);
+    rPedidos();
+    showToast('Pedido recibido — stock actualizado ✓');
+  } else {
+    await _entregarPedidoCliente(p);
+    await dbUpsertPedido(p);
+    rPedidos();
+    showToast('Pedido entregado — registrado en ventas ✓');
   }
 }
 
