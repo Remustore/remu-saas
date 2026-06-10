@@ -32,16 +32,42 @@ serve(async (req) => {
       return new Response('not_authorized', { status: 200, headers: cors });
     }
 
-    // Buscar el tenant por el ref que se pasa en external_reference
-    const ref = mp.external_reference || '';
-    if (!ref) return new Response('no_ref', { status: 200, headers: cors });
-
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // Obtener tenant actual para leer módulos existentes
-    const { data: tenant, error: tErr } = await sb
-      .from('tenants').select('modulos').eq('id', ref).single();
-    if (tErr || !tenant) throw new Error(`Tenant no encontrado: ${ref}`);
+    // Identificar el tenant: primero por external_reference (si vino seteado),
+    // si no por el email del pagador (columna tenants.email, o el email de su usuario en Auth)
+    let ref = mp.external_reference || '';
+    let tenant: { id: string; modulos: any } | null = null;
+
+    if (ref) {
+      const { data } = await sb.from('tenants').select('id, modulos').eq('id', ref).maybeSingle();
+      if (data) tenant = data;
+    }
+
+    if (!tenant) {
+      const payerEmail = (mp.payer_email || '').toLowerCase();
+      if (!payerEmail) return new Response('no_ref_no_email', { status: 200, headers: cors });
+
+      const { data: porEmail } = await sb.from('tenants').select('id, modulos').eq('email', payerEmail).maybeSingle();
+      if (porEmail) {
+        tenant = porEmail;
+      } else {
+        // Tenants creados antes de guardar el email: buscar el usuario en Auth y su tenant_id
+        const { data: usersPage } = await sb.auth.admin.listUsers({ perPage: 1000 });
+        const u = (usersPage?.users || []).find(x => (x.email || '').toLowerCase() === payerEmail);
+        const tid = u?.user_metadata?.tenant_id;
+        if (tid) {
+          const { data } = await sb.from('tenants').select('id, modulos').eq('id', tid).maybeSingle();
+          if (data) {
+            tenant = data;
+            // Backfill para que la próxima notificación matchee directo
+            await sb.from('tenants').update({ email: payerEmail }).eq('id', tid);
+          }
+        }
+      }
+      if (!tenant) return new Response('tenant_no_encontrado', { status: 200, headers: cors });
+      ref = tenant.id;
+    }
 
     const ahora = new Date().toISOString();
     const nuevo = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();

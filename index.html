@@ -2680,7 +2680,7 @@ async function crearTenant(){
   try {
     // 1. Crear tenant
     const { data: tenant, error: te } = await sb.from('tenants').insert({
-      nombre, rubro, modulos, activo: true, created_at: new Date().toISOString()
+      nombre, rubro, modulos, email, activo: true, created_at: new Date().toISOString()
     }).select().single();
     if(te) throw te;
 
@@ -9640,7 +9640,7 @@ async function _rwFinish(btn){
     const tenantId = crypto.randomUUID();
     const trialHasta = new Date(Date.now()+30*24*60*60*1000).toISOString();
     const {error:te} = await sb.from('tenants').insert({
-      id: tenantId, nombre: __rw.nombre, rubro: __rw.rubro,
+      id: tenantId, nombre: __rw.nombre, rubro: __rw.rubro, email,
       modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true},
       activo: true, created_at: new Date().toISOString()
     });
