@@ -4,8 +4,29 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')  ?? '';
 const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const MP_TOKEN      = Deno.env.get('MP_ACCESS_TOKEN') ?? '';
+const RESEND_KEY    = Deno.env.get('RESEND_API_KEY') ?? '';
+const ADMIN_EMAIL   = 'rensiignacio34@gmail.com';
 
 const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type' };
+
+async function notificarPago(nombreNegocio: string, monto: number, payerEmail: string) {
+  if (!RESEND_KEY) return;
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Remu Gestion <onboarding@resend.dev>',
+        to: ADMIN_EMAIL,
+        subject: `💰 Pago activado: ${nombreNegocio}`,
+        html: `<p>Se activó la suscripción de <strong>${nombreNegocio}</strong>.</p>
+               <p>Monto: $${monto}<br>Email del pagador: ${payerEmail}<br>Fecha: ${new Date().toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires' })}</p>`
+      })
+    });
+  } catch (e) {
+    console.error('[mp-webhook] Error enviando email:', e);
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -37,18 +58,18 @@ serve(async (req) => {
     // Identificar el tenant: primero por external_reference (si vino seteado),
     // si no por el email del pagador (columna tenants.email, o el email de su usuario en Auth)
     let ref = mp.external_reference || '';
-    let tenant: { id: string; modulos: any } | null = null;
+    let tenant: { id: string; nombre: string; modulos: any } | null = null;
+    const payerEmail = (mp.payer_email || '').toLowerCase();
 
     if (ref) {
-      const { data } = await sb.from('tenants').select('id, modulos').eq('id', ref).maybeSingle();
+      const { data } = await sb.from('tenants').select('id, nombre, modulos').eq('id', ref).maybeSingle();
       if (data) tenant = data;
     }
 
     if (!tenant) {
-      const payerEmail = (mp.payer_email || '').toLowerCase();
       if (!payerEmail) return new Response('no_ref_no_email', { status: 200, headers: cors });
 
-      const { data: porEmail } = await sb.from('tenants').select('id, modulos').eq('email', payerEmail).maybeSingle();
+      const { data: porEmail } = await sb.from('tenants').select('id, nombre, modulos').eq('email', payerEmail).maybeSingle();
       if (porEmail) {
         tenant = porEmail;
       } else {
@@ -57,7 +78,7 @@ serve(async (req) => {
         const u = (usersPage?.users || []).find(x => (x.email || '').toLowerCase() === payerEmail);
         const tid = u?.user_metadata?.tenant_id;
         if (tid) {
-          const { data } = await sb.from('tenants').select('id, modulos').eq('id', tid).maybeSingle();
+          const { data } = await sb.from('tenants').select('id, nombre, modulos').eq('id', tid).maybeSingle();
           if (data) {
             tenant = data;
             // Backfill para que la próxima notificación matchee directo
@@ -83,6 +104,9 @@ serve(async (req) => {
     const { error: uErr } = await sb
       .from('tenants').update({ modulos: mods, activo: true }).eq('id', ref);
     if (uErr) throw new Error(uErr.message);
+
+    const monto = mp.auto_recurring?.transaction_amount || mp.transaction_amount || 0;
+    await notificarPago(tenant.nombre || ref, monto, payerEmail);
 
     console.log(`[mp-webhook] Tenant activado: ${ref} | sub: ${id}`);
     return new Response(JSON.stringify({ ok: true, tenant: ref }), {
