@@ -7562,21 +7562,30 @@ async function sincronizarFijosSupabase(fijos, accion){
         .eq('estado', 'bloqueado');
       const empId = fijo.empleadoId ? (parseInt(fijo.empleadoId)||null) : null;
       const horaStr = String(fijo.hora || '').substring(0, 5);
+      // Un turno fijo puede durar más de 30min: bloquear un slot por cada
+      // tramo de 30min que ocupa, para que no se superponga con reservas online.
+      const [hH, hM] = horaStr.split(':').map(Number);
+      const baseMin = hH * 60 + hM;
+      const pasos = Math.max(1, Math.ceil((fijo.duracion || 30) / 30));
       const diasHasta = (fijo.dia - hoy.getDay() + 7) % 7;
       let fecha = new Date(hoy);
       fecha.setDate(hoy.getDate() + diasHasta);
       while(fecha <= limite){
-        rows.push({
-          tenant_id: currentTenant.id,
-          nombre: '__fijo__:' + fijo.id,
-          tel: fijo.tel||'',
-          servicio_id: null,
-          empleado_id: empId,
-          fecha: _fijosLocDate(fecha),
-          hora: horaStr,
-          estado: 'bloqueado',
-          created_at: new Date().toISOString()
-        });
+        for(let p = 0; p < pasos; p++){
+          const m = baseMin + p * 30;
+          const horaSlot = String(Math.floor(m/60)%24).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+          rows.push({
+            tenant_id: currentTenant.id,
+            nombre: '__fijo__:' + fijo.id,
+            tel: fijo.tel||'',
+            servicio_id: null,
+            empleado_id: empId,
+            fecha: _fijosLocDate(fecha),
+            hora: horaSlot,
+            estado: 'bloqueado',
+            created_at: new Date().toISOString()
+          });
+        }
         fecha.setDate(fecha.getDate() + 7);
       }
     }
