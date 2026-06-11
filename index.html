@@ -12766,9 +12766,32 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
         // Auto-activar si regresa de pago exitoso de Mercado Pago
         const urlPago = new URLSearchParams(window.location.search);
         if(urlPago.get('mp_ok') === '1' && !mods.pago_activo){
+          const preapprovalId = urlPago.get('preapproval_id');
           history.replaceState({}, '', window.location.pathname);
-          await activarSuscripcionTenant();
-          return;
+          // Si MP nos devolvió el id de la suscripción, validamos el pago real
+          // contra MP (vía mp-webhook, mismo chequeo que usa MP al notificar) y
+          // dejamos que el webhook active el tenant + mande el aviso por mail.
+          if(preapprovalId){
+            try {
+              const r = await fetch(sb.supabaseUrl + '/functions/v1/mp-webhook?type=subscription_preapproval&id=' + encodeURIComponent(preapprovalId));
+              const j = await r.json().catch(()=>null);
+              if(j && j.ok){
+                showToast('✓ Suscripción activada por 30 días. ¡Gracias!', 'ok');
+                document.getElementById('trialScreen').style.display = 'none';
+                setupApp();
+                await loadAll();
+                return;
+              }
+            } catch(e){ console.warn('[mp_ok] verificación falló:', e); }
+            // Si la verificación no confirmó el pago, no activamos solos:
+            // mostramos la pantalla de trial con el botón "Ya pagué" para
+            // reintentar manualmente (sin perder la suscripción si MP tardó).
+          } else {
+            // Sin preapproval_id (no debería pasar en el flujo normal de MP):
+            // mantenemos la activación manual existente como respaldo.
+            await activarSuscripcionTenant();
+            return;
+          }
         }
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
