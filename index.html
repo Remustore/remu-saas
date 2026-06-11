@@ -15522,8 +15522,7 @@ async function _syncFijosSupabase(){
       __tenantName: currentTenant.nombre || '', __rubro: currentTenant.rubro || '',
       __slug: slug
     };
-    await sb.from('precios').update({ data: rowData })
-      .eq('id', rowId).eq('tenant_id', currentTenant.id);
+    await sb.from('precios').upsert({ id: rowId, tenant_id: currentTenant.id, data: rowData }, { onConflict: 'id' });
     console.log('[remu] syncFijos OK — apertura:', tc.apertura, '| fijos:', fijos.length);
   } catch(e){ console.warn('[remu] syncFijos error:', e); }
 }
@@ -17084,6 +17083,13 @@ async function _mFCS_sinCobro(){
         });
         if(nuevos.length && typeof saveTurnosLocal==='function'){
           saveTurnosLocal([...turnosExistentes, ...nuevos]);
+        }
+        // Persistir cada turno generado como 'confirmado' real en Supabase, para que
+        // aparezca en la agenda del sistema (no solo bloqueado en el link público)
+        if(nuevos.length && typeof _upsertTurnoSb==='function'){
+          for(const t of nuevos){
+            try { await _upsertTurnoSb(t); } catch(e){ console.warn('[fijos] upsert turno', e); }
+          }
         }
         if(syncSupabase && typeof sincronizarFijosSupabase==='function'){
           try { await sincronizarFijosSupabase((fijos||[]).filter(function(f){ return f.activo; }),'crear'); }
