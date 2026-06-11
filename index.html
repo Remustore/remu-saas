@@ -9147,14 +9147,22 @@ function _cfgRowId(tenantId){
 }
 
 // Persiste turnosCfg + onlineCfg a Supabase (tabla precios, SELECT público)
+// IMPORTANTE: la fila 'cfg' también guarda __turnosFijos, __fichasCli, etc.
+// Por eso se lee la fila actual y se fusiona — nunca se pisa entera, para
+// no perder datos guardados desde otro dispositivo/sesión.
 async function persistCfgToSupabase(){
   if(!currentTenant?.id) return;
   const turnosCfg = getTurnosCfg();
   const onlineCfg = getOnlineCfg();
   const rowId = _cfgRowId(currentTenant.id);
+  let base = {};
+  try {
+    const { data: cur } = await sb.from('precios').select('data').eq('id', rowId).maybeSingle();
+    if(cur && cur.data) base = cur.data;
+  } catch(e){ /* fila aún no existe: se crea desde cero */ }
   const row = {
     id: rowId,
-    data: { id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: tenantSlug(currentTenant.nombre||'') },
+    data: { ...base, id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: tenantSlug(currentTenant.nombre||'') },
     tenant_id: currentTenant.id
   };
   const { error } = await sb.from('precios').upsert(row, { onConflict: 'id' });
@@ -15515,7 +15523,15 @@ async function _syncFijosSupabase(){
     var oc     = typeof getOnlineCfg === 'function' ? getOnlineCfg() : {};
     var fichas = typeof getFichasCli === 'function' ? getFichasCli() : undefined;
     var slug   = typeof tenantSlug   === 'function' ? tenantSlug(currentTenant.nombre || '') : '';
+    // Leer la fila actual y fusionar — nunca pisarla entera, para no perder
+    // datos guardados desde otro dispositivo/sesión (ver persistCfgToSupabase).
+    var base = {};
+    try {
+      var cur = await sb.from('precios').select('data').eq('id', rowId).maybeSingle();
+      if(cur && cur.data && cur.data.data) base = cur.data.data;
+    } catch(e0){ /* fila aún no existe */ }
     var rowData = {
+      ...base,
       id: rowId, __tipo: 'cfg',
       __turnosCfg: tc, __onlineCfg: oc, __fichasCli: fichas,
       __turnosFijos: fijos,
@@ -17085,10 +17101,14 @@ async function _mFCS_sinCobro(){
           saveTurnosLocal([...turnosExistentes, ...nuevos]);
         }
         // Persistir cada turno generado como 'confirmado' real en Supabase, para que
-        // aparezca en la agenda del sistema (no solo bloqueado en el link público)
-        if(nuevos.length && typeof _upsertTurnoSb==='function'){
+        // aparezca en la agenda del sistema (no solo bloqueado en el link público).
+        // OJO: usar window._upsertTurnoSb — dentro de este bloque hay otra función
+        // local _upsertTurnoSb(turno,estado) con distinta firma que la tapa, y al
+        // llamarla sin 'estado' generaba turnos 'pendiente' incompletos (sin
+        // servicio, duración, es_fijo, etc.)
+        if(nuevos.length && typeof window._upsertTurnoSb==='function'){
           for(const t of nuevos){
-            try { await _upsertTurnoSb(t); } catch(e){ console.warn('[fijos] upsert turno', e); }
+            try { await window._upsertTurnoSb(t); } catch(e){ console.warn('[fijos] upsert turno', e); }
           }
         }
         if(syncSupabase && typeof sincronizarFijosSupabase==='function'){
