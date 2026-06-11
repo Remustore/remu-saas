@@ -2823,6 +2823,18 @@ async function precargarServiciosTenant(tenantId, rubro, nombre){
   
   // Store config row — __tipo:'cfg' y __slug para que resolveSlug() lo encuentre
   const cfgId = parseInt((tenantId||'').replace(/-/g,'').substring(0,8),16) % 1000000 + 9999;
+  // Si ya existe otro negocio con el mismo slug (nombres iguales/parecidos),
+  // se agrega un sufijo del tenantId para que cada uno tenga su propio link
+  // público y no se pisen las reservas online entre sí.
+  let slugBase = tenantSlug(nombre);
+  let slugFinal = slugBase;
+  try {
+    const { data: choque } = await sb.from('precios')
+      .select('tenant_id').contains('data', { __slug: slugBase }).limit(1);
+    if(choque && choque.length && choque[0].tenant_id !== tenantId){
+      slugFinal = slugBase + '-' + (tenantId||'').replace(/-/g,'').substring(0,4);
+    }
+  } catch(e){ /* si falla la verificación, se usa el slug base */ }
   await sb.from('precios').upsert({
     id: cfgId,
     data: {
@@ -2832,7 +2844,7 @@ async function precargarServiciosTenant(tenantId, rubro, nombre){
       __tipo: 'cfg',
       __tenantName: nombre,
       __rubro: rubro,
-      __slug: tenantSlug(nombre)
+      __slug: slugFinal
     },
     tenant_id: tenantId
   }, { onConflict: 'id' });
@@ -9171,7 +9183,7 @@ async function persistCfgToSupabase(){
   } catch(e){ /* fila aún no existe: se crea desde cero */ }
   const row = {
     id: rowId,
-    data: { ...base, id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: tenantSlug(currentTenant.nombre||'') },
+    data: { ...base, id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: base.__slug || tenantSlug(currentTenant.nombre||'') },
     tenant_id: currentTenant.id
   };
   const { error } = await sb.from('precios').upsert(row, { onConflict: 'id' });
@@ -14776,11 +14788,15 @@ var _solBadgeInited = false;
           if(lRaw){ var lc=JSON.parse(lRaw); tc.apertura=lc.apertura||tc.apertura; tc.cierre=lc.cierre||tc.cierre; if(lc.dias&&lc.dias.length) tc.dias=lc.dias; if(lc.empleados) tc.empleados=lc.empleados; }
         } catch(e3){}
         localStorage.setItem(TURNOS_CFG_KEY+'_'+tenantId, JSON.stringify(tc));
+        // El slug ya fue asignado (y des-colisionado) por _orig.apply de arriba:
+        // lo preservamos en vez de recalcularlo para no pisar ese valor.
+        var cfgPrevia = (freshRows||[]).find(function(r){ return r.id===cfgId2; });
+        var slugPrevio = cfgPrevia && cfgPrevia.data && cfgPrevia.data.__slug;
         await sb.from('precios').upsert({
           id: cfgId2, tenant_id: tenantId,
           data: {id:cfgId2, __turnosCfg:tc, __onlineCfg:{mensaje:'',insta:'',direccion:'',tel:''},
             __tipo:'cfg', __tenantName:nombre||'', __rubro:rubro||'',
-            __slug: typeof tenantSlug==='function' ? tenantSlug(nombre||'') : ''}
+            __slug: slugPrevio || (typeof tenantSlug==='function' ? tenantSlug(nombre||'') : '')}
         }, {onConflict:'id'});
       } catch(e){ console.error('[remu] wizard svcs apply error', e); }
     }
@@ -15554,7 +15570,6 @@ async function _syncFijosSupabase(){
     var tc     = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {};
     var oc     = typeof getOnlineCfg === 'function' ? getOnlineCfg() : {};
     var fichas = typeof getFichasCli === 'function' ? getFichasCli() : undefined;
-    var slug   = typeof tenantSlug   === 'function' ? tenantSlug(currentTenant.nombre || '') : '';
     // Leer la fila actual y fusionar — nunca pisarla entera, para no perder
     // datos guardados desde otro dispositivo/sesión (ver persistCfgToSupabase).
     var base = {};
@@ -15562,6 +15577,11 @@ async function _syncFijosSupabase(){
       var cur = await sb.from('precios').select('data').eq('id', rowId).maybeSingle();
       if(cur && cur.data && cur.data.data) base = cur.data.data;
     } catch(e0){ /* fila aún no existe */ }
+    // El __slug es el identificador del link público: una vez asignado se
+    // mantiene fijo (no se recalcula del nombre), para que renombrar el
+    // negocio no rompa el link ya compartido con clientes, y para que dos
+    // negocios con nombres similares no terminen con el mismo slug.
+    var slug = base.__slug || (typeof tenantSlug === 'function' ? tenantSlug(currentTenant.nombre || '') : '');
     var rowData = {
       ...base,
       id: rowId, __tipo: 'cfg',
