@@ -7600,15 +7600,13 @@ function _fijosLocDate(d){
 
 async function sincronizarFijosSupabase(fijos, accion){
   if(!sb || !currentTenant?.id || !fijos?.length) return;
-  const todStr = _fijosLocDate(new Date());
   try{
     if(accion === 'borrar'){
       for(const f of fijos){
         await sb.from('turnos_solicitudes').delete()
           .eq('tenant_id', currentTenant.id)
           .eq('nombre', '__fijo__:' + f.id)
-          .eq('estado', 'bloqueado')
-          .gte('fecha', todStr);
+          .eq('estado', 'bloqueado');
       }
       return;
     }
