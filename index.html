@@ -12068,6 +12068,22 @@ function gsSearch(q){
     </div>`));
   }
 
+  // Turnos (salones/peluquerías/barberías/etc.) — busca por cliente, teléfono o servicio,
+  // en todos los turnos (no solo terminados), para encontrar también turnos próximos
+  if(typeof getTurnos==='function' && esNegocioTurnos(currentTenant?.rubro)){
+    const turnosCoinc = getTurnos()
+      .filter(t=>t.estado!=='cancelado' && ((t.cliente&&t.cliente.toLowerCase().includes(ql))||(t.tel&&t.tel.includes(ql))||(t.servicioNombre&&t.servicioNombre.toLowerCase().includes(ql))))
+      .sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora))
+      .slice(0,4);
+    if(turnosCoinc.length){
+      results.push('<div class="gsr-section">📅 Turnos</div>');
+      turnosCoinc.forEach(t=>results.push(`<div class="gsr-item" data-fecha="${t.fecha}" onclick="go('turnos');document.getElementById('turnosFecha').value=this.dataset.fecha;rTurnos();document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+        <div><div class="gsr-name">${esc(t.cliente||'')}</div><div class="gsr-sub">${esc(t.servicioNombre||'')} · ${fD(t.fecha)} ${esc((t.hora||'').substring(0,5))}</div></div>
+        <span class="bx byw">${esc(t.estado)}</span>
+      </div>`));
+    }
+  }
+
   // Clientes / Taller
   const clientes = getClientes().filter(c=>c.nombre.toLowerCase().includes(ql)||c.tel.includes(ql)).slice(0,3);
   if(clientes.length){
