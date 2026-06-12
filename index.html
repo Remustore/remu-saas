@@ -950,6 +950,21 @@ $$;</pre>
       <!-- AVISOS DIARIOS -->
       <div id="dashAvisos" style="margin-bottom:14px"></div>
 
+      <!-- ASISTENTE IA (piloto) -->
+      <div id="aiAsistenteCard" class="card" style="margin-bottom:14px;display:none">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <h3 style="margin:0">🤖 Asistente IA</h3>
+          <span class="bx bg2" style="font-size:.65rem">Beta</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input id="aiAsistentePregunta" type="text" placeholder="Preguntale algo sobre tus turnos…"
+            style="flex:1;min-width:180px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.84rem;outline:none;font-family:var(--fb)"
+            onkeydown="if(event.key==='Enter')preguntarAsistenteIA()">
+          <button class="btn bg bsm" onclick="preguntarAsistenteIA()">Preguntar</button>
+        </div>
+        <div id="aiAsistenteResp" style="margin-top:10px;font-size:.84rem;color:var(--tx2);line-height:1.6;white-space:pre-wrap"></div>
+      </div>
+
       <!-- GANANCIA HOY — tarjeta destacada, primera en mobile -->
       <div id="gananciaHoyCard" class="card" style="margin-bottom:14px"></div>
 
@@ -17175,6 +17190,40 @@ async function _mFCS_sinCobro(){
   /* ── K. Arranque: sync inicial ── */
   setTimeout(_syncFromSupabase, 4000);
   setTimeout(function(){ if(typeof resyncTurnosToSupabase==='function') resyncTurnosToSupabase(); }, 7000);
+
+  /* ── L. Asistente IA — piloto solo para Rocaspana ── */
+  (function(){
+    var TENANTS_IA = [
+      '53ff91e9-27ba-4337-a5cd-c3c70fa9d862',
+      'eb2cba64-e143-42fc-8178-c03678400281'
+    ];
+    if(typeof rDash === 'function'){
+      var _rDashOrig = rDash;
+      rDash = function(){
+        var r = _rDashOrig.apply(this, arguments);
+        var card = document.getElementById('aiAsistenteCard');
+        if(card) card.style.display = (currentTenant && TENANTS_IA.includes(currentTenant.id)) ? '' : 'none';
+        return r;
+      };
+    }
+    window.preguntarAsistenteIA = async function(){
+      var input = document.getElementById('aiAsistentePregunta');
+      var out   = document.getElementById('aiAsistenteResp');
+      var pregunta = (input?.value||'').trim();
+      if(!pregunta || !currentTenant?.id || !sb) return;
+      out.textContent = 'Pensando…';
+      try {
+        const { data, error } = await sb.functions.invoke('ai-asistente', {
+          body: { tenantId: currentTenant.id, pregunta }
+        });
+        if(error) throw error;
+        if(data?.error) throw new Error(data.error);
+        out.textContent = data?.respuesta || 'No pude generar una respuesta.';
+      } catch(e){
+        out.textContent = '⚠ ' + (e?.message || 'Error consultando al asistente');
+      }
+    };
+  })();
 
 })();
 </script>
