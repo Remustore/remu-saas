@@ -9560,6 +9560,7 @@ function _rwS1(){
     {v:'Barbería',          icon:'✂',  desc:'Cortes, barba, coloración'},
     {v:'Salón de belleza',  icon:'💅', desc:'Peluquería, manicuria, estética'},
     {v:'Taller de celulares',icon:'📱',desc:'Reparaciones, diagnóstico, repuestos'},
+    {v:'Gomería',           icon:'🔧', desc:'Cubiertas, alineación, balanceo'},
     {v:'Otro',              icon:'🏠', desc:'Otro tipo de negocio'},
   ];
   return `<div>
@@ -9597,6 +9598,7 @@ function _rwSvcsSugeridos(rubro){
   if(/barber/i.test(rubro)) return [{n:'Corte de pelo',p:0},{n:'Arreglo de barba',p:0},{n:'Corte + barba',p:0},{n:'Degradé',p:0}];
   if(/salon|belleza|peluq|manicur/i.test(rubro)) return [{n:'Corte de pelo',p:0},{n:'Tintura',p:0},{n:'Manicuria',p:0},{n:'Peinado',p:0}];
   if(/taller|celular/i.test(rubro)) return [{n:'Cambio de pantalla',p:0},{n:'Cambio de batería',p:0},{n:'Desbloqueo',p:0}];
+  if(/gomer|neumat|cubiert/i.test(rubro)) return [{n:'Cambio de cubierta',p:0},{n:'Alineación y balanceo',p:0},{n:'Reparación de pinchadura',p:0},{n:'Rotación de neumáticos',p:0}];
   return [];
 }
 
@@ -9609,6 +9611,8 @@ function _rwS2(){
     ? ['Corte de pelo','Tintura','Mechas','Peinado','Manicuria','Pedicura','Lifting','Depilación','Maquillaje']
     : /taller|celular/i.test(r)
     ? ['Cambio de pantalla','Cambio de batería','Cambio de tapa','Desbloqueo','Conector de carga','Diagnóstico']
+    : /gomer|neumat|cubiert/i.test(r)
+    ? ['Cambio de cubierta','Reparación de pinchadura','Alineación','Balanceo','Alineación y balanceo','Rotación de neumáticos','Cambio de válvula','Control de presión']
     : [];
   const lista = __rw.svcs.map((s,i)=>`
     <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;background:#111;border:1px solid #1e1e1e;border-radius:8px">
