@@ -7607,6 +7607,12 @@ async function sincronizarFijosSupabase(fijos, accion){
           .eq('tenant_id', currentTenant.id)
           .eq('nombre', '__fijo__:' + f.id)
           .eq('estado', 'bloqueado');
+        // También liberar los turnos "confirmado" ya generados a futuro para este fijo
+        await sb.from('turnos_solicitudes').delete()
+          .eq('tenant_id', currentTenant.id)
+          .eq('fijo_id', String(f.id))
+          .eq('es_fijo', true)
+          .gte('fecha', _fijosLocDate(new Date()));
       }
       return;
     }
