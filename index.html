@@ -17229,10 +17229,12 @@ async function _mFCS_sinCobro(){
       if(!pregunta || !currentTenant?.id || !sb) return;
       out.textContent = 'Pensando…';
       try {
-        const { data, error } = await sb.functions.invoke('ai-asistente', {
-          body: { tenantId: currentTenant.id, pregunta }
+        const r = await fetch(sb.supabaseUrl + '/functions/v1/ai-asistente', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sb.supabaseKey },
+          body: JSON.stringify({ tenantId: currentTenant.id, pregunta })
         });
-        if(error) throw error;
+        const data = await r.json();
         if(data?.error) throw new Error(data.error);
         out.textContent = data?.respuesta || 'No pude generar una respuesta.';
       } catch(e){

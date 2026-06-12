@@ -5,7 +5,7 @@ const SUPABASE_URL  = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
 
-const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type' };
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info' };
 
 // Piloto: asistente habilitado solo para estos tenants (Rocaspana, peluquería + manicura)
 const TENANTS_PERMITIDOS = [
