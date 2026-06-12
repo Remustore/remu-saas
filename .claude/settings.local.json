@@ -17,7 +17,30 @@
       "Bash(git stash:*)",
       "Bash(git -C \"C:/Users/flroc/remu-saas\" remote -v)",
       "Bash(git *)",
-      "Bash(cat \"C:/Users/flroc/remu-saas/supabase/migrations/\"*.sql)"
+      "Bash(cat \"C:/Users/flroc/remu-saas/supabase/migrations/\"*.sql)",
+      "Bash(sed -n '193,200p' \"C:/Users/flroc/remu-saas/b/index.html\")",
+      "Bash(sed -n '8058,8068p' \"C:/Users/flroc/remu-saas/index.html\")",
+      "Bash(grep -v \"^d.*\\\\.$\")",
+      "Bash(dir \"C:\\\\Users\\\\flroc\\\\remu-saas\" /b)",
+      "Bash(dir \"C:\\\\Users\\\\flroc\\\\Downloads\" /b)",
+      "Bash(python3 -c \"import base64; d=open\\('./logo-remu-store.jpg.jpeg','rb'\\).read\\(\\); print\\('data:image/jpeg;base64,'+base64.b64encode\\(d\\).decode\\(\\)\\)\")",
+      "Bash(python -c \"import base64; d=open\\('./logo-remu-store.jpg.jpeg','rb'\\).read\\(\\); open\\('./logo.b64.txt','w'\\).write\\('data:image/jpeg;base64,'+base64.b64encode\\(d\\).decode\\(\\)\\)\")",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Git/bin:/c/Program Files/Git/cmd\")",
+      "Bash(export PATH=\"$PATH:/c/Program Files/Git/bin:/c/Program Files/Git/cmd:/c/Program Files/Git/usr/bin\")",
+      "WebFetch(domain:remugestion.ar)",
+      "Bash(bash *)",
+      "PowerShell(git push *)",
+      "PowerShell(git *)",
+      "Bash(md \"C:\\\\Users\\\\flroc\\\\remu-saas\\\\supabase\\\\functions\\\\send-welcome-email\")",
+      "Bash(md \"C:\\\\Users\\\\flroc\\\\remu-saas\\\\supabase\\\\functions\\\\send-trial-expiry\")",
+      "PowerShell(Get-Content *)",
+      "PowerShell(& 'C:\\\\Users\\\\flroc\\\\remu-saas\\\\_patch_caja2.ps1')",
+      "PowerShell(& 'C:\\\\Users\\\\flroc\\\\remu-saas\\\\_patch_caja3.ps1')",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(\"/c/Program Files/Git/bin/git\" -C \"C:/Users/flroc/remu-saas\" add b/index.html)",
+      "Bash(\"/c/Program Files/Git/bin/git\" -C \"C:/Users/flroc/remu-saas\" status)",
+      "Bash(/c/Program Files/Git/bin/git *)"
     ]
   }
 }

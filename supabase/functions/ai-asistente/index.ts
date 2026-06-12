@@ -48,9 +48,37 @@ serve(async (req) => {
       srv: t.servicio_nombre, emp: t.empleado_nombre, estado: t.estado, precio: t.precio
     }));
 
+    // Catálogo de servicios y precios cargados (para presupuestos)
+    const cfgRowId = parseInt(tenantId.replace(/-/g, '').substring(0, 8), 16) % 1000000 + 9999;
+    const { data: cfgRow } = await sb.from('precios').select('data').eq('id', cfgRowId).maybeSingle();
+    const servicios = (cfgRow?.data?.__turnosCfg?.servicios || []).map((s: any) => ({
+      nombre: s.nombre, sector: s.sector, duracion: s.duracion, precio: s.precio
+    }));
+
+    const guiaApp = `Guía rápida de Remu Gestión (para ayudar al dueño a usar la app):
+- "Turnos": agenda diaria/semanal de citas. Se pueden crear, editar, cancelar y marcar como "terminado".
+- "Turnos fijos": citas recurrentes (mismo día y hora cada semana) que se generan automáticamente.
+- "Link público / reservas online": cada negocio tiene un link (sección "Link público") para que sus clientes reserven turnos solos, eligiendo servicio, profesional, fecha y horario disponible.
+- "Servicios": catálogo de servicios con precio y duración, configurable en "Configuración" o "Servicios".
+- "Empleados/Profesionales": se agregan en "Equipo" o "Empleados", y se les puede asignar turnos y horarios.
+- "Clientes": ficha de cada cliente con historial de turnos.
+- "Ventas": registro de ventas de productos (si el negocio vende productos además de servicios).
+- "Gastos": registro de gastos del negocio.
+- "Stock": control de inventario de productos.
+- "Configuración": datos del negocio, horarios de atención, mensajes para clientes, etc.`;
+
     const system = `Sos el asistente de gestión de "${tenant?.nombre || 'el negocio'}" (${tenant?.rubro || ''}) dentro de Remu Gestión.
 Hoy es ${hoy}. Tenés acceso a los turnos del negocio entre ${hace30} y ${en14} en formato JSON (f=fecha, h=hora, cli=cliente, srv=servicio, emp=empleado/profesional, estado, precio).
-Respondé en español, de forma breve, clara y concreta, basándote SOLO en estos datos. Si la pregunta no se puede responder con esta información, decilo honestamente. No inventes datos.`;
+También tenés el catálogo de servicios con sus precios y duraciones (nombre, sector, duracion en minutos, precio).
+
+${guiaApp}
+
+Respondé en español, de forma breve, clara y concreta.
+- Para preguntas sobre los turnos/agenda del negocio, basate SOLO en los datos JSON. Si no se puede responder con esos datos, decilo honestamente y no inventes números.
+- Para preguntas sobre cómo usar la app (dónde está tal función, cómo configurar algo), usá la guía de arriba. Si la guía no cubre lo que preguntan, decí que no tenés esa información y sugerí consultar con soporte.
+- Si te piden redactar un mensaje (recordatorio, aviso, promo) para enviarle a un cliente, redactalo con buena onda y profesional, usando los datos reales del turno si corresponde.
+- Si ves patrones útiles en los datos (días con pocos turnos, servicios poco pedidos, huecos libres), podés sugerir ideas o consejos de gestión, dejando claro que son sugerencias basadas en los datos disponibles.
+- Si te piden armar un presupuesto/cotización (por ejemplo para un evento o casamiento), usá los precios del catálogo de servicios, sumá los que correspondan y mostrá el detalle ítem por ítem y el total. Si algún servicio pedido no está en el catálogo, decilo en lugar de inventar un precio.`;
 
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -63,7 +91,7 @@ Respondé en español, de forma breve, clara y concreta, basándote SOLO en esto
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 600,
         system,
-        messages: [{ role: 'user', content: `Datos de turnos (JSON): ${JSON.stringify(datos)}\n\nPregunta del dueño: ${pregunta}` }]
+        messages: [{ role: 'user', content: `Catálogo de servicios y precios (JSON): ${JSON.stringify(servicios)}\n\nDatos de turnos (JSON): ${JSON.stringify(datos)}\n\nPregunta del dueño: ${pregunta}` }]
       })
     });
 
