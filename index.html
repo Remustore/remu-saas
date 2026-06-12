@@ -2939,6 +2939,7 @@ async function loadTenants(){
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
         <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:var(--gld);border-color:rgba(201,168,76,.4)" onclick="accederComoTenant('${t.id}')">→ Acceder</button>
+        <button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="eliminarTenantDefinitivo('${t.id}','${esc(t.nombre)}')">🗑 Eliminar</button>
       </div>
     </div>`;
   }).join('');
@@ -3637,6 +3638,29 @@ async function toggleTenant(id, activo){
   if(!confirm(`¿${activo?'Desactivar':'Activar'} este cliente?`)) return;
   const { error } = await sb.from('tenants').update({ activo: !activo }).eq('id', id);
   if(!error) loadTenants();
+}
+
+async function eliminarTenantDefinitivo(id, nombre){
+  const msg = `⚠️ ESTO BORRA PERMANENTEMENTE el negocio "${nombre}":\n\n• Todos sus datos (ventas, stock, turnos, precios, gastos, etc.)\n• Su(s) usuario(s) de acceso\n• El negocio en sí\n\nEsta acción NO SE PUEDE DESHACER.\n\nEscribí el nombre del negocio para confirmar:`;
+  const input = prompt(msg);
+  if(input !== nombre){ showToast('Cancelado'); return; }
+
+  showToast('Eliminando negocio...');
+  try {
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token;
+    const r = await fetch(sb.supabaseUrl + '/functions/v1/admin-delete-tenant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ tenantId: id })
+    });
+    const data = await r.json();
+    if(!r.ok || data?.error) throw new Error(data?.error || 'Error desconocido');
+    showToast(`✓ "${data.nombre}" eliminado`);
+    loadTenants();
+  } catch(e){
+    alert('Error al eliminar: ' + (e?.message || e));
+  }
 }
 
 async function accederComoTenant(id){
