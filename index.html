@@ -12950,6 +12950,20 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 .lp-divider{height:1px;background:linear-gradient(90deg,transparent,#1e1e1e 20%,#1e1e1e 80%,transparent);margin:0 20px}
 .lp-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:#c9a84c;font-size:.72rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:5px 12px;border-radius:20px;margin-bottom:20px}
 .lp-precio-box{background:#111;border:1px solid #1e1e1e;border-radius:20px;padding:32px 24px;text-align:center;max-width:440px;margin:0 auto}
+.lp-stats{display:flex;margin-top:40px;border:1px solid #1e1e1e;border-radius:14px;overflow:hidden;background:#0f0f0f}
+.lp-stat{flex:1;padding:18px 10px;text-align:center;border-right:1px solid #1e1e1e}
+.lp-stat:last-child{border-right:none}
+.lp-stat-num{font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:#c9a84c}
+.lp-stat-lbl{font-size:.62rem;color:#a89880;margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
+.lp-steps{display:flex;flex-direction:column;gap:28px}
+.lp-step{text-align:center}
+.lp-step-num{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#080808;font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+.lp-step h3{font-weight:700;font-size:.95rem;color:#f5f0e8;margin:0 0 6px}
+.lp-step p{font-size:.82rem;color:#a89880;line-height:1.6;margin:0}
+@media(min-width:640px){.lp-steps{flex-direction:row}.lp-step{flex:1}}
+.lp-wa-float{position:fixed;bottom:20px;right:16px;display:flex;align-items:center;gap:8px;background:#25d366;color:#fff;text-decoration:none;padding:12px 18px;border-radius:50px;font-family:'Outfit',sans-serif;font-weight:700;font-size:.85rem;box-shadow:0 4px 18px rgba(37,211,102,.4);z-index:999;transition:transform .15s}
+.lp-wa-float:hover{transform:translateY(-2px)}
+@media(max-width:480px){.lp-wa-float span{display:none}}
 @media(min-width:640px){
   .lp-grid-3{flex-direction:row}
   .lp-grid-4{flex-direction:row;flex-wrap:wrap}
@@ -12976,6 +12990,12 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     <button onclick="document.getElementById('landingPage').style.display='none';document.getElementById('loginScreen').style.display='flex'" class="lp-btn-ghost" style="width:auto;margin-top:0">Ya tengo cuenta → Ingresar</button>
   </div>
   <p style="font-size:.72rem;color:#5a5040;margin-top:16px">Sin tarjeta de crédito. Sin compromiso. Cancelás cuando querés.</p>
+  <div class="lp-stats">
+    <div class="lp-stat"><div class="lp-stat-num">100%</div><div class="lp-stat-lbl">Desde el celular</div></div>
+    <div class="lp-stat"><div class="lp-stat-num">2 min</div><div class="lp-stat-lbl">Para empezar</div></div>
+    <div class="lp-stat"><div class="lp-stat-num">$0</div><div class="lp-stat-lbl">El primer mes</div></div>
+    <div class="lp-stat"><div class="lp-stat-num">24/7</div><div class="lp-stat-lbl">Turnos online</div></div>
+  </div>
 </div>
 
 <!-- ② PROBLEMA -->
@@ -13102,6 +13122,32 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
   </div>
 </div>
 
+<!-- ④.5 CÓMO FUNCIONA -->
+<div class="lp-divider"></div>
+<div class="lp-section">
+  <div style="text-align:center;max-width:680px;margin:0 auto 48px">
+    <div class="lp-tag">Simple desde el día 1</div>
+    <h2 class="lp-h2">Tres pasos para tener tu sistema</h2>
+  </div>
+  <div class="lp-steps">
+    <div class="lp-step">
+      <div class="lp-step-num">1</div>
+      <h3>Creás tu cuenta gratis</h3>
+      <p>Ingresás el nombre de tu negocio, elegís tu rubro y listo. En minutos tenés tu sistema activo con los servicios precargados para vos.</p>
+    </div>
+    <div class="lp-step">
+      <div class="lp-step-num">2</div>
+      <h3>Configurás en 2 minutos</h3>
+      <p>Ajustás tus precios, horarios y empleados. Todo intuitivo, desde el celular. Sin tutoriales, sin tecnicismos, sin llamar a nadie.</p>
+    </div>
+    <div class="lp-step">
+      <div class="lp-step-num">3</div>
+      <h3>Compartís tu link</h3>
+      <p>Te damos tu link de turnos y tu lista de precios. Los pegás en Instagram y WhatsApp — tus clientes empiezan a reservar solos.</p>
+    </div>
+  </div>
+</div>
+
 <!-- ⑤ PRECIO -->
 <div class="lp-divider"></div>
 <div class="lp-section" style="text-align:center">
@@ -13128,9 +13174,22 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
 <footer style="padding:40px 20px;text-align:center">
   <div style="font-family:'Playfair Display',serif;font-size:1.3rem;font-weight:800;color:#c9a84c;letter-spacing:1px;margin-bottom:6px">Remu</div>
   <div style="font-size:.75rem;color:#5a5040;margin-bottom:4px">remugestion.ar</div>
+  <div style="display:flex;justify-content:center;gap:18px;margin-bottom:12px;font-size:.75rem">
+    <a href="terminos.html" style="color:#a89880;text-decoration:underline;text-underline-offset:3px">Términos y Condiciones</a>
+    <a href="privacidad.html" style="color:#a89880;text-decoration:underline;text-underline-offset:3px">Privacidad</a>
+  </div>
   <div style="font-size:.7rem;color:#3a3028;margin-bottom:16px">© 2026 Remu Gestión. Todos los derechos reservados.</div>
   <button onclick="document.getElementById('landingPage').style.display='none';document.getElementById('loginScreen').style.display='flex'" style="background:none;border:none;color:#a89880;font-family:'Outfit',sans-serif;font-size:.8rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Ingresar a mi cuenta</button>
 </footer>
+
+<!-- FLOATING WHATSAPP BUTTON -->
+<a href="https://wa.me/5493472628087?text=Hola!%20Quiero%20informaci%C3%B3n%20sobre%20Remu%20Gesti%C3%B3n%20para%20mi%20negocio"
+   target="_blank" rel="noopener" class="lp-wa-float">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+  <span>Consultar por WhatsApp</span>
+</a>
 </div>
 
 <!-- ── Notificaciones: banner de opt-in ── -->
