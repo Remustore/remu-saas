@@ -3914,7 +3914,7 @@ async function loadAll(){
         if(cfgRow.__onlineCfg && !localStorage.getItem(oKey))
           localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
         if(cfgRow.__fichasCli){
-          const fKey = 'fichasCli_' + tid;
+          const fKey = FICHAS_KEY + '_' + tid;
           const existF = localStorage.getItem(fKey);
           // Merge: local wins for keys present locally, Supabase fills missing ones
           const merged = {...cfgRow.__fichasCli, ...(existF ? JSON.parse(existF) : {})};
@@ -9030,6 +9030,7 @@ function guardarFichaCliente(ficha){
   const fichas = getFichas();
   fichas[ficha.nombre.toLowerCase()] = ficha;
   saveFichas(fichas);
+  persistCfgToSupabase().catch(()=>{});
 }
 
 function rFichasClientes(){
@@ -9185,10 +9186,15 @@ function rFichasClientesMain(){
     const visits = turnos.filter(t=>t.cliente===nombre);
     const ultima = visits.sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
     const totalGastado = visits.filter(t=>t.estado==='terminado').reduce((a,t)=>a+t.precio,0);
+    const tel = ultima?.tel || '';
+    const telFmt = tel ? tel.replace(/\D/g,'') : '';
     return `<div style="padding:14px;border-bottom:1px solid var(--bor)">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
         <div style="flex:1">
-          <div style="font-weight:600;font-size:.9rem">${nombre}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:.9rem">${nombre}</span>
+            ${tel?`<a href="https://wa.me/549${telFmt}" target="_blank" rel="noopener" style="font-size:.72rem;color:#25d366;background:rgba(37,211,102,.1);border:1px solid rgba(37,211,102,.25);padding:1px 8px;border-radius:10px;text-decoration:none">📱 ${tel}</a>`:''}
+          </div>
           <div style="font-size:.75rem;color:var(--tx2);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap">
             ${ficha.color?`<span>🎨 ${ficha.color}</span>`:''}
             ${ficha.largo?`<span>✂ ${ficha.largo}</span>`:''}
@@ -9235,9 +9241,10 @@ async function persistCfgToSupabase(){
     const { data: cur } = await sb.from('precios').select('data').eq('id', rowId).maybeSingle();
     if(cur && cur.data) base = cur.data;
   } catch(e){ /* fila aún no existe: se crea desde cero */ }
+  const fichasCli = getFichas();
   const row = {
     id: rowId,
-    data: { ...base, id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: base.__slug || tenantSlug(currentTenant.nombre||'') },
+    data: { ...base, id: rowId, __turnosCfg: turnosCfg, __onlineCfg: onlineCfg, __fichasCli: fichasCli, __tipo: 'cfg', __tenantName: currentTenant.nombre||'', __rubro: currentTenant.rubro||'', __slug: base.__slug || tenantSlug(currentTenant.nombre||'') },
     tenant_id: currentTenant.id
   };
   const { error } = await sb.from('precios').upsert(row, { onConflict: 'id' });
