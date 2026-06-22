@@ -2163,7 +2163,9 @@ if (typeof window.APP_CONFIG === 'undefined' || !window.APP_CONFIG.supabaseUrl) 
 const SURL = window.APP_CONFIG.supabaseUrl;
 const SKEY = window.APP_CONFIG.supabaseAnonKey;
 
-const sb = supabase.createClient(SURL, SKEY);
+const sb = supabase.createClient(SURL, SKEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+});
 
 // ═══ ESCAPE DE HTML — previene XSS ═══
 // Usá esc() para todo valor de base de datos que se inserte en innerHTML.
