@@ -7962,7 +7962,8 @@ async function saveTurno(_override){
     notas, estado,
     esFijo:   turnoOriginal?.esFijo||false,
     fijoId:   turnoOriginal?.fijoId||null,
-    creadoEn: turnoOriginal?.creadoEn||new Date().toISOString()
+    creadoEn: turnoOriginal?.creadoEn||new Date().toISOString(),
+    _sbId:    turnoOriginal?._sbId||null
   };
 
   if(id){
