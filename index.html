@@ -7473,6 +7473,12 @@ async function _reloadTurnosCache(){
       .order('fecha').order('hora');
     if(error) throw error;
     if(data){
+      // Si Supabase devuelve vacío pero el caché local tiene turnos, es probable
+      // un problema de sesión/RLS — conservar el caché para no vaciar la vista
+      if(data.length === 0 && (_turnosCache||[]).length > 0){
+        console.warn('[_reloadTurnosCache] Supabase devolvió [] pero caché local tiene datos — conservando caché');
+        return;
+      }
       const remoto = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
       const refIdsRemotos = new Set(remoto.map(t=>String(t.id)));
       // Conservar turnos guardados localmente que aún no terminaron de sincronizarse a Supabase
@@ -10048,6 +10054,9 @@ function aplicarModoEmpleado(){
   if(window.currentEmpleadoNombre){
     turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
   }
+  // Siempre arrancar en la fecha de hoy al entrar como empleado
+  const _empFechaEl = document.getElementById('turnosFecha');
+  if(_empFechaEl) _empFechaEl.value = tod();
   go('turnos');
 }
 
@@ -10404,7 +10413,7 @@ function rTurnosTec(){
 async function checkNuevasSolicitudes(){
   if(!currentTenant?.id) return;
   try {
-    const hoy = new Date().toISOString().slice(0,10);
+    const hoy = tod();
     const { data } = await sb.from('turnos_solicitudes')
       .select('id')
       .eq('tenant_id', currentTenant.id)
@@ -13436,7 +13445,7 @@ function checkTurnosEnUnaHora(){
   const turnos = typeof getTurnos === 'function' ? getTurnos() : [];
   if (!turnos.length) return;
   const now = new Date();
-  const hoy = now.toISOString().slice(0, 10);
+  const hoy = tod();
   const storKey = 'notif_1h_' + hoy + '_' + (currentTenant?.id || '');
   const yaSet = new Set(JSON.parse(localStorage.getItem(storKey) || '[]'));
   const cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : { servicios: [] };
