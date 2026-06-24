@@ -7422,8 +7422,9 @@ function _getAdminSbIds(){ try{ return new Set(JSON.parse(localStorage.getItem('
 function _addAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.add(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
 function _removeAdminSbId(id){ const k='adm_sb_ids_'+(currentTenant?.id||''); const s=_getAdminSbIds(); s.delete(id); try{ localStorage.setItem(k,JSON.stringify([...s])); }catch(e){} }
 
+// Retorna {ok:true, sbId} en éxito o {ok:false, error} en fallo — nunca tira excepción
 async function _upsertTurnoSb(obj){
-  if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return;
+  if(!sb||!currentTenant?.id||!obj?.fecha||!obj?.hora) return {ok:false, error:'sin conexión o datos incompletos'};
   const tid = currentTenant.id;
   const srvId = obj.servicioId ? (isNaN(parseInt(obj.servicioId)) ? null : String(obj.servicioId)) : null;
   const payload = {
@@ -7451,23 +7452,20 @@ async function _upsertTurnoSb(obj){
     if(obj._sbId){
       const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', obj._sbId);
       if(error) throw error;
+      return {ok:true, sbId:obj._sbId};
     } else {
-      const {data, error} = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
+      const {data, error} = await sb.from('turnos_solicitudes')
+        .upsert({...payload}, {onConflict:'tenant_id,ref_id'}).select('id').single();
       if(error) throw error;
       if(data?.id){
         obj._sbId = data.id;
         _addAdminSbId(data.id);
-        if(_turnosCache){
-          const idx = _turnosCache.findIndex(t=>String(t.id)===String(obj.id));
-          if(idx!==-1){ _turnosCache[idx]._sbId = data.id; _saveTurnosLS(_turnosCache); }
-        }
       }
+      return {ok:true, sbId:data?.id};
     }
   } catch(e){
     console.warn('[_upsertTurnoSb]', e.message);
-    // Agregar a cola separada en localStorage — sobrevive recargas de página
-    _addToPendingQueue(obj);
-    console.warn('[_upsertTurnoSb] Turno en cola pendiente — se reintentará automáticamente');
+    return {ok:false, error:e.message};
   }
 }
 
@@ -7518,17 +7516,21 @@ async function _syncPendingTurnos(){
   }
 }
 
+// Retorna {ok:true} en éxito o {ok:false, error} en fallo
 async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
-  if(!sb||!currentTenant?.id||!obj?.id) return;
+  if(!sb||!currentTenant?.id||!obj?.id) return {ok:false, error:'sin conexión'};
   const upd = {estado: nuevoEstado};
   if(nuevoEstado==='terminado'&&precio>0){upd.precio=precio; upd.metodo=metodo||'Efectivo';}
   try {
     if(obj._sbId){
-      await sb.from('turnos_solicitudes').update(upd).eq('id', obj._sbId);
+      const {error} = await sb.from('turnos_solicitudes').update(upd).eq('id', obj._sbId);
+      if(error) throw error;
+      return {ok:true};
     } else {
-      await _upsertTurnoSb({...obj, estado:nuevoEstado, precio:precio||obj.precio, metodo:metodo||obj.metodo});
+      const result = await _upsertTurnoSb({...obj, estado:nuevoEstado, precio:precio||obj.precio, metodo:metodo||obj.metodo});
+      return result;
     }
-  } catch(e){ console.warn('[_updateEstadoSb]', e.message); }
+  } catch(e){ console.warn('[_updateEstadoSb]', e.message); return {ok:false, error:e.message}; }
 }
 
 async function _reloadTurnosCache(){
@@ -8042,6 +8044,16 @@ async function saveTurno(_override){
     _sbId:    turnoOriginal?._sbId||null
   };
 
+  // ── SUPABASE PRIMERO ────────────────────────────────────────────────────
+  const saveBtn = document.getElementById('turnoSaveBtn') || document.querySelector('#mTurno .btn');
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Guardando...'; }
+  const sbResult = await _upsertTurnoSb(obj);
+  if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=id?'Guardar cambios':'Agendar turno'; }
+  if(!sbResult?.ok){
+    showToast('❌ No se pudo guardar: '+(sbResult?.error||'sin conexión')+'. Revisá tu internet e intentá de nuevo.','err');
+    return;
+  }
+  // Solo actualiza el caché local DESPUÉS de confirmar Supabase
   if(id){
     const idx = turnos.findIndex(t=>String(t.id)===String(id));
     if(idx>-1){ turnos[idx]=obj; } else { showToast('Error: turno no encontrado','err'); return; }
@@ -8049,8 +8061,6 @@ async function saveTurno(_override){
     turnos.push(obj);
   }
   saveTurnosLocal(turnos);
-
-  await _upsertTurnoSb(obj);
 
   const yaEstabaTerminado = turnoOriginal&&turnoOriginal.estado==='terminado';
   if(estado==='terminado'&&precioCobrado>0&&!yaEstabaTerminado){
@@ -8110,9 +8120,15 @@ async function saveTurno(_override){
 function cancelarTurno(id){
   _confirmarModal('¿Eliminar este turno?', async ()=>{
     const turno = getTurnos().find(x=>String(x.id)===String(id));
+    if(turno){
+      const sbResult = await _updateEstadoSb(turno,'cancelado');
+      if(sbResult && sbResult.ok === false){
+        showToast('❌ No se pudo eliminar: sin conexión. Intentá de nuevo.','err');
+        return;
+      }
+    }
     const turnos = getTurnos().filter(x=>String(x.id)!==String(id));
     saveTurnosLocal(turnos);
-    if(turno) await _updateEstadoSb(turno,'cancelado');
     rTurnos();
     showToast('Turno eliminado ✓');
   });
@@ -8146,11 +8162,6 @@ async function confirmarFinalizarTurno(){
   const id = window.__pendingFinalizarId;
   if(id == null) return;
   window.__pendingFinalizarId = null;
-  if(monto > 0){
-    const turnos = getTurnos();
-    const idx = turnos.findIndex(x=>String(x.id)===String(id));
-    if(idx !== -1){ turnos[idx] = {...turnos[idx], precio: monto, metodo}; saveTurnosLocal(turnos); }
-  }
   await _doEstadoTurno(id, 'terminado', monto > 0 ? monto : null, metodo);
 }
 
@@ -8159,15 +8170,20 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
   if(idx === -1) return;
   const turnoAntes = turnos[idx];
-  // Calcular precio y metodo ANTES de guardar para persistirlos en el turno
   const _precio = (precioExtra != null) ? precioExtra : (parseFloat(turnoAntes.precio)||0);
   const _metodo = metodoExtra || turnoAntes.metodo || 'Efectivo';
   const _upd = { estado: nuevoEstado };
-  // Persistir precio y metodo en el turno para que getCajas() / rDash() los lean correctamente
   if(nuevoEstado === 'terminado' && _precio > 0){ _upd.precio = _precio; _upd.metodo = _metodo; }
+
+  // ── SUPABASE PRIMERO ────────────────────────────────────────────────────
+  const sbResult = await _updateEstadoSb(turnoAntes, nuevoEstado, _precio, _metodo);
+  if(sbResult && sbResult.ok === false){
+    showToast('❌ No se pudo actualizar: sin conexión. Intentá de nuevo.','err');
+    return;
+  }
+  // Solo actualiza el caché local DESPUÉS de confirmar Supabase
   turnos[idx] = {...turnos[idx], ..._upd};
   saveTurnosLocal(turnos);
-  await _updateEstadoSb(turnoAntes, nuevoEstado, _precio, _metodo);
   if(nuevoEstado === 'terminado'){
     const t = turnos[idx];
     const precio = _precio;
