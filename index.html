@@ -7294,8 +7294,22 @@ function mostrarResumenSemanal(){
 // ═══ MÓDULO DE TURNOS ═══
 const TURNOS_KEY = 'turnos';
 const TURNOS_CFG_KEY = 'turnosCfg';
+const PENDING_SYNC_KEY = 'remu_pending_sync_';
 let turnosFiltroEmpleado = 'todos';
 let turnosVista = 'lista';
+
+function _pendingQueueKey(){ return PENDING_SYNC_KEY+(currentTenant?.id||''); }
+function _getPendingQueue(){ try{ return JSON.parse(localStorage.getItem(_pendingQueueKey())||'[]'); }catch(e){ return []; } }
+function _savePendingQueue(q){ try{ localStorage.setItem(_pendingQueueKey(), JSON.stringify(q)); }catch(e){} }
+function _addToPendingQueue(turno){
+  const q = _getPendingQueue();
+  const idx = q.findIndex(t=>String(t.id)===String(turno.id));
+  if(idx!==-1) q[idx]=turno; else q.push(turno);
+  _savePendingQueue(q);
+}
+function _removeFromPendingQueue(turnoId){
+  _savePendingQueue(_getPendingQueue().filter(t=>String(t.id)!==String(turnoId)));
+}
 
 // Servicios predeterminados
 const SERVICIOS_DEFAULT = [
@@ -7451,21 +7465,15 @@ async function _upsertTurnoSb(obj){
     }
   } catch(e){
     console.warn('[_upsertTurnoSb]', e.message);
-    // Marcar como pendiente de sync para reintentar luego
-    if(_turnosCache){
-      const idx = _turnosCache.findIndex(t=>String(t.id)===String(obj.id));
-      if(idx!==-1 && !_turnosCache[idx]._pendingSync){
-        _turnosCache[idx]._pendingSync = true;
-        _saveTurnosLS(_turnosCache);
-        console.warn('[_upsertTurnoSb] Turno marcado _pendingSync — se reintentará automáticamente');
-      }
-    }
+    // Agregar a cola separada en localStorage — sobrevive recargas de página
+    _addToPendingQueue(obj);
+    console.warn('[_upsertTurnoSb] Turno en cola pendiente — se reintentará automáticamente');
   }
 }
 
 async function _syncPendingTurnos(){
   if(!sb||!currentTenant?.id) return;
-  const pending = (getTurnos()||[]).filter(t=>t._pendingSync);
+  const pending = _getPendingQueue();
   if(!pending.length) return;
   console.log('[_syncPendingTurnos] Reintentando sync de', pending.length, 'turno(s) pendiente(s)...');
   let synced = 0;
@@ -7489,20 +7497,22 @@ async function _syncPendingTurnos(){
         const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', t._sbId);
         if(!error) ok = true;
       } else {
-        const {data, error} = await sb.from('turnos_solicitudes').insert(payload).select('id').single();
-        if(!error && data?.id){ payload._sbId = data.id; t._sbId = data.id; _addAdminSbId(data.id); ok = true; }
+        const {data, error} = await sb.from('turnos_solicitudes')
+          .upsert({...payload}, {onConflict:'tenant_id,ref_id'}).select('id').single();
+        if(!error && data?.id){ t._sbId = data.id; _addAdminSbId(data.id); ok = true; }
       }
       if(ok){
+        _removeFromPendingQueue(t.id);
         if(_turnosCache){
           const idx = _turnosCache.findIndex(c=>String(c.id)===String(t.id));
-          if(idx!==-1){ delete _turnosCache[idx]._pendingSync; if(t._sbId) _turnosCache[idx]._sbId = t._sbId; }
+          if(idx!==-1 && t._sbId) _turnosCache[idx]._sbId = t._sbId;
         }
         synced++;
       }
     } catch(e){ console.warn('[_syncPendingTurnos] Error en turno', t.id, e.message); }
   }
   if(synced > 0){
-    _saveTurnosLS(_turnosCache);
+    if(_turnosCache) _saveTurnosLS(_turnosCache);
     showToast('☁ '+synced+' turno'+(synced>1?'s':'')+' sincronizado'+(synced>1?'s':'')+' con Supabase ✓');
     console.log('[_syncPendingTurnos]', synced, 'turno(s) sincronizados correctamente');
   }
