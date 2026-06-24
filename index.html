@@ -1011,7 +1011,7 @@ $$;</pre>
         <div class="ch"><h3>🛒 Objetivos de compra</h3><button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Agregar</button></div>
         <div id="objetivosCompraList"></div>
       </div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid"></div><div id="movCajaLista" style="margin-top:10px"></div></div>
+      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre general</button><span id="botonescierre-dash"></span></div></div><div class="g4" id="cajasGrid"></div><div id="movCajaLista" style="margin-top:10px"></div></div>
       <div class="g2" style="margin-bottom:14px">
         <div class="card" style="display:none">
           <div class="ch"><h3>Meta mensual</h3></div>
@@ -1539,7 +1539,7 @@ $$;</pre>
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
       <div class="pt">Gastos</div><div class="ps">Fijos, variables y stock del local</div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre del día</button></div></div><div class="g4" id="cajasGrid-g"></div><div id="movCajaLista-g" style="margin-top:10px"></div></div>
+      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre general</button><span id="botonescierre-gastos"></span></div></div><div class="g4" id="cajasGrid-g"></div><div id="movCajaLista-g" style="margin-top:10px"></div></div>
       <div class="g2" id="gStats" style="margin-bottom:14px"></div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button class="btn bg" onclick="openM('mGasto',null)">+ Registrar gasto</button>
@@ -6375,10 +6375,78 @@ function getCajas(){
   return cajas;
 }
 
+function cierreEmpleada(nombreEmpleada){
+  const hoy = tod();
+  const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
+  const emp = (cfg.empleados||[]).find(e=>e.nombre===nombreEmpleada);
+  const pct = emp ? (emp.comision||0) : 0;
+  const turnos = typeof getTurnos==='function'
+    ? getTurnos().filter(t=>t.fecha===hoy && t.estado==='terminado' && t.empleadoNombre===nombreEmpleada)
+    : [];
+  const total = turnos.reduce((a,t)=>a+(parseFloat(t.precio)||0),0);
+  const comision = Math.round(total * pct / 100);
+  const salon = total - comision;
+  const fD2 = typeof fD==='function' ? fD : d=>d;
+  const _F = typeof _F==='function' ? _F : (typeof fmt==='function' ? fmt : v=>'$'+v);
+  const porMetodo = {};
+  turnos.forEach(t=>{ const m=t.metodo||'Efectivo'; porMetodo[m]=(porMetodo[m]||0)+(t.precio||0); });
+  const metodoRows = Object.entries(porMetodo).map(([m,v])=>
+    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.82rem;color:var(--tx2)">${m}</span><span style="font-size:.82rem;font-weight:600;color:var(--gld)">${fmt(v)}</span></div>`
+  ).join('');
+  const html = `<div style="padding:16px">
+    <div style="font-family:var(--fh);font-size:1.1rem;font-weight:700;margin-bottom:4px">💅 Cierre de ${esc(nombreEmpleada)} — ${fD2(hoy)}</div>
+    <div style="font-size:.75rem;color:var(--tx2);margin-bottom:16px">${esc((currentTenant&&currentTenant.nombre)||'')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+      <div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Servicios</div>
+        <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--ok)">${fmt(total)}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${turnos.length} turno${turnos.length!==1?'s':''}</div>
+      </div>
+      <div style="background:var(--bg);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px">Comisión ${pct}%</div>
+        <div style="font-family:var(--fh);font-size:1.4rem;font-weight:700;color:var(--gld)">${fmt(comision)}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">Lo lleva ${esc(nombreEmpleada)}</div>
+      </div>
+    </div>
+    ${metodoRows ? `<div style="margin-bottom:14px"><div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Por método de pago</div>${metodoRows}</div>` : ''}
+    <div style="border-top:1px solid var(--bor);padding-top:10px">
+      <div style="display:flex;justify-content:space-between;padding:3px 0"><div style="font-size:.72rem;color:var(--tx2)">Total cobrado</div><div style="font-size:.82rem;font-weight:600">${fmt(total)}</div></div>
+      <div style="display:flex;justify-content:space-between;padding:3px 0"><div style="font-size:.72rem;color:var(--tx2)">Comisión ${esc(nombreEmpleada)} (${pct}%)</div><div style="font-size:.82rem;font-weight:600;color:var(--gld)">${fmt(comision)}</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--bor);margin-top:6px">
+        <div style="font-size:.82rem;font-weight:700">Queda para el salón</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:700;color:var(--ok)">${fmt(salon)}</div>
+      </div>
+    </div>
+    ${!turnos.length?'<div style="font-size:.8rem;color:var(--mut);text-align:center;padding:12px 0">Sin turnos terminados hoy</div>':''}
+  </div>`;
+  let overlay = document.getElementById('cierreEmpleadaOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'cierreEmpleadaOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:360;display:flex;align-items:center;justify-content:center;padding:20px';
+    overlay.onclick = e=>{ if(e.target===overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto">${html}<div style="padding:14px;text-align:right;border-top:1px solid var(--bor)"><button class="btn" onclick="document.getElementById('cierreEmpleadaOverlay').remove()">Cerrar</button></div></div>`;
+  overlay.style.display='flex';
+}
+
+function _renderBotonesCierreEmpleadas(){
+  const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
+  const emps = (cfg.empleados||[]);
+  if(emps.length < 2) return;
+  const btns = emps.map(e=>`<button class="btn bsm" style="background:rgba(201,168,76,.15);color:var(--gld);border:1px solid rgba(201,168,76,.3)" onclick="cierreEmpleada('${esc(e.nombre)}')">💅 Cierre ${esc(e.nombre)}</button>`).join('');
+  ['botonescierre-dash','botonescierre-gastos'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = btns;
+  });
+}
+
 function rCajas(){
   const c=getCajas();
   const rubro2 = (currentTenant?.rubro||'').toLowerCase();
   const esSalonCaja = esNegocioTurnos(rubro2);
+  _renderBotonesCierreEmpleadas();
   const items = esSalonCaja
     ? [{k:'servicio',l:'✂ Servicios',obj:0},{k:'accesorios',l:'🛍 Productos',obj:0},{k:'general',l:'💼 General',obj:0}]
     : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
