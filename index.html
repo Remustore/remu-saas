@@ -6387,7 +6387,6 @@ function cierreEmpleada(nombreEmpleada){
   const comision = Math.round(total * pct / 100);
   const salon = total - comision;
   const fD2 = typeof fD==='function' ? fD : d=>d;
-  const _F = typeof _F==='function' ? _F : (typeof fmt==='function' ? fmt : v=>'$'+v);
   const porMetodo = {};
   turnos.forEach(t=>{ const m=t.metodo||'Efectivo'; porMetodo[m]=(porMetodo[m]||0)+(t.precio||0); });
   const metodoRows = Object.entries(porMetodo).map(([m,v])=>
