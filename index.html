@@ -7107,60 +7107,38 @@ function getStockMov(){
   return raw ? JSON.parse(raw) : [];
 }
 
-function registrarMovStock(productoId, nombre, cantidad, tipo, motivo){
+async function registrarMovStock(productoId, nombre, cantidad, tipo, motivo){
+  const hora = new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'});
+  const fecha = tod();
+  // Cache local inmediato para UI rápida
   const movs = getStockMov();
-  movs.unshift({
-    id: Date.now(),
-    productoId,
-    nombre,
-    cantidad,
-    tipo, // 'venta', 'devolucion', 'ajuste', 'auditoria'
-    motivo,
-    fecha: tod(),
-    hora: new Date().toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'})
-  });
-  // Guardar solo los últimos 500 movimientos
+  movs.unshift({ id: Date.now(), productoId, nombre, cantidad, tipo, motivo, fecha, hora });
   if(movs.length > 500) movs.splice(500);
   localStorage.setItem(MOV_KEY + '_' + (currentTenant?.id||''), JSON.stringify(movs));
+  // Persistir en Supabase (fire and forget)
+  if(currentTenant?.id){
+    sb.from('stock_movimientos').insert({
+      tenant_id: currentTenant.id, producto_id: productoId,
+      nombre, cantidad, tipo, motivo, fecha, hora
+    }).then(({error})=>{ if(error) console.warn('[movStock]', error.message); });
+  }
   rStockMov();
 }
 
-function rStockMov(){
-  const filtro = document.getElementById('stockMovFiltro');
-  const list = document.getElementById('stockMovList');
-  if(!list) return;
-  
-  // Actualizar filtro con productos
-  if(filtro){
-    const current = filtro.value;
-    filtro.innerHTML = '<option value="">Todos los productos</option>' +
-      S.stock.map(s=>`<option value="${s.id}" ${s.id==current?'selected':''}>${s.nombre}</option>`).join('');
-  }
-  
-  let movs = getStockMov();
-  const filtroVal = filtro?.value;
-  if(filtroVal) movs = movs.filter(m=>m.productoId==filtroVal);
-  
+function _renderMovList(list, movs){
+  const colores = { venta:'var(--bad)', devolucion:'var(--ok)', ajuste:'var(--wrn)', auditoria:'var(--inf)' };
+  const iconos  = { venta:'📤', devolucion:'📥', ajuste:'✏️', auditoria:'🔍' };
   if(!movs.length){
     list.innerHTML = '<div style="color:var(--mut);font-size:.8rem;padding:16px 0;text-align:center">Sin movimientos registrados aún</div>';
     return;
   }
-  
-  const colores = {
-    venta: 'var(--bad)',
-    devolucion: 'var(--ok)',
-    ajuste: 'var(--wrn)',
-    auditoria: 'var(--inf)'
-  };
-  const iconos = { venta:'📤', devolucion:'📥', ajuste:'✏️', auditoria:'🔍' };
-  
   list.innerHTML = movs.slice(0,50).map(m=>`
     <div style="padding:10px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;gap:12px">
       <div style="display:flex;gap:10px;align-items:center">
         <span style="font-size:1rem">${iconos[m.tipo]||'📦'}</span>
         <div>
-          <div style="font-size:.82rem;font-weight:500">${m.nombre}</div>
-          <div style="font-size:.72rem;color:var(--tx2)">${m.motivo} · ${fD(m.fecha)} ${m.hora}</div>
+          <div style="font-size:.82rem;font-weight:500">${esc(m.nombre)}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">${esc(m.motivo||'')} · ${fD(m.fecha)} ${m.hora||''}</div>
         </div>
       </div>
       <div style="text-align:right">
@@ -7169,6 +7147,42 @@ function rStockMov(){
       </div>
     </div>
   `).join('');
+}
+
+async function rStockMov(){
+  const filtro = document.getElementById('stockMovFiltro');
+  const list = document.getElementById('stockMovList');
+  if(!list) return;
+  // Actualizar filtro con productos
+  if(filtro){
+    const current = filtro.value;
+    filtro.innerHTML = '<option value="">Todos los productos</option>' +
+      S.stock.map(s=>`<option value="${s.id}" ${s.id==current?'selected':''}>${esc(s.nombre)}</option>`).join('');
+  }
+  const filtroVal = filtro?.value;
+  // Mostrar cache local inmediatamente
+  let movsLocal = getStockMov();
+  if(filtroVal) movsLocal = movsLocal.filter(m=>m.productoId==filtroVal);
+  _renderMovList(list, movsLocal);
+  // Cargar desde Supabase y actualizar
+  if(currentTenant?.id){
+    try{
+      let q = sb.from('stock_movimientos').select('*').eq('tenant_id', currentTenant.id)
+        .order('created_at',{ascending:false}).limit(200);
+      if(filtroVal) q = q.eq('producto_id', filtroVal);
+      const {data, error} = await q;
+      if(!error && data && data.length){
+        const movs = data.map(m=>({
+          id: m.id, productoId: m.producto_id, nombre: m.nombre,
+          cantidad: m.cantidad, tipo: m.tipo, motivo: m.motivo,
+          fecha: m.fecha, hora: m.hora
+        }));
+        // Sincronizar cache local con datos de Supabase
+        localStorage.setItem(MOV_KEY+'_'+(currentTenant?.id||''), JSON.stringify(movs));
+        _renderMovList(list, movs);
+      }
+    } catch(e){ console.warn('[rStockMov]', e); }
+  }
 }
 
 function rComparativa(){
