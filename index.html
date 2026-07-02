@@ -3879,7 +3879,7 @@ async function loadAll(){
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
-      dbGetConfig('objetivos'), dbGetConfig('movCaja'),
+      dbGetConfig('objetivos'), dbLoad('mov_caja'),
       dbLoadPedidos()
     ]);
     S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
@@ -6482,7 +6482,7 @@ function editMovCaja(id){
 function delMovCaja(id){
   _confirmarModal('¿Eliminar este movimiento?', async ()=>{
     S.movCaja = (S.movCaja||[]).filter(x=>x.id!==id);
-    await dbSetConfig('movCaja', S.movCaja);
+    await dbDelete('mov_caja', id);
     rCajas(); rMovCaja(); rDash();
     showToast('Movimiento eliminado ✓');
   });
@@ -6525,7 +6525,7 @@ async function saveMovCaja(){
   } else {
     S.movCaja.push(obj);
   }
-  await dbSetConfig('movCaja',S.movCaja);
+  await dbUpsert('mov_caja', obj);
   closeM('mMovCaja');
   showToast(existingId?'Movimiento actualizado ✓':'Movimiento registrado ✓');
   rCajas(); rMovCaja(); rDash();
@@ -6613,8 +6613,9 @@ async function guardarCierreDiario(resetear){
     localStorage.setItem('caja_reset_'+(currentTenant?.id||'')+'_'+data.fecha, Date.now());
     // Limpiar movCaja del día para que la caja arranque en cero
     const hoy = tod();
+    const _hoyMovs = (S.movCaja||[]).filter(m => !m.fecha || m.fecha === hoy);
     S.movCaja = (S.movCaja||[]).filter(m => m.fecha && m.fecha !== hoy);
-    try { await dbSetConfig('movCaja', S.movCaja); } catch(e){}
+    try { await Promise.all(_hoyMovs.map(m => dbDelete('mov_caja', m.id))); } catch(e){}
     // Resetear también ventas del día en memoria (solo en pantalla, no borra Supabase)
     // La caja visual queda en $0 porque movCaja está limpio y ventas quedan en Supabase
     // Refresh UI
@@ -12720,7 +12721,7 @@ async function silentRefresh(){
       dbLoad('stock'),dbLoad('equipos'),dbLoad('ventas'),dbLoad('gastos'),
       dbLoad('reparaciones'),dbLoad('precios'),dbGetConfig('meta'),
       dbLoad('inversores'),dbLoad('movimientos_inv'),
-      dbGetConfig('objetivos'),dbGetConfig('movCaja')
+      dbGetConfig('objetivos'),dbLoad('mov_caja')
     ]);
     S.stock=stock;S.equipos=equipos;
     // Deduplicar por turnoId igual que en loadAll()
