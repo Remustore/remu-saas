@@ -32,6 +32,26 @@ window.APP_CONFIG = {
 </script>
 <!-- config.js permite override local de credenciales (ignorado por git) -->
 <script src="config.js" onerror="void 0"></script>
+<script src="https://browser.sentry-cdn.com/8.38.0/bundle.min.js" crossorigin="anonymous"></script>
+<script>
+(function(){
+  const dsn = window.APP_CONFIG?.sentryDsn;
+  if(dsn && typeof Sentry !== 'undefined'){
+    Sentry.init({
+      dsn,
+      environment: 'production',
+      release: 'remu-saas@1.0',
+      tracesSampleRate: 0.05,
+      beforeSend(event){
+        // No enviar errores de extensiones del navegador
+        const url = event.request?.url || '';
+        if(url.includes('chrome-extension') || url.includes('moz-extension')) return null;
+        return event;
+      }
+    });
+  }
+})();
+</script>
 <style>
 :root{
   --bg:#080808;--sur:#0f0f0f;--car:#141414;--car2:#1a1a1a;

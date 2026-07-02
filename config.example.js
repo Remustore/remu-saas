@@ -21,4 +21,7 @@ window.APP_CONFIG = {
 
   // Clave pública "anon key" de Supabase (Settings > API > anon public)
   supabaseAnonKey: 'REEMPLAZAR_CON_TU_SUPABASE_ANON_KEY',
+
+  // DSN de Sentry para monitoreo de errores (sentry.io > tu proyecto > Settings > Client Keys)
+  sentryDsn: 'REEMPLAZAR_CON_TU_SENTRY_DSN',
 };
