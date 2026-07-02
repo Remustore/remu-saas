@@ -6561,32 +6561,52 @@ function cierreDiario(){
       <span style="font-size:.82rem;font-weight:600;color:var(--gld)">${fmt(v)}</span>
     </div>`).join('');
 
-  // Historial de cierres anteriores
-  const cierresKey = 'cierres_caja_'+(currentTenant?.id||'');
-  const historial = JSON.parse(localStorage.getItem(cierresKey)||'[]').slice(-5).reverse();
-  const histRows = historial.map(c=>
-    `<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor);font-size:.76rem">
-      <span style="color:var(--mut)">${esc(c.fecha)} ${esc(c.hora||'')}</span>
-      <span style="color:var(--tx2);font-weight:600">${fmt(c.total)}</span>
-    </div>`).join('');
-
   const m = document.getElementById('mCierreDiario');
   if(!m) return;
   document.getElementById('cdFecha').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'});
   document.getElementById('cdTotal').textContent = fmt(totalCajas);
   document.getElementById('cdMetodos').innerHTML = metodoRows || '<div style="font-size:.8rem;color:var(--mut);padding:6px 0">Sin operaciones registradas</div>';
-  document.getElementById('cdHistorial').innerHTML = histRows || '<div style="font-size:.78rem;color:var(--mut);padding:6px 0">Sin cierres anteriores</div>';
   window.__cierreDiarioData = { total: totalCajas, metodos, fecha: hoy, hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) };
+  // Mostrar historial desde localStorage como cache inmediato
+  const cierresKey = 'cierres_caja_'+(currentTenant?.id||'');
+  const _renderHistCierres = (lista) => {
+    const rows = lista.map(c=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor);font-size:.76rem">
+      <span style="color:var(--mut)">${esc(c.fecha)} ${esc(c.hora||'')}</span>
+      <span style="color:var(--tx2);font-weight:600">${fmt(c.total)}</span>
+    </div>`).join('');
+    const el = document.getElementById('cdHistorial');
+    if(el) el.innerHTML = rows || '<div style="font-size:.78rem;color:var(--mut);padding:6px 0">Sin cierres anteriores</div>';
+  };
+  _renderHistCierres(JSON.parse(localStorage.getItem(cierresKey)||'[]').slice(-5).reverse());
   openM('mCierreDiario');
+  // Actualizar historial desde Supabase en segundo plano
+  if(currentTenant?.id){
+    sb.from('cierres_caja').select('fecha,hora,total').eq('tenant_id',currentTenant.id)
+      .order('created_at',{ascending:false}).limit(5)
+      .then(({data,error})=>{
+        if(!error && data && data.length){
+          localStorage.setItem(cierresKey, JSON.stringify([...data].reverse()));
+          _renderHistCierres(data);
+        }
+      });
+  }
 }
 
 async function guardarCierreDiario(resetear){
   const data = window.__cierreDiarioData;
   if(!data) return;
+  // Cache local
   const cierresKey = 'cierres_caja_'+(currentTenant?.id||'');
   const historial = JSON.parse(localStorage.getItem(cierresKey)||'[]');
   historial.push(data);
   localStorage.setItem(cierresKey, JSON.stringify(historial));
+  // Persistir en Supabase
+  if(currentTenant?.id){
+    sb.from('cierres_caja').insert({
+      tenant_id: currentTenant.id, fecha: data.fecha, hora: data.hora,
+      total: data.total, metodos: data.metodos
+    }).then(({error})=>{ if(error) console.warn('[cierreCaja]', error.message); });
+  }
   closeM('mCierreDiario');
   if(resetear){
     // Guardar timestamp del cierre
@@ -6710,15 +6730,28 @@ function nuevaAuditoria(){
   showToast('Nueva ronda generada ✓');
 }
 
-function rAuditoria(){
+async function rAuditoria(){
   let aud = getAuditoria();
-  
+  // Sincronizar historial desde Supabase (enriquece el cache local si hay más datos)
+  if(currentTenant?.id){
+    try{
+      const {data} = await sb.from('auditorias').select('producto_id,nombre,fecha,cantidad_sistema,cantidad_real,diferencia,motivo')
+        .eq('tenant_id',currentTenant.id).order('fecha',{ascending:false}).limit(300);
+      if(data && data.length > aud.historial.length){
+        aud.historial = data.map(h=>({
+          productoId: h.producto_id, nombre: h.nombre, fecha: h.fecha,
+          cantidadSistema: h.cantidad_sistema, cantidadReal: h.cantidad_real,
+          diferencia: h.diferencia, motivo: h.motivo||''
+        }));
+        saveAuditoria(aud);
+      }
+    } catch(e){ console.warn('[rAuditoria] Supabase fetch:', e); }
+  }
   // Si no hay ronda para hoy, generarla automáticamente
   // También regenerar si los items no coinciden con el stock actual del tenant
   const stockIds = S.stock.map(s=>s.id);
   const audIds = aud.items.map(i=>i.productoId);
   const hayMezcla = audIds.some(id => !stockIds.includes(id));
-  
   if(aud.fecha !== tod() || !aud.items.length || hayMezcla){
     aud = generarRonda();
   }
@@ -6825,19 +6858,23 @@ async function audConfirmar(idx){
     }
   }
 
-  // Agregar al historial
-  aud.historial.push({
-    productoId: item.productoId,
-    nombre: item.nombre,
-    fecha: tod(),
-    cantidadSistema: item.cantidadSistema,
-    cantidadReal: item.cantidadReal,
-    diferencia,
-    motivo: item.motivo || ''
-  });
-
+  // Agregar al historial local
+  const entradaHist = {
+    productoId: item.productoId, nombre: item.nombre, fecha: tod(),
+    cantidadSistema: item.cantidadSistema, cantidadReal: item.cantidadReal,
+    diferencia, motivo: item.motivo || ''
+  };
+  aud.historial.push(entradaHist);
   item.verificado = true;
   saveAuditoria(aud);
+  // Persistir en Supabase
+  if(currentTenant?.id){
+    sb.from('auditorias').insert({
+      tenant_id: currentTenant.id, producto_id: item.productoId, nombre: item.nombre,
+      fecha: tod(), cantidad_sistema: item.cantidadSistema, cantidad_real: item.cantidadReal,
+      diferencia, motivo: item.motivo || ''
+    }).then(({error})=>{ if(error) console.warn('[auditoria]', error.message); });
+  }
   
   const msg = diferencia !== 0 
     ? `Stock corregido: ${item.nombre} → ${item.cantidadReal} uds`
