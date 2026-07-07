@@ -160,7 +160,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;m
 .nav-badge{background:var(--bad);color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:auto;min-width:18px;text-align:center;}
 .ni:hover{background:var(--car);color:var(--tx);}
 .ni.active{background:var(--gld2);color:var(--gld);border-color:rgba(201,168,76,.2);}
-.nico{font-size:.9rem;width:17px;text-align:center;}
+.nico{display:inline-flex;align-items:center;justify-content:center;width:17px;flex-shrink:0;}.nico svg{width:15px;height:15px;stroke-width:1.8;}
 .sbf{margin-top:auto;padding:14px 16px;border-top:1px solid var(--bor);font-size:.67rem;color:var(--tx2);line-height:1.7;}
 .logout-btn{display:flex;align-items:center;gap:7px;padding:8px 12px;margin:6px 7px;border-radius:7px;cursor:pointer;color:var(--bad);font-size:.78rem;font-weight:500;background:rgba(201,82,76,.07);border:1px solid rgba(201,82,76,.15);}
 .logout-btn:hover{background:rgba(201,82,76,.15);}
@@ -881,28 +881,28 @@ $$;</pre>
     <div class="ls" id="sbSub">Sistema de Gestión</div>
   </div>
   <div class="ns">Principal</div>
-  <div class="ni" onclick="go('dashboard')"><span class="nico">◈</span>Inicio</div>
+  <div class="ni" onclick="go('dashboard')"><span class="nico"><i data-lucide="layout-dashboard"></i></span>Inicio</div>
   <!-- TALLER DE CELULARES -->
-  <div class="ni" onclick="go('taller')" id="nav-taller" style="display:none"><span class="nico">🔧</span>Reparaciones</div>
-  <div class="ni" onclick="go('ventas')" id="nav-ventas" style="display:none"><span class="nico">💰</span>Ventas</div>
-  <div class="ni" onclick="go('stock')" id="nav-stock" style="display:none"><span class="nico">📦</span>Productos<span id="stockBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('taller')" id="nav-taller" style="display:none"><span class="nico"><i data-lucide="wrench"></i></span>Reparaciones</div>
+  <div class="ni" onclick="go('ventas')" id="nav-ventas" style="display:none"><span class="nico"><i data-lucide="receipt"></i></span>Ventas</div>
+  <div class="ni" onclick="go('stock')" id="nav-stock" style="display:none"><span class="nico"><i data-lucide="package"></i></span>Productos<span id="stockBadge" class="nav-badge" style="display:none">0</span></div>
   <!-- BARBERÍA / SALÓN -->
-  <div class="ni" onclick="go('turnos')" id="nav-turnos" style="display:none"><span class="nico">📆</span>Agenda del día</div>
-  <div class="ni" onclick="go('clientes')" id="nav-clientes" style="display:none"><span class="nico">👥</span>Clientes</div>
+  <div class="ni" onclick="go('turnos')" id="nav-turnos" style="display:none"><span class="nico"><i data-lucide="calendar"></i></span>Agenda del día</div>
+  <div class="ni" onclick="go('clientes')" id="nav-clientes" style="display:none"><span class="nico"><i data-lucide="users"></i></span>Clientes</div>
   <!-- COMPARTIDOS -->
-  <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline" style="display:none"><span class="nico">🔗</span>Reservas online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
-  <div class="ni" onclick="go('gastos')" id="nav-gastos" style="display:none"><span class="nico">💵</span>Caja y Gastos</div>
-  <div class="ni" onclick="go('analisis')" id="nav-analisis" style="display:none"><span class="nico">📊</span>Análisis</div>
-  <div class="ni" onclick="go('precios')" id="nav-precios" style="display:none"><span class="nico">🏷</span>Mis precios</div>
-  <div class="ni" onclick="go('pedidos')" id="nav-pedidos" style="display:none"><span class="nico">📋</span>Pedidos<span id="pedidosBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('turnosOnline')" id="nav-turnosOnline" style="display:none"><span class="nico"><i data-lucide="calendar-check"></i></span>Reservas online<span id="solicitudesBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('gastos')" id="nav-gastos" style="display:none"><span class="nico"><i data-lucide="wallet"></i></span>Caja y Gastos</div>
+  <div class="ni" onclick="go('analisis')" id="nav-analisis" style="display:none"><span class="nico"><i data-lucide="bar-chart-2"></i></span>Análisis</div>
+  <div class="ni" onclick="go('precios')" id="nav-precios" style="display:none"><span class="nico"><i data-lucide="tag"></i></span>Mis precios</div>
+  <div class="ni" onclick="go('pedidos')" id="nav-pedidos" style="display:none"><span class="nico"><i data-lucide="clipboard-list"></i></span>Pedidos<span id="pedidosBadge" class="nav-badge" style="display:none">0</span></div>
   <!-- INTERNOS (siempre ocultos en sidebar) -->
-  <div class="ni" onclick="go('equipos')" id="nav-equipos" style="display:none"><span class="nico">▤</span>Equipos</div>
-  <div class="ni" onclick="go('auditoria')" id="nav-auditoria" style="display:none"><span class="nico">📋</span>Control Stock</div>
-  <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec" style="display:none"><span class="nico">🔧</span>Turnos técnicos</div>
-  <div class="ni" onclick="go('fichasClientes')" id="nav-fichas" style="display:none"><span class="nico">📋</span>Fichas</div>
-  <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos" style="display:none"><span class="nico">🔒</span>Turnos fijos</div>
-  <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico">⏳</span>Lista de espera</div>
-  <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico">🎯</span>Objetivos de compra</div>
+  <div class="ni" onclick="go('equipos')" id="nav-equipos" style="display:none"><span class="nico"><i data-lucide="smartphone"></i></span>Equipos</div>
+  <div class="ni" onclick="go('auditoria')" id="nav-auditoria" style="display:none"><span class="nico"><i data-lucide="clipboard-check"></i></span>Control Stock</div>
+  <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec" style="display:none"><span class="nico"><i data-lucide="calendar-clock"></i></span>Turnos técnicos</div>
+  <div class="ni" onclick="go('fichasClientes')" id="nav-fichas" style="display:none"><span class="nico"><i data-lucide="file-text"></i></span>Fichas</div>
+  <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos" style="display:none"><span class="nico"><i data-lucide="lock"></i></span>Turnos fijos</div>
+  <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico"><i data-lucide="clock"></i></span>Lista de espera</div>
+  <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico"><i data-lucide="target"></i></span>Objetivos de compra</div>
   <div class="sbf" id="sbFooter">
     <div style="font-weight:600;margin-bottom:4px;color:var(--tx)" id="sbBizName"></div>
     <div id="sbUserEmail" style="margin-bottom:10px"></div>
@@ -1011,7 +1011,7 @@ $$;</pre>
       </div>
       <div class="card" style="margin-bottom:14px" id="dashQuickBtns">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="_initVTipoSelect();openM('mVenta',null);go('ventas')">
+          <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="abrirVentaRapida();go('ventas')">
             <span style="font-size:1.1rem">💰</span> Registrar venta
           </button>
           <button class="btn bgh" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mTaller',null);go('taller')">
@@ -1098,7 +1098,7 @@ $$;</pre>
     <!-- VENTAS -->
     <div class="sec" id="sec-ventas">
       <div class="pt">Ventas</div><div class="ps">Registro de operaciones</div>
-      <div class="card"><div class="ch"><h3></h3><button class="btn bg" onclick="_initVTipoSelect();openM('mVenta',null)">+ Registrar venta</button></div>
+      <div class="card"><div class="ch"><h3></h3><button class="btn bg" onclick="abrirVentaRapida()">+ Registrar venta</button></div>
       <div class="tw"><table><thead><tr><th>Fecha</th><th>Descripción</th><th class="col-hide">Cant.</th><th class="col-hide">Precio</th><th>Total</th><th class="col-hide">Pago</th><th></th></tr></thead><tbody id="tbV"></tbody></table></div></div>
     </div>
 
@@ -1727,6 +1727,60 @@ $$;</pre>
 <div class="fr"><div><label>Proveedor / Vendedor</label><input id="eProvNombre" placeholder="Nombre del proveedor"></div><div><label>Tel. proveedor</label><input id="eProvTel" type="tel" placeholder="11 2345 6789"></div></div>
 <div class="fr full"><div><label>Observaciones</label><textarea id="eNot" placeholder="Opcional..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mEquipo')">Cancelar</button><button class="btn bg" onclick="saveEquipo()">Guardar</button></div></div></div>
+
+<!-- Venta Rápida -->
+<div class="mb" id="mVentaRapida">
+  <div class="md" style="max-width:380px">
+    <div class="mh">
+      <div class="mt2">Nueva venta</div>
+      <button class="xbtn" onclick="closeM('mVentaRapida')">✕</button>
+    </div>
+    <div class="mc" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" id="vrProdId">
+      <!-- Buscador de producto -->
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Producto</label>
+        <input type="text" id="vrBuscar" placeholder="Buscá un producto..." autocomplete="off"
+          style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem"
+          oninput="vrBuscarProd(this.value)">
+        <div id="vrSugg" style="display:none;border:1px solid var(--bor);border-radius:8px;margin-top:4px;overflow:hidden;max-height:180px;overflow-y:auto;background:var(--bg2)"></div>
+      </div>
+      <!-- Producto seleccionado -->
+      <div id="vrSelBox" style="display:none;background:var(--bg2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px">
+        <div id="vrNombre" style="font-weight:700;font-size:.95rem"></div>
+        <div id="vrPrecioLabel" style="color:var(--gld);font-weight:700;font-size:.85rem;margin-top:2px"></div>
+      </div>
+      <!-- Cantidad y método -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Cantidad</label>
+          <input type="number" id="vrCant" value="1" min="1"
+            style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:1.1rem;font-weight:700;text-align:center"
+            oninput="vrActualizarTotal()">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Método de pago</label>
+          <select id="vrMet" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.82rem">
+            <option>Efectivo</option>
+            <option>Transferencia</option>
+            <option>Mercado Pago</option>
+            <option>Tarjeta débito</option>
+            <option>Tarjeta crédito</option>
+          </select>
+        </div>
+      </div>
+      <!-- Total -->
+      <div id="vrTotalBox" style="display:none;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Total a cobrar</div>
+        <div id="vrTotal" style="font-size:1.8rem;font-weight:900;color:var(--gld)"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeM('mVentaRapida')">Cancelar</button>
+      <button class="btn bg" id="vrConfBtn" onclick="confirmarVentaRapida()" style="flex:1" disabled>Confirmar venta</button>
+    </div>
+  </div>
+</div>
 
 <!-- Venta -->
 <div class="mb" id="mVenta"><div class="md"><div class="mh"><div class="mt2" id="mVentaTitle">Registrar Venta</div><button class="xbtn" onclick="closeM('mVenta')">✕</button></div>
@@ -2938,10 +2992,10 @@ async function loadTenants(){
     return `
     <div class="tenant-row" style="flex-direction:column;align-items:flex-start;gap:10px">
       <div style="display:flex;align-items:center;gap:10px;width:100%">
-        <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">${emoji||t.nombre.slice(0,1).toUpperCase()}</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">${emoji||esc(t.nombre.slice(0,1).toUpperCase())}</div>
         <div style="flex:1;min-width:0">
-          <div class="tenant-name">${t.nombre} ${autoReg}</div>
-          <div class="tenant-email">${t.rubro||'Sin rubro'} · Registrado: ${fechaReg}</div>
+          <div class="tenant-name">${esc(t.nombre)} ${autoReg}</div>
+          <div class="tenant-email">${esc(t.rubro||'Sin rubro')} · Registrado: ${fechaReg}</div>
         </div>
         <span class="tenant-badge ${t.activo?'t-active':'t-inactive'}">${t.activo?'Activo':'Inactivo'}</span>
       </div>
@@ -4083,6 +4137,7 @@ function openM(id, editId){
     if(id==='mPrecio'){ el.querySelector('.mt2').textContent='Agregar Servicio'; initPrCatSelect(''); const _pd=document.getElementById('prDur'); if(_pd) _pd.value='30'; }
   }
   el.classList.add('open');
+  if(id==='mVenta' && !editId){ popVSels(); document.getElementById('vFec').value=tod(); }
   if(editId) fillModalEdit(id, editId);
 }
 
@@ -4244,16 +4299,81 @@ async function saveStock(){
   closeM('mStock'); rStock(); updateStockNotif(); showToast('Producto guardado ✓');
 }
 
+// ── Venta Rápida ──────────────────────────────────────────────
+function abrirVentaRapida(){
+  openM('mVentaRapida', null);
+  document.getElementById('vrProdId').value = '';
+  document.getElementById('vrBuscar').value = '';
+  document.getElementById('vrSugg').style.display = 'none';
+  document.getElementById('vrSelBox').style.display = 'none';
+  document.getElementById('vrTotalBox').style.display = 'none';
+  document.getElementById('vrCant').value = 1;
+  document.getElementById('vrConfBtn').disabled = true;
+  setTimeout(()=>document.getElementById('vrBuscar').focus(), 80);
+}
+
 function abrirVentaDesdeProd(prodId){
-  // Pre-llenar modal de venta con el producto de stock seleccionado
-  openM('mVenta', null);
-  const vTipo = document.getElementById('vTipo');
-  if(vTipo){ vTipo.value = 'producto'; uVUI(); }
-  // Esperar que popVSels() llene el select, luego seleccionar el producto
-  setTimeout(()=>{
-    const vProd = document.getElementById('vProd');
-    if(vProd){ vProd.value = String(prodId); autoFillPrecio(); }
-  }, 80);
+  openM('mVentaRapida', null);
+  document.getElementById('vrBuscar').value = '';
+  document.getElementById('vrSugg').style.display = 'none';
+  document.getElementById('vrCant').value = 1;
+  vrSeleccionarProd(prodId);
+}
+
+function vrBuscarProd(q){
+  const box = document.getElementById('vrSugg');
+  if(!q){ box.style.display='none'; return; }
+  const resultados = S.stock.filter(s=>s.cantidad>0 && s.nombre.toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  if(!resultados.length){ box.style.display='none'; return; }
+  box.innerHTML = resultados.map(s=>
+    `<div onclick="vrSeleccionarProd(${s.id})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <span style="font-size:.88rem">${esc(s.nombre)}</span>
+      <span style="font-size:.8rem;color:var(--gld);font-weight:700;white-space:nowrap;margin-left:8px">${fmt(s.precio)}</span>
+    </div>`
+  ).join('');
+  box.style.display = 'block';
+}
+
+function vrSeleccionarProd(prodId){
+  const prod = S.stock.find(s=>s.id===prodId);
+  if(!prod) return;
+  document.getElementById('vrProdId').value = prodId;
+  document.getElementById('vrBuscar').value = prod.nombre;
+  document.getElementById('vrSugg').style.display = 'none';
+  document.getElementById('vrNombre').textContent = prod.nombre;
+  document.getElementById('vrPrecioLabel').textContent = fmt(prod.precio)+' c/u — stock: '+prod.cantidad;
+  document.getElementById('vrSelBox').style.display = 'block';
+  document.getElementById('vrTotalBox').style.display = 'block';
+  document.getElementById('vrConfBtn').disabled = false;
+  vrActualizarTotal();
+  setTimeout(()=>document.getElementById('vrCant').focus(), 50);
+}
+
+function vrActualizarTotal(){
+  const prodId = parseInt(document.getElementById('vrProdId').value);
+  const prod   = S.stock.find(s=>s.id===prodId);
+  const cant   = parseInt(document.getElementById('vrCant').value)||1;
+  if(prod) document.getElementById('vrTotal').textContent = fmt(prod.precio * cant);
+}
+
+async function confirmarVentaRapida(){
+  const prodId = parseInt(document.getElementById('vrProdId').value);
+  const prod   = S.stock.find(s=>s.id===prodId);
+  if(!prod) return;
+  const cant   = parseInt(document.getElementById('vrCant').value)||1;
+  const metodo = document.getElementById('vrMet').value;
+  if(cant > prod.cantidad){ showToast('Stock insuficiente (disponible: '+prod.cantidad+')'); return; }
+  const venta = {id:Date.now(), tipo:'producto', nombre:prod.nombre, productoId:prod.id,
+    cantidad:cant, precio:prod.precio, total:prod.precio*cant,
+    costo:prod.costo||0, metodo, fecha:tod(), comPct:0, comision:0};
+  S.ventas.push(venta);
+  await dbUpsert('ventas', venta);
+  prod.cantidad -= cant;
+  await dbUpsert('stock', prod);
+  registrarMovStock(prod.id, prod.nombre, -cant, 'venta', 'Venta rápida');
+  closeM('mVentaRapida');
+  showToast('✓ Venta registrada — '+fmt(venta.total));
+  rStock(); rVentas();
 }
 
 async function delStock(id){
@@ -5021,7 +5141,7 @@ function verEstadisticasTaller(){
 
       ${tiemposProm.length?`<div style="font-size:.72rem;font-weight:600;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-top:14px;margin-bottom:8px">⏱ Trabajos activos — días en taller</div>
       ${tiemposProm.slice(0,5).map(t=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bor);font-size:.82rem">
-        <span>${t.cliente} — ${t.equipo||'—'}</span>
+        <span>${esc(t.cliente)} — ${esc(t.equipo||'—')}</span>
         <span style="color:${t.dias>5?'var(--bad)':t.dias>2?'var(--wrn)':'var(--ok)'};font-weight:600">${t.dias}d</span>
       </div>`).join('')}`:''}
     </div>
@@ -8567,15 +8687,15 @@ function rTurnos(){
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-weight:600;font-size:.95rem">${t.cliente}</span>
+            <span style="font-weight:600;font-size:.95rem">${esc(t.cliente)}</span>
             ${t.esFijo?'<span style="font-size:.68rem;font-weight:700;color:var(--gld);background:rgba(201,168,76,.18);padding:2px 7px;border-radius:10px">🔒 Fijo</span>':''}
             ${estadoBadge[t.estado]||''}
             ${t.precio>0?`<span style="font-size:.78rem;color:var(--gld);font-weight:600">${fmt(t.precio)}</span>`:''}
           </div>
           <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
-            🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ✂ ${t.servicioNombre} &nbsp;·&nbsp; 👤 ${t.empleadoNombre}
+            🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ✂ ${esc(t.servicioNombre||'')} &nbsp;·&nbsp; 👤 ${esc(t.empleadoNombre||'')}
           </div>
-          ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${t.notas}</div>`:''}
+          ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${esc(t.notas)}</div>`:''}
         </div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;flex-shrink:0">
           ${acciones[t.estado] || acciones['confirmado']}
@@ -14420,11 +14540,11 @@ function rAccionesRapidas(){
 
   var btns = esBarb ? [
     { em:'➕', lbl:'Turno rápido',    clr:'var(--gld)', action:"go('turnos');setTimeout(function(){openM('mTurno',null)},300)" },
-    { em:'💰', lbl:'Registrar cobro', clr:'var(--ok)',  action:"openM('mVenta',null);go('ventas')" },
+    { em:'💰', lbl:'Registrar cobro', clr:'var(--ok)',  action:"abrirVentaRapida();go('ventas')" },
     { em:'👤', lbl:'Cliente nuevo',   clr:'var(--inf)', action:"go('clientes')" }
   ] : [
     { em:'🔧', lbl:'Equipo nuevo',    clr:'var(--wrn)', action:"openM('mTaller',null);go('taller')" },
-    { em:'💰', lbl:'Registrar venta', clr:'var(--ok)',  action:"openM('mVenta',null);go('ventas')" },
+    { em:'💰', lbl:'Registrar venta', clr:'var(--ok)',  action:"abrirVentaRapida();go('ventas')" },
     { em:'📋', lbl:'Pedido nuevo',    clr:'var(--inf)', action:"go('pedidos');setTimeout(function(){openM('mPedido',null)},300)" }
   ];
 
@@ -17602,5 +17722,6 @@ async function _mFCS_sinCobro(){
 
 })();
 </script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="lucide.createIcons()"></script>
 </body>
 </html>
