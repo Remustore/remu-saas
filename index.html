@@ -110,6 +110,18 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;m
 .login-btn:hover{background:var(--gll);}
 .login-err{color:var(--bad);font-size:.78rem;margin-top:10px;display:none;}
 .login-loading{color:var(--mut);font-size:.78rem;margin-top:10px;display:none;}
+.login-forgot{color:var(--tx2);font-size:.72rem;margin-top:14px;cursor:pointer;text-align:center;display:block;background:none;border:none;font-family:var(--fb);width:100%;}
+.login-forgot:hover{color:var(--gld);}
+/* MODAL CONTRASEÑA */
+#passResetModal{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:10000;padding:20px;}
+.pass-box{background:var(--sur);border:1px solid var(--bor2);border-radius:16px;padding:36px;width:100%;max-width:380px;}
+.pass-box h3{font-family:var(--fh);font-size:1.1rem;font-weight:700;color:var(--tx);margin-bottom:6px;}
+.pass-box p{font-size:.78rem;color:var(--tx2);margin-bottom:16px;line-height:1.6;}
+.pass-box label{display:block;font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px;margin-top:12px;}
+.pass-box input{width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:11px 14px;border-radius:8px;font-family:var(--fb);font-size:.88rem;outline:none;transition:border .15s;}
+.pass-box input:focus{border-color:var(--gld);}
+.pass-box-msg{font-size:.78rem;margin-top:10px;text-align:center;display:none;}
+.pass-box-cancel{width:100%;margin-top:8px;padding:10px;background:none;border:1px solid var(--bor2);color:var(--tx2);border-radius:8px;cursor:pointer;font-family:var(--fb);font-size:.82rem;}
 
 /* SUPERADMIN PANEL */
 #superadminScreen{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;z-index:9997;overflow-y:auto;}
@@ -614,6 +626,7 @@ textarea{resize:vertical;min-height:70px;}
     <button class="login-btn" onclick="doLogin()" id="loginBtn">Ingresar</button>
     <div class="login-err" id="loginErr">Email o contraseña incorrectos</div>
     <div class="login-loading" id="loginLoading">Verificando...</div>
+    <button class="login-forgot" onclick="mostrarOlvidePass()">¿Olvidaste tu contraseña?</button>
   </div>
 
   <!-- Branded login box - shown when tenant has logo -->
@@ -638,12 +651,39 @@ textarea{resize:vertical;min-height:70px;}
       </button>
       <div id="loginErrBranded" style="color:#e07070;font-size:.78rem;margin-top:10px;text-align:center;display:none">Email o contraseña incorrectos</div>
       <div id="loginLoadingBranded" style="color:rgba(255,255,255,.4);font-size:.78rem;margin-top:10px;text-align:center;display:none">Verificando...</div>
+      <button onclick="mostrarOlvidePass()" style="width:100%;margin-top:12px;padding:0;background:none;border:none;color:rgba(255,255,255,.35);font-size:.72rem;cursor:pointer;font-family:var(--fb);text-align:center;">¿Olvidaste tu contraseña?</button>
     </div>
   </div>
 
   <style>
   @keyframes logoIn{from{opacity:0;transform:scale(.9) translateY(-10px)}to{opacity:1;transform:none}}
   </style>
+</div>
+
+<!-- MODAL: RECUPERAR / CAMBIAR CONTRASEÑA -->
+<div id="passResetModal">
+  <div class="pass-box">
+    <h3 id="passResetTitle">Recuperar contraseña</h3>
+    <p id="passResetDesc">Ingresá tu email y te mandamos un link para crear una nueva contraseña.</p>
+    <!-- Paso 1: enviar link por email -->
+    <div id="passResetStep1">
+      <label>Email</label>
+      <input type="email" id="passResetEmail" placeholder="tu@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')enviarLinkRecuperacion()">
+      <button class="login-btn" style="margin-top:16px" onclick="enviarLinkRecuperacion()">Enviar link de recuperación</button>
+      <div class="pass-box-msg" id="passResetMsg"></div>
+      <button class="pass-box-cancel" onclick="cerrarPassReset()">Cancelar</button>
+    </div>
+    <!-- Paso 2: ingresar nueva contraseña (recovery link o cambio desde panel) -->
+    <div id="passResetStep2" style="display:none">
+      <label>Nueva contraseña</label>
+      <input type="password" id="passNueva" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')guardarNuevaContrasena()">
+      <label>Repetir contraseña</label>
+      <input type="password" id="passNueva2" placeholder="Repetir contraseña" onkeydown="if(event.key==='Enter')guardarNuevaContrasena()">
+      <button class="login-btn" style="margin-top:16px" onclick="guardarNuevaContrasena()">Guardar nueva contraseña</button>
+      <div class="pass-box-msg" id="passNuevaMsg"></div>
+      <button class="pass-box-cancel" id="passResetCancelBtn2" onclick="cerrarPassReset()">Cancelar</button>
+    </div>
+  </div>
 </div>
 
 <!-- SUPERADMIN PANEL -->
@@ -910,6 +950,7 @@ $$;</pre>
     <span onclick="doUndo()" style="color:var(--gld);cursor:pointer;font-size:.73rem">↩ Deshacer</span>
   </div>
   <div id="btnCambiarNegocio" onclick="_mostrarSelectorTenant(window.__adminExternoTenants||[])" style="display:none;align-items:center;gap:8px;padding:9px 16px;margin:0 8px 6px;border-radius:8px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25);color:#c9a84c;cursor:pointer;font-size:.78rem;font-weight:600;font-family:var(--fb)">⇄ Cambiar negocio</div>
+  <div class="logout-btn" style="color:var(--tx2);background:rgba(255,255,255,.04);border-color:var(--bor2);margin-bottom:4px" onclick="abrirCambioContrasena()">🔑 Cambiar contraseña</div>
   <div class="logout-btn" onclick="doLogout()">⎋ Cerrar sesión</div>
   <div class="logout-btn" style="color:var(--bad);margin-top:4px;font-size:.72rem" onclick="borrarTodosMisDatos()">🗑 Borrar todos mis datos</div>
 </div>
@@ -2234,6 +2275,13 @@ const sb = supabase.createClient(SURL, SKEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 });
 
+// Detectar PASSWORD_RECOVERY lo antes posible — antes del init IIFE — para no perder
+// el evento en flujos PKCE donde Supabase procesa el ?code= durante getSession().
+let _recoveryPending = false;
+sb.auth.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') _recoveryPending = true;
+});
+
 // ═══ ESCAPE DE HTML — previene XSS ═══
 // Usá esc() para todo valor de base de datos que se inserte en innerHTML.
 // DOMPurify está disponible para casos donde necesites renderizar HTML de usuario.
@@ -2365,6 +2413,92 @@ async function doLogin(){
   } finally {
     btn.disabled=false; lod.style.display='none';
   }
+}
+
+// ── Recuperación / cambio de contraseña ──────────────────────────────────────
+let _passRecoveryFlow = false; // true cuando el user llegó via link de email
+
+function mostrarOlvidePass(){
+  document.getElementById('passResetTitle').textContent = 'Recuperar contraseña';
+  document.getElementById('passResetDesc').textContent = 'Ingresá tu email y te mandamos un link para crear una nueva contraseña.';
+  document.getElementById('passResetStep1').style.display = '';
+  document.getElementById('passResetStep2').style.display = 'none';
+  // Pre-llenar con el email ya ingresado, ya sea en el box default o el branded
+  const preEmail = (document.getElementById('loginUser')?.value.trim() || '')
+                || (document.getElementById('loginUser2')?.value.trim() || '');
+  document.getElementById('passResetEmail').value = preEmail;
+  document.getElementById('passResetMsg').style.display = 'none';
+  document.getElementById('passResetModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('passResetEmail').focus(), 100);
+}
+
+async function enviarLinkRecuperacion(){
+  const email = document.getElementById('passResetEmail').value.trim().toLowerCase();
+  const msg = document.getElementById('passResetMsg');
+  if(!email){
+    msg.textContent = 'Ingresá tu email.';
+    msg.style.color = 'var(--bad)'; msg.style.display = 'block'; return;
+  }
+  msg.textContent = 'Enviando...'; msg.style.color = 'var(--tx2)'; msg.style.display = 'block';
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/' });
+  if(error){
+    msg.textContent = error.message || 'Error al enviar. Verificá el email.';
+    msg.style.color = 'var(--bad)';
+  } else {
+    msg.textContent = '✓ Link enviado. Revisá tu email (también la carpeta de spam).';
+    msg.style.color = 'var(--ok)';
+  }
+}
+
+function abrirCambioContrasena(){
+  document.getElementById('passResetTitle').textContent = 'Cambiar contraseña';
+  document.getElementById('passResetDesc').textContent = 'Elegí una nueva contraseña para tu cuenta.';
+  document.getElementById('passResetStep1').style.display = 'none';
+  document.getElementById('passResetStep2').style.display = '';
+  document.getElementById('passNueva').value = '';
+  document.getElementById('passNueva2').value = '';
+  document.getElementById('passNuevaMsg').style.display = 'none';
+  document.getElementById('passResetCancelBtn2').style.display = '';
+  document.getElementById('passResetModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('passNueva').focus(), 100);
+}
+
+async function guardarNuevaContrasena(){
+  const p1 = document.getElementById('passNueva').value;
+  const p2 = document.getElementById('passNueva2').value;
+  const msg = document.getElementById('passNuevaMsg');
+  if(!p1 || p1.length < 6){
+    msg.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    msg.style.color = 'var(--bad)'; msg.style.display = 'block'; return;
+  }
+  if(p1 !== p2){
+    msg.textContent = 'Las contraseñas no coinciden.';
+    msg.style.color = 'var(--bad)'; msg.style.display = 'block'; return;
+  }
+  msg.textContent = 'Guardando...'; msg.style.color = 'var(--tx2)'; msg.style.display = 'block';
+  const { error } = await sb.auth.updateUser({ password: p1 });
+  if(error){
+    msg.textContent = error.message || 'Error al guardar. Intentá de nuevo.';
+    msg.style.color = 'var(--bad)';
+  } else {
+    msg.textContent = '✓ Contraseña actualizada correctamente.';
+    msg.style.color = 'var(--ok)';
+    setTimeout(async () => {
+      cerrarPassReset();
+      if(_passRecoveryFlow){
+        // vino de link de email → cerrar sesión y volver al login
+        _passRecoveryFlow = false;
+        await sb.auth.signOut();
+        document.getElementById('loginScreen').style.display = 'flex';
+      } else {
+        showToast('Contraseña actualizada', 'ok');
+      }
+    }, 1500);
+  }
+}
+
+function cerrarPassReset(){
+  document.getElementById('passResetModal').style.display = 'none';
 }
 
 // ── Admin Externo: login multi-tenant ─────────────────────────────────────────
@@ -13200,8 +13334,29 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
     return;
   }
 
-
+  // getSession() garantiza que la inicialización de Supabase está completa —
+  // es aquí donde se procesa el ?code= de PKCE o el token del hash legacy,
+  // y donde el listener de módulo puede haber recibido PASSWORD_RECOVERY.
   const { data: { session } } = await sb.auth.getSession();
+
+  // ── Recovery link de contraseña ───────────────────────────────────────────
+  if(_recoveryPending){
+    _passRecoveryFlow = true;
+    history.replaceState({}, '', window.location.pathname);
+    document.getElementById('loadingScreen').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('passResetTitle').textContent = 'Crear nueva contraseña';
+    document.getElementById('passResetDesc').textContent = 'Ingresá la nueva contraseña para tu cuenta.';
+    document.getElementById('passResetStep1').style.display = 'none';
+    document.getElementById('passResetStep2').style.display = '';
+    document.getElementById('passNueva').value = '';
+    document.getElementById('passNueva2').value = '';
+    document.getElementById('passNuevaMsg').style.display = 'none';
+    document.getElementById('passResetCancelBtn2').style.display = 'none';
+    document.getElementById('passResetModal').style.display = 'flex';
+    setTimeout(() => document.getElementById('passNueva').focus(), 200);
+    return;
+  }
   if(session){
     currentUser = session.user;
     const { data: td } = await sb.from('tenants').select('*').eq('id', session.user.user_metadata?.tenant_id).single();
