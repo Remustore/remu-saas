@@ -13,6 +13,10 @@ serve(async (req) => {
     const { email, nombre, tenantId } = await req.json();
     if (!email) return new Response(JSON.stringify({ error: 'email required' }), { status: 400 });
 
+    const escHtml = (s: string) => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    const safeNombre = escHtml(nombre||'');
+    const safeEmail  = escHtml(email||'');
+
     const html = `
 <!DOCTYPE html>
 <html lang="es">
@@ -24,11 +28,11 @@ serve(async (req) => {
       <div style="font-size:.78rem;color:#585044;margin-top:4px;letter-spacing:.5px">Sistema de gestión profesional</div>
     </div>
     <div style="padding:32px">
-      <p style="color:#f5f0e8;font-size:1.1rem;font-weight:600;margin:0 0 12px">¡Bienvenido${nombre ? ', ' + nombre : ''}! 🎉</p>
+      <p style="color:#f5f0e8;font-size:1.1rem;font-weight:600;margin:0 0 12px">¡Bienvenido${safeNombre ? ', ' + safeNombre : ''}! 🎉</p>
       <p style="color:#a89880;font-size:.9rem;line-height:1.7;margin:0 0 20px">Tu cuenta en Remu Gestión fue creada exitosamente. Tenés <strong style="color:#c9a84c">30 días de prueba gratuita</strong> con acceso completo a todas las funcionalidades.</p>
       <div style="background:#080808;border:1px solid #1e1e1e;border-radius:8px;padding:16px;margin-bottom:24px">
         <div style="font-size:.72rem;color:#585044;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Tus datos de acceso</div>
-        <div style="font-size:.88rem;color:#f5f0e8">📧 ${email}</div>
+        <div style="font-size:.88rem;color:#f5f0e8">📧 ${safeEmail}</div>
       </div>
       <a href="${APP_URL}" style="display:inline-block;background:#c9a84c;color:#080808;font-weight:700;font-size:.9rem;padding:14px 28px;border-radius:8px;text-decoration:none;margin-bottom:24px">Ingresar al sistema →</a>
       <p style="color:#585044;font-size:.78rem;line-height:1.6;margin:0">¿Necesitás ayuda? Escribinos por <a href="https://wa.me/5493472628087" style="color:#c9a84c">WhatsApp</a> o respondé este email.</p>
