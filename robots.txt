@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /landing.html
+Allow: /terminos.html
+Allow: /privacidad.html
+Allow: /p/
+Disallow: /index.html
+Disallow: /b/
+
+Sitemap: https://remugestion.ar/sitemap.xml
