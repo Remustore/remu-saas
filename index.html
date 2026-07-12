@@ -3840,7 +3840,9 @@ async function guardarEdicionTenant(id){
 async function toggleTenant(id, activo){
   if(!confirm(`¿${activo?'Desactivar':'Activar'} este cliente?`)) return;
   const { error } = await sb.from('tenants').update({ activo: !activo }).eq('id', id);
-  if(!error) loadTenants();
+  if(error){ showSaMsg('Error al actualizar: ' + error.message, 'err'); return; }
+  showSaMsg(activo ? 'Cliente desactivado' : 'Cliente activado', 'ok');
+  loadTenants();
 }
 
 async function eliminarTenantDefinitivo(id, nombre){
