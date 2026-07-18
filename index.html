@@ -8702,9 +8702,8 @@ function avisarHorarioEmpleado(empId){
 }
 
 function enviarRecordatorioWA(id){
-  const turnos = getTurnos();
   const sid = String(id);
-  const t = turnos.find(x=>String(x.id)===sid);
+  const t = getTurnos().find(x=>String(x.id)===sid);
   if(!t||!t.tel) return alert('Este cliente no tiene teléfono registrado');
   if(t.avisado){
     let hace = '';
@@ -8726,14 +8725,19 @@ Te recordamos tu turno en *${negocio}*:
 
 ¡Te esperamos! Si no podés asistir avisanos con anticipación. 🙏`;
   const tel = t.tel.replace(/\D/g,'');
-  window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`,'_blank');
-  const idx = turnos.findIndex(x=>String(x.id)===sid);
-  if(idx>=0){
-    turnos[idx] = {...turnos[idx], avisado:true, avisadoAt:new Date().toISOString()};
-    saveTurnosLocal(turnos);
-  }
-  rTurnos();
-  mostrarAvisosDaily();
+  const waUrl = `https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`;
+  document.getElementById('waMB').textContent = msg;
+  document.querySelector('#mWA .mt2').textContent = `📲 Recordatorio — ${esc(t.cliente)}`;
+  document.getElementById('waLink').onclick = () => {
+    window.open(waUrl, '_blank');
+    const all = getTurnos();
+    const idx = all.findIndex(x=>String(x.id)===sid);
+    if(idx>=0){ all[idx] = {...all[idx], avisado:true, avisadoAt:new Date().toISOString()}; saveTurnosLocal(all); }
+    closeM('mWA');
+    rTurnos();
+    mostrarAvisosDaily();
+  };
+  openM('mWA', null);
 }
 
 function rTurnos(){
