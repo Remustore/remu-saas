@@ -2128,6 +2128,12 @@ $$;</pre>
 <div class="mf" style="border-top:none;padding:0"><button class="btn bs" onclick="cpWA()">Copiar</button><button class="btn bg" id="waLink">Abrir WhatsApp</button><button class="btn" onclick="closeM('mWA')">Cerrar</button></div>
 </div></div></div>
 
+<!-- Avisar equipo por WA -->
+<div class="mb" id="mAvisarEquipo"><div class="md"><div class="mh"><div class="mt2">📲 Avisar equipo</div><button class="xbtn" onclick="closeM('mAvisarEquipo')">✕</button></div>
+<div class="mc" id="mAvisarEquipoBody"></div>
+<div class="mf"><button class="btn" onclick="closeM('mAvisarEquipo')">Cerrar</button></div>
+</div></div>
+
 <!-- Gasto -->
 <div class="mb" id="mGasto"><div class="md"><div class="mh"><div class="mt2" id="mGastoTitulo">Registrar Gasto</div><button class="xbtn" onclick="closeM('mGasto')">✕</button></div>
 <div class="mc"><input type="hidden" id="gId">
@@ -9230,7 +9236,9 @@ async function sincronizarServiciosTurno(){
   }
 }
 
-// Envía WA con el listado completo de turnos del día a cada empleado
+let _avisarItems = [];
+
+// Muestra modal con un botón por empleado en lugar de abrir pestañas automáticamente
 function avisarEquipoDia(){
   const fecha = document.getElementById('turnosFecha')?.value || tod();
   const cfg = getTurnosCfg();
@@ -9247,14 +9255,39 @@ function avisarEquipoDia(){
       : `No hay turnos asignados a empleados con teléfono para el ${fD(fecha)}.`;
     return alert(msg);
   }
-  conTurnos.forEach((e, i)=>{
+  _avisarItems = conTurnos.map(e=>{
     const misTurnos = turnos.filter(t=>String(t.empleadoId)===String(e.id)).sort((a,b)=>a.hora.localeCompare(b.hora));
-    const lista = misTurnos.map(t=>`• ${t.hora} — ${esc(t.cliente)} (${esc(t.servicioNombre||'servicio')})`).join('\n');
+    const lista = misTurnos.map(t=>`• ${t.hora} — ${t.cliente} (${t.servicioNombre||'servicio'})`).join('\n');
     const texto = `Hola ${e.nombre}! 👋\n\nTus turnos del *${fD(fecha)}* en *${negocio}*:\n\n${lista}\n\nTotal: *${misTurnos.length} turno${misTurnos.length>1?'s':''}* 💪`;
-    setTimeout(()=>{ window.open(`https://wa.me/549${e.tel}?text=${encodeURIComponent(texto)}`,'_blank'); }, i*400);
+    return { nombre: e.nombre, texto, tel: e.tel, count: misTurnos.length };
   });
-  if(sinTel.length) showToast(`Avisando a ${conTurnos.length} profesional${conTurnos.length>1?'es':''}. Sin tel: ${sinTel.map(e=>e.nombre).join(', ')}`);
-  else showToast(`Avisando a ${conTurnos.length} profesional${conTurnos.length>1?'es':''}...`);
+  const body = document.getElementById('mAvisarEquipoBody');
+  body.innerHTML = _avisarItems.map((it,i)=>`
+    <div style="border:1px solid var(--br);border-radius:8px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>${esc(it.nombre)}</strong>
+        <span style="font-size:.78rem;color:var(--tx2)">${it.count} turno${it.count>1?'s':''}</span>
+      </div>
+      <div class="wa-box" style="font-size:.75rem;max-height:90px;overflow-y:auto;margin-bottom:8px">${esc(it.texto)}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn bs bsm" onclick="_avisarCopy(${i})">Copiar</button>
+        <button class="btn bg bsm" onclick="_avisarWA(${i})">📲 Abrir WhatsApp</button>
+      </div>
+    </div>`).join('');
+  if(sinTel.length) body.innerHTML += `<p style="font-size:.78rem;color:var(--tx2);margin:4px 0 0">Sin teléfono: ${sinTel.map(e=>esc(e.nombre)).join(', ')}</p>`;
+  const title = document.querySelector('#mAvisarEquipo .mt2');
+  if(title) title.textContent = `📲 Avisar equipo — ${fD(fecha)}`;
+  openM('mAvisarEquipo', null);
+}
+
+function _avisarWA(i){
+  const it = _avisarItems[i];
+  if(it) window.open(`https://wa.me/549${it.tel}?text=${encodeURIComponent(it.texto)}`, '_blank');
+}
+
+function _avisarCopy(i){
+  const it = _avisarItems[i];
+  if(it) navigator.clipboard.writeText(it.texto).then(()=>showToast('Copiado ✓'));
 }
 
 // ═══ BLOQUEOS DE DISPONIBILIDAD ═══
