@@ -7200,18 +7200,37 @@ function exportarExcel(){
   // Hoja Turnos (solo salon)
   if(tFilt.length){
     const turnosData = [
-      ['Fecha','Cliente','Servicio','Empleado','Precio','Comisión','Neto local','Método de pago'],
+      ['Fecha','Cliente','Servicio','Sector','Empleado','Precio','Comisión','Neto local','Método de pago'],
       ...tFilt.map(t=>{
         const com = comTurnoXl(t);
-        return [t.fecha, t.cliente||'', t.servicioNombre||'', empMap[String(t.empleadoId)]||'', t.precio||0, com, (t.precio||0)-com, t.metodo||''];
+        return [t.fecha, t.cliente||'', t.servicioNombre||'', t.sector||'', empMap[String(t.empleadoId)]||'', t.precio||0, com, (t.precio||0)-com, t.metodo||''];
       })
     ];
     const tTotal = tFilt.reduce((a,t)=>a+(t.precio||0),0);
     const tCom   = tFilt.reduce((a,t)=>a+comTurnoXl(t),0);
     turnosData.push(['','','','','TOTAL',tTotal,tCom,tTotal-tCom,'']);
     const ws0 = XLSX.utils.aoa_to_sheet(turnosData);
-    ws0['!cols'] = [{wch:12},{wch:25},{wch:25},{wch:20},{wch:12},{wch:12},{wch:12},{wch:18}];
+    ws0['!cols'] = [{wch:12},{wch:25},{wch:25},{wch:16},{wch:20},{wch:12},{wch:12},{wch:12},{wch:18}];
     XLSX.utils.book_append_sheet(wb, ws0, 'Turnos');
+
+    // Hoja Por sector
+    const secMap = {};
+    tFilt.forEach(t=>{
+      const s = t.sector||'Sin sector';
+      if(!secMap[s]) secMap[s] = {cantidad:0, ingresos:0, comisiones:0};
+      const com = comTurnoXl(t);
+      secMap[s].cantidad++;
+      secMap[s].ingresos += t.precio||0;
+      secMap[s].comisiones += com;
+    });
+    const secData = [
+      ['Sector','Turnos','Ingresos','Comisiones','Neto sector'],
+      ...Object.entries(secMap).sort((a,b)=>b[1].ingresos-a[1].ingresos).map(([s,d])=>[s, d.cantidad, d.ingresos, d.comisiones, d.ingresos-d.comisiones])
+    ];
+    secData.push(['TOTAL', tFilt.length, tTotal, tCom, tTotal-tCom]);
+    const wsSec = XLSX.utils.aoa_to_sheet(secData);
+    wsSec['!cols'] = [{wch:20},{wch:8},{wch:14},{wch:14},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsSec, 'Por sector');
   }
 
   // Hoja Reparaciones / Trabajos (solo taller, entregados en el período)
@@ -7344,11 +7363,23 @@ function exportarPDF(){
   const neto = totalIng - tC - tG - totCom - totalCostosRep;
 
   let turnosRows = '';
+  let sectorRows = '';
   if(tFilt.length){
     turnosRows = tFilt.map(t=>{
       const _com = comTurno(t), _pct = empPctMap[String(t.empleadoId)]||0;
-      return `<tr><td>${t.fecha}</td><td>${t.cliente||''}</td><td>${t.servicioNombre||''}</td><td>${empMap[String(t.empleadoId)]||''}</td><td>${fN(t.precio||0)}</td><td style="color:#c9524c">${_com>0?fN(_com)+' ('+_pct+'%)':'-'}</td><td>${t.metodo||''}</td></tr>`;
+      return `<tr><td>${t.fecha}</td><td>${t.cliente||''}</td><td>${t.servicioNombre||''}</td><td>${t.sector||''}</td><td>${empMap[String(t.empleadoId)]||''}</td><td>${fN(t.precio||0)}</td><td style="color:#c9524c">${_com>0?fN(_com)+' ('+_pct+'%)':'-'}</td><td>${t.metodo||''}</td></tr>`;
     }).join('');
+    const secMap = {};
+    tFilt.forEach(t=>{
+      const s = t.sector||'Sin sector';
+      if(!secMap[s]) secMap[s] = {cantidad:0, ingresos:0, comisiones:0};
+      const com = comTurno(t);
+      secMap[s].cantidad++;
+      secMap[s].ingresos += t.precio||0;
+      secMap[s].comisiones += com;
+    });
+    sectorRows = Object.entries(secMap).sort((a,b)=>b[1].ingresos-a[1].ingresos)
+      .map(([s,d])=>`<tr><td><strong>${s}</strong></td><td style="text-align:center">${d.cantidad}</td><td>${fN(d.ingresos)}</td><td style="color:#c9524c">${d.comisiones>0?fN(d.comisiones):'-'}</td><td style="color:green">${fN(d.ingresos-d.comisiones)}</td></tr>`).join('');
   }
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -7379,9 +7410,13 @@ function exportarPDF(){
   </div>
 
   ${tFilt.length?`<h2>✂ Servicios / Turnos (${tFilt.length})</h2>
-  <table><tr><th>Fecha</th><th>Cliente</th><th>Servicio</th><th>Empleado</th><th>Precio</th><th>Comisión</th><th>Pago</th></tr>
+  <table><tr><th>Fecha</th><th>Cliente</th><th>Servicio</th><th>Sector</th><th>Empleado</th><th>Precio</th><th>Comisión</th><th>Pago</th></tr>
   ${turnosRows}
-  <tr class="total"><td colspan="4">TOTAL</td><td>${fN(tT)}</td><td style="color:#c9524c">${totCom>0?fN(totCom):'-'}</td><td></td></tr></table>`:''}
+  <tr class="total"><td colspan="5">TOTAL</td><td>${fN(tT)}</td><td style="color:#c9524c">${totCom>0?fN(totCom):'-'}</td><td></td></tr></table>
+  <h2>📂 Resumen por sector</h2>
+  <table><tr><th>Sector</th><th>Turnos</th><th>Ingresos</th><th>Comisiones</th><th>Neto sector</th></tr>
+  ${sectorRows}
+  <tr class="total"><td>TOTAL</td><td style="text-align:center">${tFilt.length}</td><td>${fN(tT)}</td><td style="color:#c9524c">${totCom>0?fN(totCom):'-'}</td><td style="color:green">${fN(tT-totCom)}</td></tr></table>`:''}
 
   ${repFilt.length?`<h2>🔧 Reparaciones / Trabajos (${repFilt.length})</h2>
   <table><tr><th>Entrega</th><th>Cliente</th><th>Equipo</th><th>Presupuesto</th><th>Costo+Flete</th><th>Ganancia</th><th>Pago</th></tr>
