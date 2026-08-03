@@ -5619,8 +5619,9 @@ async function marcarPedidoLlego(id){
 // Si no hay match (era una compra especial que nunca se cargó al stock), no se toca el inventario.
 async function _entregarPedidoCliente(p){
   const items = _pedidoItems(p);
-  items.forEach((it,i)=>{
-    if(!it.nombre) return;
+  for(let i=0; i<items.length; i++){
+    const it = items[i];
+    if(!it.nombre) continue;
     const cantidad = it.cantidad||1;
     let costo = 0;
     const match = (S.stock||[]).find(s=>(s.nombre||'').trim().toLowerCase()===it.nombre.trim().toLowerCase());
@@ -5628,13 +5629,13 @@ async function _entregarPedidoCliente(p){
       match.cantidad -= cantidad;
       match.vendidos = (match.vendidos||0) + cantidad;
       costo = (match.costo||0) * cantidad;
-      dbUpsert('stock', match);
+      await dbUpsert('stock', match);
       registrarMovStock(match.id, match.nombre, -cantidad, 'venta', 'Pedido entregado: '+p.nombre);
     }
     const venta = {id:Date.now()+i, tipo:'producto', nombre:it.nombre, cantidad, precio:it.precio||0, total:cantidad*(it.precio||0), costo, metodo:'Efectivo', fecha:tod(), comPct:0, comision:0};
     S.ventas.unshift(venta);
-    dbUpsert('ventas', venta);
-  });
+    await dbUpsert('ventas', venta);
+  }
   if(typeof rVentas==='function') rVentas();
   if(typeof rStock==='function') rStock();
 }
@@ -5642,22 +5643,22 @@ async function _entregarPedidoCliente(p){
 // Pedido a proveedor recibido: los ítems se suman al stock (o se crean si no existían).
 async function _recibirPedidoProveedor(p){
   const items = _pedidoItems(p);
-  items.forEach(it=>{
-    if(!it.nombre) return;
+  for(const it of items){
+    if(!it.nombre) continue;
     const cantidad = it.cantidad||1;
     const match = (S.stock||[]).find(s=>(s.nombre||'').trim().toLowerCase()===it.nombre.trim().toLowerCase());
     if(match){
       match.cantidad = (match.cantidad||0) + cantidad;
       if(it.precio>0) match.costo = it.precio;
-      dbUpsert('stock', match);
+      await dbUpsert('stock', match);
       registrarMovStock(match.id, match.nombre, cantidad, 'ajuste', 'Recibido de proveedor: '+p.nombre);
     } else {
       const nuevo = {id:Date.now()+Math.floor(Math.random()*1000), nombre:it.nombre, categoria:'General', cantidad, minimo:3, precio:0, costo:it.precio||0, vendidos:0, notas:'Agregado desde pedido a proveedor'};
       S.stock.push(nuevo);
-      dbUpsert('stock', nuevo);
+      await dbUpsert('stock', nuevo);
       registrarMovStock(nuevo.id, nuevo.nombre, cantidad, 'ajuste', 'Recibido de proveedor: '+p.nombre);
     }
-  });
+  }
   if(typeof rStock==='function') rStock();
 }
 
@@ -9581,11 +9582,11 @@ function getFichaCliente(nombre){
   return fichas[nombre.toLowerCase()] || {nombre, color:'', largo:'', alergias:'', notas:'', ultimaVisita:''};
 }
 
-function guardarFichaCliente(ficha){
+async function guardarFichaCliente(ficha){
   const fichas = getFichas();
   fichas[ficha.nombre.toLowerCase()] = ficha;
   saveFichas(fichas);
-  persistCfgToSupabase().catch(()=>{});
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
 }
 
 function rFichasClientes(){
@@ -12490,11 +12491,11 @@ function getFichaCli(nombre){
   return getFichasCli()[normNomCli(nombre)] || {colorCodigo:'', alergias:'', notas:''};
 }
 
-function saveFichaCli(nombre, data){
+async function saveFichaCli(nombre, data){
   const fichas = getFichasCli();
   fichas[normNomCli(nombre)] = {...(fichas[normNomCli(nombre)]||{}), ...data};
   localStorage.setItem(_fCliKey(), JSON.stringify(fichas));
-  persistCfgToSupabase().catch(()=>{});
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); }
 }
 
 function abrirFichaCli(nombre){
@@ -14990,14 +14991,16 @@ function rSmartAlerts(){
   var _orig = eliminarServicioTurno;
   eliminarServicioTurno = function(id){
     if(typeof _confirmarModal==='function'){
-      _confirmarModal('¿Eliminar este servicio?', function(){
+      _confirmarModal('¿Eliminar este servicio?', async function(){
         var cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : null;
         if(!cfg) return;
         cfg.servicios = cfg.servicios.filter(function(s){ return s.id!==id; });
         if(typeof TURNOS_CFG_KEY!=='undefined' && typeof currentTenant!=='undefined'){
           localStorage.setItem(TURNOS_CFG_KEY+'_'+(currentTenant?currentTenant.id:''), JSON.stringify(cfg));
         }
-        if(typeof persistCfgToSupabase==='function') persistCfgToSupabase();
+        if(typeof persistCfgToSupabase==='function'){
+          try{ await persistCfgToSupabase(); }catch(e){ if(typeof showToast==='function') showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
+        }
         if(typeof rTurnosConfig==='function') rTurnosConfig();
         if(typeof showToast==='function') showToast('Servicio eliminado ✓');
       });
