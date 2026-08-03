@@ -4120,9 +4120,10 @@ async function loadAll(){
       if(cfgRow){
         const tKey = TURNOS_CFG_KEY + '_' + tid;
         const oKey = ONLINE_CFG_KEY  + '_' + tid;
-        if(cfgRow.__turnosCfg && !localStorage.getItem(tKey))
+        // Siempre aplicar desde Supabase: es la fuente de verdad (cada guardado local hace await a Supabase)
+        if(cfgRow.__turnosCfg)
           localStorage.setItem(tKey, JSON.stringify(cfgRow.__turnosCfg));
-        if(cfgRow.__onlineCfg && !localStorage.getItem(oKey))
+        if(cfgRow.__onlineCfg)
           localStorage.setItem(oKey, JSON.stringify(cfgRow.__onlineCfg));
         if(cfgRow.__fichasCli){
           const fKey = FICHAS_KEY + '_' + tid;
@@ -7809,13 +7810,13 @@ function esBloqueadoEnFecha(bloqueos, fecha, hora){
   });
 }
 
-function saveTurnosConfig(){
+async function saveTurnosConfig(){
   const cfg = getTurnosCfg();
   cfg.apertura = document.getElementById('horApertura')?.value || '09:00';
   cfg.cierre = document.getElementById('horCierre')?.value || '20:00';
   cfg.dias = [...document.querySelectorAll('.diasSalon:checked')].map(c=>parseInt(c.value));
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
   showToast('Configuración guardada ✓');
 }
 
@@ -9385,7 +9386,7 @@ function rBloqueosList(empId){
     }).join('');
 }
 
-function guardarBloqueo(){
+async function guardarBloqueo(){
   const empId = document.getElementById('bloqueoEmpId').value;
   const tipo = document.getElementById('bloqueoTipo').value;
   const horaIni = document.getElementById('bloqueoHoraIni').value;
@@ -9414,7 +9415,7 @@ function guardarBloqueo(){
   if(!emp.bloqueos) emp.bloqueos=[];
   emp.bloqueos.push(bloqueo);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); console.error('persistCfgToSupabase error (guardarBloqueo):', e); return; }
   // Para dia_unico: sincronizar slots bloqueados en turnos_solicitudes (visible en página pública)
   // y auto-cancelar turnos manuales que caigan en ese horario
   let _toastMsg = 'Bloqueo agregado ✓';
@@ -9450,7 +9451,7 @@ function guardarBloqueo(){
   showToast(_toastMsg);
 }
 
-function eliminarBloqueo(empId, bloqueoId){
+async function eliminarBloqueo(empId, bloqueoId){
   if(!confirm('¿Eliminar este bloqueo?')) return;
   const cfg = getTurnosCfg();
   const emp = cfg.empleados.find(e=>String(e.id)===String(empId));
@@ -9458,7 +9459,7 @@ function eliminarBloqueo(empId, bloqueoId){
   const _blqObj=(emp.bloqueos||[]).find(b=>String(b.id)===String(bloqueoId));
   emp.bloqueos=(emp.bloqueos||[]).filter(b=>String(b.id)!==String(bloqueoId));
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); console.error('persistCfgToSupabase error (eliminarBloqueo):', e); return; }
   // Para dia_unico: liberar slots en turnos_solicitudes
   if(_blqObj?.tipo==='dia_unico'){
     const [_ah,_am]=(cfg.apertura||'09:00').split(':').map(Number);
@@ -9477,7 +9478,7 @@ function eliminarBloqueo(empId, bloqueoId){
   showToast('Bloqueo eliminado ✓');
 }
 
-function agregarEmpleado(){
+async function agregarEmpleado(){
   const nombre = prompt('Nombre del empleado:');
   if(!nombre) return;
   const sectores = prompt('Sectores que atiende (ej: Peluquería, Manicuria)') || '';
@@ -9486,12 +9487,12 @@ function agregarEmpleado(){
   const cfg = getTurnosCfg();
   cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean), comision, tel});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
   rTurnosConfig();
   showToast('Empleado agregado ✓');
 }
 
-function editarEmpleado(id){
+async function editarEmpleado(id){
   const cfg = getTurnosCfg();
   const e = cfg.empleados.find(x=>x.id===id);
   if(!e) return;
@@ -9502,17 +9503,17 @@ function editarEmpleado(id){
   const tel = (prompt('WhatsApp del empleado (para avisarle sus turnos):', e.tel||'') || '').replace(/\D/g,'');
   e.nombre=nombre; e.sectores=sectores.split(',').map(s=>s.trim()).filter(Boolean); e.comision=comision; e.tel=tel;
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e2){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
   rTurnosConfig();
   showToast('Empleado actualizado ✓');
 }
 
-function eliminarEmpleado(id){
+async function eliminarEmpleado(id){
   if(!confirm('¿Eliminar este empleado?')) return;
   const cfg = getTurnosCfg();
   cfg.empleados = cfg.empleados.filter(e=>e.id!==id);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
   rTurnosConfig();
 }
 
@@ -10077,7 +10078,7 @@ function handleLogoUpload(input){
   reader.readAsDataURL(file);
 }
 
-function saveOnlineConfig(){
+async function saveOnlineConfig(){
   const cfg = {
     mensaje: document.getElementById('onlineMensaje')?.value||'',
     insta: document.getElementById('onlineInsta')?.value||'',
@@ -10088,7 +10089,7 @@ function saveOnlineConfig(){
     idioma: document.getElementById('onlineIdioma')?.value||'es'
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  persistCfgToSupabase();
+  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
   showToast('Configuración guardada ✓');
 }
 
