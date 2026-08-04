@@ -1483,7 +1483,11 @@ $$;</pre>
         </div>
         <div id="onlineLogoPreview" style="margin-bottom:4px"></div>
         <div style="font-size:.72rem;color:var(--mut)">Aparece en tu página de turnos, lista de precios y catálogo público.</div>
-        <button class="btn bg" style="margin-top:14px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
+        <label style="margin-top:14px">📲 Mensaje de recordatorio WhatsApp</label>
+        <textarea id="onlineMsgRecordatorio" rows="7" placeholder="Dejá vacío para usar el mensaje por defecto" style="width:100%;box-sizing:border-box;margin-bottom:4px;resize:vertical"></textarea>
+        <div style="font-size:.72rem;color:var(--mut);margin-bottom:4px">Variables disponibles: <code>{cliente}</code> <code>{negocio}</code> <code>{fecha}</code> <code>{hora}</code> <code>{servicio}</code> <code>{empleado}</code> <code>{direccion}</code></div>
+        <button class="btn bgh bsm" style="margin-bottom:10px;font-size:.75rem" onclick="document.getElementById('onlineMsgRecordatorio').value=msgRecordatorioDefault()">↺ Restaurar por defecto</button>
+        <button class="btn bg" style="margin-top:4px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
       <!-- Reservas online -->
@@ -8738,6 +8742,36 @@ function avisarHorarioEmpleado(empId){
   mostrarAvisosDaily();
 }
 
+function msgRecordatorioDefault(){
+  return `Hola {cliente} 👋
+
+Te recordamos tu turno en *{negocio}*:
+
+📅 *Fecha:* {fecha}
+🕐 *Hora:* {hora}
+✂ *Servicio:* {servicio}
+👤 *Con:* {empleado}{direccionLine}
+
+¡Te esperamos! Si no podés asistir avisanos con anticipación. 🙏`;
+}
+
+function buildMsgRecordatorio(t){
+  const oc = getOnlineCfg();
+  const negocio = currentTenant?.nombre||'el salón';
+  const direccion = oc.direccion||'';
+  const template = oc.msgRecordatorio || msgRecordatorioDefault();
+  const direccionLine = direccion ? `\n📍 *Dirección:* ${direccion}` : '';
+  return template
+    .replace(/\{cliente\}/g, t.cliente||'')
+    .replace(/\{negocio\}/g, negocio)
+    .replace(/\{fecha\}/g, fD(t.fecha))
+    .replace(/\{hora\}/g, t.hora||'')
+    .replace(/\{servicio\}/g, t.servicioNombre||'')
+    .replace(/\{empleado\}/g, t.empleadoNombre||'')
+    .replace(/\{direccion\}/g, direccion)
+    .replace(/\{direccionLine\}/g, direccionLine);
+}
+
 function enviarRecordatorioWA(id){
   const sid = String(id);
   const t = getTurnos().find(x=>String(x.id)===sid);
@@ -8750,17 +8784,7 @@ function enviarRecordatorioWA(id){
     }
     if(!confirm(`Ya se envió recordatorio a ${t.cliente}${hace}. ¿Enviar de nuevo?`)) return;
   }
-  const negocio = currentTenant?.nombre||'el salón';
-  const msg = `Hola ${t.cliente} 👋
-
-Te recordamos tu turno en *${negocio}*:
-
-📅 *Fecha:* ${fD(t.fecha)}
-🕐 *Hora:* ${t.hora}
-✂ *Servicio:* ${t.servicioNombre}
-👤 *Con:* ${t.empleadoNombre}
-
-¡Te esperamos! Si no podés asistir avisanos con anticipación. 🙏`;
+  const msg = buildMsgRecordatorio(t);
   const tel = t.tel.replace(/\D/g,'');
   const waUrl = `https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`;
   document.getElementById('waMB').textContent = msg;
@@ -9832,7 +9856,7 @@ async function rTurnosOnline(){
 
   // Solo actualizar inputs si el usuario NO está escribiendo en alguno de ellos.
   // silentRefresh() llama a esta función cada 30 seg — sin este check borra lo que el usuario está tipeando.
-  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel','onlineNotaPrecios'];
+  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel','onlineNotaPrecios','onlineMsgRecordatorio'];
   const _editando = _cfgInputIds.includes(document.activeElement?.id);
   if(!_editando){
     if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
@@ -9840,6 +9864,7 @@ async function rTurnosOnline(){
     if(document.getElementById('onlineDireccion')) document.getElementById('onlineDireccion').value = cfg.direccion||'';
     if(document.getElementById('onlineTel')) document.getElementById('onlineTel').value = cfg.tel||'';
     if(document.getElementById('onlineNotaPrecios')) document.getElementById('onlineNotaPrecios').value = cfg.notaPrecios||'';
+    if(document.getElementById('onlineMsgRecordatorio')) document.getElementById('onlineMsgRecordatorio').value = cfg.msgRecordatorio||'';
     if(document.getElementById('onlineIdioma')) document.getElementById('onlineIdioma').value = cfg.idioma||'es';
     const _logo = cfg.logo||'';
     if(document.getElementById('onlineLogo')) document.getElementById('onlineLogo').value = _logo;
@@ -10001,13 +10026,14 @@ async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
   // Open WA to notify client
   if(tel){
     const neg = currentTenant?.nombre||'el negocio';
+    const _dir = getOnlineCfg().direccion||'';
     const msg = `Hola ${nombre} 👋
 
 Tu turno en *${neg}* fue *confirmado* ✅
 
 📅 *Fecha:* ${fecha}
 🕐 *Hora:* ${hora}
-🔧 *Servicio:* ${servicio}
+🔧 *Servicio:* ${servicio}${_dir?`\n📍 *Dirección:* ${_dir}`:''}
 
 ¡Te esperamos!`;
     window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
@@ -10051,11 +10077,12 @@ async function cancelarReservaOnline(id, nombre, tel, fecha, hora){
 
 function waRespuestaSolicitud(nombre, tel, estado, fecha, hora){
   const neg = currentTenant?.nombre||'el negocio';
+  const _dir = getOnlineCfg().direccion||'';
   let msg = estado==='confirmado'
     ? `Hola ${nombre} 👋
 
 Tu turno en *${neg}* fue *confirmado* ✅
-📅 ${fecha} a las ${hora}
+📅 ${fecha} a las ${hora}${_dir?`\n📍 ${_dir}`:''}
 
 ¡Te esperamos!`
     : `Hola ${nombre}, te recordamos tu solicitud de turno en *${neg}*. ¿Confirmamos para el ${fecha} a las ${hora}?`;
@@ -10087,7 +10114,8 @@ async function saveOnlineConfig(){
     tel: (document.getElementById('onlineTel')?.value||'').replace(/\D/g,''),
     notaPrecios: document.getElementById('onlineNotaPrecios')?.value||'',
     logo: document.getElementById('onlineLogo')?.value||'',
-    idioma: document.getElementById('onlineIdioma')?.value||'es'
+    idioma: document.getElementById('onlineIdioma')?.value||'es',
+    msgRecordatorio: document.getElementById('onlineMsgRecordatorio')?.value||''
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
