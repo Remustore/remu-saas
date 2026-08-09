@@ -25,7 +25,7 @@ serve(async (req) => {
     // Turnos del mes actual terminados
     const { data: turnos } = await sb
       .from('turnos_solicitudes')
-      .select('fecha, hora, cliente, servicio, precio, empleado_nombre, estado, metodo_pago')
+      .select('fecha, hora, nombre, servicio_nombre, precio, empleado_nombre, estado, metodo')
       .eq('tenant_id', tenantId)
       .eq('estado', 'terminado')
       .gte('fecha', mesActual + '-01')
@@ -35,7 +35,7 @@ serve(async (req) => {
     const en7dias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
     const { data: proximos } = await sb
       .from('turnos_solicitudes')
-      .select('fecha, hora, cliente, servicio, empleado_nombre, estado')
+      .select('fecha, hora, nombre, servicio_nombre, empleado_nombre, estado')
       .eq('tenant_id', tenantId)
       .in('estado', ['confirmado', 'pendiente'])
       .gte('fecha', hoy)
@@ -68,7 +68,7 @@ serve(async (req) => {
     const proxRows = listaProx.slice(0, 15).map(t => `
       <tr>
         <td style="padding:7px 14px;color:#a89880;font-size:.82rem">${t.fecha} ${t.hora}</td>
-        <td style="padding:7px 14px;color:#f5f0e8;font-size:.82rem">${t.cliente || ''}</td>
+        <td style="padding:7px 14px;color:#f5f0e8;font-size:.82rem">${t.nombre || ''}</td>
         <td style="padding:7px 14px;color:#a89880;font-size:.82rem">${t.empleado_nombre || ''}</td>
         <td style="padding:7px 14px;font-size:.82rem"><span style="background:${t.estado==='confirmado'?'rgba(76,175,125,.15)':'rgba(201,168,76,.12)'};color:${t.estado==='confirmado'?'#4caf7d':'#c9a84c'};padding:2px 8px;border-radius:10px">${t.estado}</span></td>
       </tr>`).join('');
