@@ -972,6 +972,7 @@ $$;</pre>
       <div class="tb-sync"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">Conectado</span></div>
       <div class="tb-user" id="tbUser"></div><button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bor2);color:var(--tx);padding:5px 10px;border-radius:7px;font-size:.75rem;cursor:pointer;margin-left:8px" title="Alternar modo">🌙</button>
       <button style="background:none;border:1px solid var(--bor);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" onclick="descargarBackup()">💾</button>
+      <button id="btnGestionUsuarios" onclick="gestionarUsuarios(currentTenant?.id)" style="display:none;background:none;border:1px solid var(--bor);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" title="Gestionar usuarios">👥</button>
       <button id="saBackBtn" onclick="volverAlSuperadmin()" style="display:none;align-items:center;gap:5px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gld);padding:5px 12px;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;">⚙ Volver al panel</button>
     </div>
   </div>
@@ -1310,6 +1311,7 @@ $$;</pre>
           <button class="btn bg" style="padding:7px 14px;font-size:.8rem" onclick="go('turnosConfig')">⚙ Configurar turnos</button>
           <button class="btn bs bsm" onclick="avisarEquipoDia()" title="Enviar a cada profesional sus turnos del día por WhatsApp">📲 Avisar equipo</button>
           <button class="btn bg bsm" onclick="openNuevoTurno()">+ Nuevo turno</button>
+          <button id="empCierreBtn" class="btn bsm" style="display:none;background:rgba(201,168,76,.15);color:var(--gld);border:1px solid rgba(201,168,76,.3)" onclick="cierreEmpleada(window.currentEmpleadoNombre)">💅 Mi cierre de hoy</button>
         </div>
       </div>
 
@@ -1353,14 +1355,14 @@ $$;</pre>
       <div id="preciosLinkBox" style="margin-bottom:14px"></div>
 
       <!-- Sectores y servicios -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" id="cardSectoresServicios" style="margin-bottom:14px">
         <div class="ch"><h3>✂ Sectores y servicios</h3><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="sincronizarPreciosTurno()">🔄 Sincronizar precios</button><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div></div>
         <div style="font-size:.74rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">📌 Estos son los servicios que tus clientes ven y pueden reservar online (con precio y duración) en tu página pública — el link está arriba. <strong>Los precios se cargan y editan en "Lista de Precios"</strong>; si los cambiás ahí, tocá "🔄 Sincronizar precios" para que se reflejen acá.</div>
         <div id="serviciosTurnosList"></div>
       </div>
 
       <!-- Empleados -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" id="cardGestionEmpleados" style="margin-bottom:14px">
         <div class="ch"><h3>👤 Empleados</h3><button class="btn bg bsm" onclick="agregarEmpleado()">+ Agregar</button></div>
         <div id="empleadosList"></div>
         <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:.75rem;color:var(--tx2)">
@@ -1370,8 +1372,16 @@ $$;</pre>
 
       <!-- CAJA POR EMPLEADA -->
       <div class="card" style="margin-bottom:14px">
-        <div class="ch"><h3>💰 Caja por empleada — hoy</h3>
-          <input type="date" id="cajEmpFecha" onchange="rCajaEmpleadas()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+        <div class="ch">
+          <h3 id="cajEmpTitle">💰 Caja por empleada — hoy</h3>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="cajEmpModo" onchange="cajEmpCambiarModo()" style="padding:5px 8px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+              <option value="dia">📅 Día</option>
+              <option value="mes">📆 Mes</option>
+            </select>
+            <input type="date" id="cajEmpFecha" onchange="rCajaEmpleadas()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+            <input type="month" id="cajEmpMes" onchange="rCajaEmpleadas()" style="display:none;padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+          </div>
         </div>
         <div id="cajaEmpleadasGrid"></div>
       </div>
@@ -1386,7 +1396,7 @@ $$;</pre>
       </div>
 
       <!-- Sincronización online -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" id="cardSyncOnline" style="margin-bottom:14px">
         <div class="ch"><h3>🔄 Sincronización turnos online</h3></div>
         <div style="font-size:.78rem;color:var(--tx2);margin-bottom:12px;line-height:1.6">
           Si ves horarios bloqueados en el turnero público que no aparecen en el calendario, usá este botón para limpiar datos huérfanos y resincronizar desde el estado actual.
@@ -1403,7 +1413,7 @@ $$;</pre>
       </div>
 
       <!-- Horarios -->
-      <div class="card">
+      <div class="card" id="cardHorarioSalon">
         <div class="ch"><h3>🕐 Horario del salón</h3></div>
         <div class="fr">
           <div><label>Apertura</label><input type="time" id="horApertura" value="09:00" onchange="saveTurnosConfig()"></div>
@@ -2714,6 +2724,9 @@ function setupApp(){
   // Si es empleado, ocultar todo excepto turnos y fichas
   if(currentRole === 'empleado'){
     aplicarModoEmpleado();
+  } else {
+    const _ugBtn = document.getElementById('btnGestionUsuarios');
+    if(_ugBtn) _ugBtn.style.display = '';
   }
   // Auto backup diario
   const hoyKey = 'lastBackup_' + (currentTenant?.id||'');
@@ -3222,8 +3235,8 @@ function _renderUsersModal(t){
         <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--bor)">
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:12px">+ AGREGAR USUARIO</div>
           <input type="hidden" id="uaTenantId" value="${esc(t.id)}">
-          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre</label>
-          <input id="uaNombre" placeholder="Ej: María González" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre <span style="color:var(--mut);font-weight:400;text-transform:none">(para empleados: igual al nombre en la lista de turnos)</span></label>
+          <input id="uaNombre" placeholder="Ej: DELFI, Fiore..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
           <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Email</label>
           <input id="uaEmail" type="email" placeholder="usuario@negocio.com" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:10px;font-family:var(--fb)">
           <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Contraseña</label>
@@ -9543,21 +9556,56 @@ async function eliminarEmpleado(id){
 }
 
 // ═══ CAJA POR EMPLEADA ═══
+function cajEmpCambiarModo(){
+  const modo = document.getElementById('cajEmpModo')?.value || 'dia';
+  const fechaEl = document.getElementById('cajEmpFecha');
+  const mesEl = document.getElementById('cajEmpMes');
+  const titleEl = document.getElementById('cajEmpTitle');
+  if(modo === 'mes'){
+    fechaEl.style.display = 'none';
+    mesEl.style.display = '';
+    if(!mesEl.value) mesEl.value = tod().substring(0,7);
+    if(titleEl) titleEl.textContent = '💰 Caja por empleada — mes';
+  } else {
+    fechaEl.style.display = '';
+    mesEl.style.display = 'none';
+    if(!fechaEl.value) fechaEl.value = tod();
+    if(titleEl) titleEl.textContent = '💰 Caja por empleada — hoy';
+  }
+  rCajaEmpleadas();
+}
+
 function rCajaEmpleadas(){
   const el = document.getElementById('cajaEmpleadasGrid');
   if(!el) return;
+  const modo = document.getElementById('cajEmpModo')?.value || 'dia';
   const fechaEl = document.getElementById('cajEmpFecha');
+  const mesEl = document.getElementById('cajEmpMes');
   if(!fechaEl.value) fechaEl.value = tod();
-  const fecha = fechaEl.value;
   const cfg = getTurnosCfg();
-  const turnos = getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado'&&t.precio>0);
 
-  if(!cfg.empleados.length){
+  let turnos;
+  if(modo === 'mes'){
+    if(!mesEl.value) mesEl.value = tod().substring(0,7);
+    const mes = mesEl.value;
+    turnos = getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes)&&t.estado==='terminado'&&t.precio>0);
+  } else {
+    const fecha = fechaEl.value;
+    turnos = getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado'&&t.precio>0);
+  }
+
+  let empleados = cfg.empleados;
+  // Si está logueado como empleada, mostrar solo su propia caja
+  if(currentRole === 'empleado' && window.currentEmpleadoNombre){
+    empleados = empleados.filter(e=>e.nombre===window.currentEmpleadoNombre);
+  }
+
+  if(!empleados.length){
     el.innerHTML='<div style="color:var(--mut);font-size:.8rem;padding:12px">Agregá empleadas primero</div>';
     return;
   }
 
-  el.innerHTML = cfg.empleados.map(e=>{
+  el.innerHTML = empleados.map(e=>{
     const tEmp = turnos.filter(t=>t.empleadoId==e.id);
     const total = tEmp.reduce((a,t)=>a+t.precio,0);
     const comision = Math.round(total*(e.comision||0)/100);
@@ -9574,7 +9622,7 @@ function rCajaEmpleadas(){
       </div>
       ${tEmp.length?`<div style="margin-top:8px;border-top:1px solid var(--bor);padding-top:8px">
         ${tEmp.map(t=>`<div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--tx2);padding:2px 0">
-          <span>${t.hora} — ${t.cliente} (${t.servicioNombre})</span>
+          <span>${modo==='mes'?t.fecha+' '+t.hora:t.hora} — ${t.cliente} (${t.servicioNombre})</span>
           <span style="color:var(--tx)">${fmt(t.precio)}</span>
         </div>`).join('')}
       </div>`:''}
@@ -10620,7 +10668,17 @@ function aplicarModoEmpleado(){
       el.style.display='none';
     }
   });
-  
+
+  // Ocultar cards de admin en sec-turnosConfig, mantener caja y fichas visibles
+  ['cardSectoresServicios','cardGestionEmpleados','cardSyncOnline','cardHorarioSalon'].forEach(id=>{
+    const c = document.getElementById(id);
+    if(c) c.style.display = 'none';
+  });
+
+  // Mostrar botón de cierre propio
+  const _cierreBtn = document.getElementById('empCierreBtn');
+  if(_cierreBtn) _cierreBtn.style.display = '';
+
   // Simplificar topbar
   const tbUser = document.getElementById('tbUser');
   if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser?.email || '');
