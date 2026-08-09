@@ -7670,26 +7670,24 @@ function rComparativa(){
 
 function autoBackup(){
   try {
-    const fecha = tod().replace(/-/g,'');
     const datos = {
-      version: '1.0',
-      fecha: tod(),
-      negocio: currentTenant?.nombre || 'backup',
-      datos: {
-        stock: S.stock,
-        ventas: S.ventas,
-        gastos: S.gastos,
-        reparaciones: S.reparaciones,
-        equipos: S.equipos,
-        precios: S.precios,
-        inversores: S.inversores,
-        movimientos_inv: S.movimientos_inv
-      }
+      version: '1.0', fecha: tod(), negocio: currentTenant?.nombre || 'backup',
+      datos: { stock: S.stock, ventas: S.ventas, gastos: S.gastos, reparaciones: S.reparaciones, equipos: S.equipos, precios: S.precios, inversores: S.inversores, movimientos_inv: S.movimientos_inv }
     };
-    // Guardar en localStorage como backup de emergencia
     localStorage.setItem('autoBackup_' + (currentTenant?.id||''), JSON.stringify(datos));
-    console.log('Backup automático guardado:', fecha);
-  } catch(e){ console.error('Error en backup automático:', e); }
+  } catch(e){}
+
+  // Enviar backup por email si hay tenant y usuario logueado como admin
+  if(!currentTenant?.id || !currentUser?.email || currentRole !== 'admin') return;
+  if(!sb?.supabaseUrl) return;
+  fetch(sb.supabaseUrl + '/functions/v1/backup-diario', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sb.supabaseKey },
+    body: JSON.stringify({ tenantId: currentTenant.id, emailDestino: currentUser.email, nombreNegocio: currentTenant.nombre || '' })
+  }).then(r => r.json()).then(r => {
+    if(r.id) console.log('Backup email enviado ✓');
+    else console.warn('Backup email:', r);
+  }).catch(e => console.warn('Backup email error:', e));
 }
 
 function mostrarResumenSemanal(){
