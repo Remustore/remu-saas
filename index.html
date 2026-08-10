@@ -972,6 +972,7 @@ $$;</pre>
       <div class="tb-sync"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">Conectado</span></div>
       <div class="tb-user" id="tbUser"></div><button id="themeToggle" onclick="toggleTheme()" style="background:none;border:1px solid var(--bor2);color:var(--tx);padding:5px 10px;border-radius:7px;font-size:.75rem;cursor:pointer;margin-left:8px" title="Alternar modo">🌙</button>
       <button style="background:none;border:1px solid var(--bor);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" onclick="descargarBackup()">💾</button>
+      <span id="backupBadge" style="display:none;font-size:.65rem;color:#4caf7d;border:1px solid rgba(76,175,125,.3);padding:2px 7px;border-radius:10px;background:rgba(76,175,125,.08);white-space:nowrap">✓ backup hoy</span>
       <button id="btnGestionUsuarios" onclick="gestionarUsuarios(currentTenant?.id)" style="display:none;background:none;border:1px solid var(--bor);color:var(--tx);padding:5px 10px;border-radius:6px;font-size:.7rem;cursor:pointer;" title="Gestionar usuarios">👥</button>
       <button id="saBackBtn" onclick="volverAlSuperadmin()" style="display:none;align-items:center;gap:5px;background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35);color:var(--gld);padding:5px 12px;border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;">⚙ Volver al panel</button>
     </div>
@@ -1381,6 +1382,7 @@ $$;</pre>
             </select>
             <input type="date" id="cajEmpFecha" onchange="rCajaEmpleadas()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
             <input type="month" id="cajEmpMes" onchange="rCajaEmpleadas()" style="display:none;padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+            <button onclick="exportarCajaPDF()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);color:var(--gld);cursor:pointer">📄 Exportar</button>
           </div>
         </div>
         <div id="cajaEmpleadasGrid"></div>
@@ -2737,6 +2739,7 @@ function setupApp(){
       localStorage.setItem(hoyKey, tod());
     }, 3000);
   }
+  rBackupBadge();
   
   // Poll for new solicitudes every 2 minutes
   setTimeout(checkNuevasSolicitudes, 5000);
@@ -7685,9 +7688,101 @@ function autoBackup(){
     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sb.supabaseKey },
     body: JSON.stringify({ tenantId: currentTenant.id, emailDestino: currentUser.email, nombreNegocio: currentTenant.nombre || '' })
   }).then(r => r.json()).then(r => {
-    if(r.id) console.log('Backup email enviado ✓');
-    else console.warn('Backup email:', r);
+    if(r.ok || r.id) {
+      localStorage.setItem('backupEmailFecha_' + currentTenant.id, tod());
+      rBackupBadge();
+      console.log('Backup email enviado ✓');
+    } else console.warn('Backup email:', r);
   }).catch(e => console.warn('Backup email error:', e));
+}
+
+function rBackupBadge(){
+  const badge = document.getElementById('backupBadge');
+  if(!badge || !currentTenant?.id) return;
+  const fecha = localStorage.getItem('backupEmailFecha_' + currentTenant.id);
+  badge.style.display = fecha === tod() ? '' : 'none';
+}
+
+function exportarCajaPDF(){
+  const modo  = document.getElementById('cajEmpModo')?.value || 'dia';
+  const periodo = modo === 'mes'
+    ? (document.getElementById('cajEmpMes')?.value || tod().substring(0,7))
+    : (document.getElementById('cajEmpFecha')?.value || tod());
+  const cfg = getTurnosCfg();
+  let empleados = cfg.empleados || [];
+  if(currentRole === 'empleado' && window.currentEmpleadoNombre)
+    empleados = empleados.filter(e => e.nombre === window.currentEmpleadoNombre);
+
+  const turnos = getTurnos().filter(t =>
+    (modo === 'mes' ? t.fecha?.startsWith(periodo) : t.fecha === periodo) &&
+    t.estado === 'terminado' && t.precio > 0
+  );
+
+  const negocio  = currentTenant?.nombre || '';
+  const titulo   = modo === 'mes'
+    ? new Date(periodo + '-02').toLocaleString('es-AR', { month: 'long', year: 'numeric' })
+    : new Date(periodo + 'T12:00:00').toLocaleDateString('es-AR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+
+  let totalGeneral = 0;
+  const empSections = empleados.map(e => {
+    const te = turnos.filter(t => t.empleadoId == e.id);
+    const total = te.reduce((a,t) => a + t.precio, 0);
+    const comision = Math.round(total * (e.comision||0) / 100);
+    totalGeneral += total;
+    if(!te.length) return '';
+    const filas = te.map(t =>
+      `<tr><td>${modo==='mes'?t.fecha+' '+t.hora:t.hora}</td><td>${t.cliente||''}</td><td>${t.servicioNombre||''}</td><td style="text-align:right">${fmt(t.precio)}</td></tr>`
+    ).join('');
+    return `
+      <div class="emp-block">
+        <div class="emp-header">
+          <span>${e.nombre}</span>
+          <div>
+            <span class="total-emp">${fmt(total)}</span>
+            ${e.comision>0 ? `<span class="com">Comisión ${e.comision}%: ${fmt(comision)}</span>` : ''}
+          </div>
+        </div>
+        <table><thead><tr><th>Hora</th><th>Cliente</th><th>Servicio</th><th>Precio</th></tr></thead>
+        <tbody>${filas}</tbody></table>
+      </div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<title>Caja — ${negocio}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;font-size:13px;color:#111;padding:32px;max-width:800px;margin:auto}
+  h1{font-size:1.3rem;font-weight:700;margin-bottom:2px}
+  .sub{color:#666;font-size:.8rem;margin-bottom:24px}
+  .emp-block{margin-bottom:20px;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden}
+  .emp-header{display:flex;justify-content:space-between;align-items:center;background:#f7f7f7;padding:10px 14px;border-bottom:1px solid #e0e0e0}
+  .emp-header span:first-child{font-weight:700;font-size:.95rem}
+  .total-emp{font-weight:700;font-size:1rem;color:#1a7a4a}
+  .com{font-size:.75rem;color:#b08000;margin-left:8px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:6px 14px;text-align:left;font-size:.78rem;border-bottom:1px solid #f0f0f0}
+  th{color:#888;font-weight:600;background:#fafafa}
+  .total-bar{margin-top:20px;padding:14px 18px;background:#f0faf5;border:1.5px solid #b2dfca;border-radius:8px;display:flex;justify-content:space-between;align-items:center}
+  .total-bar .label{font-size:.85rem;color:#555}
+  .total-bar .value{font-size:1.4rem;font-weight:800;color:#1a7a4a}
+  .footer{margin-top:28px;font-size:.7rem;color:#aaa;text-align:center}
+  @media print{body{padding:16px}button{display:none}}
+</style></head>
+<body>
+  <h1>💰 Caja — ${negocio}</h1>
+  <div class="sub">${titulo} · Generado ${new Date().toLocaleString('es-AR')}</div>
+  ${empSections || '<p style="color:#888;padding:12px">Sin servicios terminados en este período.</p>'}
+  <div class="total-bar">
+    <span class="label">Total del período</span>
+    <span class="value">${fmt(totalGeneral)}</span>
+  </div>
+  <div class="footer">Remu Gestión · remugestion.ar</div>
+  <script>window.onload=()=>window.print()<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if(w){ w.document.write(html); w.document.close(); }
 }
 
 function mostrarResumenSemanal(){
