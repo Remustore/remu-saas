@@ -8397,7 +8397,9 @@ function filtrarServiciosPorEmpleado(){
   const srvSel = document.getElementById('turnoServicio');
   const empId = empSel?.value;
   const emp = cfg.empleados.find(e => String(e.id) === String(empId));
-  const sectoresEmp = emp?.sectores || [];
+  let sectoresEmp = emp?.sectores || [];
+  if(typeof sectoresEmp === 'string'){ try{ sectoresEmp = JSON.parse(sectoresEmp); }catch(e){ sectoresEmp = []; } }
+  if(!Array.isArray(sectoresEmp)) sectoresEmp = [];
 
   const _svcs = cfg.servicios.length > 0
     ? cfg.servicios
