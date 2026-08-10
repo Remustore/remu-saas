@@ -5904,7 +5904,7 @@ function initPrCatSelect(valorActual){
   const esSalon = esBarber || /salon|belleza|peluq|manicur/i.test(rub);
   let opts;
   if(esBarber) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'barba',l:'🪒 Barba'},{v:'coloracion',l:'🎨 Coloración'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'otro',l:'🔧 Otros'}];
-  else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'manicuria',l:'💅 Manicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
+  else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'manicuria',l:'💅 Manicuria'},{v:'pedicuria',l:'🦶 Pedicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
   else opts = [{v:'',l:'— Sin categoría'},{v:'pantalla',l:'📱 Pantallas'},{v:'tapa',l:'🔲 Tapas'},{v:'bateria',l:'🔋 Baterías'},{v:'conector',l:'🔌 Conectores'},{v:'camara',l:'📸 Cámaras'},{v:'otro',l:'🔧 Otros'}];
   sel.innerHTML = opts.map(o=>`<option value="${o.v}"${o.v===valorActual?' selected':''}>${o.l}</option>`).join('');
   // Adapt label
@@ -5967,6 +5967,7 @@ function setupPreciosTabs(){
          <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
          <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
          <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
+         <button class="tab" onclick="setPrFilt('pedicuria',this)">🦶 Pedicuria</button>
          <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
          <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
          <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>`;
@@ -6060,6 +6061,7 @@ function rPrecios(){
            <button class="tab" onclick="setPrFilt('tintura',this)">🎨 Tintura</button>
            <button class="tab" onclick="setPrFilt('tratamiento',this)">✨ Tratamientos</button>
            <button class="tab" onclick="setPrFilt('manicuria',this)">💅 Manicuria</button>
+           <button class="tab" onclick="setPrFilt('pedicuria',this)">🦶 Pedicuria</button>
            <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
            <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
            <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>
@@ -6080,7 +6082,8 @@ function rPrecios(){
     'tintura':     /color|tintura|mechas|reflejos|balayage|highlight|decolor|tinte|babylight/i,
     'tratamiento': /tratamiento|keratina|brushing|hidrat|botox|permanente|alisado|briz/i,
     'maquillaje':  /maquillaje|makeup|novias?|quincea/i,
-    'manicuria':   /manicur|pedicur|esmalt|gel|acr[ií]lic|uñ/i,
+    'manicuria':   /manicur|esmalt|gel|acr[ií]lic|uñ/i,
+    'pedicuria':   /pedicur|pies.*semi|semi.*pies|pies.*esmal|pies.*comun|pedicur/i,
     'lifting':     /lifting|pesta[ñn]/i,
     'depilacion':  /depilac|cera|laser/i,
     'pantalla':    /pantalla|display|lcd/i,
@@ -6091,7 +6094,7 @@ function rPrecios(){
     'otro':        null  // 'otro' se maneja aparte: ítems sin categoría específica
   };
   // Lista de todos los keywords para determinar si un ítem cae en 'otro'
-  const todosKw = [prCatKw.corte,prCatKw.barba,prCatKw.coloracion,prCatKw.tintura,prCatKw.tratamiento,prCatKw.maquillaje,prCatKw.manicuria,prCatKw.lifting,prCatKw.depilacion,prCatKw.pantalla,prCatKw.bateria,prCatKw.tapa,prCatKw.conector,prCatKw.camara].filter(Boolean);
+  const todosKw = [prCatKw.corte,prCatKw.barba,prCatKw.coloracion,prCatKw.tintura,prCatKw.tratamiento,prCatKw.maquillaje,prCatKw.manicuria,prCatKw.pedicuria,prCatKw.lifting,prCatKw.depilacion,prCatKw.pantalla,prCatKw.bateria,prCatKw.tapa,prCatKw.conector,prCatKw.camara].filter(Boolean);
   // Deduplicar por nombre: si hay duplicados (onboarding precio:0 + manual con precio), conservar el mayor precio
   const dedupPr = new Map();
   S.precios.forEach(p=>{
