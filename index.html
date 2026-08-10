@@ -7680,20 +7680,7 @@ function autoBackup(){
     localStorage.setItem('autoBackup_' + (currentTenant?.id||''), JSON.stringify(datos));
   } catch(e){}
 
-  // Enviar backup por email si hay tenant y usuario logueado como admin
-  if(!currentTenant?.id || !currentUser?.email || currentRole !== 'admin') return;
-  if(!sb?.supabaseUrl) return;
-  fetch(sb.supabaseUrl + '/functions/v1/backup-diario', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + sb.supabaseKey },
-    body: JSON.stringify({ tenantId: currentTenant.id, emailDestino: currentUser.email, nombreNegocio: currentTenant.nombre || '' })
-  }).then(r => r.json()).then(r => {
-    if(r.ok || r.id) {
-      localStorage.setItem('backupEmailFecha_' + currentTenant.id, tod());
-      rBackupBadge();
-      console.log('Backup email enviado ✓');
-    } else console.warn('Backup email:', r);
-  }).catch(e => console.warn('Backup email error:', e));
+  // El backup por email lo maneja el cron nocturno (backup-diario-todos, 23:00 AR)
 }
 
 function rBackupBadge(){

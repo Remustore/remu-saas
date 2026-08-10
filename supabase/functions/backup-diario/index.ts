@@ -149,7 +149,7 @@ serve(async (req) => {
 
     // Modo universal: recorre todos los tenants y manda a cada admin
     if (body.all === true || (!body.tenantId && !body.emailDestino)) {
-      const { data: tenants } = await sb.from('tenants').select('id, nombre, modulos');
+      const { data: tenants } = await sb.from('tenants').select('id, nombre, modulos').eq('activo', true);
       const { data: authData } = await sb.auth.admin.listUsers({ perPage: 500 });
       const users = authData?.users ?? [];
 
