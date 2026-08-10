@@ -1964,7 +1964,7 @@ $$;</pre>
 <div class="mc">
   <input type="hidden" id="turnoId">
   <div class="fr"><div><label>Cliente</label><div style="position:relative"><input id="turnoCli" placeholder="Nombre del cliente" oninput="autocompleteCliTurno(this.value)" autocomplete="off"><div id="turnoCliSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--car2);border:1px solid var(--bor2);border-radius:0 0 7px 7px;z-index:500;max-height:200px;overflow-y:auto"></div></div><div id="turnoFichaLink" style="display:none;margin-top:4px"></div></div><div><label>Teléfono / WA</label><input id="turnoTel" placeholder="11 2345 6789"></div></div>
-  <div class="fr"><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div><div><label>Empleado</label><select id="turnoEmpleado" onchange="verificarConflicto()"></select></div></div>
+  <div class="fr"><div><label>Empleado</label><select id="turnoEmpleado" onchange="filtrarServiciosPorEmpleado()"></select></div><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div></div>
   <div class="fr"><div><label>Fecha</label><input type="date" id="turnoFecha" onchange="updateDuracionTurno()"></div><div><label>Hora</label><input type="time" id="turnoHora" step="1800" onchange="updateDuracionTurno()"></div></div>
   <div id="turnoDurBox" style="background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--tx2)">
     Duración estimada: <strong id="turnoDurLabel" style="color:var(--gld)">—</strong>
@@ -8369,14 +8369,8 @@ function openNuevoTurno(){
   empSel.innerHTML = cfg.empleados.length
     ? cfg.empleados.map(e=>`<option value="${e.id}">${e.nombre}</option>`).join('')
     : '<option value="">Sin empleados — configurar primero</option>';
-  // Fill servicios select — usar S.precios como fallback si cfg.servicios está vacío
-  const srvSel = document.getElementById('turnoServicio');
-  const _svcs = cfg.servicios.length > 0 ? cfg.servicios : (S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible').map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}));
-  if(!_svcs.length){
-    srvSel.innerHTML = '<option value="">Sin servicios — configurá primero en ⚙</option>';
-  } else {
-    srvSel.innerHTML = _svcs.map(s=>`<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}">${s.sector?s.sector+': ':''}${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`).join('');
-  }
+  // Fill servicios filtrados por empleado seleccionado
+  filtrarServiciosPorEmpleado();
   // Set date
   const fechaEl = document.getElementById('turnoFecha');
   if(!fechaEl.value) fechaEl.value = document.getElementById('turnosFecha')?.value || tod();
@@ -8395,6 +8389,56 @@ function openNuevoTurno(){
   if(fijoBox) fijoBox.checked = false;
   updateDuracionTurno();
   openM('mTurno', null);
+}
+
+function filtrarServiciosPorEmpleado(){
+  const cfg = getTurnosCfg();
+  const empSel = document.getElementById('turnoEmpleado');
+  const srvSel = document.getElementById('turnoServicio');
+  const empId = empSel?.value;
+  const emp = cfg.empleados.find(e => String(e.id) === String(empId));
+  const sectoresEmp = emp?.sectores || [];
+
+  const _svcs = cfg.servicios.length > 0
+    ? cfg.servicios
+    : (S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible')
+        .map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}));
+
+  let svcs = _svcs;
+  if(sectoresEmp.length > 0){
+    const filtered = _svcs.filter(s => sectoresEmp.some(sec => (s.sector||'').toLowerCase() === sec.toLowerCase()));
+    if(filtered.length) svcs = filtered;
+  }
+
+  if(!svcs.length){
+    srvSel.innerHTML = '<option value="">Sin servicios — configurá primero en ⚙</option>';
+    updateDuracionTurno();
+    return;
+  }
+
+  // Agrupar por modelo — cfg.servicios usa id:Date.now(), matchear por nombre
+  const grupos = {};
+  for(const s of svcs){
+    const n = (s.nombre||'').trim().toLowerCase();
+    const pr = (S.precios||[]).find(p => (p.nombre||'').trim().toLowerCase() === n);
+    const g = pr?.modelo || s.sector || 'Servicios';
+    if(!grupos[g]) grupos[g] = [];
+    grupos[g].push(s);
+  }
+
+  const grupoKeys = Object.keys(grupos);
+  if(grupoKeys.length > 1){
+    srvSel.innerHTML = grupoKeys.map(g =>
+      `<optgroup label="${g}">${grupos[g].map(s =>
+        `<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}">${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`
+      ).join('')}</optgroup>`
+    ).join('');
+  } else {
+    srvSel.innerHTML = svcs.map(s =>
+      `<option value="${s.id}" data-dur="${s.duracion}" data-precio="${s.precio||0}">${s.nombre} (${s.duracion} min)${s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):''}</option>`
+    ).join('');
+  }
+  updateDuracionTurno();
 }
 
 function updateDuracionTurno(){
