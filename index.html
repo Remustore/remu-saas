@@ -943,6 +943,8 @@ $$;</pre>
   <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos" style="display:none"><span class="nico"><i data-lucide="lock"></i></span>Turnos fijos</div>
   <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico"><i data-lucide="clock"></i></span>Lista de espera</div>
   <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico"><i data-lucide="target"></i></span>Objetivos de compra</div>
+  <div class="ns" id="nav-sep-config" style="display:none">Configuración</div>
+  <div class="ni" onclick="go('turnosConfig')" id="nav-turnosConfig" style="display:none"><span class="nico"><i data-lucide="settings"></i></span>Configuración</div>
   <div class="sbf" id="sbFooter">
     <div style="font-weight:600;margin-bottom:4px;color:var(--tx)" id="sbBizName"></div>
     <div id="sbUserEmail" style="margin-bottom:10px"></div>
@@ -1348,9 +1350,29 @@ $$;</pre>
 
     <!-- CONFIGURACION TURNOS -->
     <div class="sec" id="sec-turnosConfig">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <div class="pt">Configuración de turnos</div>
-        <button class="btn bsm" onclick="go('turnos')">← Volver</button>
+      <div style="margin-bottom:16px">
+        <div class="pt">⚙ Configuración</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">Empleados, servicios, horarios y página online</div>
+      </div>
+
+      <!-- Accesos rápidos -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
+        <div onclick="go('turnos')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.3rem">📅</span>
+          <div><div style="font-size:.82rem;font-weight:600">Agenda del día</div><div style="font-size:.7rem;color:var(--tx2)">Ver turnos</div></div>
+        </div>
+        <div onclick="go('turnosOnline')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.3rem">🌐</span>
+          <div><div style="font-size:.82rem;font-weight:600">Página online</div><div style="font-size:.7rem;color:var(--tx2)">Dirección, Instagram, mensajes</div></div>
+        </div>
+        <div onclick="go('precios')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.3rem">💎</span>
+          <div><div style="font-size:.82rem;font-weight:600">Lista de precios</div><div style="font-size:.7rem;color:var(--tx2)">Editar servicios y precios</div></div>
+        </div>
+        <div onclick="go('fichasClientes')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.3rem">📁</span>
+          <div><div style="font-size:.82rem;font-weight:600">Fichas de clientes</div><div style="font-size:.7rem;color:var(--tx2)">Historial y notas</div></div>
+        </div>
       </div>
 
       <div id="preciosLinkBox" style="margin-bottom:14px"></div>
@@ -4249,7 +4271,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración de turnos', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas' };
 
 function go(id){
   window._currentSection = id;
@@ -13083,10 +13105,10 @@ function aplicarModulosPorRubro(rubro){
     showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
   } else if(esBarberia){
     // ✂️ BARBERÍA
-    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else if(esSalon){
     // 💅 SALÓN DE BELLEZA
-    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-stock','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-stock','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else {
     // Rubro no reconocido: mostrar todo para que nada quede oculto
     showNav('nav-taller','nav-stock','nav-ventas','nav-turnos','nav-turnosOnline',
