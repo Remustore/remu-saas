@@ -6789,23 +6789,24 @@ function delMovCaja(id){
 }
 
 function rMovCaja(){
-  const el = document.getElementById('movCajaLista');
-  if(!el) return;
-  const hoy = tod();
-  const movs = (S.movCaja||[]).filter(m=>!m.fecha||m.fecha===hoy).sort((a,b)=>(b.id||0)-(a.id||0));
-  if(!movs.length){ el.innerHTML=''; return; }
-  el.innerHTML = `<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;padding-top:8px;border-top:1px solid var(--bor)">Movimientos de hoy</div>` +
+  const mes = tod().slice(0,7);
+  const movs = (S.movCaja||[]).filter(m=>!m.fecha||(m.fecha||'').slice(0,7)===mes).sort((a,b)=>(b.id||0)-(a.id||0));
+  const html = movs.length ? `<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;padding-top:8px;border-top:1px solid var(--bor)">Movimientos del mes</div>` +
     movs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
       <div style="flex:1;min-width:0">
         <div style="font-size:.82rem;font-weight:600">${esc(m.concepto||'—')}</div>
-        <div style="font-size:.7rem;color:var(--tx2)">${esc(m.caja)} · ${m.tipo==='ingreso'?'⬆ Ingreso':'⬇ Egreso'}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${m.fecha||''} · ${esc(m.caja)} · ${m.tipo==='ingreso'?'⬆ Ingreso':'⬇ Egreso'}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
         <span style="font-weight:700;color:${m.tipo==='ingreso'?'var(--ok)':'var(--bad)'}">${m.tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</span>
         <button class="btn be bsm" onclick="editMovCaja(${m.id})">✎</button>
         <button class="btn bd bsm" onclick="delMovCaja(${m.id})">✕</button>
       </div>
-    </div>`).join('');
+    </div>`).join('') : '';
+  ['movCajaLista','movCajaLista-g'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = html;
+  });
 }
 
 async function saveMovCaja(){
