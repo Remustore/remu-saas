@@ -6868,6 +6868,53 @@ function cierreDiario(){
   document.getElementById('cdTotal').textContent = fmt(totalCajas);
   document.getElementById('cdMetodos').innerHTML = metodoRows || '<div style="font-size:.8rem;color:var(--mut);padding:6px 0">Sin operaciones registradas</div>';
   window.__cierreDiarioData = { total: totalCajas, metodos, fecha: hoy, hora: new Date().toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) };
+
+  // Egresos del día
+  const _gastosHoy = S.gastos.filter(g=>g.fecha===hoy);
+  const _movEgHoy  = (S.movCaja||[]).filter(m=>(!m.fecha||m.fecha===hoy)&&m.tipo==='egreso');
+  const _totEg = _gastosHoy.reduce((a,g)=>a+(g.monto||0),0) + _movEgHoy.reduce((a,m)=>a+(m.monto||0),0);
+
+  // Costos fijos mensuales de referencia
+  const _FIJO_T = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
+  let _costoMes = 0;
+  S.gastos.filter(g=>_FIJO_T.has(g.tipo)).forEach(g=>{
+    const frec=g.frecuencia||'mensual';
+    if(frec==='mensual') _costoMes += g.monto||0;
+    else if(frec==='unico'&&(g.fecha||'').startsWith(hoy.slice(0,7))) _costoMes += g.monto||0;
+    else if(frec==='cuotas'&&g.cuotas) _costoMes += Math.round((g.monto||0)/g.cuotas);
+  });
+  const _refDia = _costoMes > 0 ? Math.round(_costoMes/26) : 0;
+
+  let _extraHtml = '';
+  if(_totEg > 0){
+    const _egRows = [
+      ..._gastosHoy.map(g=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.78rem;color:var(--tx2)">${esc(g.concepto||'—')}</span><span style="font-size:.78rem;font-weight:600;color:var(--bad)">-${fmt(g.monto)}</span></div>`),
+      ..._movEgHoy.map(m=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bor)"><span style="font-size:.78rem;color:var(--tx2)">${esc(m.concepto||'—')}</span><span style="font-size:.78rem;font-weight:600;color:var(--bad)">-${fmt(m.monto)}</span></div>`)
+    ].join('');
+    _extraHtml += `<div style="margin-bottom:12px">
+      <div style="font-size:.72rem;color:var(--bad);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Egresos del día</div>
+      ${_egRows}
+      <div style="display:flex;justify-content:space-between;padding:6px 0;margin-top:2px">
+        <span style="font-size:.78rem;font-weight:600">Total egresos</span>
+        <span style="font-size:.78rem;font-weight:700;color:var(--bad)">-${fmt(_totEg)}</span>
+      </div>
+    </div>`;
+  }
+  if(_costoMes > 0){
+    _extraHtml += `<div style="background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:8px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:.72rem;color:var(--gld);font-weight:600;margin-bottom:6px">📊 Referencia costos fijos</div>
+      <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:3px">
+        <span style="color:var(--tx2)">Costo mensual fijo</span>
+        <span style="font-weight:600;color:var(--tx2)">${fmt(_costoMes)}/mes</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.76rem">
+        <span style="color:var(--mut)">Promedio diario (~26 días)</span>
+        <span style="color:var(--mut)">~${fmt(_refDia)}/día</span>
+      </div>
+    </div>`;
+  }
+  document.getElementById('cdExtra').innerHTML = _extraHtml;
+
   // Mostrar historial desde localStorage como cache inmediato
   const cierresKey = 'cierres_caja_'+(currentTenant?.id||'');
   const _renderHistCierres = (lista) => {
