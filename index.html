@@ -1012,6 +1012,7 @@ $$;</pre>
           </div>
         </div>
       </div>
+
       <!-- AVISOS DIARIOS -->
       <div id="dashAvisos" style="margin-bottom:14px"></div>
 
@@ -1030,10 +1031,11 @@ $$;</pre>
         <div id="aiAsistenteResp" style="margin-top:10px;font-size:.84rem;color:var(--tx2);line-height:1.6;white-space:pre-wrap"></div>
       </div>
 
-      <!-- GANANCIA HOY — tarjeta destacada, primera en mobile -->
+      <!-- ① BLOQUE FINANCIERO: ganancia del día + KPIs del período -->
       <div id="gananciaHoyCard" class="card" style="margin-bottom:14px"></div>
+      <div id="dStats" class="g4" style="margin-bottom:14px"></div>
 
-      <!-- BARRA DE ENERGÍA -->
+      <!-- ② META DEL DÍA -->
       <div class="card" style="margin-bottom:14px" id="energyCard">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
           <div id="energyMsg" style="font-family:var(--fh);font-size:1rem;font-weight:700">Cargando...</div>
@@ -1045,81 +1047,83 @@ $$;</pre>
         <div id="energySub" style="font-size:.75rem;color:var(--tx2);margin-top:8px"></div>
       </div>
 
-      <div class="card" style="margin-bottom:14px">
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
-          <div style="text-align:center;padding:16px 8px">
-            <div id="labelVentaHoy" style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">💰 Vendido hoy</div>
-            <div id="bigVentaHoy" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--ok)">$0</div>
+      <!-- ③ RESUMEN DEL DÍA: números rápidos + acciones -->
+      <div class="g2" style="margin-bottom:14px">
+        <div class="card">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0">
+            <div style="text-align:center;padding:16px 8px">
+              <div id="labelVentaHoy" style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">💰 Vendido hoy</div>
+              <div id="bigVentaHoy" style="font-family:var(--fh);font-size:1.55rem;font-weight:700;color:var(--ok)">$0</div>
+            </div>
+            <div style="text-align:center;padding:16px 8px;border-left:1px solid var(--bor);border-right:1px solid var(--bor)">
+              <div id="labelTrabajosListos" style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">🔧 Listos p/ entregar</div>
+              <div id="bigTrabajosListos" style="font-family:var(--fh);font-size:1.55rem;font-weight:700;color:var(--wrn)">0</div>
+            </div>
+            <div style="text-align:center;padding:16px 8px">
+              <div id="labelStockBajo" style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">📦 Stock bajo mínimo</div>
+              <div id="bigStockBajo" style="font-family:var(--fh);font-size:1.55rem;font-weight:700;color:var(--bad)">0</div>
+            </div>
           </div>
-          <div style="text-align:center;padding:16px 8px;border-left:1px solid var(--bor);border-right:1px solid var(--bor)">
-            <div id="labelTrabajosListos" style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">🔧 Listos p/ entregar</div>
-            <div id="bigTrabajosListos" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--wrn)">0</div>
-          </div>
-          <div style="text-align:center;padding:16px 8px">
-            <div id="labelStockBajo" style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">📦 Stock bajo mínimo</div>
-            <div id="bigStockBajo" style="font-family:var(--fh);font-size:1.8rem;font-weight:700;color:var(--bad)">0</div>
+        </div>
+        <div class="card" id="dashQuickBtns">
+          <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Acciones rápidas</div>
+          <div style="display:grid;gap:10px">
+            <button class="btn bg" style="padding:13px;font-size:.88rem;justify-content:center" onclick="abrirVentaRapida();go('ventas')">
+              <span style="font-size:1rem">💰</span> Registrar venta
+            </button>
+            <button class="btn bgh" style="padding:13px;font-size:.88rem;justify-content:center" onclick="openM('mTaller',null);go('taller')">
+              <span style="font-size:1rem">🔧</span> Nuevo trabajo
+            </button>
           </div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:14px" id="dashQuickBtns">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <button class="btn bg" style="padding:14px;font-size:.88rem;justify-content:center" onclick="abrirVentaRapida();go('ventas')">
-            <span style="font-size:1.1rem">💰</span> Registrar venta
-          </button>
-          <button class="btn bgh" style="padding:14px;font-size:.88rem;justify-content:center" onclick="openM('mTaller',null);go('taller')">
-            <span style="font-size:1.1rem">🔧</span> Nuevo trabajo
-          </button>
-        </div>
-      </div>
-      <div class="card"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
-      <div class="card" id="objetivosCompraCard" style="display:none">
+
+      <!-- ④ OBJETIVOS DE HOY -->
+      <div class="card" style="margin-bottom:14px"><div class="ch"><h3>🎯 Objetivos de hoy</h3><button class="btn bg" style="padding:7px 14px;font-size:.8rem;gap:6px" onclick="openM('mObjetivos',null)">⚙ Configurar metas</button></div><div class="g3" id="objHoy"></div></div>
+      <div class="card" id="objetivosCompraCard" style="display:none;margin-bottom:14px">
         <div class="ch"><h3>🛒 Objetivos de compra</h3><button class="btn bg bsm" onclick="agregarObjetivoCompra()">+ Agregar</button></div>
         <div id="objetivosCompraList"></div>
       </div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre general</button><span id="botonescierre-dash"></span></div></div><div class="g4" id="cajasGrid"></div><div id="movCajaLista" style="margin-top:10px"></div></div>
-      <div class="g2" style="margin-bottom:14px">
-        <div class="card" style="display:none">
-          <div class="ch"><h3>Meta mensual</h3></div>
-          <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
-            <div style="text-align:center">
-              <svg width="120" height="70" viewBox="0 0 120 70">
-                <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="var(--bor2)" stroke-width="8" stroke-linecap="round"/>
-                <path d="M10,60 A50,50 0 0,1 110,60" fill="none" stroke="url(#ga)" stroke-width="8" stroke-linecap="round" stroke-dasharray="157" id="metaArc" style="stroke-dashoffset:157;transition:stroke-dashoffset .8s ease"/>
-                <defs><linearGradient id="ga" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--gld)"/><stop offset="100%" stop-color="var(--gll)"/></linearGradient></defs>
-                <text x="60" y="55" text-anchor="middle" fill="var(--gld)" font-size="14" font-weight="700" font-family="Playfair Display,serif" id="mPct">0%</text>
-              </svg>
-              <div style="font-size:.68rem;color:var(--mut)">logrado</div>
-            </div>
-            <div style="flex:1">
-              <div style="font-size:.7rem;color:var(--mut);margin-bottom:4px">Meta mensual</div>
-              <input id="metaIn" type="number" placeholder="$0" style="width:120px;margin-bottom:8px">
-              <div style="font-size:.75rem;color:var(--tx2)">Ventas: <span id="mVen" style="color:var(--gld);font-weight:600">$0</span></div>
-              <div style="font-size:.72rem;color:var(--mut)">Meta: <span id="mVal">$0</span></div>
-              <button class="btn bsm bg" onclick="saveMeta()" style="margin-top:8px">Guardar</button>
-            </div>
-          </div>
-        </div>
-        <div class="card"><h3>Flujo de caja</h3><div style="margin-top:10px" id="flujo"></div></div>
+
+      <!-- ⑤ CAJAS Y FLUJO -->
+      <div class="card" style="margin-bottom:14px"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre general</button><span id="botonescierre-dash"></span></div></div><div class="g4" id="cajasGrid"></div><div id="movCajaLista" style="margin-top:10px"></div></div>
+      <div class="card" style="margin-bottom:14px"><h3>Flujo de caja</h3><div style="margin-top:10px" id="flujo"></div></div>
+
+      <!-- ⑥ MÉTRICAS DE TURNOS (salones/barberías) -->
+      <div class="card" id="metricasTurnosCard" style="display:none;margin-bottom:14px"></div>
+
+      <!-- ⑦ GRÁFICOS: 7 días (talleres) / Pagos + Días activos (salones) -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>📊 Últimos 7 días</h3></div>
+        <div id="grafico7dias" style="padding-top:8px"></div>
       </div>
       <div class="g2" style="margin-bottom:14px">
-        <div class="card" id="topSCard"><div class="ch"><h3>🏆 Más vendidos</h3></div><div id="topS"></div></div>
-        <div class="card" id="resumenSemCard" style="display:none;margin-bottom:14px;border-left:3px solid var(--gld)">
+        <div class="card">
+          <div class="ch"><h3>🥧 Por método de pago</h3></div>
+          <div id="graficoPagos" style="padding-top:8px"></div>
+        </div>
+        <div class="card">
+          <div class="ch"><h3>📅 Días más activos</h3></div>
+          <div id="graficoDias" style="padding-top:8px"></div>
+        </div>
+      </div>
+
+      <!-- ⑧ RANKINGS E INSIGHTS -->
+      <div class="card" style="margin-bottom:14px" id="topSCard"><div class="ch"><h3>🏆 Más vendidos</h3></div><div id="topS"></div></div>
+      <div class="card" id="resumenSemCard" style="display:none;margin-bottom:14px;border-left:3px solid var(--gld)">
         <div class="ch"><h3>📅 Resumen de la semana pasada</h3><button class="btn bsm" onclick="document.getElementById('resumenSemCard').style.display='none'">✕</button></div>
         <div id="resumenSemContent"></div>
       </div>
-      <div class="card"><div class="ch"><h3>⚠️ Alertas</h3></div><div id="alerts"></div></div>
-      </div>
+      <div class="card" style="margin-bottom:14px"><div class="ch"><h3>⚠️ Alertas</h3></div><div id="alerts"></div></div>
       <div class="card"><div class="ch"><h3>Consejos para tu negocio</h3></div><div id="cons"></div></div>
-      <div class="card" id="metricasTurnosCard" style="display:none;margin-top:14px"></div>
-      <div id="dStats" class="g4" style="margin-top:14px"></div>
-      
-      <!-- DIVISION DE INGRESOS -->
+
+      <!-- DIVISIÓN DE INGRESOS (hidden, shown by config) -->
       <div class="card" id="divisionCard" style="margin-top:14px;display:none">
         <div class="ch"><h3>💰 División de ingresos del mes</h3><button class="btn bgh bsm" onclick="verConfigDivision()">⚙ Configurar %</button></div>
         <div id="divisionGrid"></div>
       </div>
 
-      <!-- PANEL DINERO 50/30/20 -->
+      <!-- PANEL DINERO 50/30/20 (hidden, shown by config) -->
       <div id="panelDinero" style="display:none;margin-top:14px">
         <div class="card" style="border-left:3px solid var(--gld)">
           <div class="ch">
@@ -1130,20 +1134,15 @@ $$;</pre>
         </div>
       </div>
 
-      <!-- GRAFICOS -->
-      <div class="g2" style="margin-top:14px">
-        <div class="card">
-          <div class="ch"><h3>📊 Últimos 7 días</h3></div>
-          <div id="grafico7dias" style="padding-top:8px"></div>
-        </div>
-        <div class="card">
-          <div class="ch"><h3>🥧 Por método de pago</h3></div>
-          <div id="graficoPagos" style="padding-top:8px"></div>
-        </div>
-      </div>
-      <div class="card" style="margin-top:14px">
-        <div class="ch"><h3>📅 Días más activos de la semana</h3></div>
-        <div id="graficoDias" style="padding-top:8px"></div>
+      <!-- IDs para Meta mensual (usados por JS, no visibles) -->
+      <div style="display:none" aria-hidden="true">
+        <svg width="0" height="0"><defs><linearGradient id="ga" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="var(--gld)"/><stop offset="100%" stop-color="var(--gll)"/></linearGradient></defs>
+          <path id="metaArc" stroke-dasharray="157" style="stroke-dashoffset:157"/>
+        </svg>
+        <span id="mPct">0%</span>
+        <span id="mVen">$0</span>
+        <span id="mVal">$0</span>
+        <input id="metaIn" type="number" placeholder="$0">
       </div>
     </div>
 
