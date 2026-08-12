@@ -1631,6 +1631,15 @@ $$;</pre>
         <div id="cajaEmpleadasGrid"></div>
       </div>
 
+      <!-- HORAS DE LUNA -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch">
+          <h3>🕐 Horas de Luna</h3>
+          <button class="btn bg bsm" onclick="abrirRegistroHorasLuna()">+ Cargar horas</button>
+        </div>
+        <div id="horasLunaResumen"></div>
+      </div>
+
       <div class="g2" id="gStats" style="margin-bottom:14px"></div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button class="btn bg" onclick="openM('mGasto',null)">+ Registrar gasto</button>
@@ -2171,6 +2180,36 @@ $$;</pre>
 <div class="mc" id="mAvisarEquipoBody"></div>
 <div class="mf"><button class="btn" onclick="closeM('mAvisarEquipo')">Cerrar</button></div>
 </div></div>
+
+<!-- Horas Luna -->
+<div class="mb" id="mHorasLuna">
+  <div class="md" style="max-width:380px">
+    <div class="mh">
+      <div class="mt2">🕐 Registrar horas de Luna</div>
+      <button class="xbtn" onclick="closeM('mHorasLuna')">✕</button>
+    </div>
+    <div class="mc">
+      <label>Fecha</label>
+      <input type="date" id="hlFecha" oninput="hlActualizarTarifa()" style="width:100%;margin-bottom:10px">
+      <label>Horas trabajadas</label>
+      <input type="number" id="hlHoras" min="0.5" max="12" step="0.5" placeholder="Ej: 4" oninput="hlActualizarTarifa()" style="width:100%;margin-bottom:10px">
+      <div id="hlPreview" style="display:none;background:var(--bg);border:1px solid var(--bor2);border-radius:8px;padding:12px;font-size:.83rem;margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="color:var(--tx2)">Tarifa</span>
+          <span id="hlTarifaTxt" style="font-weight:600"></span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--tx2)">Total del día</span>
+          <span id="hlMontoTxt" style="font-weight:700;color:var(--gld)"></span>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeM('mHorasLuna')">Cancelar</button>
+      <button class="btn bg" onclick="guardarHoraLuna()">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Informe Contable -->
 <div class="mb" id="mInformeContable">
@@ -5824,6 +5863,7 @@ function rGastos(){
   if(cajEl && !cajEl.value) cajEl.value = tod();
   rCajaEmpleadas();
   rMovCaja();
+  rHorasLuna();
   const m=mes();
   const hoy=tod();
   const en30=new Date();en30.setDate(en30.getDate()+30);const en30s=en30.toISOString().slice(0,10);
@@ -12012,6 +12052,175 @@ function getClientesFrecuentes(){
 }
 
 // ═══ RESUMEN MENSUAL PDF ═══
+// ═══ HORAS DE LUNA ═══
+const HL_TARIFA_SEMANA = 5000;
+const HL_TARIFA_SABADO = 5500;
+
+function _hlKey(){ return 'horasLuna_' + (currentTenant?.id||''); }
+
+function getHorasLuna(){
+  try{ return JSON.parse(localStorage.getItem(_hlKey())||'[]'); }catch(e){ return []; }
+}
+
+function saveHorasLuna(arr){
+  localStorage.setItem(_hlKey(), JSON.stringify(arr));
+}
+
+function _hlTarifa(fecha){
+  const d = new Date(fecha + 'T12:00:00');
+  return d.getDay() === 6 ? HL_TARIFA_SABADO : HL_TARIFA_SEMANA;
+}
+
+// Período actual: pago el 5 y el 20
+// → período que termina el 5: del 21 del mes anterior al 5 del mes actual
+// → período que termina el 20: del 6 al 20 del mes actual
+function _hlPeriodoActual(){
+  const hoy = new Date();
+  const dia = hoy.getDate();
+  const anio = hoy.getFullYear();
+  const mes  = hoy.getMonth(); // 0-based
+  let desde, hasta, label;
+  if(dia <= 5){
+    const mesAnterior = mes === 0 ? 11 : mes - 1;
+    const anioAnterior = mes === 0 ? anio - 1 : anio;
+    desde = new Date(anioAnterior, mesAnterior, 21).toISOString().slice(0,10);
+    hasta = new Date(anio, mes, 5).toISOString().slice(0,10);
+    label = `21/${String(mesAnterior+1).padStart(2,'0')} → 05/${String(mes+1).padStart(2,'0')}`;
+  } else if(dia <= 20){
+    desde = new Date(anio, mes, 6).toISOString().slice(0,10);
+    hasta = new Date(anio, mes, 20).toISOString().slice(0,10);
+    label = `06/${String(mes+1).padStart(2,'0')} → 20/${String(mes+1).padStart(2,'0')}`;
+  } else {
+    const mesSig = mes === 11 ? 0 : mes + 1;
+    const anioSig = mes === 11 ? anio + 1 : anio;
+    desde = new Date(anio, mes, 21).toISOString().slice(0,10);
+    hasta = new Date(anioSig, mesSig, 5).toISOString().slice(0,10);
+    label = `21/${String(mes+1).padStart(2,'0')} → 05/${String(mesSig+1).padStart(2,'0')}`;
+  }
+  return { desde, hasta, label };
+}
+
+function abrirRegistroHorasLuna(){
+  const el = document.getElementById('hlFecha');
+  if(el) el.value = tod();
+  const elH = document.getElementById('hlHoras');
+  if(elH) elH.value = '';
+  document.getElementById('hlPreview').style.display = 'none';
+  openM('mHorasLuna', null);
+}
+
+function hlActualizarTarifa(){
+  const fecha = document.getElementById('hlFecha')?.value;
+  const horas = parseFloat(document.getElementById('hlHoras')?.value) || 0;
+  const prev  = document.getElementById('hlPreview');
+  if(!fecha || !horas){ if(prev) prev.style.display='none'; return; }
+  const tarifa = _hlTarifa(fecha);
+  const monto  = tarifa * horas;
+  const esSab  = new Date(fecha+'T12:00:00').getDay() === 6;
+  document.getElementById('hlTarifaTxt').textContent = fmt(tarifa) + '/hr' + (esSab ? ' (sábado)' : '');
+  document.getElementById('hlMontoTxt').textContent  = fmt(monto);
+  if(prev) prev.style.display = 'block';
+}
+
+function guardarHoraLuna(){
+  const fecha = document.getElementById('hlFecha')?.value;
+  const horas = parseFloat(document.getElementById('hlHoras')?.value) || 0;
+  if(!fecha || horas <= 0){ showToast('Completá fecha y horas', 'err'); return; }
+  const tarifa = _hlTarifa(fecha);
+  const arr = getHorasLuna();
+  // Si ya existe entrada para esa fecha, reemplazar
+  const idx = arr.findIndex(h => h.fecha === fecha);
+  const entrada = { id: idx >= 0 ? arr[idx].id : Date.now(), fecha, horas, tarifa, monto: Math.round(tarifa * horas), pagado: false };
+  if(idx >= 0) arr[idx] = entrada; else arr.push(entrada);
+  saveHorasLuna(arr);
+  closeM('mHorasLuna');
+  rHorasLuna();
+  showToast('Horas guardadas ✓');
+}
+
+function eliminarHoraLuna(id){
+  const arr = getHorasLuna().filter(h => h.id !== id);
+  saveHorasLuna(arr);
+  rHorasLuna();
+}
+
+function generarPagoLuna(){
+  const { desde, hasta, label } = _hlPeriodoActual();
+  const arr = getHorasLuna().filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta);
+  if(!arr.length){ showToast('Sin horas pendientes en este período', 'err'); return; }
+  const total  = arr.reduce((a, h) => a + h.monto, 0);
+  const mitad  = Math.round(total / 2);
+  if(!confirm(`Generar pago de Luna por ${fmt(total)}?\n\n• DELFI: ${fmt(mitad)}\n• Fiore: ${fmt(total - mitad)}\n\nPeíodo: ${label}`)) return;
+
+  // Registrar dos egresos en gastos
+  const fechaHoy = tod();
+  const gastoDelfi = { id: Date.now(),     concepto: `Sueldo Luna (DELFI 50%) — ${label}`, monto: mitad,          tipo: 'personal', fecha: fechaHoy, frecuencia: 'unico' };
+  const gastoFiore = { id: Date.now() + 1, concepto: `Sueldo Luna (Fiore 50%) — ${label}`, monto: total - mitad,  tipo: 'personal', fecha: fechaHoy, frecuencia: 'unico' };
+
+  Promise.all([dbUpsert('gastos', gastoDelfi), dbUpsert('gastos', gastoFiore)]).then(() => {
+    S.gastos.push(gastoDelfi, gastoFiore);
+    // Marcar horas como pagadas
+    const ids = new Set(arr.map(h => h.id));
+    const todas = getHorasLuna().map(h => ids.has(h.id) ? { ...h, pagado: true } : h);
+    saveHorasLuna(todas);
+    rHorasLuna();
+    rGastos();
+    showToast('Pago de Luna registrado ✓');
+  }).catch(() => showToast('Error al guardar', 'err'));
+}
+
+function rHorasLuna(){
+  const el = document.getElementById('horasLunaResumen');
+  if(!el) return;
+  const { desde, hasta, label } = _hlPeriodoActual();
+  const todas    = getHorasLuna();
+  const periodo  = todas.filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta)
+                        .sort((a,b) => a.fecha.localeCompare(b.fecha));
+  const historial = todas.filter(h => h.pagado).slice(-5).reverse();
+  const totalHoras = periodo.reduce((a,h) => a + h.horas, 0);
+  const totalMonto = periodo.reduce((a,h) => a + h.monto, 0);
+  const mitad = Math.round(totalMonto / 2);
+
+  if(!periodo.length && !historial.length){
+    el.innerHTML = `<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin horas cargadas todavía. Tocá "+ Cargar horas" al final de cada jornada.</div>`;
+    return;
+  }
+
+  const filasActuales = periodo.map(h => {
+    const esSab = new Date(h.fecha+'T12:00:00').getDay() === 6;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bor);font-size:.83rem">
+      <div>
+        <span style="font-weight:600">${fD(h.fecha)}</span>
+        ${esSab ? '<span style="font-size:.68rem;color:var(--gld);margin-left:6px;background:var(--car);padding:1px 6px;border-radius:8px">Sáb</span>' : ''}
+        <span style="color:var(--tx2);margin-left:8px">${h.horas}h × ${fmt(h.tarifa)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-weight:600;color:var(--gld)">${fmt(h.monto)}</span>
+        <button class="btn bd bsm" onclick="eliminarHoraLuna(${h.id})" style="padding:3px 7px;font-size:.7rem">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Período actual — ${label}</div>
+    ${filasActuales || '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin horas cargadas en este período.</div>'}
+    ${periodo.length ? `
+    <div style="margin-top:12px;background:var(--bg);border-radius:8px;padding:12px 14px">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px">
+        <span style="color:var(--tx2)">${totalHoras}h trabajadas</span>
+        <span style="font-weight:700;font-size:.95rem;color:var(--gld)">${fmt(totalMonto)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.76rem;color:var(--tx2);margin-bottom:12px">
+        <span>DELFI ${fmt(mitad)} · Fiore ${fmt(totalMonto - mitad)}</span>
+        <span>50% / 50%</span>
+      </div>
+      <button class="btn bg" style="width:100%;font-size:.84rem" onclick="generarPagoLuna()">💸 Generar pago — ${fmt(totalMonto)}</button>
+    </div>` : ''}
+    ${historial.length ? `
+    <div style="margin-top:14px;font-size:.72rem;color:var(--mut);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Últimos pagos</div>
+    ${historial.map(h=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--tx2);padding:5px 0;border-bottom:1px solid var(--bor)"><span>${fD(h.fecha)} · ${h.horas}h</span><span style="color:var(--mut)">${fmt(h.monto)} ✓</span></div>`).join('')}` : ''}`;
+}
+
 function abrirModalInformeContable(){
   const el = document.getElementById('icPeriodo');
   if(el && !el.value) el.value = mes();
