@@ -12054,7 +12054,21 @@ function getClientesFrecuentes(){
 // ═══ RESUMEN MENSUAL PDF ═══
 // ═══ HORAS DE LUNA ═══
 const HL_TARIFA_SEMANA = 5000;
-const HL_TARIFA_SABADO = 5500;
+const HL_TARIFA_ESPECIAL = 5500; // sábado, domingo y feriados nacionales
+
+// Feriados nacionales Argentina — actualizar cada año
+const HL_FERIADOS_AR = new Set([
+  // 2026
+  '2026-01-01','2026-02-16','2026-02-17','2026-03-24',
+  '2026-04-02','2026-04-03','2026-05-01','2026-05-25',
+  '2026-06-17','2026-06-20','2026-07-09','2026-08-17',
+  '2026-10-12','2026-11-20','2026-12-08','2026-12-25',
+  // 2027
+  '2027-01-01','2027-02-08','2027-02-09','2027-03-24',
+  '2027-03-26','2027-04-02','2027-05-01','2027-05-25',
+  '2027-06-17','2027-06-20','2027-07-09','2027-08-16',
+  '2027-10-11','2027-11-22','2027-12-08','2027-12-25',
+]);
 
 function _hlKey(){ return 'horasLuna_' + (currentTenant?.id||''); }
 
@@ -12066,9 +12080,21 @@ function saveHorasLuna(arr){
   localStorage.setItem(_hlKey(), JSON.stringify(arr));
 }
 
-function _hlTarifa(fecha){
+function _hlEsEspecial(fecha){
+  const day = new Date(fecha + 'T12:00:00').getDay();
+  return day === 0 || day === 6 || HL_FERIADOS_AR.has(fecha);
+}
+
+function _hlTipoLabel(fecha){
   const d = new Date(fecha + 'T12:00:00');
-  return d.getDay() === 6 ? HL_TARIFA_SABADO : HL_TARIFA_SEMANA;
+  if(HL_FERIADOS_AR.has(fecha)) return 'feriado';
+  if(d.getDay() === 0) return 'domingo';
+  if(d.getDay() === 6) return 'sábado';
+  return '';
+}
+
+function _hlTarifa(fecha){
+  return _hlEsEspecial(fecha) ? HL_TARIFA_ESPECIAL : HL_TARIFA_SEMANA;
 }
 
 // Período actual: pago el 5 y el 20
@@ -12116,8 +12142,8 @@ function hlActualizarTarifa(){
   if(!fecha || !horas){ if(prev) prev.style.display='none'; return; }
   const tarifa = _hlTarifa(fecha);
   const monto  = tarifa * horas;
-  const esSab  = new Date(fecha+'T12:00:00').getDay() === 6;
-  document.getElementById('hlTarifaTxt').textContent = fmt(tarifa) + '/hr' + (esSab ? ' (sábado)' : '');
+  const tipo   = _hlTipoLabel(fecha);
+  document.getElementById('hlTarifaTxt').textContent = fmt(tarifa) + '/hr' + (tipo ? ` (${tipo})` : '');
   document.getElementById('hlMontoTxt').textContent  = fmt(monto);
   if(prev) prev.style.display = 'block';
 }
@@ -12187,11 +12213,11 @@ function rHorasLuna(){
   }
 
   const filasActuales = periodo.map(h => {
-    const esSab = new Date(h.fecha+'T12:00:00').getDay() === 6;
+    const tipo = _hlTipoLabel(h.fecha);
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bor);font-size:.83rem">
       <div>
         <span style="font-weight:600">${fD(h.fecha)}</span>
-        ${esSab ? '<span style="font-size:.68rem;color:var(--gld);margin-left:6px;background:var(--car);padding:1px 6px;border-radius:8px">Sáb</span>' : ''}
+        ${tipo ? `<span style="font-size:.68rem;color:var(--gld);margin-left:6px;background:var(--car);padding:1px 6px;border-radius:8px">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</span>` : ''}
         <span style="color:var(--tx2);margin-left:8px">${h.horas}h × ${fmt(h.tarifa)}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
