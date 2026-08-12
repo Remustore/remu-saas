@@ -10929,55 +10929,33 @@ async function agregarCategoriaStock(nombre){
 }
 
 function aplicarModoEmpleado(){
-  // Ocultar TODOS los nav items
-  document.querySelectorAll('.ni').forEach(el=>el.style.display='none');
-  document.querySelectorAll('.ns').forEach(el=>el.style.display='none');
-  
-  // Mostrar solo turnos y fichas
-  ['nav-turnos','nav-fichas'].forEach(id=>{ 
-    const el=document.getElementById(id); 
-    if(el){ el.style.display='flex'; el.style.removeProperty('display'); el.style.display='flex'; }
-  });
-  
-  // Ocultar todas las secciones de contenido excepto turnos, config y fichas
-  document.querySelectorAll('.sec').forEach(el=>{
-    const id = el.id;
-    if(id !== 'sec-turnos' && id !== 'sec-turnosConfig' && id !== 'sec-fichasClientes' && id !== 'sec-gastos'){
-      el.style.display='none';
-    }
+  // Ocultar toda la navegación
+  document.querySelectorAll('.ni,.ns').forEach(el => el.style.display = 'none');
+
+  // Solo Agenda y Fichas en el nav
+  ['nav-turnos','nav-fichas'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.removeProperty('display');
   });
 
-  // Ocultar cards de admin en sec-turnosConfig
-  ['cardSectoresServicios','cardGestionEmpleados','cardSyncOnline','cardHorarioSalon'].forEach(id=>{
-    const c = document.getElementById(id);
-    if(c) c.style.display = 'none';
+  // Empleado solo puede ver agenda y fichas — sin finanzas, sin config, sin análisis
+  const PERMITIDAS = new Set(['sec-turnos','sec-fichasClientes']);
+  document.querySelectorAll('.sec').forEach(el => {
+    if(!PERMITIDAS.has(el.id)) el.style.display = 'none';
   });
 
-  // En sec-gastos: ocultar todo excepto la caja por empleada
-  document.querySelectorAll('#sec-gastos .card').forEach(c=>{
-    const id = c.id || '';
-    if(!id.includes('cajEmpTitle') && !c.querySelector('#cajaEmpleadasGrid')){
-      c.style.display = 'none';
-    }
-  });
-  document.getElementById('gStats')?.style && (document.getElementById('gStats').style.display='none');
-  document.getElementById('gastosContainer')?.style && (document.getElementById('gastosContainer').style.display='none');
-
-  // Mostrar botón de cierre propio
-  const _cierreBtn = document.getElementById('empCierreBtn');
-  if(_cierreBtn) _cierreBtn.style.display = '';
-
-  // Simplificar topbar
+  // Topbar: mostrar solo nombre, ocultar botones de admin
   const tbUser = document.getElementById('tbUser');
   if(tbUser) tbUser.textContent = '👤 ' + (window.currentEmpleadoNombre || currentUser?.email || '');
-  
-  // Auto-filtrar turnos
+
+  // Auto-filtrar agenda a los propios turnos
   if(window.currentEmpleadoNombre){
     turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
   }
-  // Siempre arrancar en la fecha de hoy al entrar como empleado
-  const _empFechaEl = document.getElementById('turnosFecha');
-  if(_empFechaEl) _empFechaEl.value = tod();
+
+  // Arrancar siempre en la fecha de hoy
+  const fechaEl = document.getElementById('turnosFecha');
+  if(fechaEl) fechaEl.value = tod();
   go('turnos');
 }
 
