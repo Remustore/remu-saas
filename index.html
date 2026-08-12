@@ -482,7 +482,14 @@ textarea{resize:vertical;min-height:70px;}
 
   /* Topbar: título con truncado para no comprimir botones */
   .tb-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.95rem;}
-  .topbar{gap:8px;}
+  .topbar{gap:6px;}
+  /* Ocultar elementos secundarios de la topbar en mobile */
+  .tb-sync{display:none;}
+  #backupBadge{display:none !important;}
+  #btnGestionUsuarios{display:none !important;}
+  /* El botón de backup y el tema se mantienen pero más chicos */
+  #themeToggle{padding:5px 8px !important;font-size:.7rem !important;margin-left:4px !important;}
+  .topbar button[onclick="descargarBackup()"]{display:none;}
 
   /* Vista semanal: scroll horizontal (7 columnas no caben en 390px) */
   #turnosSemana{overflow-x:auto;-webkit-overflow-scrolling:touch;}
@@ -1357,32 +1364,25 @@ $$;</pre>
 
       <!-- Accesos rápidos -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
-        <div onclick="go('turnos')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.3rem">📅</span>
+        <div onclick="go('turnos')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+          <span class="nico" style="flex-shrink:0"><i data-lucide="calendar"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Agenda del día</div><div style="font-size:.7rem;color:var(--tx2)">Ver turnos</div></div>
         </div>
-        <div onclick="go('turnosOnline')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.3rem">🌐</span>
+        <div onclick="go('turnosOnline')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+          <span class="nico" style="flex-shrink:0"><i data-lucide="globe"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Página online</div><div style="font-size:.7rem;color:var(--tx2)">Dirección, Instagram, mensajes</div></div>
         </div>
-        <div onclick="go('precios')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.3rem">💎</span>
+        <div onclick="go('precios')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+          <span class="nico" style="flex-shrink:0"><i data-lucide="tag"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Lista de precios</div><div style="font-size:.7rem;color:var(--tx2)">Editar servicios y precios</div></div>
         </div>
-        <div onclick="go('fichasClientes')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px;display:flex;align-items:center;gap:10px">
-          <span style="font-size:1.3rem">📁</span>
+        <div onclick="go('fichasClientes')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+          <span class="nico" style="flex-shrink:0"><i data-lucide="users"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Fichas de clientes</div><div style="font-size:.7rem;color:var(--tx2)">Historial y notas</div></div>
         </div>
       </div>
 
       <div id="preciosLinkBox" style="margin-bottom:14px"></div>
-
-      <!-- Sectores y servicios -->
-      <div class="card" id="cardSectoresServicios" style="margin-bottom:14px">
-        <div class="ch"><h3>✂ Sectores y servicios</h3><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="sincronizarPreciosTurno()">🔄 Sincronizar precios</button><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div></div>
-        <div style="font-size:.74rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">📌 Estos son los servicios que tus clientes ven y pueden reservar online (con precio y duración) en tu página pública — el link está arriba. <strong>Los precios se cargan y editan en "Lista de Precios"</strong>; si los cambiás ahí, tocá "🔄 Sincronizar precios" para que se reflejen acá.</div>
-        <div id="serviciosTurnosList"></div>
-      </div>
 
       <!-- Empleados -->
       <div class="card" id="cardGestionEmpleados" style="margin-bottom:14px">
@@ -1393,51 +1393,15 @@ $$;</pre>
         </div>
       </div>
 
-      <!-- CAJA POR EMPLEADA -->
-      <div class="card" style="margin-bottom:14px">
-        <div class="ch">
-          <h3 id="cajEmpTitle">💰 Caja por empleada — hoy</h3>
-          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <select id="cajEmpModo" onchange="cajEmpCambiarModo()" style="padding:5px 8px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
-              <option value="dia">📅 Día</option>
-              <option value="mes">📆 Mes</option>
-            </select>
-            <input type="date" id="cajEmpFecha" onchange="rCajaEmpleadas()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
-            <input type="month" id="cajEmpMes" onchange="rCajaEmpleadas()" style="display:none;padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
-            <button onclick="exportarCajaPDF()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);color:var(--gld);cursor:pointer">📄 Exportar</button>
-          </div>
-        </div>
-        <div id="cajaEmpleadasGrid"></div>
-      </div>
-
-      <!-- FICHAS DE CLIENTES -->
-      <div class="card" style="margin-bottom:14px">
-        <div class="ch">
-          <h3>📋 Fichas de clientes</h3>
-          <div class="srch"><span>⌕</span><input id="fichaQ" placeholder="Buscar cliente..." oninput="rFichasClientes()"></div>
-        </div>
-        <div id="fichasClientesList"></div>
-      </div>
-
-      <!-- Sincronización online -->
-      <div class="card" id="cardSyncOnline" style="margin-bottom:14px">
-        <div class="ch"><h3>🔄 Sincronización turnos online</h3></div>
-        <div style="font-size:.78rem;color:var(--tx2);margin-bottom:12px;line-height:1.6">
-          Si ves horarios bloqueados en el turnero público que no aparecen en el calendario, usá este botón para limpiar datos huérfanos y resincronizar desde el estado actual.
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn bg" onclick="limpiarYResyncTurnos(this)" style="font-size:.82rem">
-            🧹 Limpiar y resincronizar slots online
-          </button>
-          <button class="btn" onclick="migrarTurnosManual(this)" style="font-size:.82rem">
-            ☁ Migrar calendario a Supabase
-          </button>
-        </div>
-        <div id="resyncStatus" style="display:none;margin-top:10px;font-size:.78rem;padding:8px 12px;border-radius:8px"></div>
+      <!-- Sectores y servicios -->
+      <div class="card" id="cardSectoresServicios" style="margin-bottom:14px">
+        <div class="ch"><h3>✂ Sectores y servicios</h3><div style="display:flex;gap:6px"><button class="btn bs bsm" onclick="sincronizarPreciosTurno()">🔄 Sincronizar precios</button><button class="btn bg bsm" onclick="agregarServicioTurno()">+ Agregar</button></div></div>
+        <div style="font-size:.74rem;color:var(--tx2);margin-bottom:10px;line-height:1.5">📌 Estos son los servicios que tus clientes ven y pueden reservar online (con precio y duración) en tu página pública — el link está arriba. <strong>Los precios se cargan y editan en "Lista de Precios"</strong>; si los cambiás ahí, tocá "🔄 Sincronizar precios" para que se reflejen acá.</div>
+        <div id="serviciosTurnosList"></div>
       </div>
 
       <!-- Horarios -->
-      <div class="card" id="cardHorarioSalon">
+      <div class="card" id="cardHorarioSalon" style="margin-bottom:14px">
         <div class="ch"><h3>🕐 Horario del salón</h3></div>
         <div class="fr">
           <div><label>Apertura</label><input type="time" id="horApertura" value="09:00" onchange="saveTurnosConfig()"></div>
@@ -1455,6 +1419,23 @@ $$;</pre>
             <label class="mod-check"><input type="checkbox" class="diasSalon" value="0" onchange="saveTurnosConfig()"> Dom</label>
           </div>
         </div>
+      </div>
+
+      <!-- Sincronización online -->
+      <div class="card" id="cardSyncOnline">
+        <div class="ch"><h3>🔄 Sincronización turnos online</h3></div>
+        <div style="font-size:.78rem;color:var(--tx2);margin-bottom:12px;line-height:1.6">
+          Si ves horarios bloqueados en el turnero público que no aparecen en el calendario, usá este botón para limpiar datos huérfanos y resincronizar desde el estado actual.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn bg" onclick="limpiarYResyncTurnos(this)" style="font-size:.82rem">
+            🧹 Limpiar y resincronizar slots online
+          </button>
+          <button class="btn" onclick="migrarTurnosManual(this)" style="font-size:.82rem">
+            ☁ Migrar calendario a Supabase
+          </button>
+        </div>
+        <div id="resyncStatus" style="display:none;margin-top:10px;font-size:.78rem;padding:8px 12px;border-radius:8px"></div>
       </div>
     </div>
 
@@ -1631,7 +1612,25 @@ $$;</pre>
     <!-- GASTOS -->
     <div class="sec" id="sec-gastos">
       <div class="pt">Gastos</div><div class="ps">Fijos, variables y stock del local</div>
-      <div class="card"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre general</button><span id="botonescierre-gastos"></span></div></div><div class="g4" id="cajasGrid-g"></div><div id="movCajaLista-g" style="margin-top:10px"></div></div>
+      <div class="card" style="margin-bottom:14px"><div class="ch"><h3>💵 Estado de cajas</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn bsm bg2" onclick="openNuevoMovCaja()">+ Ingreso/Egreso</button><button class="btn bsm bgh" onclick="cierreDiario()">📋 Cierre general</button><span id="botonescierre-gastos"></span></div></div><div class="g4" id="cajasGrid-g"></div><div id="movCajaLista-g" style="margin-top:10px"></div></div>
+
+      <!-- CAJA POR EMPLEADA -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch">
+          <h3 id="cajEmpTitle">💰 Caja por empleada — hoy</h3>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="cajEmpModo" onchange="cajEmpCambiarModo()" style="padding:5px 8px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+              <option value="dia">📅 Día</option>
+              <option value="mes">📆 Mes</option>
+            </select>
+            <input type="date" id="cajEmpFecha" onchange="rCajaEmpleadas()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+            <input type="month" id="cajEmpMes" onchange="rCajaEmpleadas()" style="display:none;padding:5px 10px;font-size:.78rem;border-radius:6px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx)">
+            <button onclick="exportarCajaPDF()" style="padding:5px 10px;font-size:.78rem;border-radius:6px;background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);color:var(--gld);cursor:pointer">📄 Exportar</button>
+          </div>
+        </div>
+        <div id="cajaEmpleadasGrid"></div>
+      </div>
+
       <div class="g2" id="gStats" style="margin-bottom:14px"></div>
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
         <button class="btn bg" onclick="openM('mGasto',null)">+ Registrar gasto</button>
@@ -1666,6 +1665,7 @@ $$;</pre>
           <button class="btn bgh bsm" onclick="exportarExcel()">📊 Excel</button>
           <button class="btn bgh bsm" onclick="exportarPDF()">📄 PDF datos</button>
           <button class="btn bg bsm" onclick="generarResumenMesPDF()">📋 Resumen del mes</button>
+          <button class="btn bsm" onclick="abrirModalInformeContable()" style="background:rgba(76,142,201,.12);border:1px solid rgba(76,142,201,.3);color:var(--inf)">📊 Informe contable</button>
         </div>
       </div>
       <div class="card" style="margin-bottom:14px">
@@ -2171,6 +2171,28 @@ $$;</pre>
 <div class="mc" id="mAvisarEquipoBody"></div>
 <div class="mf"><button class="btn" onclick="closeM('mAvisarEquipo')">Cerrar</button></div>
 </div></div>
+
+<!-- Informe Contable -->
+<div class="mb" id="mInformeContable">
+  <div class="md" style="max-width:420px">
+    <div class="mh">
+      <div class="mt2">📊 Informe contable</div>
+      <button class="xbtn" onclick="closeM('mInformeContable')">✕</button>
+    </div>
+    <div class="mc">
+      <p style="font-size:.82rem;color:var(--tx2);margin-bottom:16px;line-height:1.6">Genera un informe completo para compartir con tu contador. Incluye ingresos, gastos, métodos de pago, comisiones y balance neto.</p>
+      <label>Período</label>
+      <input type="month" id="icPeriodo" style="width:100%;margin-bottom:10px">
+      <label>Nombre del negocio en el informe</label>
+      <input type="text" id="icNombre" style="width:100%;margin-bottom:4px" placeholder="Ej: Rocaspana's Estilo y Belleza">
+      <p style="font-size:.72rem;color:var(--mut);margin-bottom:14px">Se carga automáticamente, podés editarlo si querés</p>
+    </div>
+    <div class="mf">
+      <button class="btn" onclick="closeM('mInformeContable')">Cancelar</button>
+      <button class="btn bg" onclick="generarInformeContable()">Generar PDF</button>
+    </div>
+  </div>
+</div>
 
 <!-- Gasto -->
 <div class="mb" id="mGasto"><div class="md"><div class="mh"><div class="mt2" id="mGastoTitulo">Registrar Gasto</div><button class="xbtn" onclick="closeM('mGasto')">✕</button></div>
@@ -5798,6 +5820,10 @@ async function delGasto(id){
 
 function rGastos(){
   rGastosCoverage();
+  const cajEl = document.getElementById('cajEmpFecha');
+  if(cajEl && !cajEl.value) cajEl.value = tod();
+  rCajaEmpleadas();
+  rMovCaja();
   const m=mes();
   const hoy=tod();
   const en30=new Date();en30.setDate(en30.getDate()+30);const en30s=en30.toISOString().slice(0,10);
@@ -9408,11 +9434,8 @@ async function rTurnosConfig(){
   if(document.getElementById('horCierre')) document.getElementById('horCierre').value = cfg.cierre||'20:00';
   document.querySelectorAll('.diasSalon').forEach(c=>{ c.checked = cfg.dias.includes(parseInt(c.value)); });
   
-  // Set today's date in caja
-  const cajEl = document.getElementById('cajEmpFecha');
-  if(cajEl && !cajEl.value) cajEl.value = tod();
-  rCajaEmpleadas();
   rFichasClientes();
+  if(window.lucide) lucide.createIcons();
 }
 
 // El precio es un dato único que vive en "Lista de Precios" — acá solo se busca por nombre
@@ -9994,9 +10017,12 @@ function checkFichaAlerta(nombre){
 }
 
 // ═══ FICHAS STANDALONE ═══
-function rFichasClientesMain(){
+window.__fichasLimit = 15;
+
+function rFichasClientesMain(verMas){
   const el = document.getElementById('fichasClientesMain');
   if(!el) return;
+  if(!verMas) window.__fichasLimit = 15;
   const q = (document.getElementById('fichaQ2')?.value||'').toLowerCase();
   const fichas = Object.values(getFichas());
   const turnos = getTurnos();
@@ -10008,7 +10034,11 @@ function rFichasClientesMain(){
     return;
   }
 
-  el.innerHTML = todos.map(nombre=>{
+  const limite = window.__fichasLimit;
+  const visibles = todos.slice(0, limite);
+  const restantes = todos.length - visibles.length;
+
+  function _filaFicha(nombre){
     const ficha = getFichaCliente(nombre);
     const visits = turnos.filter(t=>t.cliente===nombre);
     const ultima = visits.sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
@@ -10036,7 +10066,16 @@ function rFichasClientesMain(){
         <button class="btn be bsm" onclick="editarFichaCliente('${nombre.replace(/'/g,"\'")}')">✎ Editar</button>
       </div>
     </div>`;
-  }).join('');
+  }
+
+  el.innerHTML = visibles.map(_filaFicha).join('') +
+    (restantes > 0
+      ? `<div style="padding:14px;text-align:center">
+           <button class="btn bsm" onclick="window.__fichasLimit+=${limite};rFichasClientesMain(true)" style="width:100%;color:var(--tx2)">
+             Ver ${restantes} cliente${restantes!==1?'s':''} más ↓
+           </button>
+         </div>`
+      : '');
 }
 
 // ═══ TURNOS ONLINE ═══
@@ -10860,19 +10899,29 @@ function aplicarModoEmpleado(){
     if(el){ el.style.display='flex'; el.style.removeProperty('display'); el.style.display='flex'; }
   });
   
-  // Ocultar todas las secciones de contenido excepto turnos y fichas
+  // Ocultar todas las secciones de contenido excepto turnos, config y fichas
   document.querySelectorAll('.sec').forEach(el=>{
     const id = el.id;
-    if(id !== 'sec-turnos' && id !== 'sec-turnosConfig' && id !== 'sec-fichasClientes'){
+    if(id !== 'sec-turnos' && id !== 'sec-turnosConfig' && id !== 'sec-fichasClientes' && id !== 'sec-gastos'){
       el.style.display='none';
     }
   });
 
-  // Ocultar cards de admin en sec-turnosConfig, mantener caja y fichas visibles
+  // Ocultar cards de admin en sec-turnosConfig
   ['cardSectoresServicios','cardGestionEmpleados','cardSyncOnline','cardHorarioSalon'].forEach(id=>{
     const c = document.getElementById(id);
     if(c) c.style.display = 'none';
   });
+
+  // En sec-gastos: ocultar todo excepto la caja por empleada
+  document.querySelectorAll('#sec-gastos .card').forEach(c=>{
+    const id = c.id || '';
+    if(!id.includes('cajEmpTitle') && !c.querySelector('#cajaEmpleadasGrid')){
+      c.style.display = 'none';
+    }
+  });
+  document.getElementById('gStats')?.style && (document.getElementById('gStats').style.display='none');
+  document.getElementById('gastosContainer')?.style && (document.getElementById('gastosContainer').style.display='none');
 
   // Mostrar botón de cierre propio
   const _cierreBtn = document.getElementById('empCierreBtn');
@@ -11963,6 +12012,216 @@ function getClientesFrecuentes(){
 }
 
 // ═══ RESUMEN MENSUAL PDF ═══
+function abrirModalInformeContable(){
+  const el = document.getElementById('icPeriodo');
+  if(el && !el.value) el.value = mes();
+  const elN = document.getElementById('icNombre');
+  if(elN && !elN.value) elN.value = currentTenant?.nombre || '';
+  openM('mInformeContable', null);
+}
+
+function generarInformeContable(){
+  const periodo = document.getElementById('icPeriodo')?.value || mes();
+  const nombreNegocio = (document.getElementById('icNombre')?.value || currentTenant?.nombre || 'Mi Negocio').trim();
+  closeM('mInformeContable');
+
+  const [pAnio, pMes] = periodo.split('-').map(Number);
+  const mNombre = new Date(pAnio, pMes - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  const rubro = (currentTenant?.rubro || '').toLowerCase();
+  const esTurnos = esNegocioTurnos(rubro);
+
+  // ── Ingresos ──
+  const turnos   = getTurnos ? getTurnos().filter(t => t.fecha && t.fecha.startsWith(periodo) && t.estado === 'terminado') : [];
+  const ventas   = S.ventas.filter(v => v.fecha && v.fecha.startsWith(periodo));
+  const reps     = S.reparaciones
+    .filter(r => r.estado === 'entregado')
+    .map(r => r.fechaEnt ? r : { ...r, fechaEnt: r.fecha })
+    .filter(r => r.fechaEnt && r.fechaEnt.startsWith(periodo));
+  const ventasShow = esTurnos ? ventas.filter(v => v.tipo !== 'servicio') : ventas;
+
+  const tT = turnos.reduce((a, t) => a + (t.precio || 0), 0);
+  const tV = ventasShow.reduce((a, v) => a + (v.total || 0), 0);
+  const tR = reps.reduce((a, r) => a + (r.presupuesto || 0), 0);
+  const totalIngresos = tT + tV + tR;
+
+  // Métodos de pago — combinar turnos + ventas
+  const metodos = {};
+  turnos.forEach(t => {
+    const k = t.metodo || 'Efectivo';
+    metodos[k] = (metodos[k] || 0) + (t.precio || 0);
+  });
+  ventasShow.forEach(v => {
+    const k = v.metodo || 'Efectivo';
+    metodos[k] = (metodos[k] || 0) + (v.total || 0);
+  });
+
+  // ── Gastos ──
+  const FIJO_TIPOS = new Set(['fijo', 'servicios', 'personal', 'herramientas', 'marketing', 'mejoras', 'inversion']);
+  const gastosM  = S.gastos.filter(g => g.fecha && g.fecha.startsWith(periodo));
+  const gastosFijos = S.gastos.filter(g => FIJO_TIPOS.has(g.tipo) && (g.frecuencia || 'mensual') === 'mensual');
+  const gastosVar   = gastosM.filter(g => g.tipo === 'variable');
+  const gastosStock = gastosM.filter(g => g.tipo === 'stock');
+  const tGF = gastosFijos.reduce((a, g) => a + g.monto, 0);
+  const tGV = gastosVar.reduce((a, g) => a + g.monto, 0);
+  const tGS = gastosStock.reduce((a, g) => a + g.monto, 0);
+  const totalGastos = tGF + tGV + tGS;
+
+  // ── Mov Caja ──
+  const movs = (S.movCaja || []).filter(m => m.fecha && m.fecha.startsWith(periodo));
+  const movsIngreso = movs.filter(m => (m.tipo || 'ingreso') === 'ingreso');
+  const movsEgreso  = movs.filter(m => m.tipo === 'egreso');
+  const tMI = movsIngreso.reduce((a, m) => a + (m.monto || 0), 0);
+  const tME = movsEgreso.reduce((a, m) => a + (m.monto || 0), 0);
+
+  // ── Comisiones ──
+  const cfg = getTurnosCfg();
+  const comisiones = cfg.empleados.map(emp => {
+    const tEmp = turnos.filter(t => t.empleadoId == emp.id);
+    const total = tEmp.reduce((a, t) => a + (t.precio || 0), 0);
+    const comision = Math.round(total * (emp.comision || 0) / 100);
+    return { empleado: emp.nombre, servicios: tEmp.length, total, comision, pct: emp.comision || 0 };
+  }).filter(c => c.pct > 0);
+  const totalComisiones = comisiones.reduce((a, c) => a + c.comision, 0);
+
+  // ── Costos de reparaciones ──
+  const costoReps = reps.reduce((a, r) => a + (r.costoRep || 0) + (r.flete || 0), 0);
+
+  // ── Balance ──
+  const totalEgresos = totalGastos + totalComisiones + costoReps + tME;
+  const balance = totalIngresos + tMI - totalEgresos;
+  const margen  = totalIngresos > 0 ? Math.round(balance / totalIngresos * 100) : 0;
+
+  const fmtAR = n => '$ ' + Math.abs(Math.round(n)).toLocaleString('es-AR');
+  const fmtRow = (label, val, bold, color) =>
+    `<tr><td>${label}</td><td style="text-align:right;font-weight:${bold?700:400};color:${color||'inherit'}">${fmtAR(val)}</td></tr>`;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a1612;background:#fff;padding:36px 40px;font-size:13px;line-height:1.5}
+  .header{border-bottom:2px solid #1a1612;padding-bottom:14px;margin-bottom:20px}
+  .header h1{font-size:1.5rem;font-weight:800;letter-spacing:-.3px}
+  .header .sub{font-size:.78rem;color:#6b5d4a;margin-top:3px}
+  .header .meta{font-size:.7rem;color:#a8957e;margin-top:2px}
+  .section{margin-bottom:20px}
+  .section h2{font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#a8957e;border-bottom:1px solid #e0d8cc;padding-bottom:5px;margin-bottom:10px}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px}
+  .kpi{background:#f5f2ec;border-radius:6px;padding:10px 12px;text-align:center}
+  .kpi-label{font-size:.62rem;color:#a8957e;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+  .kpi-val{font-size:1.1rem;font-weight:800}
+  .ok{color:#2e7d52}.bad{color:#b8352a}.gld{color:#8a6a1e}.muted{color:#6b5d4a}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;padding:6px 8px;font-size:.63rem;color:#a8957e;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid #e0d8cc}
+  td{padding:6px 8px;font-size:.82rem;border-bottom:1px solid #f0ebe3;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .total-row td{font-weight:700;border-top:1px solid #c8c0b4;border-bottom:none;padding-top:8px}
+  .badge{display:inline-block;padding:1px 6px;border-radius:10px;font-size:.65rem;font-weight:600}
+  .badge-ok{background:#e8f5ee;color:#2e7d52}.badge-gld{background:#faf3dc;color:#8a6a1e}
+  .footer{margin-top:28px;padding-top:12px;border-top:1px solid #e0d8cc;font-size:.68rem;color:#a8957e;display:flex;justify-content:space-between}
+  .disclaimer{margin-top:8px;font-size:.65rem;color:#c8c0b4;font-style:italic}
+  @media print{body{padding:18px 24px}@page{margin:1.5cm}}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>${nombreNegocio}</h1>
+  <div class="sub">Informe contable — ${mNombre}</div>
+  <div class="meta">Generado el ${new Date().toLocaleDateString('es-AR', { day:'2-digit', month:'long', year:'numeric' })} · Remu Gestión</div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="kpi-label">Ingresos brutos</div><div class="kpi-val gld">${fmtAR(totalIngresos)}</div></div>
+  <div class="kpi"><div class="kpi-label">Total egresos</div><div class="kpi-val bad">${fmtAR(totalEgresos)}</div></div>
+  <div class="kpi"><div class="kpi-label">Balance neto</div><div class="kpi-val ${balance >= 0 ? 'ok' : 'bad'}">${balance < 0 ? '−' : ''}${fmtAR(balance)}</div></div>
+  <div class="kpi"><div class="kpi-label">Margen</div><div class="kpi-val ${margen >= 0 ? 'ok' : 'bad'}">${margen}%</div></div>
+</div>
+
+<!-- INGRESOS -->
+<div class="section">
+  <h2>Ingresos del período</h2>
+  <table>
+    <thead><tr><th>Concepto</th><th style="text-align:right">Importe</th></tr></thead>
+    <tbody>
+      ${tT > 0 ? fmtRow(`Servicios / turnos (${turnos.length})`, tT) : ''}
+      ${tV > 0 ? fmtRow(`Ventas de productos (${ventasShow.length})`, tV) : ''}
+      ${tR > 0 ? fmtRow(`Reparaciones (${reps.length})`, tR) : ''}
+      ${tMI > 0 ? fmtRow(`Ingresos de caja adicionales (${movsIngreso.length})`, tMI) : ''}
+      <tr class="total-row"><td>Total ingresos</td><td style="text-align:right;color:#8a6a1e">${fmtAR(totalIngresos + tMI)}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+${Object.keys(metodos).length > 1 ? `
+<div class="section">
+  <h2>Ingresos por método de cobro</h2>
+  <table>
+    <thead><tr><th>Método</th><th style="text-align:right">Importe</th><th style="text-align:right">%</th></tr></thead>
+    <tbody>
+      ${Object.entries(metodos).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`
+        <tr><td>${k}</td><td style="text-align:right">${fmtAR(v)}</td><td style="text-align:right;color:#a8957e">${totalIngresos > 0 ? Math.round(v/totalIngresos*100) : 0}%</td></tr>
+      `).join('')}
+    </tbody>
+  </table>
+</div>` : ''}
+
+${comisiones.length ? `
+<div class="section">
+  <h2>Comisiones y liquidación de empleadas</h2>
+  <table>
+    <thead><tr><th>Empleada</th><th style="text-align:right">Servicios</th><th style="text-align:right">Facturado</th><th style="text-align:right">% Comisión</th><th style="text-align:right">A pagar</th></tr></thead>
+    <tbody>
+      ${comisiones.map(c=>`<tr><td>${c.empleado}</td><td style="text-align:right">${c.servicios}</td><td style="text-align:right">${fmtAR(c.total)}</td><td style="text-align:right">${c.pct}%</td><td style="text-align:right;font-weight:600;color:#2e7d52">${fmtAR(c.comision)}</td></tr>`).join('')}
+      <tr class="total-row"><td colspan="4">Total comisiones</td><td style="text-align:right;color:#b8352a">${fmtAR(totalComisiones)}</td></tr>
+    </tbody>
+  </table>
+</div>` : ''}
+
+<!-- EGRESOS -->
+<div class="section">
+  <h2>Egresos del período</h2>
+  <table>
+    <thead><tr><th>Concepto</th><th>Tipo</th><th style="text-align:right">Importe</th></tr></thead>
+    <tbody>
+      ${gastosFijos.map(g=>`<tr><td>${g.concepto}</td><td><span class="badge badge-gld">Fijo</span></td><td style="text-align:right">${fmtAR(g.monto)}</td></tr>`).join('')}
+      ${gastosVar.map(g=>`<tr><td>${g.concepto}</td><td><span class="badge" style="background:#f0ebe3;color:#6b5d4a">Variable</span></td><td style="text-align:right">${fmtAR(g.monto)}</td></tr>`).join('')}
+      ${gastosStock.map(g=>`<tr><td>${g.concepto}</td><td><span class="badge" style="background:#e8f0f8;color:#2e5a8a">Stock</span></td><td style="text-align:right">${fmtAR(g.monto)}</td></tr>`).join('')}
+      ${comisiones.length ? `<tr><td>Comisiones empleadas</td><td><span class="badge" style="background:#f0ebe3;color:#6b5d4a">Personal</span></td><td style="text-align:right">${fmtAR(totalComisiones)}</td></tr>` : ''}
+      ${costoReps > 0 ? `<tr><td>Costo repuestos y flete</td><td><span class="badge" style="background:#e8f0f8;color:#2e5a8a">Insumos</span></td><td style="text-align:right">${fmtAR(costoReps)}</td></tr>` : ''}
+      ${movsEgreso.map(m=>`<tr><td>${m.concepto||'Egreso de caja'}</td><td><span class="badge" style="background:#fdf0ef;color:#b8352a">Caja</span></td><td style="text-align:right">${fmtAR(m.monto)}</td></tr>`).join('')}
+      <tr class="total-row"><td colspan="2">Total egresos</td><td style="text-align:right;color:#b8352a">${fmtAR(totalEgresos)}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- BALANCE -->
+<div class="section">
+  <h2>Resumen general</h2>
+  <table>
+    <tbody>
+      ${fmtRow('Ingresos brutos', totalIngresos + tMI, false, '#8a6a1e')}
+      ${fmtRow('Total egresos', totalEgresos, false, '#b8352a')}
+      <tr class="total-row"><td>Balance neto del período</td><td style="text-align:right;font-weight:800;color:${balance >= 0 ? '#2e7d52' : '#b8352a'}">${balance < 0 ? '−' : ''}${fmtAR(balance)}</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="footer">
+  <span>${nombreNegocio} · ${mNombre}</span>
+  <span>Remu Gestión · remugestion.ar</span>
+</div>
+<p class="disclaimer">Este informe es un resumen de gestión generado automáticamente. No reemplaza la documentación contable ni fiscal oficial.</p>
+
+</body></html>`;
+
+  const ventana = window.open('', '_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+  setTimeout(() => ventana.print(), 600);
+}
+
 function generarResumenMesPDF(){
   const m = mes();
   const [mAnio, mMes] = m.split('-').map(Number);
