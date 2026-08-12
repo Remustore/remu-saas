@@ -1313,9 +1313,12 @@ $$;</pre>
     <!-- TURNOS -->
     <div class="sec" id="sec-turnos">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:2px">
-        <div>
-          <div class="pt">Turnos</div>
-          <div class="ps" style="margin-bottom:0">Agenda del salón</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <div class="pt">Turnos</div>
+            <div class="ps" style="margin-bottom:0">Agenda del salón</div>
+          </div>
+          <div id="ocupacionBadge" style="display:none"></div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn bg" style="padding:7px 14px;font-size:.8rem" onclick="go('turnosConfig')">⚙ Configurar turnos</button>
@@ -1453,6 +1456,8 @@ $$;</pre>
         </div>
         <button class="btn bg bsm" onclick="editarFichaCliente('')">+ Nueva ficha</button>
       </div>
+      <!-- Clientas inactivas -->
+      <div id="clientasInactivasCard" style="margin-bottom:14px"></div>
       <div class="card">
         <div class="ch">
           <div class="srch"><span>⌕</span><input id="fichaQ2" placeholder="Buscar cliente..." oninput="rFichasClientesMain()"></div>
@@ -9174,7 +9179,7 @@ function rTurnos(){
       confirmado:  `${_cobrarBtn}<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="cambiarEstadoTurno('${t.id}','llego')">🟢 Llegó</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
       llego:       `${_cobrarBtn}<button class="btn bsm" style="background:rgba(201,148,76,.15);color:var(--wrn);border:1px solid rgba(201,148,76,.3)" onclick="cambiarEstadoTurno('${t.id}','en_proceso')">🔄 En curso</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
       en_proceso:  `${_cobrarBtn}<button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
-      terminado:   `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span>`,
+      terminado:   `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem;margin-left:4px" onclick="reagendarTurno('${t.id}')">🔄 Reagendar</button>`,
       no_vino:     `<span style="font-size:.72rem;color:var(--bad)">❌ No asistió</span>`,
     };
     return `<div class="card" style="${cardStyle}">
@@ -9208,6 +9213,7 @@ function rTurnos(){
   if(turnosVista==='horario') rTurnosHorario();
   if(turnosVista==='semana') rTurnosSemana();
   if(turnosVista==='calendario') rTurnosCalendario();
+  rOcupacionDia();
 }
 
 function rTurnosHorario(){
@@ -10068,10 +10074,116 @@ function checkFichaAlerta(nombre){
 // ═══ FICHAS STANDALONE ═══
 window.__fichasLimit = 15;
 
+// ── CLIENTAS INACTIVAS ────────────────────────────────
+function rClientasInactivas(){
+  const el = document.getElementById('clientasInactivasCard');
+  if(!el) return;
+  const DIAS_INACTIVA = 60;
+  const hoy = new Date();
+  const turnos = getTurnos().filter(t => t.estado === 'terminado');
+  const fichas = getFichas();
+
+  // Para cada cliente con ficha o turno, calcular último turno terminado
+  const nombres = new Set([
+    ...Object.keys(fichas),
+    ...turnos.map(t => (t.cliente||'').toLowerCase()).filter(Boolean)
+  ]);
+
+  const inactivas = [];
+  nombres.forEach(nom => {
+    const ts = turnos.filter(t => (t.cliente||'').toLowerCase() === nom);
+    if(!ts.length) return;
+    const ultimo = ts.reduce((a,b) => (a.fecha||'') > (b.fecha||'') ? a : b);
+    const dias = Math.floor((hoy - new Date(ultimo.fecha + 'T12:00:00')) / 86400000);
+    if(dias >= DIAS_INACTIVA){
+      inactivas.push({ nombre: ultimo.cliente || nom, dias, tel: ultimo.tel || '' });
+    }
+  });
+
+  if(!inactivas.length){ el.innerHTML = ''; return; }
+  inactivas.sort((a,b) => b.dias - a.dias);
+
+  const [mostrar, resto] = [inactivas.slice(0,5), inactivas.length - 5];
+  el.innerHTML = `
+    <div style="background:rgba(201,148,76,.08);border:1px solid rgba(201,148,76,.25);border-radius:10px;padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:.82rem;font-weight:700;color:var(--wrn)">⏰ ${inactivas.length} clienta${inactivas.length!==1?'s':''} sin volver hace +${DIAS_INACTIVA} días</div>
+        <span style="font-size:.7rem;color:var(--tx2)">Tocar para enviar WA</span>
+      </div>
+      ${mostrar.map(c=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(201,148,76,.15);font-size:.82rem">
+          <span style="font-weight:600;color:var(--tx)">${esc(c.nombre)}</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="color:var(--tx2);font-size:.75rem">${c.dias} días</span>
+            ${c.tel ? `<a href="https://wa.me/549${c.tel.replace(/\D/g,'')}?text=${encodeURIComponent('Hola '+c.nombre+'! 😊 Hace tiempo que no te vemos. ¿Cuándo te agendamos?')}" target="_blank" class="btn bsm" style="background:rgba(37,211,102,.15);color:#25d366;border:1px solid rgba(37,211,102,.3);font-size:.7rem;padding:3px 10px">💬 WA</a>` : '<span style="font-size:.7rem;color:var(--mut)">sin tel</span>'}
+          </div>
+        </div>`).join('')}
+      ${resto > 0 ? `<div style="font-size:.75rem;color:var(--tx2);margin-top:8px;text-align:center">...y ${resto} más</div>` : ''}
+    </div>`;
+}
+
+// ── REAGENDAR TURNO ────────────────────────────────────
+function reagendarTurno(id){
+  const t = getTurnos().find(x => String(x.id) === String(id));
+  if(!t) return;
+  // Fecha sugerida: 3 semanas después del turno original
+  const base = new Date(t.fecha + 'T12:00:00');
+  base.setDate(base.getDate() + 21);
+  // Si la fecha sugerida ya pasó, usar hoy + 3 semanas
+  const hoy = new Date();
+  const sugerida = base > hoy ? base : new Date(hoy.getTime() + 21*86400000);
+  const fechaSug = sugerida.toISOString().slice(0,10);
+
+  openNuevoTurno();
+  setTimeout(()=>{
+    const cf = document.getElementById('turnoCliente');
+    if(cf){ cf.value = t.cliente || ''; cf.dispatchEvent(new Event('input')); }
+    const tf = document.getElementById('turnoTel');
+    if(tf) tf.value = t.tel || '';
+    const ff = document.getElementById('turnoFecha');
+    if(ff){ ff.value = fechaSug; ff.dispatchEvent(new Event('change')); }
+    const cfg = getTurnosCfg();
+    const empSel = document.getElementById('turnoEmpleado');
+    if(empSel && t.empleadoId){
+      const opt = empSel.querySelector(`option[value="${t.empleadoId}"]`);
+      if(opt) opt.selected = true;
+    }
+    const srvSel = document.getElementById('turnoServicio');
+    if(srvSel && t.servicioId){
+      const opt = srvSel.querySelector(`option[value="${t.servicioId}"]`);
+      if(opt){ opt.selected = true; srvSel.dispatchEvent(new Event('change')); }
+    }
+    showToast('Reagendando a '+fechaSug+' — revisá la hora disponible');
+  }, 200);
+}
+
+// ── OCUPACIÓN DEL DÍA ──────────────────────────────────
+function rOcupacionDia(){
+  const badge = document.getElementById('ocupacionBadge');
+  if(!badge) return;
+  const fecha = document.getElementById('turnosFecha')?.value || tod();
+  if(fecha !== tod()){ badge.style.display='none'; return; }
+
+  const cfg = getTurnosCfg();
+  const empleados = (cfg.empleados||[]).length || 1;
+  const [ah] = (cfg.apertura||'09:00').split(':').map(Number);
+  const [ch] = (cfg.cierre||'19:00').split(':').map(Number);
+  const horasAbiertas = Math.max(ch - ah, 1);
+  const capacidad = empleados * Math.floor(horasAbiertas / 0.75); // ~45min promedio por turno
+
+  const activos = getTurnos().filter(t => t.fecha === fecha && !['cancelado','no_vino'].includes(t.estado)).length;
+  const pct = Math.min(Math.round((activos / capacidad) * 100), 100);
+  const color = pct < 40 ? 'var(--ok)' : pct < 75 ? 'var(--wrn)' : 'var(--bad)';
+  const label = pct < 40 ? 'Con espacio' : pct < 75 ? 'Llenándose' : 'Casi lleno';
+
+  badge.style.display = 'flex';
+  badge.innerHTML = `<span style="background:${color}22;border:1px solid ${color}44;color:${color};font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap">${activos} turnos · ${pct}% · ${label}</span>`;
+}
+
 function rFichasClientesMain(verMas){
   const el = document.getElementById('fichasClientesMain');
   if(!el) return;
-  if(!verMas) window.__fichasLimit = 15;
+  if(!verMas){ window.__fichasLimit = 15; rClientasInactivas(); }
   const q = (document.getElementById('fichaQ2')?.value||'').toLowerCase();
   const fichas = Object.values(getFichas());
   const turnos = getTurnos();
