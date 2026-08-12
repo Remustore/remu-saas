@@ -1325,6 +1325,11 @@ $$;</pre>
         </div>
       </div>
 
+      <!-- Mi Resumen — solo visible en modo empleado -->
+      <div id="miResumenCard" style="display:none;margin-bottom:14px">
+        <div id="miResumenContent"></div>
+      </div>
+
       <!-- Selector de fecha y vista -->
       <div class="card" style="margin-bottom:14px">
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -2806,9 +2811,11 @@ function setupApp(){
   setupCategoriasStock();
   setupPreciosTabs();
   
-  // Si es empleado, ocultar todo excepto turnos y fichas
+  // Aplicar restricciones según rol
   if(currentRole === 'empleado'){
     aplicarModoEmpleado();
+  } else if(currentRole === 'recepcionista'){
+    aplicarModoRecepcionista();
   } else {
     const _ugBtn = document.getElementById('btnGestionUsuarios');
     if(_ugBtn) _ugBtn.style.display = '';
@@ -3330,7 +3337,8 @@ function _renderUsersModal(t){
           <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Rol</label>
           <select id="uaRol" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:14px;font-family:var(--fb)">
             <option value="admin">👑 Administrador — acceso completo</option>
-            <option value="empleado">👤 Empleado — solo sus turnos del día</option>
+            <option value="recepcionista">📋 Recepcionista — gestiona agenda de todos, sin finanzas</option>
+            <option value="empleado">👤 Empleado — solo sus propios turnos, sin finanzas</option>
           </select>
           <div id="uaMsg" style="font-size:.78rem;margin-bottom:8px;display:none;padding:8px 10px;border-radius:7px"></div>
           <button id="uaSubmitBtn" onclick="agregarUsuarioATenant()" style="width:100%;padding:11px;background:var(--gld);color:#000;border:none;border-radius:8px;font-weight:700;font-size:.88rem;cursor:pointer;font-family:var(--fb)">+ Crear usuario</button>
@@ -4284,6 +4292,7 @@ async function loadAll(){
     if(currentTenant?.modulos?.fidelUmbral) dbSetConfig('fidelUmbral', currentTenant.modulos.fidelUmbral);
     // Re-apply empleado restrictions after data loads
     if(currentRole === 'empleado') aplicarModoEmpleado();
+    else if(currentRole === 'recepcionista') aplicarModoRecepcionista();
     // Onboarding wizard for fresh accounts
     const _owKey = 'onboarding_v1_' + (currentTenant?.id||'');
     if(!localStorage.getItem(_owKey)){
@@ -10928,6 +10937,77 @@ async function agregarCategoriaStock(nombre){
   setupCategoriasStock();
 }
 
+function rMiResumen(){
+  const card = document.getElementById('miResumenCard');
+  const el   = document.getElementById('miResumenContent');
+  if(!card || !el) return;
+  card.style.display = 'block';
+  const nombre = window.currentEmpleadoNombre || '';
+  const hoy    = tod();
+  const mesAct = hoy.slice(0,7);
+  const turnosHoy = (S.turnos||[]).filter(t => t.fecha===hoy && (!nombre || t.empleado_nombre===nombre));
+  const turnosMes = (S.turnos||[]).filter(t => (t.fecha||'').startsWith(mesAct) && t.estado==='terminado' && (!nombre || t.empleado_nombre===nombre));
+  const terminadosHoy = turnosHoy.filter(t=>t.estado==='terminado').length;
+  const pendientesHoy = turnosHoy.filter(t=>['confirmado','pendiente'].includes(t.estado)).length;
+  // Top 3 servicios del mes
+  const servicioCount = {};
+  turnosMes.forEach(t=>{ const s=t.servicio_nombre||'Sin especificar'; servicioCount[s]=(servicioCount[s]||0)+1; });
+  const top3 = Object.entries(servicioCount).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  el.innerHTML = `
+    <div style="background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:14px 16px">
+      <div style="font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:10px">📊 Mi resumen — ${nombre}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:${top3.length?'12px':'0'}">
+        <div style="background:var(--bg);border-radius:8px;padding:10px 16px;flex:1;min-width:100px;text-align:center">
+          <div style="font-size:1.5rem;font-weight:700;color:var(--gld)">${terminadosHoy}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">Hoy terminados</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px 16px;flex:1;min-width:100px;text-align:center">
+          <div style="font-size:1.5rem;font-weight:700;color:var(--inf)">${pendientesHoy}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">Hoy pendientes</div>
+        </div>
+        <div style="background:var(--bg);border-radius:8px;padding:10px 16px;flex:1;min-width:100px;text-align:center">
+          <div style="font-size:1.5rem;font-weight:700;color:var(--ok)">${turnosMes.length}</div>
+          <div style="font-size:.72rem;color:var(--tx2)">Este mes</div>
+        </div>
+      </div>
+      ${top3.length ? `<div style="font-size:.72rem;color:var(--mut);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Top servicios del mes</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${top3.map(([s,n],i)=>`<span style="background:var(--bg);border:1px solid var(--bor2);border-radius:20px;padding:3px 10px;font-size:.76rem;color:var(--tx2)">${['🥇','🥈','🥉'][i]} ${s} <strong style="color:var(--tx)">${n}</strong></span>`).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+function aplicarModoRecepcionista(){
+  // Ocultar toda la navegación
+  document.querySelectorAll('.ni,.ns').forEach(el => el.style.display = 'none');
+
+  // Solo Agenda y Fichas en el nav
+  ['nav-turnos','nav-fichas'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.style.removeProperty('display');
+  });
+
+  // Solo puede ver agenda y fichas — sin finanzas ni configuración
+  const PERMITIDAS = new Set(['sec-turnos','sec-fichasClientes']);
+  document.querySelectorAll('.sec').forEach(el => {
+    if(!PERMITIDAS.has(el.id)) el.style.display = 'none';
+  });
+
+  // Topbar: nombre del recepcionista
+  const tbUser = document.getElementById('tbUser');
+  if(tbUser) tbUser.textContent = '📋 ' + (window.currentEmpleadoNombre || currentUser?.email || '');
+
+  // Ve TODOS los turnos (no filtrado a sí mismo)
+  turnosFiltroEmpleado = null;
+
+  // Mi resumen (sin filtro de empleado para recepcionista)
+  rMiResumen();
+
+  const fechaEl = document.getElementById('turnosFecha');
+  if(fechaEl) fechaEl.value = tod();
+  go('turnos');
+}
+
 function aplicarModoEmpleado(){
   // Ocultar toda la navegación
   document.querySelectorAll('.ni,.ns').forEach(el => el.style.display = 'none');
@@ -10952,6 +11032,9 @@ function aplicarModoEmpleado(){
   if(window.currentEmpleadoNombre){
     turnosFiltroEmpleado = 'auto_' + window.currentEmpleadoNombre;
   }
+
+  // Mostrar resumen propio
+  rMiResumen();
 
   // Arrancar siempre en la fecha de hoy
   const fechaEl = document.getElementById('turnosFecha');
