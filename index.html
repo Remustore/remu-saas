@@ -10135,7 +10135,7 @@ function reagendarTurno(id){
 
   openNuevoTurno();
   setTimeout(()=>{
-    const cf = document.getElementById('turnoCliente');
+    const cf = document.getElementById('turnoCli');
     if(cf){ cf.value = t.cliente || ''; cf.dispatchEvent(new Event('input')); }
     const tf = document.getElementById('turnoTel');
     if(tf) tf.value = t.tel || '';
@@ -10152,7 +10152,7 @@ function reagendarTurno(id){
       const opt = srvSel.querySelector(`option[value="${t.servicioId}"]`);
       if(opt){ opt.selected = true; srvSel.dispatchEvent(new Event('change')); }
     }
-    showToast('Reagendando a '+fechaSug+' — revisá la hora disponible');
+    showToast('📋 Formulario cargado · elegí la hora y tocá Guardar', 'ok');
   }, 200);
 }
 
