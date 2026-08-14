@@ -85,7 +85,7 @@ body.light-mode .bgr{background:rgba(30,107,56,.12);color:var(--ok);}
 body.light-mode .byw{background:rgba(122,72,16,.12);color:var(--wrn);}
 body.light-mode .brd{background:rgba(138,32,32,.12);color:var(--bad);}
 body.light-mode .bgx{background:rgba(122,92,16,.1);color:var(--gld);}
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;min-height:100vh;}
 ::-webkit-scrollbar{width:4px;height:4px;}
 ::-webkit-scrollbar-thumb{background:var(--bor2);border-radius:10px;}
@@ -342,8 +342,8 @@ textarea{resize:vertical;min-height:70px;}
   .cnt{padding:12px;width:100%;box-sizing:border-box;}
   .card{box-sizing:border-box;width:100%;}
 
-  /* Overlay when sidebar open */
-  #sbOverlay{display:block;}
+  /* Overlay when sidebar open — JS controla display via toggleSB() */
+  #sbOverlay{display:none;pointer-events:none;}
   
   /* Topbar compacto */
   .topbar{padding:10px 14px;}
@@ -4501,7 +4501,8 @@ function toggleSB(){
   const sb = document.getElementById('sb');
   const ov = document.getElementById('sbOverlay');
   sb.classList.toggle('open');
-  if(ov) ov.style.display = sb.classList.contains('open') ? 'block' : 'none';
+  const open = sb.classList.contains('open');
+  if(ov){ ov.style.display = open ? 'block' : 'none'; ov.style.pointerEvents = open ? 'auto' : 'none'; }
 }
 function openM(id, editId){
   const el = document.getElementById(id);
