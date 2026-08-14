@@ -716,6 +716,8 @@ textarea{resize:vertical;min-height:70px;}
           <input id="saRubro" placeholder="Ej: Telefonía · Servicio técnico">
           <label>Email del cliente (login)</label>
           <input type="email" id="saEmail" placeholder="cliente@email.com">
+          <label>Teléfono / WhatsApp <span style="color:var(--mut);font-weight:400">(opcional)</span></label>
+          <input type="tel" id="saTelefono" placeholder="Ej: 3472628087">
           <label>Contraseña inicial</label>
           <input type="password" id="saPass" placeholder="Mínimo 6 caracteres">
           <label>Módulos habilitados</label>
@@ -1641,9 +1643,9 @@ $$;</pre>
       </div>
 
       <!-- HORAS DE LUNA -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card" id="cardHorasLuna" style="margin-bottom:14px;display:none">
         <div class="ch">
-          <h3>🕐 Horas de Luna</h3>
+          <h3 id="hlCardTitle">🕐 Horas</h3>
           <button class="btn bg bsm" onclick="abrirRegistroHorasLuna()">+ Cargar horas</button>
         </div>
         <div id="horasLunaResumen"></div>
@@ -2194,7 +2196,7 @@ $$;</pre>
 <div class="mb" id="mHorasLuna">
   <div class="md" style="max-width:380px">
     <div class="mh">
-      <div class="mt2">🕐 Registrar horas de Luna</div>
+      <div class="mt2" id="hlModalTitle">🕐 Registrar horas</div>
       <button class="xbtn" onclick="closeM('mHorasLuna')">✕</button>
     </div>
     <div class="mc">
@@ -2987,6 +2989,7 @@ async function crearTenant(){
   const rubro   = document.getElementById('saRubro').value.trim();
   const email   = document.getElementById('saEmail').value.trim().toLowerCase();
   const pass    = document.getElementById('saPass').value.trim();
+  const telefono = document.getElementById('saTelefono')?.value.trim() || '';
   const msg     = document.getElementById('saMsg');
 
   if(!nombre || !email || !pass){ showSaMsg('Completá todos los campos obligatorios', 'err'); return; }
@@ -3010,7 +3013,10 @@ async function crearTenant(){
     plan:           planSel,
     precio_mensual: precioMens,
     pago_activo:    false,
-    trial_hasta:    new Date(Date.now()+30*24*60*60*1000).toISOString()
+    trial_hasta:    new Date(Date.now()+30*24*60*60*1000).toISOString(),
+    telefono:       telefono,
+    crm_estado:     'nuevo',
+    crm_notas:      ''
   };
 
   showSaMsg('Creando cliente...', 'ok');
@@ -3056,6 +3062,7 @@ async function crearTenant(){
     document.getElementById('saRubro').value='';
     document.getElementById('saEmail').value='';
     document.getElementById('saPass').value='';
+    if(document.getElementById('saTelefono')) document.getElementById('saTelefono').value='';
     loadTenants();
 
   } catch(e) {
@@ -3243,6 +3250,13 @@ async function loadTenants(){
         : mods.precio_mensual===15000
           ? '<span style="font-size:.65rem;color:var(--mut);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">💎 Fundador</span>'
           : '';
+    const tel = mods.telefono || '';
+    const telWa = tel.replace(/\D/g,'');
+    const crmEstado = mods.crm_estado || 'nuevo';
+    const crmNotas = mods.crm_notas || '';
+    const crmColors = { nuevo:'rgba(76,142,201,.15)', contactado:'rgba(201,168,76,.15)', interesado:'rgba(76,175,125,.15)', descartado:'rgba(201,82,76,.15)' };
+    const crmTextColors = { nuevo:'var(--inf)', contactado:'var(--wrn)', interesado:'var(--ok)', descartado:'var(--bad)' };
+    const crmLabels = { nuevo:'🆕 Nuevo', contactado:'📞 Contactado', interesado:'⭐ Interesado', descartado:'❌ Descartado' };
     return `
     <div class="tenant-row" style="flex-direction:column;align-items:flex-start;gap:10px">
       <div style="display:flex;align-items:center;gap:10px;width:100%">
@@ -3250,8 +3264,18 @@ async function loadTenants(){
         <div style="flex:1;min-width:0">
           <div class="tenant-name">${esc(t.nombre)} ${autoReg}</div>
           <div class="tenant-email">${esc(t.rubro||'Sin rubro')} · Registrado: ${fechaReg}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap">
+            ${t.email ? `<span style="font-size:.7rem;color:var(--tx2)">${esc(t.email)}</span><button onclick="navigator.clipboard.writeText('${esc(t.email||'')}');showToast('Email copiado')" style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:.7rem;padding:0">📋</button>` : ''}
+            ${tel ? `<a href="https://wa.me/549${telWa}" target="_blank" style="font-size:.7rem;color:#25d366;text-decoration:none">📱 WA ${tel}</a>` : ''}
+          </div>
         </div>
         <span class="tenant-badge ${t.activo?'t-active':'t-inactive'}">${t.activo?'Activo':'Inactivo'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-left:46px;width:calc(100% - 46px)">
+        <select onchange="actualizarCrmEstado('${t.id}', this.value)" style="background:${crmColors[crmEstado]||'var(--bg)'};color:${crmTextColors[crmEstado]||'var(--tx)'};border:1px solid var(--bor2);border-radius:6px;padding:3px 8px;font-size:.72rem;font-family:var(--fb);outline:none;cursor:pointer">
+          ${['nuevo','contactado','interesado','descartado'].map(e=>`<option value="${e}" ${crmEstado===e?'selected':''}>${crmLabels[e]}</option>`).join('')}
+        </select>
+        <input placeholder="Notas rápidas..." value="${esc(crmNotas)}" onblur="actualizarCrmNotas('${t.id}', this.value)" style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:3px 8px;border-radius:6px;font-size:.72rem;font-family:var(--fb);outline:none;min-width:0">
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding-left:46px">
         ${trialLabel}
@@ -3259,6 +3283,7 @@ async function loadTenants(){
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="activarPago('${t.id}')">✓ Marcar pagado</button>`:'<button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="desactivarPago(\''+t.id+'\')">Cancelar pago</button>'}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="extenderTrial('${t.id}')">+30 días trial</button>`:''}
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="gestionarUsuarios('${t.id}')">👥 ${(mods.usuarios||[]).length||1} usuario${((mods.usuarios||[]).length||1)!==1?'s':''}</button>
+        <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:#9a7fd4;border-color:rgba(154,127,212,.4)" onclick="configurarModuloHL('${t.id}')">⚙ Horas extra</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
         <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:var(--gld);border-color:rgba(201,168,76,.4)" onclick="accederComoTenant('${t.id}')">→ Acceder</button>
@@ -3266,6 +3291,92 @@ async function loadTenants(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ── CRM SEGUIMIENTO ───────────────────────────────────────────────────
+async function actualizarCrmEstado(tenantId, estado){
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+  if(!t) return;
+  await sb.from('tenants').update({ modulos: { ...t.modulos, crm_estado: estado } }).eq('id', tenantId);
+  showToast('Estado actualizado ✓');
+}
+
+async function actualizarCrmNotas(tenantId, notas){
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+  if(!t) return;
+  await sb.from('tenants').update({ modulos: { ...t.modulos, crm_notas: notas } }).eq('id', tenantId);
+}
+
+// ── MÓDULO HORAS EXTRA (configurable por tenant) ──────────────────────
+async function configurarModuloHL(tenantId){
+  const { data: t } = await sb.from('tenants').select('*').eq('id', tenantId).single();
+  if(!t) return;
+  const cfg = t.modulos?.horas_luna || {};
+
+  let ov = document.getElementById('hlConfigOverlay');
+  if(!ov){
+    ov = document.createElement('div');
+    ov.id = 'hlConfigOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px';
+    ov.onclick = e => { if(e.target === ov) ov.remove(); };
+    document.body.appendChild(ov);
+  }
+
+  const inp = (id, label, val, ph, type='text') => `
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">${label}</label>
+    <input id="${id}" type="${type}" value="${esc(String(val??''))}" placeholder="${ph}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-size:.85rem;outline:none;margin-bottom:12px;font-family:var(--fb)">`;
+
+  ov.innerHTML = `
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:16px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto">
+      <div style="padding:18px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center">
+        <div style="font-family:var(--fh);font-size:1rem;font-weight:700">⚙ Horas extra — ${esc(t.nombre)}</div>
+        <button onclick="document.getElementById('hlConfigOverlay')?.remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:18px 20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">
+          <span style="font-size:.88rem;font-weight:600">Módulo activo</span>
+          <label style="position:relative;display:inline-block;width:42px;height:24px;cursor:pointer">
+            <input type="checkbox" id="hlActivo" ${cfg.activo?'checked':''} style="opacity:0;width:0;height:0">
+            <span id="hlActivoSlider" style="position:absolute;inset:0;border-radius:24px;background:${cfg.activo?'var(--ok)':'var(--bor2)'};transition:.2s" onclick="this.style.background=document.getElementById('hlActivo').checked?'var(--bor2)':'var(--ok)'"></span>
+          </label>
+        </div>
+        ${inp('hlNombreCfg','Nombre del colaborador',cfg.nombre||'','Ej: Luna')}
+        ${inp('hlResp1Cfg','Responsable 1 (50%)',cfg.resp1||'','Ej: DELFI')}
+        ${inp('hlResp2Cfg','Responsable 2 (50%)',cfg.resp2||'','Ej: Fiore')}
+        ${inp('hlTarifaSem','Tarifa semana/hora ($)',cfg.tarifaSemana||5000,'5000','number')}
+        ${inp('hlTarifaEsp','Tarifa especial sáb/dom/feriado ($)',cfg.tarifaEspecial||5500,'5500','number')}
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="sa-btn outline" style="flex:1;margin:0" onclick="document.getElementById('hlConfigOverlay')?.remove()">Cancelar</button>
+          <button class="sa-btn" style="flex:1;margin:0;background:rgba(154,127,212,.15);border-color:rgba(154,127,212,.4);color:#b08ad4" onclick="_guardarModuloHL('${tenantId}')">Guardar</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function _guardarModuloHL(tenantId){
+  const activo    = document.getElementById('hlActivo')?.checked || false;
+  const nombre    = document.getElementById('hlNombreCfg')?.value.trim() || 'Colaborador';
+  const resp1     = document.getElementById('hlResp1Cfg')?.value.trim() || 'Responsable 1';
+  const resp2     = document.getElementById('hlResp2Cfg')?.value.trim() || 'Responsable 2';
+  const tarifaSemana   = parseInt(document.getElementById('hlTarifaSem')?.value) || 5000;
+  const tarifaEspecial = parseInt(document.getElementById('hlTarifaEsp')?.value) || 5500;
+
+  const { data: t, error } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+  if(error || !t){ showToast('Error al cargar tenant', 'err'); return; }
+
+  const modulos = { ...(t.modulos||{}), horas_luna: { activo, nombre, resp1, resp2, tarifaSemana, tarifaEspecial } };
+  const { error: ue } = await sb.from('tenants').update({ modulos }).eq('id', tenantId);
+  if(ue){ showToast('Error al guardar', 'err'); return; }
+
+  document.getElementById('hlConfigOverlay')?.remove();
+  showToast(`Módulo "${nombre}" ${activo?'activado':'desactivado'} ✓`);
+  loadTenants();
+
+  // Si es el tenant actual, actualizar en memoria
+  if(currentTenant?.id === tenantId){
+    currentTenant = { ...currentTenant, modulos };
+    rHorasLuna();
+  }
 }
 
 // ── MULTI-USUARIOS POR TENANT ──────────────────────────────────────────
@@ -6428,9 +6539,8 @@ async function rMetricasTurnos(){
   const { data: rows } = await sb.from('turnos_solicitudes')
     .select('fecha,servicio_id')
     .eq('tenant_id', currentTenant.id)
-    .eq('estado','confirmado')
-    .gte('fecha', desdeStr)
-    .not('nombre','like','__%');
+    .in('estado',['confirmado','terminado','llego','en_proceso'])
+    .gte('fecha', desdeStr);
 
   if(!rows || !rows.length){
     card.innerHTML=`<div class="ch"><h3>📊 Métricas de turnos</h3></div><div style="text-align:center;padding:20px;color:var(--tx2);font-size:.85rem">Sin turnos confirmados aún</div>`;
@@ -12225,8 +12335,13 @@ function getClientesFrecuentes(){
 
 // ═══ RESUMEN MENSUAL PDF ═══
 // ═══ HORAS DE LUNA ═══
-const HL_TARIFA_SEMANA = 5000;
-const HL_TARIFA_ESPECIAL = 5500; // sábado, domingo y feriados nacionales
+function _hlCfg(){ return currentTenant?.modulos?.horas_luna || {}; }
+function _hlActivo(){ return !!_hlCfg().activo; }
+function _hlNombre(){ return _hlCfg().nombre || 'Colaborador'; }
+function _hlTarifaSemana(){ return Number(_hlCfg().tarifaSemana) || 5000; }
+function _hlTarifaEspecial(){ return Number(_hlCfg().tarifaEspecial) || 5500; }
+function _hlResp1(){ return _hlCfg().resp1 || 'Responsable 1'; }
+function _hlResp2(){ return _hlCfg().resp2 || 'Responsable 2'; }
 
 // Feriados nacionales Argentina — actualizar cada año
 const HL_FERIADOS_AR = new Set([
@@ -12242,14 +12357,17 @@ const HL_FERIADOS_AR = new Set([
   '2027-10-11','2027-11-22','2027-12-08','2027-12-25',
 ]);
 
-function _hlKey(){ return 'horasLuna_' + (currentTenant?.id||''); }
-
-function getHorasLuna(){
-  try{ return JSON.parse(localStorage.getItem(_hlKey())||'[]'); }catch(e){ return []; }
-}
-
-function saveHorasLuna(arr){
-  localStorage.setItem(_hlKey(), JSON.stringify(arr));
+async function _migrateHorasLunaLocalStorage(){
+  const key = 'horasLuna_' + (currentTenant?.id||'');
+  const raw = localStorage.getItem(key);
+  if(!raw) return;
+  try {
+    const arr = JSON.parse(raw);
+    if(!arr.length){ localStorage.removeItem(key); return; }
+    const rows = arr.map(h => ({ ...h, tenant_id: currentTenant.id }));
+    const { error } = await sb.from('horas_luna').upsert(rows, { onConflict: 'id' });
+    if(!error){ localStorage.removeItem(key); console.log('[HL] migrados', rows.length, 'registros de localStorage'); }
+  } catch(e){ console.error('[HL] error migración', e); }
 }
 
 function _hlEsEspecial(fecha){
@@ -12266,7 +12384,7 @@ function _hlTipoLabel(fecha){
 }
 
 function _hlTarifa(fecha){
-  return _hlEsEspecial(fecha) ? HL_TARIFA_ESPECIAL : HL_TARIFA_SEMANA;
+  return _hlEsEspecial(fecha) ? _hlTarifaEspecial() : _hlTarifaSemana();
 }
 
 // Período actual: pago el 5 y el 20
@@ -12304,6 +12422,8 @@ function abrirRegistroHorasLuna(){
   const elH = document.getElementById('hlHoras');
   if(elH) elH.value = '';
   document.getElementById('hlPreview').style.display = 'none';
+  const t = document.getElementById('hlModalTitle');
+  if(t) t.textContent = `🕐 Registrar horas — ${_hlNombre()}`;
   openM('mHorasLuna', null);
 }
 
@@ -12320,62 +12440,82 @@ function hlActualizarTarifa(){
   if(prev) prev.style.display = 'block';
 }
 
-function guardarHoraLuna(){
+async function guardarHoraLuna(){
   const fecha = document.getElementById('hlFecha')?.value;
   const horas = parseFloat(document.getElementById('hlHoras')?.value) || 0;
   if(!fecha || horas <= 0){ showToast('Completá fecha y horas', 'err'); return; }
   const tarifa = _hlTarifa(fecha);
-  const arr = getHorasLuna();
-  // Si ya existe entrada para esa fecha, reemplazar
-  const idx = arr.findIndex(h => h.fecha === fecha);
-  const entrada = { id: idx >= 0 ? arr[idx].id : Date.now(), fecha, horas, tarifa, monto: Math.round(tarifa * horas), pagado: false };
-  if(idx >= 0) arr[idx] = entrada; else arr.push(entrada);
-  saveHorasLuna(arr);
+  const { data: existing } = await sb.from('horas_luna').select('id').eq('tenant_id', currentTenant.id).eq('fecha', fecha).maybeSingle();
+  const entrada = { id: existing?.id || Date.now(), tenant_id: currentTenant.id, fecha, horas, tarifa, monto: Math.round(tarifa * horas), pagado: false };
+  const { error } = await sb.from('horas_luna').upsert(entrada, { onConflict: 'id' });
+  if(error){ showToast('Error al guardar', 'err'); return; }
   closeM('mHorasLuna');
-  rHorasLuna();
+  await rHorasLuna();
   showToast('Horas guardadas ✓');
 }
 
-function eliminarHoraLuna(id){
-  const arr = getHorasLuna().filter(h => h.id !== id);
-  saveHorasLuna(arr);
-  rHorasLuna();
+async function eliminarHoraLuna(id){
+  const { error } = await sb.from('horas_luna').delete().eq('id', id).eq('tenant_id', currentTenant.id);
+  if(error){ showToast('Error al eliminar', 'err'); return; }
+  await rHorasLuna();
 }
 
-function generarPagoLuna(){
+async function generarPagoLuna(){
   const { desde, hasta, label } = _hlPeriodoActual();
-  const arr = getHorasLuna().filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta);
-  if(!arr.length){ showToast('Sin horas pendientes en este período', 'err'); return; }
+  const { data: arr } = await sb.from('horas_luna').select('*').eq('tenant_id', currentTenant.id).eq('pagado', false).gte('fecha', desde).lte('fecha', hasta);
+  if(!arr?.length){ showToast('Sin horas pendientes en este período', 'err'); return; }
   const total  = arr.reduce((a, h) => a + h.monto, 0);
   const mitad  = Math.round(total / 2);
-  if(!confirm(`Generar pago de Luna por ${fmt(total)}?\n\n• DELFI: ${fmt(mitad)}\n• Fiore: ${fmt(total - mitad)}\n\nPeíodo: ${label}`)) return;
+  const nombre = _hlNombre();
+  const r1 = _hlResp1();
+  const r2 = _hlResp2();
+  if(!confirm(`Generar pago de ${nombre} por ${fmt(total)}?\n\n• ${r1}: ${fmt(mitad)}\n• ${r2}: ${fmt(total - mitad)}\n\nPeríodo: ${label}`)) return;
 
-  // Registrar dos egresos en gastos
   const fechaHoy = tod();
-  const gastoDelfi = { id: Date.now(),     concepto: `Sueldo Luna (DELFI 50%) — ${label}`, monto: mitad,          tipo: 'personal', fecha: fechaHoy, frecuencia: 'unico' };
-  const gastoFiore = { id: Date.now() + 1, concepto: `Sueldo Luna (Fiore 50%) — ${label}`, monto: total - mitad,  tipo: 'personal', fecha: fechaHoy, frecuencia: 'unico' };
+  const gasto1 = { id: Date.now(),     concepto: `Sueldo ${nombre} (${r1} 50%) — ${label}`, monto: mitad,         tipo: 'personal', fecha: fechaHoy, frecuencia: 'unico' };
+  const gasto2 = { id: Date.now() + 1, concepto: `Sueldo ${nombre} (${r2} 50%) — ${label}`, monto: total - mitad, tipo: 'personal', fecha: fechaHoy, frecuencia: 'unico' };
+  const ids = arr.map(h => h.id);
 
-  Promise.all([dbUpsert('gastos', gastoDelfi), dbUpsert('gastos', gastoFiore)]).then(() => {
-    S.gastos.push(gastoDelfi, gastoFiore);
-    // Marcar horas como pagadas
-    const ids = new Set(arr.map(h => h.id));
-    const todas = getHorasLuna().map(h => ids.has(h.id) ? { ...h, pagado: true } : h);
-    saveHorasLuna(todas);
-    rHorasLuna();
+  try {
+    await Promise.all([
+      dbUpsert('gastos', gasto1),
+      dbUpsert('gastos', gasto2),
+      sb.from('horas_luna').update({ pagado: true }).in('id', ids).eq('tenant_id', currentTenant.id)
+    ]);
+    S.gastos.push(gasto1, gasto2);
+    await rHorasLuna();
     rGastos();
-    showToast('Pago de Luna registrado ✓');
-  }).catch(() => showToast('Error al guardar', 'err'));
+    showToast(`Pago de ${nombre} registrado ✓`);
+  } catch(e){ showToast('Error al guardar', 'err'); }
 }
 
-function rHorasLuna(){
+async function rHorasLuna(){
+  const card = document.getElementById('cardHorasLuna');
+  if(!card) return;
+
+  if(!_hlActivo()){ card.style.display = 'none'; return; }
+
+  card.style.display = '';
+  const titulo = document.getElementById('hlCardTitle');
+  if(titulo) titulo.textContent = `🕐 Horas de ${_hlNombre()}`;
+
   const el = document.getElementById('horasLunaResumen');
   if(!el) return;
+
+  // Migrar datos viejos de localStorage si existen
+  await _migrateHorasLunaLocalStorage();
+
+  const nombre = _hlNombre();
+  const r1 = _hlResp1();
+  const r2 = _hlResp2();
   const { desde, hasta, label } = _hlPeriodoActual();
-  const todas    = getHorasLuna();
-  const periodo  = todas.filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta)
-                        .sort((a,b) => a.fecha.localeCompare(b.fecha));
-  const historial = todas.filter(h => h.pagado).slice(-5).reverse();
-  const totalHoras = periodo.reduce((a,h) => a + h.horas, 0);
+
+  const { data: todas, error } = await sb.from('horas_luna').select('*').eq('tenant_id', currentTenant.id).order('fecha', { ascending: true });
+  if(error){ el.innerHTML = `<div style="color:var(--bad);font-size:.82rem">Error al cargar horas</div>`; return; }
+
+  const periodo  = (todas||[]).filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta);
+  const historial = (todas||[]).filter(h => h.pagado).slice(-5).reverse();
+  const totalHoras = periodo.reduce((a,h) => a + Number(h.horas), 0);
   const totalMonto = periodo.reduce((a,h) => a + h.monto, 0);
   const mitad = Math.round(totalMonto / 2);
 
@@ -12409,10 +12549,10 @@ function rHorasLuna(){
         <span style="font-weight:700;font-size:.95rem;color:var(--gld)">${fmt(totalMonto)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:.76rem;color:var(--tx2);margin-bottom:12px">
-        <span>DELFI ${fmt(mitad)} · Fiore ${fmt(totalMonto - mitad)}</span>
+        <span>${r1} ${fmt(mitad)} · ${r2} ${fmt(totalMonto - mitad)}</span>
         <span>50% / 50%</span>
       </div>
-      <button class="btn bg" style="width:100%;font-size:.84rem" onclick="generarPagoLuna()">💸 Generar pago — ${fmt(totalMonto)}</button>
+      <button class="btn bg" style="width:100%;font-size:.84rem" onclick="generarPagoLuna()">💸 Generar pago ${nombre} — ${fmt(totalMonto)}</button>
     </div>` : ''}
     ${historial.length ? `
     <div style="margin-top:14px;font-size:.72rem;color:var(--mut);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Últimos pagos</div>

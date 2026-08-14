@@ -48,6 +48,28 @@ serve(async (req) => {
       srv: t.servicio_nombre, emp: t.empleado_nombre, estado: t.estado, precio: t.precio
     }));
 
+    // Horas de colaboradores (módulo horas_luna)
+    const inicioMes = hoy.substring(0, 7) + '-01';
+    const { data: horasLuna } = await sb.from('horas_luna')
+      .select('fecha,horas,tarifa,monto,pagado')
+      .eq('tenant_id', tenantId)
+      .gte('fecha', inicioMes)
+      .order('fecha', { ascending: true });
+
+    const { data: tenantMods } = await sb.from('tenants').select('modulos').eq('id', tenantId).maybeSingle();
+    const hlCfg = tenantMods?.modulos?.horas_luna || {};
+    const hlNombre = hlCfg.nombre || 'Colaborador';
+    const horasResumen = horasLuna && horasLuna.length > 0 ? {
+      colaborador: hlNombre,
+      mes: hoy.substring(0, 7),
+      totalHoras: horasLuna.reduce((a: number, h: any) => a + Number(h.horas), 0),
+      totalMonto: horasLuna.reduce((a: number, h: any) => a + h.monto, 0),
+      horasPagadas: horasLuna.filter((h: any) => h.pagado).reduce((a: number, h: any) => a + Number(h.horas), 0),
+      horasPendientes: horasLuna.filter((h: any) => !h.pagado).reduce((a: number, h: any) => a + Number(h.horas), 0),
+      montoPendiente: horasLuna.filter((h: any) => !h.pagado).reduce((a: number, h: any) => a + h.monto, 0),
+      detalle: horasLuna.map((h: any) => ({ fecha: h.fecha, horas: h.horas, monto: h.monto, pagado: h.pagado }))
+    } : null;
+
     // Catálogo de servicios y precios cargados (para presupuestos)
     const cfgRowId = parseInt(tenantId.replace(/-/g, '').substring(0, 8), 16) % 1000000 + 9999;
     const { data: cfgRow } = await sb.from('precios').select('data').eq('id', cfgRowId).maybeSingle();
@@ -67,14 +89,19 @@ serve(async (req) => {
 - "Stock": control de inventario de productos.
 - "Configuración": datos del negocio, horarios de atención, mensajes para clientes, etc.`;
 
+    const hlContexto = horasResumen
+      ? `\n\nMódulo de horas de ${hlNombre}: este negocio registra las horas trabajadas por ${hlNombre} (colaboradora externa). Los datos del mes actual (${horasResumen.mes}) son: ${JSON.stringify(horasResumen)}. Podés responder preguntas sobre cuántas horas lleva, cuánto se le debe pagar, si hay horas pendientes de pago, etc.`
+      : '';
+
     const system = `Sos el asistente de gestión de "${tenant?.nombre || 'el negocio'}" (${tenant?.rubro || ''}) dentro de Remu Gestión.
 Hoy es ${hoy}. Tenés acceso a los turnos del negocio entre ${hace30} y ${en14} en formato JSON (f=fecha, h=hora, cli=cliente, srv=servicio, emp=empleado/profesional, estado, precio).
-También tenés el catálogo de servicios con sus precios y duraciones (nombre, sector, duracion en minutos, precio).
+También tenés el catálogo de servicios con sus precios y duraciones (nombre, sector, duracion en minutos, precio).${hlContexto}
 
 ${guiaApp}
 
 Respondé en español, de forma breve, clara y concreta.
 - Para preguntas sobre los turnos/agenda del negocio, basate SOLO en los datos JSON. Si no se puede responder con esos datos, decilo honestamente y no inventes números.
+- Para preguntas sobre horas de colaboradores (como ${hlNombre}), usá los datos del módulo de horas si están disponibles.
 - Para preguntas sobre cómo usar la app (dónde está tal función, cómo configurar algo), usá la guía de arriba. Si la guía no cubre lo que preguntan, decí que no tenés esa información y sugerí consultar con soporte.
 - Si te piden redactar un mensaje (recordatorio, aviso, promo) para enviarle a un cliente, redactalo con buena onda y profesional, usando los datos reales del turno si corresponde.
 - Si ves patrones útiles en los datos (días con pocos turnos, servicios poco pedidos, huecos libres), podés sugerir ideas o consejos de gestión, dejando claro que son sugerencias basadas en los datos disponibles.
