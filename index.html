@@ -1015,6 +1015,9 @@ $$;</pre>
         </div>
       </div>
 
+      <!-- COBROS PENDIENTES (fiados) -->
+      <div id="dashFiados" style="margin-bottom:14px;display:none"></div>
+
       <!-- AVISOS DIARIOS -->
       <div id="dashAvisos" style="margin-bottom:14px"></div>
 
@@ -6446,7 +6449,7 @@ function mostrarAvisosDaily(){
 
 // ═══ DASHBOARD ═══
 function rDash(){
-  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily();
+  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily(); rFiadosPendientes();
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
   setTimeout(rDashPareja, 200);
@@ -9066,6 +9069,71 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   if(cierreOv && cierreOv.style.display !== 'none' && typeof cierreDiario === 'function') cierreDiario();
 }
 
+function rFiadosPendientes(){
+  const el = document.getElementById('dashFiados');
+  if(!el) return;
+  const fiados = (typeof getTurnos==='function' ? getTurnos() : [])
+    .filter(t => t.estado==='terminado' && t.metodo==='Fiado' && (parseFloat(t.precio)||0) > 0)
+    .sort((a,b) => a.fecha.localeCompare(b.fecha));
+  if(!fiados.length){ el.style.display='none'; return; }
+  el.style.display='block';
+  const total = fiados.reduce((s,t)=>s+(parseFloat(t.precio)||0),0);
+  el.innerHTML = `<div class="card" style="border-left:3px solid var(--bad)">
+    <div class="ch" style="margin-bottom:12px">
+      <h3 style="color:var(--bad)">🔴 Cobros pendientes</h3>
+      <span style="font-weight:700;color:var(--bad);font-size:1rem">${fmt(total)}</span>
+    </div>
+    ${fiados.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--brd)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.88rem">${esc(t.cliente)}</div>
+        <div style="font-size:.75rem;color:var(--mut)">${fD(t.fecha)} &nbsp;·&nbsp; ${esc(t.servicioNombre||'Servicio')}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-weight:700;color:var(--bad)">${fmt(t.precio)}</span>
+        <button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.35);font-weight:700;white-space:nowrap" onclick="cobrarFiado('${t.id}')">✓ Cobrar</button>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+
+function cobrarFiado(id){
+  const t = (typeof getTurnos==='function' ? getTurnos() : []).find(x=>String(x.id)===String(id));
+  if(!t) return;
+  const existing = document.getElementById('_cobrarFiadoPanel');
+  if(existing) existing.remove();
+  const panel = document.createElement('div');
+  panel.id = '_cobrarFiadoPanel';
+  panel.style.cssText = 'position:fixed;inset:0;z-index:10010;background:rgba(0,0,0,.65);display:flex;align-items:flex-end;justify-content:center';
+  const metodos = [['Efectivo','💵'],['Transferencia','🏦'],['Débito','💳'],['Crédito','💳'],['Mercado Pago','📱']];
+  panel.innerHTML = `<div style="background:var(--card);border-radius:14px 14px 0 0;width:100%;max-width:420px;padding:22px 20px 38px;box-sizing:border-box">
+    <div style="font-weight:700;font-size:1rem;margin-bottom:4px">💰 Registrar cobro</div>
+    <div style="font-size:.85rem;color:var(--mut);margin-bottom:18px">${esc(t.cliente)} &nbsp;·&nbsp; <strong style="color:var(--ok)">${fmt(t.precio||0)}</strong></div>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      ${metodos.map(([m,ico])=>`<button onclick="_confirmarCobrarFiado('${id}','${m}')" style="padding:13px 16px;background:var(--bg);border:1px solid var(--brd);border-radius:9px;color:var(--tx);font-size:.9rem;cursor:pointer;text-align:left;font-family:inherit">${ico} ${m}</button>`).join('')}
+    </div>
+    <button onclick="document.getElementById('_cobrarFiadoPanel').remove()" style="width:100%;margin-top:14px;padding:10px;background:transparent;border:none;color:var(--mut);font-size:.8rem;cursor:pointer">Cancelar</button>
+  </div>`;
+  panel.addEventListener('click', e=>{ if(e.target===panel) panel.remove(); });
+  document.body.appendChild(panel);
+}
+
+async function _confirmarCobrarFiado(id, metodo){
+  document.getElementById('_cobrarFiadoPanel')?.remove();
+  const turnos = typeof getTurnos==='function' ? getTurnos() : [];
+  const idx = turnos.findIndex(x=>String(x.id)===String(id));
+  if(idx===-1) return;
+  turnos[idx] = {...turnos[idx], metodo};
+  if(typeof saveTurnosLocal==='function') saveTurnosLocal(turnos);
+  const { error } = await sb.from('turnos_solicitudes')
+    .update({ metodo })
+    .eq('id', id)
+    .eq('tenant_id', currentTenant?.id);
+  if(error){ showToast('Error al registrar el cobro'); return; }
+  showToast('✓ Cobrado · ' + metodo);
+  if(typeof rTurnos==='function') rTurnos();
+  if(typeof rDash==='function') rDash();
+}
+
 function _showResenaWA(t){
   const mapsLink = getOnlineCfg().mapsResena;
   if(!mapsLink) return;
@@ -9259,7 +9327,7 @@ function rTurnos(){
   const statsEl = document.getElementById('turnosDayStats');
   const totalDia = getTurnos().filter(t=>t.fecha===fecha&&t.estado!=='cancelado');
   const finalizadosDia = totalDia.filter(t=>t.estado==='terminado');
-  const facturadoDia = finalizadosDia.reduce((s,t)=>s+(parseFloat(t.precio)||0),0);
+  const facturadoDia = finalizadosDia.filter(t=>t.metodo!=='Fiado').reduce((s,t)=>s+(parseFloat(t.precio)||0),0);
   statsEl.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
     <div class="stat" style="flex:1;min-width:90px"><div class="sl">Turnos</div><div class="sv">${totalDia.length}</div></div>
     <div class="stat" style="flex:1;min-width:90px;border-left:2px solid rgba(76,175,125,.3)"><div class="sl">Finalizados</div><div class="sv" style="color:var(--ok)">${finalizadosDia.length}</div></div>
@@ -9319,7 +9387,9 @@ function rTurnos(){
       confirmado:  `${_cobrarBtn}<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="cambiarEstadoTurno('${t.id}','llego')">🟢 Llegó</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
       llego:       `${_cobrarBtn}<button class="btn bsm" style="background:rgba(201,148,76,.15);color:var(--wrn);border:1px solid rgba(201,148,76,.3)" onclick="cambiarEstadoTurno('${t.id}','en_proceso')">🔄 En curso</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
       en_proceso:  `${_cobrarBtn}<button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
-      terminado:   `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem;margin-left:4px" onclick="reagendarTurno('${t.id}')">🔄 Reagendar</button>`,
+      terminado:   t.metodo==='Fiado'
+        ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.35);font-weight:700" onclick="cobrarFiado('${t.id}')">💰 Cobrar ${fmt(t.precio||0)}</button><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem" onclick="reagendarTurno('${t.id}')">🔄</button>`
+        : `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem;margin-left:4px" onclick="reagendarTurno('${t.id}')">🔄 Reagendar</button>`,
       no_vino:     `<span style="font-size:.72rem;color:var(--bad)">❌ No asistió</span>`,
     };
     return `<div class="card" style="${cardStyle}">
@@ -9330,6 +9400,7 @@ function rTurnos(){
             ${t.esFijo?'<span style="font-size:.68rem;font-weight:700;color:var(--gld);background:rgba(201,168,76,.18);padding:2px 7px;border-radius:10px">🔒 Fijo</span>':''}
             ${estadoBadge[t.estado]||''}
             ${t.precio>0?`<span style="font-size:.78rem;color:var(--gld);font-weight:600">${fmt(t.precio)}</span>`:''}
+            ${t.metodo==='Fiado'?`<span style="font-size:.72rem;font-weight:700;color:var(--bad);background:rgba(201,82,76,.12);padding:2px 8px;border-radius:10px;border:1px solid rgba(201,82,76,.3)">🔴 Fiado</span>`:''}
           </div>
           <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
             🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ✂ ${esc(t.servicioNombre||'')} &nbsp;·&nbsp; 👤 ${esc(t.empleadoNombre||'')}
@@ -17899,9 +17970,10 @@ function _mostrarModalFinalizarConServicio(turno, servicios){
       '<input type="number" id="mFCS_precio" value="' + (currentPrecio > 0 ? currentPrecio : '') + '" placeholder="0 — sin cobro" min="0" style="' + iStyle + '">' +
       '<label style="' + lStyle + '">Método de pago</label>' +
       '<select id="mFCS_metodo" style="' + sStyle + '">' + metodosHtml + '</select>' +
-      '<div style="display:flex;gap:10px;margin-top:22px">' +
-        '<button onclick="_mFCS_confirmar()" style="flex:1;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.92rem;font-weight:700;cursor:pointer">✓ Registrar y finalizar</button>' +
-        '<button onclick="_mFCS_sinCobro()" style="padding:14px 18px;background:transparent;border:1px solid #2e2e2e;color:#a89880;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.85rem;cursor:pointer">Sin cobro</button>' +
+      '<button onclick="_mFCS_confirmar()" style="width:100%;margin-top:22px;padding:14px;background:#c9a84c;color:#080808;border:none;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.92rem;font-weight:700;cursor:pointer">✓ Registrar y finalizar</button>' +
+      '<div style="display:flex;gap:10px;margin-top:10px">' +
+        '<button onclick="_mFCS_fiado()" style="flex:1;padding:12px;background:rgba(201,82,76,.12);border:1px solid rgba(201,82,76,.3);color:#e07878;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.85rem;font-weight:600;cursor:pointer">📋 Fiado</button>' +
+        '<button onclick="_mFCS_sinCobro()" style="flex:1;padding:12px;background:transparent;border:1px solid #2e2e2e;color:#a89880;border-radius:10px;font-family:\'Outfit\',sans-serif;font-size:.85rem;cursor:pointer">Sin cobro</button>' +
       '</div>' +
       '<button onclick="_mFCS_cerrar()" style="width:100%;margin-top:10px;padding:10px;background:transparent;border:none;color:#585044;font-family:\'Outfit\',sans-serif;font-size:.78rem;cursor:pointer">Cancelar</button>' +
     '</div>';
@@ -17959,6 +18031,17 @@ async function _mFCS_sinCobro(){
   _mFCS_cerrar();
   _mFCS_aplicarServicioAlTurno(id, srv, null, null);
   if(typeof _doEstadoTurno === 'function') await _doEstadoTurno(id, 'terminado', null, null);
+}
+
+async function _mFCS_fiado(){
+  var id = window.__pendingFinalizarId;
+  if(id == null) return;
+  var monto = parseFloat((document.getElementById('mFCS_precio')||{}).value||0)||0;
+  if(monto <= 0){ alert('Ingresá el monto del fiado antes de continuar.'); return; }
+  var srv = _mFCS_getServicio();
+  _mFCS_cerrar();
+  _mFCS_aplicarServicioAlTurno(id, srv, monto, 'Fiado');
+  if(typeof _doEstadoTurno === 'function') await _doEstadoTurno(id, 'terminado', monto, 'Fiado');
 }
 
 // Monkey-patch: interceptar cambiarEstadoTurno para 'terminado'
