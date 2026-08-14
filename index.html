@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✂</text></svg>">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -458,7 +458,7 @@ textarea{resize:vertical;min-height:70px;}
 /* ── MOBILE RESPONSIVE v2 ── */
 @media(max-width:768px){
   /* Botones pequeños: forzar touch target mínimo */
-  .bsm{min-height:40px;display:inline-flex;align-items:center;justify-content:center;}
+  .bsm{min-height:44px;display:inline-flex;align-items:center;justify-content:center;}
 
   /* Botón cerrar modal: touch target 44px */
   .xbtn{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;font-size:1.1rem;}
@@ -4308,12 +4308,12 @@ function dbGetConfig(key){
 // ═══ LOAD ALL ═══
 async function loadAll(){
   // Al cambiar de tenant, limpiar TODO el localStorage para evitar mezcla de datos
-  const prevTenant = localStorage.getItem('activeTenant');
+  let prevTenant = ''; try { prevTenant = localStorage.getItem('activeTenant') || ''; } catch(e){}
   const thisTenant = currentTenant?.id || '';
   if(prevTenant && prevTenant !== thisTenant){
-    _clearTenantCache(thisTenant); // limpia datos del tenant anterior, preserva los del nuevo
+    _clearTenantCache(thisTenant);
   }
-  localStorage.setItem('activeTenant', thisTenant);
+  try { localStorage.setItem('activeTenant', thisTenant); } catch(e){}
   document.getElementById('loadingScreen').style.display='flex';
   try{
     let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos] = await Promise.all([
@@ -4465,7 +4465,15 @@ async function doUndo(){
 const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas' };
 
 function go(id){
-  ['_cobrarFiadoPanel','_resenaWAPanel','mFinalizarConServicio'].forEach(pid=>document.getElementById(pid)?.remove());
+  // Bug 2: cerrar sidebar en móvil y ocultar overlay
+  if(window.innerWidth<769){
+    const _sb=document.getElementById('sb'); if(_sb) _sb.classList.remove('open');
+    const _ov=document.getElementById('sbOverlay'); if(_ov){_ov.style.display='none';_ov.style.pointerEvents='none';}
+  }
+  // Bug 3: limpiar overlays dinámicos huérfanos
+  ['_cobrarFiadoPanel','_resenaWAPanel','mFinalizarConServicio',
+   'fichaCliOverlay','cliOverlay','cierreOverlay','cierreEmpleadaOverlay',
+   'hlConfigOverlay','usersOverlay'].forEach(pid=>document.getElementById(pid)?.remove());
   window._currentSection = id;
   document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('active'));
@@ -7899,7 +7907,8 @@ function rComparativa(){
 
   el.innerHTML = `
     <div class="card" style="margin-bottom:14px">
-      <table style="width:100%;border-collapse:collapse">
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <table style="width:100%;border-collapse:collapse;min-width:400px">
         <thead>
           <tr>
             <th style="text-align:left;padding:8px;font-size:.7rem;color:var(--mut);text-transform:uppercase">Concepto</th>
@@ -7917,6 +7926,7 @@ function rComparativa(){
           </tr>`).join('')}
         </tbody>
       </table>
+      </div>
     </div>
     <div class="g2">
       <div class="stat">
@@ -12126,8 +12136,9 @@ function saveDivisionConfig(cfg){
 function verConfigDivision(){
   const cfg = getDivisionConfig();
   const overlay = document.createElement('div');
+  overlay.id = '_divisionCfgOv';
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.onclick=e=>{if(e.target===overlay)overlay.remove();};
+  overlay.onclick=e=>{if(e.target===overlay)overlay.remove()};
   overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:400px">
     <div style="padding:16px 20px;border-bottom:1px solid var(--bor)">
       <div style="font-family:var(--fh);font-size:1rem;font-weight:700">⚙ División de ingresos</div>
@@ -12166,7 +12177,7 @@ function guardarDivision(){
   const p = parseFloat(document.getElementById('divGanancia')?.value)||0;
   if(Math.abs(g+r+p-100)>0.1) return alert('Los porcentajes deben sumar 100%');
   saveDivisionConfig({gastos:g, reinversion:r, ganancia:p});
-  document.querySelector('[style*=fixed]')?.remove();
+  document.getElementById('_divisionCfgOv')?.remove();
   rDivision();
   showToast('División guardada ✓');
 }
