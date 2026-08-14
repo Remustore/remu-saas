@@ -14904,6 +14904,319 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
   </div>
 </div>
 
+<!-- ④.2 PREVIEW DEL SISTEMA -->
+<div class="lp-divider"></div>
+<div class="lp-section">
+<style>
+.lp-mock-frame{max-width:940px;margin:0 auto;border-radius:13px;overflow:hidden;box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.07)}
+.lp-mock-chrome{background:#110d15;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.lp-mock-chrome .lp-dots{display:flex;gap:5px}
+.lp-mock-chrome .lp-dot{width:10px;height:10px;border-radius:50%}
+.lp-mock-chrome .lp-urlbar{flex:1;background:#1c1522;border-radius:5px;padding:4px 10px;font-size:.67rem;color:#6b5870;text-align:center;font-family:monospace}
+.lp-mock-app{display:flex;background:#eddde8;overflow:hidden;height:440px}
+.lp-mock-sb{width:148px;flex-shrink:0;background:#2d1a3a;display:flex;flex-direction:column;overflow:hidden}
+.lp-mock-sb-brand{padding:11px 13px 9px;border-bottom:1px solid rgba(255,255,255,.08)}
+.lp-mock-sb-name{font-size:.58rem;font-weight:800;color:#c9a84c;letter-spacing:1px;line-height:1.3}
+.lp-mock-sb-sub{font-size:.48rem;color:#7a5a6a;margin-top:1px}
+.lp-mock-ni{padding:7px 12px;font-size:.68rem;color:#9a7a8a;display:flex;align-items:center;gap:6px}
+.lp-mock-ni.active{background:rgba(201,168,76,.12);color:#d4bac8}
+.lp-mock-main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.lp-mock-topbar{background:linear-gradient(135deg,#451d5e,#6b3080);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.lp-mock-topbar-title{font-size:.78rem;font-weight:700;color:#f5f0e8}
+.lp-mock-topbar-meta{font-size:.58rem;color:rgba(245,240,232,.45)}
+.lp-mock-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:13px}
+.lp-apt{border-radius:5px;padding:4px 7px;font-size:.56rem;color:#f0e8f5;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
+.lp-apt.d{background:#5a2878}
+.lp-apt.f{background:#1a3060}
+.lp-day-col{min-width:96px;flex-shrink:0}
+.lp-day-head{font-size:.58rem;font-weight:700;color:#4a2060;text-align:center;padding:5px 4px;border-bottom:1px solid rgba(74,32,96,.2);margin-bottom:5px}
+.lp-cli-row{background:white;border-radius:8px;padding:10px 12px;margin-bottom:7px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.lp-cli-name{font-size:.74rem;font-weight:700;color:#2d1a3a}
+.lp-cli-sub{font-size:.6rem;color:#8a6a80;margin-top:2px}
+.lp-cli-badge{background:#4a2060;border-radius:6px;padding:3px 9px;font-size:.6rem;color:white;font-weight:600;white-space:nowrap;flex-shrink:0}
+.lp-stk-row{display:flex;align-items:center;gap:6px;padding:8px 10px;background:white;border-radius:7px;margin-bottom:5px;font-size:.63rem}
+.lp-stk-name{flex:1;font-weight:600;color:#2d1a3a;line-height:1.3;min-width:0}
+.lp-stk-name small{display:block;font-size:.55rem;color:#8a6a80;font-weight:400}
+.lp-stk-cat{background:#eddde8;border-radius:4px;padding:2px 6px;color:#7a4a6a;font-size:.56rem;white-space:nowrap;flex-shrink:0}
+.lp-badge-ok{background:#dcf0e0;color:#2a7a40;border-radius:4px;padding:2px 6px;font-size:.56rem;font-weight:700}
+.lp-badge-bajo{background:#f0dcdc;color:#7a2a2a;border-radius:4px;padding:2px 6px;font-size:.56rem;font-weight:700}
+.lp-margin{color:#2a6a40;font-weight:700;min-width:28px;text-align:right;font-size:.62rem}
+@media(max-width:600px){.lp-mock-sb{display:none}.lp-day-col{min-width:78px}.lp-mock-app{height:380px}}
+@media(max-width:400px){.lp-day-col{min-width:66px}}
+</style>
+
+  <div style="text-align:center;max-width:640px;margin:0 auto 36px">
+    <div class="lp-tag">Vista real</div>
+    <h2 class="lp-h2">Lo ves, lo entendés, lo usás</h2>
+    <p class="lp-lead">No es una demo con datos de fantasía. Esto es el sistema funcionando en un salón de belleza real, con clientes reales.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:22px">
+    <button id="lpT0" onclick="lpTab(0)" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(201,168,76,.5);background:rgba(201,168,76,.18);color:#c9a84c;font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">📅 Agenda semanal</button>
+    <button id="lpT1" onclick="lpTab(1)" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#a89880;font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">👥 Clientes</button>
+    <button id="lpT2" onclick="lpTab(2)" style="padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:#a89880;font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">📦 Stock</button>
+  </div>
+
+  <!-- Device frame -->
+  <div class="lp-mock-frame">
+    <div class="lp-mock-chrome">
+      <div class="lp-dots">
+        <div class="lp-dot" style="background:#ff5f57"></div>
+        <div class="lp-dot" style="background:#febc2e"></div>
+        <div class="lp-dot" style="background:#28c840"></div>
+      </div>
+      <div class="lp-urlbar">remugestion.ar</div>
+    </div>
+    <div class="lp-mock-app">
+      <!-- Sidebar -->
+      <div class="lp-mock-sb">
+        <div class="lp-mock-sb-brand">
+          <div class="lp-mock-sb-name">ROCASPANA'S</div>
+          <div class="lp-mock-sb-sub">SALÓN DE BELLEZA</div>
+        </div>
+        <div style="padding:6px 0">
+          <div style="padding:5px 13px 3px;font-size:.52rem;color:#6a4a5a;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Principal</div>
+          <div class="lp-mock-ni">⬜ Inicio</div>
+          <div class="lp-mock-ni active" id="lpSbItem">📅 Agenda del día</div>
+          <div class="lp-mock-ni">👥 Clientes</div>
+          <div class="lp-mock-ni">💰 Caja y Gastos</div>
+          <div class="lp-mock-ni">📦 Productos</div>
+          <div class="lp-mock-ni">🏷 Mis precios</div>
+          <div class="lp-mock-ni">📋 Pedidos</div>
+          <div class="lp-mock-ni">🔒 Turnos fijos</div>
+        </div>
+      </div>
+      <!-- Main -->
+      <div class="lp-mock-main">
+        <div class="lp-mock-topbar">
+          <span class="lp-mock-topbar-title" id="lpMockTitle">Agenda del día</span>
+          <span class="lp-mock-topbar-meta">vie, 14 de agosto de 2026 · Conectado</span>
+        </div>
+        <div class="lp-mock-body">
+
+          <!-- PANEL 0: Agenda -->
+          <div id="lpPanel0">
+            <div style="font-size:.7rem;font-weight:700;color:#3a1a50;margin-bottom:11px">📅 Semana · Lun 10 – Sáb 15</div>
+            <div style="display:flex;gap:5px;overflow-x:auto;padding-bottom:4px">
+              <div class="lp-day-col">
+                <div class="lp-day-head">Lun 10</div>
+                <div class="lp-apt d">08:00 lara</div>
+                <div class="lp-apt d">09:00 ampi</div>
+                <div class="lp-apt d">09:00 amparo m.</div>
+                <div class="lp-apt d">10:30 sabri c.</div>
+                <div class="lp-apt d">11:00 gonza g.</div>
+                <div class="lp-apt d">11:30 Favio S.</div>
+                <div class="lp-apt f">12:00 mama gabi</div>
+                <div class="lp-apt d">14:00 erica u.</div>
+                <div class="lp-apt d">15:00 MELI CUFRE</div>
+                <div class="lp-apt d">16:00 leon</div>
+                <div class="lp-apt d">17:00 pri dionigi</div>
+                <div class="lp-apt d">17:30 yamí m.</div>
+                <div class="lp-apt d">18:00 andres</div>
+                <div class="lp-apt d">18:30 bibi m.</div>
+                <div class="lp-apt d">19:00 gonza b.</div>
+              </div>
+              <div class="lp-day-col">
+                <div class="lp-day-head">Mar 11</div>
+                <div class="lp-apt d">09:00 dari d.</div>
+                <div class="lp-apt d">09:00 sofía m.</div>
+                <div class="lp-apt d">10:00 KAREN P.</div>
+                <div class="lp-apt f">11:00 paula g.</div>
+                <div class="lp-apt d">11:00 Ale conti</div>
+                <div class="lp-apt d">11:00 paula n.</div>
+                <div class="lp-apt d">12:30 adrian f.</div>
+                <div class="lp-apt d">15:00 NEGRA</div>
+                <div class="lp-apt f">15:00 mica p.</div>
+                <div class="lp-apt d">15:00 emi azcaria</div>
+                <div class="lp-apt d">16:00 vane vagni</div>
+                <div class="lp-apt d">16:00 clau moine</div>
+                <div class="lp-apt d">18:30 LAUTI C.</div>
+              </div>
+              <div class="lp-day-col">
+                <div class="lp-day-head">Mié 12</div>
+                <div class="lp-apt d">08:00 pablo n.</div>
+                <div class="lp-apt f">08:00 FIORE B.</div>
+                <div class="lp-apt f">08:30 FABI FOLLA</div>
+                <div class="lp-apt d">11:00 silvi b.</div>
+                <div class="lp-apt d">11:00 leo manilla</div>
+                <div class="lp-apt f">11:00 CRISTI V.</div>
+                <div class="lp-apt d">12:00 leo betacin</div>
+                <div class="lp-apt d">14:00 flor t.</div>
+                <div class="lp-apt d">14:30 gaston o.</div>
+                <div class="lp-apt d">15:00 viko carcar</div>
+                <div class="lp-apt d">16:00 JU DI MARCO</div>
+                <div class="lp-apt d">17:30 vane maneiro</div>
+                <div class="lp-apt d">18:30 CINTIA M.</div>
+                <div class="lp-apt d">19:00 emilia g.</div>
+              </div>
+              <div class="lp-day-col">
+                <div class="lp-day-head">Jue 13</div>
+                <div class="lp-apt d">08:30 luca m.</div>
+                <div class="lp-apt f">09:00 celina g.</div>
+                <div class="lp-apt d">09:30 TIA PATRI</div>
+                <div class="lp-apt f">09:30 FABI FOLLA</div>
+                <div class="lp-apt d">11:30 Ale conti</div>
+                <div class="lp-apt d">12:00 maurito</div>
+                <div class="lp-apt d">12:30 Ramiro</div>
+                <div class="lp-apt f">14:00 viky v.</div>
+                <div class="lp-apt f">14:30 MARI STORTI</div>
+                <div class="lp-apt d">16:00 mariano b.</div>
+                <div class="lp-apt f">17:00 beti g.</div>
+                <div class="lp-apt d">17:30 MELI CUFRE</div>
+                <div class="lp-apt f">18:00 ANI BOARIN</div>
+                <div class="lp-apt d">19:30 santi s.</div>
+                <div class="lp-apt d">20:00 mati brussa</div>
+              </div>
+              <div class="lp-day-col">
+                <div class="lp-day-head">Vie 14</div>
+                <div class="lp-apt d">08:00 claudia v.</div>
+                <div class="lp-apt f">08:30 luchi</div>
+                <div class="lp-apt f">09:00 vicky g.</div>
+                <div class="lp-apt f">09:00 leo</div>
+                <div class="lp-apt d">10:30 martin l.</div>
+                <div class="lp-apt d">11:00 Emi del b.</div>
+                <div class="lp-apt f">11:00 marcos p.</div>
+                <div class="lp-apt f">11:30 Nico b.</div>
+                <div class="lp-apt d">12:30 paz cravero</div>
+                <div class="lp-apt d">13:00 ian</div>
+                <div class="lp-apt f">14:00 agas leu</div>
+                <div class="lp-apt d">15:00 roberto c.</div>
+                <div class="lp-apt f">15:30 ANITA P.</div>
+                <div class="lp-apt d">17:00 MELI CUFRE</div>
+                <div class="lp-apt d">17:30 thiago</div>
+              </div>
+              <div class="lp-day-col">
+                <div class="lp-day-head">Sáb 15</div>
+                <div class="lp-apt d">09:00 lara m.s.</div>
+                <div class="lp-apt d">09:00 jero crema</div>
+                <div class="lp-apt d">10:30 Milu C.</div>
+                <div class="lp-apt d">10:30 merica p.</div>
+                <div class="lp-apt d">11:30 paz cravero</div>
+                <div class="lp-apt d">12:00 agos jaime</div>
+                <div class="lp-apt d">12:30 damaris d.</div>
+                <div class="lp-apt d">12:50 paz cravero</div>
+                <div class="lp-apt d">14:00 lore cuesta</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:14px;margin-top:10px;font-size:.6rem;color:#7a5a7a;align-items:center">
+              <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:3px;background:#5a2878"></div>Delfi</div>
+              <div style="display:flex;align-items:center;gap:4px"><div style="width:10px;height:10px;border-radius:3px;background:#1a3060"></div>Fiore</div>
+              <div style="color:#a89880;margin-left:4px">70+ turnos en la semana</div>
+            </div>
+          </div>
+
+          <!-- PANEL 1: Clientes -->
+          <div id="lpPanel1" style="display:none">
+            <div style="background:white;border-radius:10px;padding:11px 13px;margin-bottom:11px;border:1px solid rgba(74,32,96,.08)">
+              <div style="font-size:.7rem;font-weight:700;color:#2d1a3a;margin-bottom:6px">🏅 Programa de fidelización</div>
+              <div style="font-size:.6rem;color:#8a6a80;margin-bottom:7px">Alerta cada <strong>10 visitas</strong> · Premio: <strong>15% de descuento</strong></div>
+              <div style="background:#f0e8f5;border-radius:6px;padding:5px 10px;font-size:.6rem;color:#4a2060;font-weight:600;display:inline-block">✓ WhatsApp automático al cliente activado</div>
+            </div>
+            <div class="lp-cli-row">
+              <div>
+                <div class="lp-cli-name">FABI FOLLA</div>
+                <div class="lp-cli-sub">📞 3472589012 · Última visita: 13/08/2026 · $203.000 gastados</div>
+              </div>
+              <div style="background:#c9a84c;border-radius:6px;padding:3px 9px;font-size:.6rem;color:#080808;font-weight:700;flex-shrink:0">🏆 10 visitas</div>
+            </div>
+            <div class="lp-cli-row">
+              <div>
+                <div class="lp-cli-name">Igna</div>
+                <div class="lp-cli-sub">📞 3472449954 · Última visita: 14/08/2026 · $89.000 gastados</div>
+              </div>
+              <div class="lp-cli-badge">7 visitas</div>
+            </div>
+            <div class="lp-cli-row">
+              <div>
+                <div class="lp-cli-name">Claudia Van Z.</div>
+                <div class="lp-cli-sub">📞 3472552683 · Última visita: 14/08/2026 · $124.000 gastados</div>
+              </div>
+              <div class="lp-cli-badge">12 visitas</div>
+            </div>
+            <div class="lp-cli-row">
+              <div>
+                <div class="lp-cli-name">Meli Cufre</div>
+                <div class="lp-cli-sub">📞 3472561289 · Última visita: 14/08/2026 · $67.000 gastados</div>
+              </div>
+              <div class="lp-cli-badge">5 visitas</div>
+            </div>
+          </div>
+
+          <!-- PANEL 2: Stock -->
+          <div id="lpPanel2" style="display:none">
+            <div style="font-size:.7rem;font-weight:700;color:#3a1a50;margin-bottom:9px">📦 Inventario · 11 productos cargados</div>
+            <div class="lp-stk-row">
+              <div class="lp-stk-name">STRATEGY<small>Shampoo Caspa</small></div>
+              <div class="lp-stk-cat">CASPA</div>
+              <div style="font-size:.6rem;color:#4a2060;min-width:24px;text-align:center"><strong>0</strong><br><span style="color:#8a6a80;font-size:.52rem">mín1</span></div>
+              <div style="font-size:.6rem;color:#2d1a3a;font-weight:600;min-width:42px;text-align:right">$16.900</div>
+              <div class="lp-margin">36%</div>
+              <div class="lp-badge-bajo">Bajo</div>
+            </div>
+            <div class="lp-stk-row">
+              <div class="lp-stk-name">STRATEGY 300ml<small>Shampoo Graso</small></div>
+              <div class="lp-stk-cat">GRASO</div>
+              <div style="font-size:.6rem;color:#4a2060;min-width:24px;text-align:center"><strong>2</strong><br><span style="color:#8a6a80;font-size:.52rem">mín1</span></div>
+              <div style="font-size:.6rem;color:#2d1a3a;font-weight:600;min-width:42px;text-align:right">$15.000</div>
+              <div class="lp-margin">27%</div>
+              <div class="lp-badge-ok">OK</div>
+            </div>
+            <div class="lp-stk-row">
+              <div class="lp-stk-name">PRIMONT SIGNATURE<small>Shampoo 300ml</small></div>
+              <div class="lp-stk-cat">SHAMPOO</div>
+              <div style="font-size:.6rem;color:#4a2060;min-width:24px;text-align:center"><strong>2</strong><br><span style="color:#8a6a80;font-size:.52rem">mín1</span></div>
+              <div style="font-size:.6rem;color:#2d1a3a;font-weight:600;min-width:42px;text-align:right">$25.700</div>
+              <div class="lp-margin">23%</div>
+              <div class="lp-badge-ok">OK</div>
+            </div>
+            <div class="lp-stk-row">
+              <div class="lp-stk-name">PRIMONT SIGNATURE<small>Acondicionador 300ml</small></div>
+              <div class="lp-stk-cat">ACOND.</div>
+              <div style="font-size:.6rem;color:#4a2060;min-width:24px;text-align:center"><strong>3</strong><br><span style="color:#8a6a80;font-size:.52rem">mín1</span></div>
+              <div style="font-size:.6rem;color:#2d1a3a;font-weight:600;min-width:42px;text-align:right">$25.700</div>
+              <div class="lp-margin">27%</div>
+              <div class="lp-badge-ok">OK</div>
+            </div>
+            <div class="lp-stk-row">
+              <div class="lp-stk-name">STRATEGY ANTI AG<small>Shampoo Anti Age</small></div>
+              <div class="lp-stk-cat">ANTI AGE</div>
+              <div style="font-size:.6rem;color:#4a2060;min-width:24px;text-align:center"><strong>2</strong><br><span style="color:#8a6a80;font-size:.52rem">mín1</span></div>
+              <div style="font-size:.6rem;color:#2d1a3a;font-weight:600;min-width:42px;text-align:right">$15.000</div>
+              <div class="lp-margin">27%</div>
+              <div class="lp-badge-ok">OK</div>
+            </div>
+            <div style="font-size:.6rem;color:#8a6a80;margin-top:8px;text-align:center">⚠ 1 producto con stock bajo · Alerta activada automáticamente</div>
+          </div>
+
+        </div><!-- end lp-mock-body -->
+      </div><!-- end lp-mock-main -->
+    </div><!-- end lp-mock-app -->
+  </div><!-- end lp-mock-frame -->
+
+  <p style="text-align:center;font-size:.7rem;color:#5a5040;margin-top:14px">📍 Rocaspana's Estilo y Belleza — en funcionamiento desde abril 2026</p>
+</div>
+<script>
+function lpTab(n){
+  var titles=['Agenda del día','Clientes','Productos'];
+  var sbLabels=['📅 Agenda del día','👥 Clientes','📦 Productos'];
+  [0,1,2].forEach(function(i){
+    var panel=document.getElementById('lpPanel'+i);
+    var btn=document.getElementById('lpT'+i);
+    if(panel) panel.style.display=i===n?'block':'none';
+    if(btn){
+      btn.style.background=i===n?'rgba(201,168,76,.18)':'transparent';
+      btn.style.borderColor=i===n?'rgba(201,168,76,.5)':'rgba(255,255,255,.1)';
+      btn.style.color=i===n?'#c9a84c':'#a89880';
+    }
+  });
+  var t=document.getElementById('lpMockTitle');
+  if(t) t.textContent=titles[n];
+  var sb=document.getElementById('lpSbItem');
+  if(sb) sb.textContent=sbLabels[n];
+}
+</script>
+
 <!-- ④.5 CÓMO FUNCIONA -->
 <div class="lp-divider"></div>
 <div class="lp-section">
