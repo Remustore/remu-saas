@@ -169,6 +169,8 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px;m
 .ls{font-size:.6rem;color:var(--tx2);letter-spacing:3px;text-transform:uppercase;margin-top:3px;}
 .ns{padding:16px 13px 5px;font-size:.59rem;color:var(--tx2);letter-spacing:2px;text-transform:uppercase;}
 .ni{display:flex;align-items:center;gap:9px;padding:9px 12px;margin:2px 7px;border-radius:7px;cursor:pointer;color:var(--tx);font-size:.81rem;font-weight:500;transition:all .15s;border:1px solid transparent;}
+.quick-link{cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s;}
+@media(hover:hover){.quick-link:hover{border-color:var(--gld);}}
 .nav-badge{background:var(--bad);color:#fff;font-size:.6rem;font-weight:700;padding:2px 6px;border-radius:20px;margin-left:auto;min-width:18px;text-align:center;}
 .ni:hover{background:var(--car);color:var(--tx);}
 .ni.active{background:var(--gld2);color:var(--gld);border-color:rgba(201,168,76,.2);}
@@ -1376,19 +1378,19 @@ $$;</pre>
 
       <!-- Accesos rápidos -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px">
-        <div onclick="go('turnos')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+        <div onclick="go('turnos')" class="quick-link">
           <span class="nico" style="flex-shrink:0"><i data-lucide="calendar"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Agenda del día</div><div style="font-size:.7rem;color:var(--tx2)">Ver turnos</div></div>
         </div>
-        <div onclick="go('turnosOnline')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+        <div onclick="go('turnosOnline')" class="quick-link">
           <span class="nico" style="flex-shrink:0"><i data-lucide="globe"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Página online</div><div style="font-size:.7rem;color:var(--tx2)">Dirección, Instagram, mensajes</div></div>
         </div>
-        <div onclick="go('precios')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+        <div onclick="go('precios')" class="quick-link">
           <span class="nico" style="flex-shrink:0"><i data-lucide="tag"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Lista de precios</div><div style="font-size:.7rem;color:var(--tx2)">Editar servicios y precios</div></div>
         </div>
-        <div onclick="go('fichasClientes')" style="cursor:pointer;background:var(--car2);border:1px solid var(--bor2);border-radius:10px;padding:13px 14px;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseenter="this.style.borderColor='var(--gld)'" onmouseleave="this.style.borderColor='var(--bor2)'">
+        <div onclick="go('fichasClientes')" class="quick-link">
           <span class="nico" style="flex-shrink:0"><i data-lucide="users"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Fichas de clientes</div><div style="font-size:.7rem;color:var(--tx2)">Historial y notas</div></div>
         </div>
@@ -4186,7 +4188,7 @@ async function saDiagnosticarAdminExterno(){
 
     resEl.innerHTML = `
       <div style="margin-bottom:8px"><strong style="color:#b08ad4">"${esc(email)}"</strong> aparece en <strong>${matches.length}</strong> negocio(s):</div>
-      <table style="width:100%;font-size:.75rem;border-collapse:collapse">
+      <div style="overflow-x:auto"><table style="width:100%;font-size:.75rem;border-collapse:collapse;min-width:340px">
         <thead><tr style="font-size:.65rem;color:var(--mut);text-transform:uppercase">
           <th style="text-align:left;padding:4px 8px">Negocio</th>
           <th style="text-align:left;padding:4px 8px">Rubro</th>
@@ -4194,7 +4196,7 @@ async function saDiagnosticarAdminExterno(){
           <th style="text-align:left;padding:4px 8px">ID</th>
         </tr></thead>
         <tbody>${rows}</tbody>
-      </table>
+      </table></div>
       <div style="margin-top:10px;padding-top:8px;border-top:1px solid rgba(138,92,201,.15);font-size:.72rem">
         🔌 <strong>Login RPC:</strong> ${rpcStatus}
       </div>`;
@@ -7152,7 +7154,8 @@ function cierreDiario(){
     const el = document.getElementById('cdHistorial');
     if(el) el.innerHTML = rows || '<div style="font-size:.78rem;color:var(--mut);padding:6px 0">Sin cierres anteriores</div>';
   };
-  _renderHistCierres(JSON.parse(localStorage.getItem(cierresKey)||'[]').slice(-5).reverse());
+  let _cierresCache=[]; try{_cierresCache=JSON.parse(localStorage.getItem(cierresKey)||'[]');}catch(e){}
+  _renderHistCierres(_cierresCache.slice(-5).reverse());
   openM('mCierreDiario');
   // Actualizar historial desde Supabase en segundo plano
   if(currentTenant?.id){
@@ -7172,9 +7175,9 @@ async function guardarCierreDiario(resetear){
   if(!data) return;
   // Cache local
   const cierresKey = 'cierres_caja_'+(currentTenant?.id||'');
-  const historial = JSON.parse(localStorage.getItem(cierresKey)||'[]');
+  let historial=[]; try{historial=JSON.parse(localStorage.getItem(cierresKey)||'[]');}catch(e){}
   historial.push(data);
-  localStorage.setItem(cierresKey, JSON.stringify(historial));
+  try{localStorage.setItem(cierresKey, JSON.stringify(historial));}catch(e){}
   // Persistir en Supabase
   if(currentTenant?.id){
     sb.from('cierres_caja').insert({
@@ -7263,12 +7266,11 @@ const AUD_KEY = 'auditoria';
 const PRODS_POR_DIA = 5;
 
 function getAuditoria(){
-  const raw = localStorage.getItem(AUD_KEY + '_' + (window.currentTenant?.id||''));
-  return raw ? JSON.parse(raw) : { fecha: '', items: [], historial: [] };
+  try{const raw=localStorage.getItem(AUD_KEY+'_'+(window.currentTenant?.id||''));return raw?JSON.parse(raw):{fecha:'',items:[],historial:[]};}catch(e){return{fecha:'',items:[],historial:[]};}
 }
 
 function saveAuditoria(aud){
-  localStorage.setItem(AUD_KEY + '_' + (window.currentTenant?.id||''), JSON.stringify(aud));
+  try{localStorage.setItem(AUD_KEY+'_'+(window.currentTenant?.id||''),JSON.stringify(aud));}catch(e){}
 }
 
 function generarRonda(){
