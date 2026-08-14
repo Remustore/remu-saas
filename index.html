@@ -1513,6 +1513,9 @@ $$;</pre>
         <textarea id="onlineMsgRecordatorio" rows="7" placeholder="Dejá vacío para usar el mensaje por defecto" style="width:100%;box-sizing:border-box;margin-bottom:4px;resize:vertical"></textarea>
         <div style="font-size:.72rem;color:var(--mut);margin-bottom:4px">Variables disponibles: <code>{cliente}</code> <code>{negocio}</code> <code>{fecha}</code> <code>{hora}</code> <code>{servicio}</code> <code>{empleado}</code> <code>{direccion}</code></div>
         <button class="btn bgh bsm" style="margin-bottom:10px;font-size:.75rem" onclick="document.getElementById('onlineMsgRecordatorio').value=msgRecordatorioDefault()">↺ Restaurar por defecto</button>
+        <label style="margin-top:14px">⭐ Link de reseña Google Maps</label>
+        <input id="onlineMapsResena" type="url" placeholder="https://g.page/r/..." style="margin-bottom:4px">
+        <div style="font-size:.72rem;color:var(--mut);margin-bottom:10px">Al finalizar un turno aparece un botón para pedirle reseña al cliente por WhatsApp. Conseguí el link en Google Maps → tu negocio → "Pedir reseñas".</div>
         <button class="btn bg" style="margin-top:4px;width:100%" onclick="saveOnlineConfig()">Guardar configuración</button>
       </div>
 
@@ -9052,6 +9055,7 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
     } else {
       showToast('✓ Turno finalizado');
     }
+    _showResenaWA(turnos[idx]);
   } else {
     const labels = {confirmado:'Confirmado ✅',llego:'Llegó 🟢',en_proceso:'En curso 🔄',no_vino:'No vino ❌'};
     showToast(labels[nuevoEstado] || 'Estado actualizado');
@@ -9060,6 +9064,33 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   // Si el cierre de caja está abierto, refrescarlo para actualizar la lista de "turnos por confirmar" y los totales
   const cierreOv = document.getElementById('cierreOverlay');
   if(cierreOv && cierreOv.style.display !== 'none' && typeof cierreDiario === 'function') cierreDiario();
+}
+
+function _showResenaWA(t){
+  const mapsLink = getOnlineCfg().mapsResena;
+  if(!mapsLink) return;
+  const nombre = t.cliente || t.nombre || '';
+  const tel = (t.tel||'').replace(/\D/g,'');
+  const neg = currentTenant?.nombre||'el negocio';
+  const msg = `Hola ${nombre ? nombre : ''}! 🌟 Gracias por elegirnos en *${neg}*. Si quedaste conforme, nos ayudaría mucho que nos dejes una reseña:\n${mapsLink}\n¡Gracias! 🙏`;
+  const waUrl = tel ? `https://wa.me/549${tel}?text=${encodeURIComponent(msg)}` : null;
+  const existing = document.getElementById('_resenaWAPanel');
+  if(existing) existing.remove();
+  const panel = document.createElement('div');
+  panel.id = '_resenaWAPanel';
+  panel.style.cssText = 'position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--card);border:1.5px solid var(--gld);border-radius:14px;padding:14px 16px;z-index:9999;box-shadow:0 6px 24px rgba(0,0,0,.3);max-width:340px;width:92%;display:flex;flex-direction:column;gap:10px;animation:fadeIn .2s';
+  panel.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-weight:600;font-size:.9rem">⭐ Pedir reseña${nombre ? ' a ' + esc(nombre) : ''}</div>
+      <button onclick="document.getElementById('_resenaWAPanel').remove()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--mut);padding:0 4px">✕</button>
+    </div>
+    ${waUrl
+      ? `<a href="${waUrl}" target="_blank" onclick="setTimeout(()=>document.getElementById('_resenaWAPanel')?.remove(),1500)" style="display:block;background:#25D366;color:#fff;text-align:center;padding:11px;border-radius:9px;font-weight:600;text-decoration:none;font-size:.9rem">📲 Enviar por WhatsApp</a>`
+      : `<button onclick="navigator.clipboard.writeText(${JSON.stringify(mapsLink)}).then(()=>{showToast('Link copiado ✓');document.getElementById('_resenaWAPanel')?.remove()})" class="btn bgh">📋 Copiar link de reseña</button>`
+    }
+  `;
+  document.body.appendChild(panel);
+  setTimeout(()=>{ const p=document.getElementById('_resenaWAPanel'); if(p)p.remove(); }, 30000);
 }
 
 function editarTurno(id){
@@ -10412,7 +10443,7 @@ async function rTurnosOnline(){
 
   // Solo actualizar inputs si el usuario NO está escribiendo en alguno de ellos.
   // silentRefresh() llama a esta función cada 30 seg — sin este check borra lo que el usuario está tipeando.
-  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel','onlineNotaPrecios','onlineMsgRecordatorio'];
+  const _cfgInputIds = ['onlineMensaje','onlineInsta','onlineDireccion','onlineTel','onlineNotaPrecios','onlineMsgRecordatorio','onlineMapsResena'];
   const _editando = _cfgInputIds.includes(document.activeElement?.id);
   if(!_editando){
     if(document.getElementById('onlineMensaje')) document.getElementById('onlineMensaje').value = cfg.mensaje||'';
@@ -10422,6 +10453,7 @@ async function rTurnosOnline(){
     if(document.getElementById('onlineNotaPrecios')) document.getElementById('onlineNotaPrecios').value = cfg.notaPrecios||'';
     if(document.getElementById('onlineMsgRecordatorio')) document.getElementById('onlineMsgRecordatorio').value = cfg.msgRecordatorio||'';
     if(document.getElementById('onlineIdioma')) document.getElementById('onlineIdioma').value = cfg.idioma||'es';
+    if(document.getElementById('onlineMapsResena')) document.getElementById('onlineMapsResena').value = cfg.mapsResena||'';
     const _logo = cfg.logo||'';
     if(document.getElementById('onlineLogo')) document.getElementById('onlineLogo').value = _logo;
     const _logoNombre = document.getElementById('onlineLogoNombre');
@@ -10671,7 +10703,8 @@ async function saveOnlineConfig(){
     notaPrecios: document.getElementById('onlineNotaPrecios')?.value||'',
     logo: document.getElementById('onlineLogo')?.value||'',
     idioma: document.getElementById('onlineIdioma')?.value||'es',
-    msgRecordatorio: document.getElementById('onlineMsgRecordatorio')?.value||''
+    msgRecordatorio: document.getElementById('onlineMsgRecordatorio')?.value||'',
+    mapsResena: (document.getElementById('onlineMapsResena')?.value||'').trim()
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
   try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
