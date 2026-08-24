@@ -12506,6 +12506,28 @@ function _hlTarifa(fecha){
   return _hlEsEspecial(fecha) ? _hlTarifaEspecial() : _hlTarifaSemana();
 }
 
+// Devuelve el período quincenal al que pertenece una fecha dada
+function _hlPeriodoDeF(fecha){
+  const [anio, mes, dia] = fecha.split('-').map(Number);
+  const fS = d => { const [,m,dd] = d.split('-'); return `${dd}/${m}`; };
+  let desde, hasta;
+  if(dia <= 5){
+    const mp = mes === 1 ? 12 : mes - 1;
+    const ap = mes === 1 ? anio - 1 : anio;
+    desde = `${ap}-${String(mp).padStart(2,'0')}-21`;
+    hasta = `${anio}-${String(mes).padStart(2,'0')}-05`;
+  } else if(dia <= 20){
+    desde = `${anio}-${String(mes).padStart(2,'0')}-06`;
+    hasta = `${anio}-${String(mes).padStart(2,'0')}-20`;
+  } else {
+    const ms2 = mes === 12 ? 1 : mes + 1;
+    const as2 = mes === 12 ? anio + 1 : anio;
+    desde = `${anio}-${String(mes).padStart(2,'0')}-21`;
+    hasta = `${as2}-${String(ms2).padStart(2,'0')}-05`;
+  }
+  return { desde, hasta, label: `${fS(desde)} → ${fS(hasta)}` };
+}
+
 // Período actual: pago el 5 y el 20
 // → período que termina el 5: del 21 del mes anterior al 5 del mes actual
 // → período que termina el 20: del 6 al 20 del mes actual
@@ -12579,8 +12601,8 @@ async function eliminarHoraLuna(id){
   await rHorasLuna();
 }
 
-async function generarPagoLuna(){
-  const { desde, hasta, label } = _hlPeriodoActual();
+async function generarPagoLuna(desdeOv, hastaOv, labelOv){
+  const { desde, hasta, label } = desdeOv ? { desde: desdeOv, hasta: hastaOv, label: labelOv } : _hlPeriodoActual();
   const { data: arr } = await sb.from('horas_luna').select('*').eq('tenant_id', currentTenant.id).eq('pagado', false).gte('fecha', desde).lte('fecha', hasta);
   if(!arr?.length){ showToast('Sin horas pendientes en este período', 'err'); return; }
   const total  = arr.reduce((a, h) => a + h.monto, 0);
@@ -12632,13 +12654,14 @@ async function rHorasLuna(){
   const { data: todas, error } = await sb.from('horas_luna').select('*').eq('tenant_id', currentTenant.id).order('fecha', { ascending: true });
   if(error){ el.innerHTML = `<div style="color:var(--bad);font-size:.82rem">Error al cargar horas</div>`; return; }
 
-  const periodo  = (todas||[]).filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta);
-  const historial = (todas||[]).filter(h => h.pagado).slice(-5).reverse();
+  const periodo    = (todas||[]).filter(h => !h.pagado && h.fecha >= desde && h.fecha <= hasta);
+  const anteriores = (todas||[]).filter(h => !h.pagado && (h.fecha < desde || h.fecha > hasta));
+  const historial  = (todas||[]).filter(h => h.pagado);
   const totalHoras = periodo.reduce((a,h) => a + Number(h.horas), 0);
   const totalMonto = periodo.reduce((a,h) => a + h.monto, 0);
   const mitad = Math.round(totalMonto / 2);
 
-  if(!periodo.length && !historial.length){
+  if(!periodo.length && !historial.length && !anteriores.length){
     el.innerHTML = `<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin horas cargadas todavía. Tocá "+ Cargar horas" al final de cada jornada.</div>`;
     return;
   }
@@ -12658,7 +12681,46 @@ async function rHorasLuna(){
     </div>`;
   }).join('');
 
+  let htmlAnteriores = '';
+  if(anteriores.length){
+    const antDesde = anteriores[0].fecha;
+    const antHasta = anteriores[anteriores.length - 1].fecha;
+    const antHoras = anteriores.reduce((a,h) => a + Number(h.horas), 0);
+    const antMonto = anteriores.reduce((a,h) => a + h.monto, 0);
+    const antMitad = Math.round(antMonto / 2);
+    const fS = d => { const [,m,dd] = d.split('-'); return `${dd}/${m}`; };
+    const antLabel = `${fS(antDesde)} → ${fS(antHasta)}`;
+    const filasAnt = anteriores.map(h => {
+      const tipo = _hlTipoLabel(h.fecha);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,100,80,.1);font-size:.83rem">
+        <div>
+          <span style="font-weight:600">${fD(h.fecha)}</span>
+          ${tipo ? `<span style="font-size:.68rem;color:var(--gld);margin-left:6px;background:var(--car);padding:1px 6px;border-radius:8px">${tipo.charAt(0).toUpperCase()+tipo.slice(1)}</span>` : ''}
+          <span style="color:var(--tx2);margin-left:8px">${h.horas}h × ${fmt(h.tarifa)}</span>
+        </div>
+        <span style="font-weight:600;color:var(--gld)">${fmt(h.monto)}</span>
+      </div>`;
+    }).join('');
+    htmlAnteriores = `
+    <div style="background:rgba(255,100,80,.06);border:1px solid rgba(255,100,80,.22);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:.68rem;color:rgba(255,140,110,.9);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">⚠️ Quincena anterior sin pagar — ${antLabel}</div>
+      ${filasAnt}
+      <div style="margin-top:10px;background:rgba(0,0,0,.2);border-radius:7px;padding:10px 12px">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:4px">
+          <span style="color:var(--tx2)">${antHoras}h trabajadas</span>
+          <span style="font-weight:700;color:var(--gld)">${fmt(antMonto)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:.76rem;color:var(--tx2);margin-bottom:10px">
+          <span>${r1} ${fmt(antMitad)} · ${r2} ${fmt(antMonto - antMitad)}</span>
+          <span>50% / 50%</span>
+        </div>
+        <button class="btn bg" style="width:100%;font-size:.84rem" onclick="generarPagoLuna('${antDesde}','${antHasta}','${antLabel}')">💸 Pagar quincena anterior — ${fmt(antMonto)}</button>
+      </div>
+    </div>`;
+  }
+
   el.innerHTML = `
+    ${htmlAnteriores}
     <div style="font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:8px">Período actual — ${label}</div>
     ${filasActuales || '<div style="color:var(--mut);font-size:.82rem;padding:8px 0">Sin horas cargadas en este período.</div>'}
     ${periodo.length ? `
@@ -12673,9 +12735,63 @@ async function rHorasLuna(){
       </div>
       <button class="btn bg" style="width:100%;font-size:.84rem" onclick="generarPagoLuna()">💸 Generar pago ${nombre} — ${fmt(totalMonto)}</button>
     </div>` : ''}
-    ${historial.length ? `
-    <div style="margin-top:14px;font-size:.72rem;color:var(--mut);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">Últimos pagos</div>
-    ${historial.map(h=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;color:var(--tx2);padding:5px 0;border-bottom:1px solid var(--bor)"><span>${fD(h.fecha)} · ${h.horas}h</span><span style="color:var(--mut)">${fmt(h.monto)} ✓</span></div>`).join('')}` : ''}`;
+    ${(()=>{
+      // ── Quincenas pagadas agrupadas (desde horas_luna) ──
+      if(historial.length){
+        const grupos = {};
+        historial.forEach(h => {
+          const p = _hlPeriodoDeF(h.fecha);
+          const key = p.desde + '|' + p.hasta;
+          if(!grupos[key]) grupos[key] = { label: p.label, desde: p.desde, entries: [], totalHoras: 0, totalMonto: 0 };
+          grupos[key].entries.push(h);
+          grupos[key].totalHoras += Number(h.horas);
+          grupos[key].totalMonto += h.monto;
+        });
+        const periodosArr = Object.values(grupos).sort((a,b) => b.desde.localeCompare(a.desde));
+        const htmlPeriodos = periodosArr.map(p => {
+          const mitadP = Math.round(p.totalMonto / 2);
+          const diasHTML = p.entries.map(h => {
+            const tipo = _hlTipoLabel(h.fecha);
+            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.78rem">
+              <span style="color:var(--tx2)">${fD(h.fecha)}${tipo ? ` <span style="font-size:.67rem;color:var(--gld)">(${tipo})</span>` : ''} · <span style="color:var(--tx);font-weight:600">${h.horas}h</span> × ${fmt(h.tarifa)}</span>
+              <span style="color:var(--tx2)">${fmt(h.monto)}</span>
+            </div>`;
+          }).join('');
+          return `<div style="margin-bottom:12px;border:1px solid var(--bor);border-radius:10px;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:rgba(255,255,255,.04)">
+              <span style="font-size:.82rem;font-weight:700;color:var(--tx)">📋 ${p.label}</span>
+              <span style="font-size:.88rem;font-weight:700;color:var(--ok)">${fmt(p.totalMonto)} ✓</span>
+            </div>
+            ${diasHTML}
+            <div style="padding:9px 12px;background:rgba(0,0,0,.15);font-size:.76rem;color:var(--tx2);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px">
+              <span>${p.totalHoras}h trabajadas</span>
+              <span>${r1} ${fmt(mitadP)} · ${r2} ${fmt(p.totalMonto - mitadP)}</span>
+            </div>
+          </div>`;
+        }).join('');
+        return `<div style="margin-top:18px"><div style="font-size:.72rem;color:var(--mut);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px">Quincenas anteriores</div>${htmlPeriodos}</div>`;
+      }
+      // ── Fallback: pagos manuales en gastos ──
+      const nom = nombre.toLowerCase();
+      const pagosGastos = (S.gastos||[]).filter(g => g.concepto && g.concepto.toLowerCase().includes(nom) && g.monto > 0).sort((a,b) => b.fecha.localeCompare(a.fecha)).slice(0,10);
+      if(!pagosGastos.length) return '';
+      const agrupados = {};
+      pagosGastos.forEach(g => {
+        const k = g.fecha + '|' + (g.concepto.split('—')[1]||'').trim();
+        if(!agrupados[k]) agrupados[k] = { fecha: g.fecha, label: (g.concepto.split('—')[1]||'').trim(), total: 0, items: [] };
+        agrupados[k].total += g.monto;
+        agrupados[k].items.push(g);
+      });
+      const filas = Object.values(agrupados).map(p => `
+        <div style="padding:8px 0;border-bottom:1px solid var(--bor)">
+          <div style="display:flex;justify-content:space-between;font-size:.78rem">
+            <span style="color:var(--tx2)">${fD(p.fecha)}${p.label ? ` · <em style="font-size:.71rem;color:var(--mut)">${p.label}</em>` : ''}</span>
+            <span style="color:var(--ok);font-weight:600">${fmt(p.total)} ✓</span>
+          </div>
+          <div style="font-size:.7rem;color:var(--mut);margin-top:2px">${p.items.map(i => `${i.concepto.split('(')[1]?.split(')')[0]||i.concepto}: ${fmt(i.monto)}`).join(' · ')}</div>
+        </div>`).join('');
+      return `<div style="margin-top:18px"><div style="font-size:.72rem;color:var(--mut);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Quincenas anteriores</div>${filas}</div>`;
+    })()}`;
 }
 
 function abrirModalInformeContable(){
@@ -14018,6 +14134,7 @@ function aplicarModulosPorRubro(rubro){
   const esTaller   = r.includes('taller')||r.includes('celular')||r.includes('reparac')||r.includes('tecnico')||r.includes('técnico');
   const esBarberia = r.includes('barberia')||r.includes('barbería');
   const esSalon    = r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('pestañ');
+  const esGomeria  = r.includes('gomeria')||r.includes('gomería')||r.includes('neumat')||r.includes('cubiert');
   const mods = currentTenant?.modulos || {};
 
   const showNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
@@ -14026,13 +14143,16 @@ function aplicarModulosPorRubro(rubro){
   // Sólo mostramos lo que corresponde al rubro
 
   if(esTaller){
-    // 🔧 TALLER DE CELULARES
+    // 🔧 TALLER DE CELULARES / SERVICIO TÉCNICO / ACCESORIOS
     showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
+  } else if(esGomeria){
+    // 🔧 GOMERÍA / NEUMÁTICOS
+    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-stock','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else if(esBarberia){
     // ✂️ BARBERÍA
     showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else if(esSalon){
-    // 💅 SALÓN DE BELLEZA
+    // 💅 SALÓN DE BELLEZA / PELUQUERÍA / MANICURÍA
     showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-stock','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else {
     // Rubro no reconocido: mostrar todo para que nada quede oculto
