@@ -856,6 +856,74 @@ textarea{resize:vertical;min-height:70px;}
       <div id="saStats" style="color:var(--mut);font-size:.8rem;margin-top:8px">Cargando estadísticas...</div>
     </div>
 
+    <!-- ── PLAN PREMIUM ──────────────────────────────────────────────────────── -->
+    <div class="sa-card" style="margin-top:20px;border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.03)">
+      <h3 style="color:var(--gld)">⭐ Plan Premium — estructura de precios</h3>
+      <p style="font-size:.75rem;color:var(--mut);margin-bottom:16px;line-height:1.6">Solo visible en superadmin. Definí qué incluye cada plan y a qué precio ofrecerlo.</p>
+
+      <!-- Tabla comparativa -->
+      <div style="overflow-x:auto;margin-bottom:18px">
+        <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px 10px;color:var(--tx2);border-bottom:1px solid var(--bor);font-weight:600">Feature</th>
+              <th style="text-align:center;padding:8px 10px;color:var(--tx2);border-bottom:1px solid var(--bor);font-weight:600">Starter</th>
+              <th style="text-align:center;padding:8px 10px;color:var(--gld);border-bottom:1px solid var(--bor);font-weight:700;background:rgba(201,168,76,.06)">Premium</th>
+            </tr>
+          </thead>
+          <tbody id="planTabla">
+            ${[
+              ['Turnos, ventas y clientes','✓','✓'],
+              ['Fichas técnicas (color, cabello, manicuría)','✓','✓'],
+              ['Alertas de alergias','✓','✓'],
+              ['Historial de colores automático','✓','✓'],
+              ['Nota rápida al cerrar turno','✓','✓'],
+              ['Cumpleaños + alerta semanal','✓','✓'],
+              ['Programa de fidelización','✓','✓'],
+              ['Dashboard de métricas','✓','✓'],
+              ['Horas de empleadas (Luna)','✓','✓'],
+              ['WhatsApp automático — confirmaciones','—','✓'],
+              ['WhatsApp — recordatorio 24hs automático','—','✓'],
+              ['WhatsApp — saludo de cumpleaños automático','—','✓'],
+              ['Turnos online (página pública)','—','✓'],
+              ['Múltiples sucursales / locales','—','✓'],
+              ['Módulo de gomería / telefonía','—','✓'],
+              ['Soporte prioritario','—','✓'],
+            ].map(([feat,st,pr])=>`<tr>
+              <td style="padding:7px 10px;border-bottom:1px solid var(--bor);color:var(--tx)">${feat}</td>
+              <td style="padding:7px 10px;border-bottom:1px solid var(--bor);text-align:center;color:${st==='✓'?'var(--ok)':'var(--mut)'}">${st}</td>
+              <td style="padding:7px 10px;border-bottom:1px solid var(--bor);text-align:center;color:${pr==='✓'?'var(--gld)':'var(--mut)'};background:rgba(201,168,76,.04);font-weight:${pr==='✓'?'700':'400'}">${pr}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Precios sugeridos -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="padding:14px;border:1px solid var(--bor2);border-radius:10px;background:var(--bg)">
+          <div style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Starter</div>
+          <div style="font-size:1.4rem;font-weight:700;color:var(--tx)">$<span id="pPrecioStarter">14.900</span></div>
+          <div style="font-size:.72rem;color:var(--mut);margin-top:2px">ARS / mes</div>
+          <div style="font-size:.7rem;color:var(--tx2);margin-top:8px;line-height:1.5">Lo que ya tienen los clientes actuales. Sin WA automático ni turnos online.</div>
+        </div>
+        <div style="padding:14px;border:2px solid var(--gld);border-radius:10px;background:rgba(201,168,76,.06)">
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px">Premium ⭐</div>
+          <div style="font-size:1.4rem;font-weight:700;color:var(--gld)">$<span id="pPrecioPremium">24.900</span></div>
+          <div style="font-size:.72rem;color:var(--mut);margin-top:2px">ARS / mes</div>
+          <div style="font-size:.7rem;color:var(--tx2);margin-top:8px;line-height:1.5">WA automático, turnos online, sucursales y módulos extra. Activar por tenant desde "Editar cliente".</div>
+        </div>
+      </div>
+
+      <!-- Notas de negocio -->
+      <div style="padding:12px;background:var(--bg);border-radius:8px;font-size:.75rem;color:var(--tx2);line-height:1.7">
+        <strong style="color:var(--tx);display:block;margin-bottom:6px">💡 Notas de estrategia</strong>
+        • WA automático requiere Meta Business API (costo ~$5 USD/mes extra).<br>
+        • Comenzar Starter $14.900 → aumentar Premium cuando se active WA.<br>
+        • Clientes actuales: grandfathered en Starter hasta que pidan upgrade.<br>
+        • Para Brasil: convertir a BRL con paridad local (~R$89 Starter / R$149 Premium).
+      </div>
+    </div>
+
     <!-- MÉTRICAS EXTENDIDAS -->
     <div class="sa-card" id="saMetricasCard" style="margin-top:20px;display:none">
       <h3>📈 Métricas del negocio</h3>
@@ -6394,6 +6462,34 @@ function mostrarAvisosDaily(){
   const negocio = currentTenant?.nombre||'el salón';
   const avisos = [];
 
+  // 🎂 Cumpleaños hoy
+  if(typeof getFichas === 'function' && typeof normNomCli === 'function'){
+    const fichasTodas = getFichas();
+    const telPorNomDash = {};
+    getTurnos().forEach(t=>{ if(t.cliente && t.tel) telPorNomDash[normNomCli(t.cliente)]=t.tel; });
+    const hoyMM = (new Date().getMonth()+1);
+    const hoyDD = new Date().getDate();
+    const cumpleHoy = Object.values(fichasTodas).filter(f=>{
+      if(!f.fechaCumple) return false;
+      const [,mm,dd] = f.fechaCumple.split('-').map(Number);
+      return mm===hoyMM && dd===hoyDD;
+    });
+    if(cumpleHoy.length){
+      const rows = cumpleHoy.map(f=>{
+        const tel = telPorNomDash[normNomCli(f.nombre)]||'';
+        const waBtn = tel ? `<a href="https://wa.me/549${tel.replace(/\D/g,'')}?text=${encodeURIComponent('¡Feliz cumpleaños '+f.nombre+'! 🎂🎉 Que la pases increíble. Te esperamos pronto!')}" target="_blank" class="btn bsm" style="background:rgba(37,211,102,.15);color:#25d366;border:1px solid rgba(37,211,102,.3);font-size:.7rem;padding:3px 10px;white-space:nowrap">💬 WA</a>` : '';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(236,72,153,.12);gap:8px">
+          <span style="font-size:.82rem;font-weight:600;color:var(--tx)">${esc(f.nombre)}</span>
+          ${waBtn}
+        </div>`;
+      }).join('');
+      avisos.unshift(`<div class="card" style="margin-bottom:8px;border-left:3px solid #ec4899">
+        <div style="font-weight:600;font-size:.85rem;color:#ec4899;margin-bottom:8px">🎂 Cumpleaño${cumpleHoy.length>1?'s':''}  hoy</div>
+        ${rows}
+      </div>`);
+    }
+  }
+
   // Recordatorio 24hs: turnos de mañana con teléfono
   const conTel = turnosMañana.filter(t=>t.tel);
   if(conTel.length){
@@ -9053,7 +9149,8 @@ async function _guardarNotaRapida(){
   const fichas = getFichas();
   const key = normNomCli(nombre);
   const ficha = fichas[key] || { nombre };
-  ficha.notas = (ficha.notas ? ficha.notas + '\n' : '') + `[${fecha}] ${texto}`;
+  const regs = ficha.registrosServicio || [];
+  ficha.registrosServicio = [...regs, { fecha, texto }].slice(-30);
   fichas[key] = ficha;
   saveFichas(fichas);
   await persistCfgToSupabase();
@@ -10359,6 +10456,16 @@ function editarFichaCliente(nombre){
       <input id="fichaColorUnas" value="${esc(ficha.colorUnas||'')}" placeholder="Ej: nude, rojo, colores pastel..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none;margin-bottom:6px">
       ${lbl('Notas de diseño')}
       <textarea id="fichaNotaUnas" placeholder="Referencias, preferencias especiales..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none;min-height:50px;resize:vertical">${esc(ficha.notaUnas||'')}</textarea>
+
+      ${(ficha.registrosServicio||[]).length ? `
+      <div style="margin-top:16px;padding:10px;background:rgba(201,168,76,.04);border:1px solid rgba(201,168,76,.15);border-radius:8px">
+        <div style="font-size:.68rem;font-weight:700;color:var(--gld);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">📝 Notas de servicio</div>
+        ${[...(ficha.registrosServicio||[])].reverse().slice(0,10).map(r=>`
+          <div style="padding:6px 0;border-bottom:1px solid var(--bor);font-size:.77rem">
+            <span style="color:var(--tx2);font-size:.7rem">${fD(r.fecha)}</span>
+            <div style="color:var(--tx);margin-top:2px">${esc(r.texto)}</div>
+          </div>`).join('')}
+      </div>` : ''}
 
       <div style="margin-top:16px;padding:10px;background:var(--bg);border-radius:8px">
         <div style="font-size:.68rem;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Historial de visitas</div>
