@@ -1462,6 +1462,8 @@ $$;</pre>
         </div>
         <button class="btn bg bsm" onclick="editarFichaCliente('')">+ Nueva ficha</button>
       </div>
+      <!-- Cumpleaños esta semana -->
+      <div id="cumpleañosCard" style="margin-bottom:14px"></div>
       <!-- Clientas inactivas -->
       <div id="clientasInactivasCard" style="margin-bottom:14px"></div>
       <div class="card">
@@ -2050,6 +2052,14 @@ $$;</pre>
 <div id="mPFDesc" style="font-size:.8rem;color:var(--mut);margin-bottom:14px;padding:8px 10px;background:var(--bg);border-radius:6px"></div>
 <div class="fr"><div><label>Monto cobrado ($)</label><input type="number" id="mPFMonto" placeholder="0" min="0" style="font-size:1.1rem;text-align:center"></div><div><label>Forma de pago</label><select id="mPFMetodo"><option value="Efectivo">💵 Efectivo</option><option value="Transferencia">🏦 Transferencia</option><option value="Débito">💳 Débito</option><option value="Crédito">💳 Crédito</option><option value="Mercado Pago">📱 Mercado Pago</option></select></div></div>
 </div><div class="mf"><button id="mPFSinCobro" class="btn" onclick="closeM('mPrecioFinalizar');_doEstadoTurno(window.__pendingFinalizarId,'terminado',null,null);window.__pendingFinalizarId=null">Sin cobro</button><button class="btn bg" onclick="confirmarFinalizarTurno()">Registrar y finalizar</button></div></div></div>
+
+<!-- Modal Nota Rápida al cerrar turno -->
+<div class="mb" id="mNotaRapida"><div class="md" style="max-width:380px"><div class="mh"><div class="mt2">📝 Nota del servicio</div><button class="xbtn" onclick="closeM('mNotaRapida')">✕</button></div>
+<div class="mc">
+<div id="mNRDesc" style="font-size:.8rem;color:var(--mut);margin-bottom:12px;padding:8px 10px;background:var(--bg);border-radius:6px"></div>
+<label style="font-size:.78rem;color:var(--tx2);margin-bottom:6px;display:block">¿Qué se hizo? Productos, fórmulas, observaciones…</label>
+<textarea id="mNRTexto" rows="4" placeholder="Ej: Mechas babylights, oxidante 20vol, tónico plateado. Cabello quedó muy bien..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:10px;border-radius:8px;font-family:var(--fb);font-size:.83rem;resize:vertical;outline:none;box-sizing:border-box"></textarea>
+</div><div class="mf"><button class="btn" onclick="closeM('mNotaRapida')">Omitir</button><button class="btn bg" onclick="_guardarNotaRapida()">Guardar nota</button></div></div></div>
 
 <!-- Modal Turno Fijo -->
 <div class="mb" id="mTurnoFijo"><div class="md"><div class="mh"><div class="mt2" id="mTurnoFijoTitle">Nuevo turno fijo</div><button class="xbtn" onclick="closeM('mTurnoFijo')">✕</button></div>
@@ -9021,6 +9031,35 @@ async function confirmarFinalizarTurno(){
   await _doEstadoTurno(id, 'terminado', monto > 0 ? monto : null, metodo);
 }
 
+function _mostrarNotaRapida(turno){
+  const r = (currentTenant?.rubro||'').toLowerCase();
+  const esSalon = r.includes('barberia')||r.includes('barbería')||r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('una');
+  if(!esSalon || !turno?.cliente) return;
+  window.__notaRapidaCliente = turno.cliente;
+  window.__notaRapidaFecha = turno.fecha || new Date().toISOString().slice(0,10);
+  const desc = document.getElementById('mNRDesc');
+  if(desc) desc.textContent = turno.cliente + (turno.servicioNombre ? ' · ' + turno.servicioNombre : '');
+  const ta = document.getElementById('mNRTexto');
+  if(ta) ta.value = '';
+  setTimeout(()=> openM('mNotaRapida'), 400);
+}
+
+async function _guardarNotaRapida(){
+  const texto = (document.getElementById('mNRTexto')?.value||'').trim();
+  closeM('mNotaRapida');
+  if(!texto || !window.__notaRapidaCliente) return;
+  const nombre = window.__notaRapidaCliente;
+  const fecha = window.__notaRapidaFecha || new Date().toISOString().slice(0,10);
+  const fichas = getFichas();
+  const key = normNomCli(nombre);
+  const ficha = fichas[key] || { nombre };
+  ficha.notas = (ficha.notas ? ficha.notas + '\n' : '') + `[${fecha}] ${texto}`;
+  fichas[key] = ficha;
+  saveFichas(fichas);
+  await persistCfgToSupabase();
+  showToast('✓ Nota guardada en ficha de ' + nombre);
+}
+
 async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   const turnos = getTurnos();
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
@@ -9073,6 +9112,7 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
       showToast('✓ Turno finalizado');
     }
     _showResenaWA(turnos[idx]);
+    _mostrarNotaRapida(turnos[idx]);
   } else {
     const labels = {confirmado:'Confirmado ✅',llego:'Llegó 🟢',en_proceso:'En curso 🔄',no_vino:'No vino ❌'};
     showToast(labels[nuevoEstado] || 'Estado actualizado');
@@ -10288,6 +10328,9 @@ function editarFichaCliente(nombre){
         ${histColor}
       </div>` : ''}
 
+      ${sec('🎂 Cumpleaños')}
+      <input id="fichaCumple" type="date" value="${ficha.fechaCumple||''}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none">
+
       ${sec('⚠️ Alergias')}
       <input id="fichaAlergias" value="${esc(ficha.alergias||'')}" placeholder="Ej: alergia a la oxidante, sensible al calor..." style="width:100%;background:var(--bg);border:1px solid rgba(201,82,76,.35);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none">
 
@@ -10347,6 +10390,7 @@ function editarFichaCliente(nombre){
           colorMarca:marca, oxidante, colorTono:tono, colorTiempo:tiempo, colorObs:obs,
           color:tono,
           registrosColor:regsNuevos,
+          fechaCumple:document.getElementById('fichaCumple').value,
           alergias:document.getElementById('fichaAlergias').value,
           notas:document.getElementById('fichaNota').value,
           tipoUnas:document.getElementById('fichaTipoUnas').value,
@@ -10431,6 +10475,45 @@ function rClientasInactivas(){
     </div>`;
 }
 
+// ── CUMPLEAÑOS ESTA SEMANA ─────────────────────────────
+function rCumpleSemana(){
+  const el = document.getElementById('cumpleañosCard');
+  if(!el) return;
+  const fichas = getFichas();
+  const hoy = new Date();
+  // Armar mapa de tel por nombre desde turnos (fichas no almacenan tel)
+  const telPorNombre = {};
+  getTurnos().forEach(t => { if(t.cliente && t.tel) telPorNombre[normNomCli(t.cliente)] = t.tel; });
+  const cumples = [];
+  Object.values(fichas).forEach(f => {
+    if(!f.fechaCumple) return;
+    const [,mm,dd] = f.fechaCumple.split('-').map(Number);
+    if(!mm || !dd) return;
+    let proxCumple = new Date(hoy.getFullYear(), mm-1, dd);
+    if(proxCumple < hoy) proxCumple = new Date(hoy.getFullYear()+1, mm-1, dd);
+    const diasFalta = Math.round((proxCumple - hoy) / 86400000);
+    if(diasFalta <= 7){
+      const tel = telPorNombre[normNomCli(f.nombre)] || '';
+      cumples.push({ nombre: f.nombre, tel, diasFalta, dd, mm });
+    }
+  });
+  if(!cumples.length){ el.innerHTML=''; return; }
+  cumples.sort((a,b)=>a.diasFalta-b.diasFalta);
+  const fmtFecha = c => `${String(c.dd).padStart(2,'0')}/${String(c.mm).padStart(2,'0')}`;
+  el.innerHTML = `
+    <div style="background:rgba(236,72,153,.08);border:1px solid rgba(236,72,153,.25);border-radius:10px;padding:14px 16px">
+      <div style="font-size:.82rem;font-weight:700;color:#ec4899;margin-bottom:10px">🎂 ${cumples.length} cumpleaño${cumples.length!==1?'s':''} esta semana</div>
+      ${cumples.map(c=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(236,72,153,.12);font-size:.82rem">
+          <div>
+            <span style="font-weight:600;color:var(--tx)">${esc(c.nombre)}</span>
+            <span style="font-size:.72rem;color:var(--tx2);margin-left:8px">${c.diasFalta===0?'¡Hoy! 🎉':c.diasFalta===1?'Mañana':fmtFecha(c)}</span>
+          </div>
+          ${c.tel ? `<a href="https://wa.me/549${c.tel.replace(/\D/g,'')}?text=${encodeURIComponent('¡Feliz cumpleaños '+c.nombre+'! 🎂🎉 Que la pases increíble. Te esperamos pronto!')}" target="_blank" class="btn bsm" style="background:rgba(37,211,102,.15);color:#25d366;border:1px solid rgba(37,211,102,.3);font-size:.7rem;padding:3px 10px">💬 WA</a>` : ''}
+        </div>`).join('')}
+    </div>`;
+}
+
 // ── REAGENDAR TURNO ────────────────────────────────────
 function reagendarTurno(id){
   const t = getTurnos().find(x => String(x.id) === String(id));
@@ -10492,7 +10575,7 @@ function rOcupacionDia(){
 function rFichasClientesMain(verMas){
   const el = document.getElementById('fichasClientesMain');
   if(!el) return;
-  if(!verMas){ window.__fichasLimit = 15; rClientasInactivas(); }
+  if(!verMas){ window.__fichasLimit = 15; rClientasInactivas(); rCumpleSemana(); }
   const q = (document.getElementById('fichaQ2')?.value||'').toLowerCase();
   const fichas = Object.values(getFichas());
   const turnos = getTurnos();
