@@ -4630,13 +4630,6 @@ function rCubiertas(){
   const ej=100000;
   ['cubEjC3','cubEjC6','cubEjC12'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(Math.round(ej*[c3,c6,c12][i])); });
 
-  // Si no hay datos en memoria, recargar desde DB
-  if(!S.cubiertas.length){
-    dbLoadCubiertas().then(d=>{
-      if(d && d.length){ S.cubiertas=d; rCubiertas(); }
-    }).catch(()=>{});
-  }
-
   const q = (document.getElementById('cubQ')?.value||'').toLowerCase();
   const seg = document.getElementById('cubFSegmento')?.value||'';
   let lista = S.cubiertas.filter(c =>
