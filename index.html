@@ -14690,6 +14690,14 @@ function aplicarModulosPorRubro(rubro){
   const esGomeria  = r.includes('gomeria')||r.includes('gomería')||r.includes('neumat')||r.includes('cubiert');
   const mods = currentTenant?.modulos || {};
 
+  // Ocultar todos los nav items opcionales antes de mostrar solo los del rubro activo
+  ['nav-taller','nav-equipos','nav-stock','nav-cubiertas','nav-ventas','nav-pedidos',
+   'nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-fichas',
+   'nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config',
+   'nav-auditoria','nav-turnosTec','nav-listaEspera','nav-objetivosCompra',
+   'nav-agendaTecnico','nav-inversores'
+  ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+
   const showNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
 
   // Todo oculto por defecto (ya están ocultos en el HTML con display:none)
