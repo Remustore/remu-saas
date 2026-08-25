@@ -5075,12 +5075,12 @@ async function loadAll(){
   try { localStorage.setItem('activeTenant', thisTenant); } catch(e){}
   document.getElementById('loadingScreen').style.display='flex';
   try{
-    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas,clientesGomeria] = await Promise.all([
+    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbLoad('mov_caja'),
-      dbLoadPedidos(), dbLoadCubiertas(), dbLoadClientesGomeria()
+      dbLoadPedidos(), dbLoadCubiertas()
     ]);
     S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
@@ -5133,8 +5133,10 @@ async function loadAll(){
     S.movCaja=movCaja||[];
     S.pedidos=pedidos||[];
     S.cubiertas=cubiertas||[];
-    S.clientesGomeria=clientesGomeria||[];
+    S.clientesGomeria=[];
     S.historialGomeria=[];
+    // Carga separada para no afectar el resto si falla
+    dbLoadClientesGomeria().then(d=>{ S.clientesGomeria=d||[]; }).catch(()=>{});
     // Auto-precargar servicios para tenants nuevos (primer login tras confirmar email)
     if(currentRole === 'admin' && !S.precios.length && !S.reparaciones.length && !S.ventas.length && currentTenant?.rubro){
       const _pcKey = 'precargado_' + (currentTenant?.id||'');
