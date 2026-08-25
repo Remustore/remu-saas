@@ -7261,6 +7261,7 @@ function rDash(){
   const repA=S.reparaciones.filter(r=>r.estado!=='entregado').length,eqD=S.equipos.filter(e=>e.estado==='disponible').length;
   const rubD=(currentTenant?.rubro||'').toLowerCase();
   const esBarberiaD=esNegocioTurnos(rubD);
+  const esGomeriaD=rubD.includes('gomeria')||rubD.includes('gomería')||rubD.includes('neumat')||rubD.includes('cubiert');
   // Para barberías/salones: ingresos de servicio desde getTurnos() (localStorage, sin duplicados).
   // S.ventas puede tener duplicados históricos → no usar para servicios en barberías.
   const tVProducto = esBarberiaD ? vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0) : 0;
@@ -7305,27 +7306,28 @@ function rDash(){
   stockBajoItems.forEach(s=>als.push({t:'w',m:`<strong>${s.nombre}</strong>: stock bajo (${s.cantidad} uds)`}));
   const totalBajo=S.stock.filter(s=>s.cantidad<=s.minimo).length;
   if(totalBajo>5)als.push({t:'w',m:`...y ${totalBajo-5} productos más con stock bajo`});
-  S.reparaciones.filter(r=>r.estado==='listo').forEach(r=>als.push({t:'o',m:`<strong>${r.cliente}</strong> — trabajo listo para entregar`}));
-  // Garantías por vencer
-  const hoyG = tod();
-  S.reparaciones.filter(r=>{
-    if(!r.garantiaDias||r.estado!=='entregado'||!r.fechaEntrega) return false;
-    const vence = new Date(r.fechaEntrega); vence.setDate(vence.getDate()+r.garantiaDias);
-    const diasRestantes = Math.floor((vence-new Date())/86400000);
-    return diasRestantes >= 0 && diasRestantes <= 7;
-  }).forEach(r=>{
-    const vence = new Date(r.fechaEntrega); vence.setDate(vence.getDate()+r.garantiaDias);
-    const dias = Math.floor((vence-new Date())/86400000);
-    als.push({t:'w',m:`🛡 Garantía de <strong>${r.cliente}</strong> (${r.equipo}) vence en ${dias} día${dias!==1?'s':''}`});
-  });
+  if(!esGomeriaD){
+    S.reparaciones.filter(r=>r.estado==='listo').forEach(r=>als.push({t:'o',m:`<strong>${r.cliente}</strong> — trabajo listo para entregar`}));
+    // Garantías por vencer
+    S.reparaciones.filter(r=>{
+      if(!r.garantiaDias||r.estado!=='entregado'||!r.fechaEntrega) return false;
+      const vence = new Date(r.fechaEntrega); vence.setDate(vence.getDate()+r.garantiaDias);
+      const diasRestantes = Math.floor((vence-new Date())/86400000);
+      return diasRestantes >= 0 && diasRestantes <= 7;
+    }).forEach(r=>{
+      const vence = new Date(r.fechaEntrega); vence.setDate(vence.getDate()+r.garantiaDias);
+      const dias = Math.floor((vence-new Date())/86400000);
+      als.push({t:'w',m:`🛡 Garantía de <strong>${r.cliente}</strong> (${r.equipo}) vence en ${dias} día${dias!==1?'s':''}`});
+    });
+  }
   if(ganReal<0)als.push({t:'b',m:`Los gastos superan los ingresos en <strong>${fmt(Math.abs(ganReal))}</strong>`});
   if(meta>0&&pct>=100)als.push({t:'o',m:`¡Meta de ${fmt(meta)} alcanzada! 🎉`});
   document.getElementById('alerts').innerHTML=als.length?als.map(a=>`<div class="al ${a.t==='w'?'aw':a.t==='o'?'ao':'ab'}"><span>${a.t==='w'?'⚠':a.t==='o'?'✓':'✕'}</span><span>${a.m}</span></div>`).join(''):`<div class="al ai"><span>✓</span><span>Sin alertas. Todo en orden.</span></div>`;
   const bizName = currentTenant?.nombre || 'tu negocio';
   const cns=[];
   if(mg<20&&ingresoFlujo>0)cns.push({i:'📊',t:'Revisá tus márgenes',d:'El margen está por debajo del 20%. Analizá subida de precios o reducción de costos de compra.'});
-  // Para barberías: "primera venta" no aplica — verificar con totalMesReal (turnos)
-  if(esBarberiaD ? totalMesReal===0 : tV===0)cns.push({i:'💡',t:esBarberiaD?'Agendá tu primer turno':'Registrá tu primera venta',d:esBarberiaD?'Agendá el primer turno del día para ver los números en tiempo real.':'Registrar cada operación te da datos reales para crecer.'});
+  if(esGomeriaD ? S.clientesGomeria.length===0 : esBarberiaD ? totalMesReal===0 : tV===0)
+    cns.push({i:'💡',t:esGomeriaD?'Registrá tu primer cliente':esBarberiaD?'Agendá tu primer turno':'Registrá tu primera venta',d:esGomeriaD?'Cargá el primer cliente con su patente y vehículo para empezar a llevar el historial.':esBarberiaD?'Agendá el primer turno del día para ver los números en tiempo real.':'Registrar cada operación te da datos reales para crecer.'});
   if(top.length>0)cns.push({i:'⭐',t:`Estrella: ${top[0][0]}`,d:`Es tu artículo más vendido. Mantené stock constante para no perder ventas.`});
   if(pct>=100)cns.push({i:'🚀',t:'¡Meta alcanzada!',d:'Excelente. Subí la meta el mes que viene y reinvertí en más stock.'});
   if(ganReal>0)cns.push({i:'🏦',t:'Resultado positivo',d:'Guardá un 20% del resultado neto como fondo de emergencia del negocio.'});
@@ -15316,9 +15318,23 @@ function updateBigNumbers(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon')||rubro.includes('salón')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
   const esBarberiaBig = rubro.includes('barberia')||rubro.includes('barbería');
+  const esGomeriaBig = rubro.includes('gomeria')||rubro.includes('gomería')||rubro.includes('neumat')||rubro.includes('cubiert');
 
-  // For salon/barbería, top numbers follow the period filter
-  if(esSalon || esBarberiaBig){
+  if(esGomeriaBig){
+    const filtLabel = getDFiltLabel();
+    const ventasFilt = filtrarDash(S.ventas, 'fecha');
+    const totalFilt = ventasFilt.reduce((a,v)=>a+v.total,0);
+    const serviciosMes = (S.historialGomeria||[]).filter(h=>{
+      const hoy = new Date(); const mes = hoy.toISOString().slice(0,7);
+      return h.fecha && h.fecha.startsWith(mes);
+    }).length;
+    if(lHoy) lHoy.textContent = '💰 ' + filtLabel;
+    if(lTrab) lTrab.textContent = '🚗 Clientes registrados';
+    if(lStock) lStock.textContent = '🔧 Servicios este mes';
+    if(bvh) bvh.textContent = fmt(totalFilt);
+    if(btl) btl.textContent = S.clientesGomeria.length;
+    if(bsb) bsb.textContent = serviciosMes;
+  } else if(esSalon || esBarberiaBig){
     const filtLabel = getDFiltLabel();
     // Fuente de verdad: getTurnos() para servicios (localStorage, sin duplicados posibles).
     // S.ventas puede tener duplicados históricos → no usar Math.max ni vFilt para servicios.
@@ -17372,6 +17388,7 @@ function rAccionesRapidas(){
   if(!el) return;
   var rub = (currentTenant && currentTenant.rubro ? currentTenant.rubro : '').toLowerCase();
   var esBarb = /barber|salon|belleza|peluq|manicur/i.test(rub);
+  var esGom  = /gomer|neumat|cubiert/i.test(rub);
 
   var btnStyle = 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 8px;font-size:.82rem;font-weight:600;border-radius:10px;cursor:pointer;border:1px solid var(--bor2);background:var(--sur);color:var(--tx2);transition:all .15s;';
   var emStyle  = 'font-size:1.5rem;line-height:1';
@@ -17380,6 +17397,10 @@ function rAccionesRapidas(){
     { em:'➕', lbl:'Turno rápido',    clr:'var(--gld)', action:"go('turnos');setTimeout(function(){openM('mTurno',null)},300)" },
     { em:'💰', lbl:'Registrar cobro', clr:'var(--ok)',  action:"abrirVentaRapida();go('ventas')" },
     { em:'👤', lbl:'Cliente nuevo',   clr:'var(--inf)', action:"go('clientes')" }
+  ] : esGom ? [
+    { em:'🚗', lbl:'Nuevo cliente',   clr:'var(--gld)', action:"go('clientesGomeria');setTimeout(function(){abrirFormClienteGomeria()},300)" },
+    { em:'💰', lbl:'Registrar venta', clr:'var(--ok)',  action:"abrirVentaRapida();go('ventas')" },
+    { em:'🔵', lbl:'Nueva cubierta',  clr:'var(--inf)', action:"go('cubiertas');setTimeout(function(){abrirFormCubierta()},300)" }
   ] : [
     { em:'🔧', lbl:'Equipo nuevo',    clr:'var(--wrn)', action:"openM('mTaller',null);go('taller')" },
     { em:'💰', lbl:'Registrar venta', clr:'var(--ok)',  action:"abrirVentaRapida();go('ventas')" },
