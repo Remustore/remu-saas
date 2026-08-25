@@ -14738,7 +14738,7 @@ function updateDashParejaCard(){
   `;
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); }
+function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); rCubiertas(); rClientesGomeria(); }
 
 function getClientes(){
   const r = (currentTenant?.rubro||'').toLowerCase();
