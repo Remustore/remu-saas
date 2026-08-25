@@ -4743,13 +4743,7 @@ async function dbUpsertClienteGomeria(c){
   setSyncing();
   try{
     const row = { id:c.id, tenant_id:currentTenant.id, patente:c.patente, nombre:c.nombre, tel:c.tel, km:c.km, marca_veh:c.marca_veh, modelo:c.modelo, notas:c.notas };
-    const { data: existing } = await sb.from('clientes_gomeria').select('id').eq('id', c.id).eq('tenant_id', currentTenant.id);
-    let error;
-    if(existing && existing.length > 0){
-      ({ error } = await sb.from('clientes_gomeria').update(row).eq('id', c.id).eq('tenant_id', currentTenant.id));
-    } else {
-      ({ error } = await sb.from('clientes_gomeria').insert(row));
-    }
+    const { error } = await sb.from('clientes_gomeria').upsert(row, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
   }catch(e){ console.error('[clientesGomeria] upsert error', e); setSyncErr(e?.message||''); return false; }
