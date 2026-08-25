@@ -1460,9 +1460,9 @@ $$;</pre>
           <span class="nico" style="flex-shrink:0"><i data-lucide="tag"></i></span>
           <div><div style="font-size:.82rem;font-weight:600">Lista de precios</div><div style="font-size:.7rem;color:var(--tx2)">Editar servicios y precios</div></div>
         </div>
-        <div onclick="go('fichasClientes')" class="quick-link">
+        <div onclick="_irAClientes()" class="quick-link">
           <span class="nico" style="flex-shrink:0"><i data-lucide="users"></i></span>
-          <div><div style="font-size:.82rem;font-weight:600">Fichas de clientes</div><div style="font-size:.7rem;color:var(--tx2)">Historial y notas</div></div>
+          <div><div style="font-size:.82rem;font-weight:600" id="qlClientesLabel">Fichas de clientes</div><div style="font-size:.7rem;color:var(--tx2)">Historial y notas</div></div>
         </div>
       </div>
 
@@ -4871,6 +4871,14 @@ async function guardarClienteGomeria(){
   rClientesGomeria();
 }
 
+function _irAClientes(){
+  const rub=(currentTenant?.rubro||'').toLowerCase();
+  const esGom=rub.includes('gomeria')||rub.includes('gomería')||rub.includes('neumat')||rub.includes('cubiert');
+  go(esGom?'clientesGomeria':'fichasClientes');
+  const lbl=document.getElementById('qlClientesLabel');
+  if(lbl) lbl.textContent=esGom?'Clientes':'Fichas de clientes';
+}
+
 async function eliminarClienteGomeria(id){
   if(!confirm('¿Eliminar este cliente y todo su historial?')) return;
   const ok = await dbDeleteClienteGomeria(id);
@@ -7285,6 +7293,8 @@ function rDash(){
   const opCount = vm.length + repEntregadas.length;
   const stat4 = esBarberiaD
     ? `<div class="stat"><div class="sl">Turnos ${filtLabel.toLowerCase()}</div><div class="sv" style="color:var(--wrn)">${getTurnos?filtrarDash(getTurnos(),'fecha').length:0}</div></div>`
+    : esGomeriaD
+    ? `<div class="stat"><div class="sl">🚗 Vehículos registrados</div><div class="sv" style="color:var(--wrn)">${S.clientesGomeria.length}</div><div class="ss">${(S.historialGomeria||[]).filter(h=>{const m=new Date().toISOString().slice(0,7);return h.fecha&&h.fecha.startsWith(m);}).length} servicios este mes</div></div>`
     : `<div class="stat"><div class="sl">Trabajos activos</div><div class="sv" style="color:var(--wrn)">${repA}</div><div class="ss">${eqD} equipos disponibles</div></div>`;
   document.getElementById('dStats').innerHTML=`<div class="stat"><div class="sl">${filtLabel}</div><div class="sv" style="color:var(--ok)">${fmt(totalMesReal)}</div><div class="ss">${opCount} operaciones</div></div><div class="stat"><div class="sl">Gastos del período</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div><div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${ganReal>=0?'var(--gld)':'var(--bad)'}"> ${fmt(ganReal)}</div></div>${stat4}`;
   const meta=S.meta||0,pct=meta>0?Math.min(100,Math.round(totalMesReal/meta*100)):0;
@@ -7302,7 +7312,7 @@ function rDash(){
   const cnt={};S.ventas.forEach(v=>{cnt[v.nombre]=(cnt[v.nombre]||0)+v.cantidad;});
   const top=Object.entries(cnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topS').innerHTML=top.length?top.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${n}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} uds</div></div>`).join(''):emp('📉','Sin ventas registradas');
-  const topSCard=document.getElementById('topSCard');if(topSCard)topSCard.style.display=esBarberiaD?'none':'';
+  const topSCard=document.getElementById('topSCard');if(topSCard)topSCard.style.display=(esBarberiaD||esGomeriaD)?'none':'';
   const als=[];
   const stockBajoItems=[...new Map(S.stock.filter(s=>s.cantidad<=s.minimo).map(s=>[s.nombre,s])).values()].slice(0,5);
   stockBajoItems.forEach(s=>als.push({t:'w',m:`<strong>${s.nombre}</strong>: stock bajo (${s.cantidad} uds)`}));
@@ -8029,6 +8039,12 @@ function rObjetivos(){
       bloque('📅','Turnos agendados',turnosHoy,metaTurnos,0,0) +
       bloque('✓','Turnos terminados',turnosTermHoy,metaTurnos,facturadoHoy,metaMontoTurnos) +
       bloque('💰','Facturado hoy',Math.round(ventasHoy+facturadoHoy),1,ventasHoy+facturadoHoy,(obj.accCant||1)*(obj.accPre||10000));
+  } else if(rubro.includes('gomeria')||rubro.includes('gomería')||rubro.includes('neumat')||rubro.includes('cubiert')){
+    // GOMERÍA
+    const ventasHoy = S.ventas.filter(v=>v.fecha===hoyStr).reduce((a,v)=>a+v.total,0);
+    const clientesHoy = (S.historialGomeria||[]).filter(h=>h.fecha===hoyStr).length;
+    const metaVentasMonto = (obj.accCant||1)*(obj.accPre||50000);
+    document.getElementById('objHoy').innerHTML=`<div style="font-size:.7rem;color:var(--mut);margin-bottom:10px;text-align:center">📅 ${periodoLabel}</div>`+bloque('💰','Facturado hoy',Math.round(ventasHoy),1,ventasHoy,metaVentasMonto)+bloque('🚗','Servicios hoy',clientesHoy,obj.repCant||3,0,0)+bloque('🔵','Cubiertas en stock',S.cubiertas.reduce((a,c)=>a+(c.stock||0),0),obj.eqCant||10,0,0);
   } else {
     // Remu Store — original
     const repsHoy=S.reparaciones.filter(r=>r.fecha===hoyStr&&r.estado!=='recibido').length;
