@@ -1006,6 +1006,7 @@ $$;</pre>
   <div class="ni" onclick="go('ventas')" id="nav-ventas" style="display:none"><span class="nico"><i data-lucide="receipt"></i></span>Ventas</div>
   <div class="ni" onclick="go('stock')" id="nav-stock" style="display:none"><span class="nico"><i data-lucide="package"></i></span>Productos<span id="stockBadge" class="nav-badge" style="display:none">0</span></div>
   <div class="ni" onclick="go('cubiertas')" id="nav-cubiertas" style="display:none"><span class="nico"><i data-lucide="circle-dot"></i></span>Cubiertas<span id="cubBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('clientesGomeria')" id="nav-clientesGomeria" style="display:none"><span class="nico"><i data-lucide="car"></i></span>Clientes<span id="cliGomBadge" class="nav-badge" style="display:none">0</span></div>
   <!-- BARBERÍA / SALÓN -->
   <div class="ni" onclick="go('turnos')" id="nav-turnos" style="display:none"><span class="nico"><i data-lucide="calendar"></i></span>Agenda del día</div>
   <div class="ni" onclick="go('clientes')" id="nav-clientes" style="display:none"><span class="nico"><i data-lucide="users"></i></span>Clientes</div>
@@ -1939,6 +1940,35 @@ $$;</pre>
       </div>
     </div>
 
+    <!-- CLIENTES GOMERÍA -->
+    <div class="sec" id="sec-clientesGomeria">
+      <div class="pt">Clientes — Gomería</div>
+      <div class="ps">Historial por vehículo: patente, servicios, cubiertas colocadas y recordatorios</div>
+      <div class="card">
+        <div class="ch" style="flex-wrap:wrap;gap:10px">
+          <div class="srch"><span>⌕</span><input id="cliGomQ" placeholder="Buscar por nombre, patente o teléfono..." oninput="rClientesGomeria()"></div>
+          <button class="btn bg" onclick="abrirFormClienteGomeria()">+ Nuevo cliente</button>
+        </div>
+        <div style="overflow-x:auto;margin-top:8px">
+          <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:600px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--bor)">
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Patente</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Cliente</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Teléfono</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Vehículo</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">Visitas</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Última visita</th>
+                <th style="padding:9px 8px"></th>
+              </tr>
+            </thead>
+            <tbody id="cliGomTbody"></tbody>
+          </table>
+        </div>
+        <div id="cliGomEmpty" style="display:none;text-align:center;padding:32px;color:var(--mut);font-size:.82rem">Sin clientes registrados. Usá "+ Nuevo cliente" para empezar.</div>
+      </div>
+    </div>
+
     </div>
   </div>
 </div>
@@ -1996,6 +2026,86 @@ $$;</pre>
   </div>
 </div>
 <div class="mf"><button class="btn" onclick="closeM('mCubierta')">Cancelar</button><button class="btn bg" onclick="guardarCubierta()">Guardar cubierta</button></div>
+</div></div>
+
+<!-- GOMERÍA: Formulario cliente -->
+<div class="mb" id="mClienteGomeria"><div class="md" style="max-width:500px"><div class="mh"><div class="mt2" id="mCliGomTitle">Nuevo cliente</div><button class="xbtn" onclick="closeM('mClienteGomeria')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="cliGomId">
+  <div class="fr">
+    <div><label>Patente *</label><input id="cliGomPatente" placeholder="Ej: ABC123" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+    <div><label>Nombre del cliente</label><input id="cliGomNombre" placeholder="Nombre y apellido"></div>
+  </div>
+  <div class="fr">
+    <div><label>Teléfono</label><input id="cliGomTel" type="tel" placeholder="Ej: 11 1234-5678"></div>
+    <div><label>KM actuales del vehículo</label><input id="cliGomKm" type="number" placeholder="Ej: 45000"></div>
+  </div>
+  <div class="fr">
+    <div><label>Marca del vehículo</label><input id="cliGomMarcaVeh" placeholder="Ej: Ford, VW, Renault"></div>
+    <div><label>Modelo</label><input id="cliGomModelo" placeholder="Ej: Focus, Gol, Clio"></div>
+  </div>
+  <div><label>Notas (opcional)</label><input id="cliGomNotas" placeholder="Observaciones del vehículo o cliente"></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mClienteGomeria')">Cancelar</button><button class="btn bg" onclick="guardarClienteGomeria()">Guardar cliente</button></div>
+</div></div>
+
+<!-- GOMERÍA: Registrar servicio en historial -->
+<div class="mb" id="mServicioGomeria"><div class="md" style="max-width:520px"><div class="mh"><div class="mt2">Registrar servicio</div><button class="xbtn" onclick="closeM('mServicioGomeria')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="srvGomClienteId">
+  <div id="srvGomClienteInfo" style="background:var(--bg2);border-radius:8px;padding:10px 12px;margin-bottom:4px;font-size:.82rem;color:var(--tx2)"></div>
+  <div class="fr">
+    <div><label>Fecha del servicio</label><input id="srvGomFecha" type="date"></div>
+    <div><label>KM al momento del servicio</label><input id="srvGomKm" type="number" placeholder="Ej: 45200"></div>
+  </div>
+  <div><label>Servicio realizado *</label>
+    <select id="srvGomTipo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:8px;font-family:var(--fb);font-size:.86rem;outline:none" onchange="_srvGomTipoChange()">
+      <option value="">— Seleccionar —</option>
+      <option>Cambio de cubiertas</option>
+      <option>Rotación de cubiertas</option>
+      <option>Reparación de pinchadura</option>
+      <option>Alineación y balanceo</option>
+      <option>Cambio de aceite</option>
+      <option>Cambio de filtros</option>
+      <option>Reparación tren delantero</option>
+      <option>Cambio de amortiguadores</option>
+      <option>Otro</option>
+    </select>
+  </div>
+  <!-- Solo visible si es cambio/rotación de cubiertas -->
+  <div id="srvGomCubiertasBloque" style="display:none">
+    <div class="fr">
+      <div><label>Medida colocada</label><input id="srvGomMedida" placeholder="Ej: 195/65 R15" list="srvGomMedidasList"><datalist id="srvGomMedidasList"></datalist></div>
+      <div><label>Marca</label><input id="srvGomMarca" placeholder="Ej: Fate, Michelin" list="srvGomMarcasList"><datalist id="srvGomMarcasList"></datalist></div>
+    </div>
+    <div class="fr">
+      <div><label>Cantidad de cubiertas</label><input id="srvGomCantCub" type="number" min="1" max="4" placeholder="1-4" value="4"></div>
+      <div><label>KM próxima rotación</label><input id="srvGomKmRotacion" type="number" placeholder="Ej: 10000" value="10000"></div>
+    </div>
+  </div>
+  <div class="fr">
+    <div><label>Precio cobrado ($)</label><input id="srvGomPrecio" type="number" placeholder="0"></div>
+    <div><label>Forma de pago</label>
+      <select id="srvGomPago" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:8px;font-family:var(--fb);font-size:.86rem;outline:none">
+        <option>Efectivo</option><option>Débito</option><option>Crédito 3c</option><option>Crédito 6c</option><option>Crédito 12c</option><option>Transferencia</option>
+      </select>
+    </div>
+  </div>
+  <div><label>Observaciones del servicio</label><input id="srvGomObs" placeholder="Detalles adicionales..."></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mServicioGomeria')">Cancelar</button><button class="btn bg" onclick="guardarServicioGomeria()">Registrar servicio</button></div>
+</div></div>
+
+<!-- GOMERÍA: Historial de un cliente -->
+<div class="mb" id="mHistorialGomeria"><div class="md" style="max-width:600px"><div class="mh"><div class="mt2" id="mHistGomTitle">Historial del cliente</div><button class="xbtn" onclick="closeM('mHistorialGomeria')">✕</button></div>
+<div class="mc">
+  <div id="mHistGomInfo" style="background:var(--bg2);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:.83rem"></div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button class="btn bg bsm" onclick="_abrirNuevoServicio()">+ Registrar servicio</button>
+  </div>
+  <div id="mHistGomLista"></div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mHistorialGomeria')">Cerrar</button></div>
 </div></div>
 
 <!-- Stock -->
@@ -2623,7 +2733,7 @@ function esNegocioTurnos(rubro){
 let currentUser = null;    // usuario Supabase Auth
 let currentTenant = null;  // objeto tenant { id, nombre, rubro, modulos }
 let currentRole = null;    // 'admin' | 'superadmin'
-let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[] };
+let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
 let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 
 // ═══ SYNC UI ═══
@@ -4616,6 +4726,297 @@ async function eliminarCubierta(id){
   rCubiertas();
 }
 
+// ═══ GOMERÍA — CLIENTES ════════════════════════════════════════════════════
+
+async function dbLoadClientesGomeria(){
+  try{
+    const { data, error } = await sb.from('clientes_gomeria').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
+    if(error) throw error;
+    return (data||[]).map(r=>({
+      id:r.id, patente:r.patente||'', nombre:r.nombre||'', tel:r.tel||'',
+      km:r.km||0, marca_veh:r.marca_veh||'', modelo:r.modelo||'', notas:r.notas||''
+    }));
+  }catch(e){ console.error('[clientesGomeria] load error', e); return []; }
+}
+
+async function dbUpsertClienteGomeria(c){
+  setSyncing();
+  try{
+    const row = { id:c.id, tenant_id:currentTenant.id, patente:c.patente, nombre:c.nombre, tel:c.tel, km:c.km, marca_veh:c.marca_veh, modelo:c.modelo, notas:c.notas };
+    const { error } = await sb.from('clientes_gomeria').upsert(row, { onConflict:'id' });
+    if(error) throw error;
+    setSynced(); return true;
+  }catch(e){ console.error('[clientesGomeria] upsert error', e); setSyncErr(e?.message||''); return false; }
+}
+
+async function dbDeleteClienteGomeria(id){
+  setSyncing();
+  try{
+    await sb.from('historial_gomeria').delete().eq('cliente_id', id).eq('tenant_id', currentTenant.id);
+    const { error } = await sb.from('clientes_gomeria').delete().eq('id', id).eq('tenant_id', currentTenant.id);
+    if(error) throw error;
+    setSynced(); return true;
+  }catch(e){ console.error('[clientesGomeria] delete error', e); setSyncErr(); return false; }
+}
+
+async function dbLoadHistorialGomeria(clienteId){
+  try{
+    const { data, error } = await sb.from('historial_gomeria').select('*').eq('tenant_id', currentTenant.id).eq('cliente_id', clienteId).order('fecha', { ascending: false });
+    if(error) throw error;
+    return (data||[]).map(r=>({
+      id:r.id, cliente_id:r.cliente_id, fecha:r.fecha||'', km:r.km||0,
+      tipo:r.tipo||'', medida:r.medida||'', marca:r.marca||'',
+      cant_cubiertas:r.cant_cubiertas||0, km_rotacion:r.km_rotacion||0,
+      precio:r.precio||0, pago:r.pago||'Efectivo', obs:r.obs||''
+    }));
+  }catch(e){ console.error('[historialGomeria] load error', e); return []; }
+}
+
+async function dbUpsertServicioGomeria(s){
+  setSyncing();
+  try{
+    const row = { id:s.id, tenant_id:currentTenant.id, cliente_id:s.cliente_id, fecha:s.fecha, km:s.km, tipo:s.tipo, medida:s.medida, marca:s.marca, cant_cubiertas:s.cant_cubiertas, km_rotacion:s.km_rotacion, precio:s.precio, pago:s.pago, obs:s.obs };
+    const { error } = await sb.from('historial_gomeria').upsert(row, { onConflict:'id' });
+    if(error) throw error;
+    setSynced(); return true;
+  }catch(e){ console.error('[historialGomeria] upsert error', e); setSyncErr(e?.message||''); return false; }
+}
+
+async function dbDeleteServicioGomeria(id){
+  setSyncing();
+  try{
+    const { error } = await sb.from('historial_gomeria').delete().eq('id', id).eq('tenant_id', currentTenant.id);
+    if(error) throw error;
+    setSynced(); return true;
+  }catch(e){ console.error('[historialGomeria] delete error', e); setSyncErr(); return false; }
+}
+
+// ─── Render lista clientes gomería ───────────────────────────────────────────
+function rClientesGomeria(){
+  const q = (document.getElementById('cliGomQ')?.value||'').toLowerCase();
+  const tbody = document.getElementById('cliGomTbody');
+  const empty = document.getElementById('cliGomEmpty');
+  const badge = document.getElementById('cliGomBadge');
+  if(!tbody) return;
+
+  let lista = S.clientesGomeria.filter(c=>{
+    if(!q) return true;
+    return (c.patente+c.nombre+c.tel).toLowerCase().includes(q);
+  });
+
+  if(badge){ badge.textContent=S.clientesGomeria.length; badge.style.display=S.clientesGomeria.length?'':'none'; }
+  if(!lista.length){ tbody.innerHTML=''; if(empty) empty.style.display=''; return; }
+  if(empty) empty.style.display='none';
+
+  tbody.innerHTML = lista.map(c=>{
+    const visitas = (S.historialGomeria||[]).filter(h=>h.cliente_id===c.id).length;
+    const ultima = (S.historialGomeria||[]).filter(h=>h.cliente_id===c.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    return `<tr style="border-bottom:1px solid var(--bor2)">
+      <td style="padding:9px 8px;font-weight:700;font-size:.85rem;color:var(--tx);letter-spacing:.5px">${c.patente||'—'}</td>
+      <td style="padding:9px 8px">${c.nombre||'—'}</td>
+      <td style="padding:9px 8px">${c.tel ? `<a href="tel:${c.tel}" style="color:var(--gld)">${c.tel}</a>` : '—'}</td>
+      <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${[c.marca_veh,c.modelo].filter(Boolean).join(' ')||'—'}</td>
+      <td style="padding:9px 8px;text-align:right">${visitas}</td>
+      <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${ultima ? _fmtFechaCorta(ultima.fecha) : '—'}</td>
+      <td style="padding:9px 8px;display:flex;gap:6px">
+        <button class="btn bsm" onclick="verHistorialGomeria('${c.id}')">📋 Historial</button>
+        <button class="btn bsm be" onclick="abrirFormClienteGomeria('${c.id}')">✎</button>
+        <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarClienteGomeria('${c.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function _fmtFechaCorta(f){
+  if(!f) return '—';
+  const [y,m,d] = f.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// ─── Formulario cliente ───────────────────────────────────────────────────────
+function abrirFormClienteGomeria(id=null){
+  const c = id ? S.clientesGomeria.find(x=>x.id===id) : null;
+  document.getElementById('mCliGomTitle').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+  document.getElementById('cliGomId').value = c?.id||'';
+  document.getElementById('cliGomPatente').value = c?.patente||'';
+  document.getElementById('cliGomNombre').value = c?.nombre||'';
+  document.getElementById('cliGomTel').value = c?.tel||'';
+  document.getElementById('cliGomKm').value = c?.km||'';
+  document.getElementById('cliGomMarcaVeh').value = c?.marca_veh||'';
+  document.getElementById('cliGomModelo').value = c?.modelo||'';
+  document.getElementById('cliGomNotas').value = c?.notas||'';
+  openM('mClienteGomeria');
+}
+
+async function guardarClienteGomeria(){
+  const patente = document.getElementById('cliGomPatente').value.trim().toUpperCase();
+  if(!patente){ showToast('La patente es obligatoria','err'); return; }
+  const existId = document.getElementById('cliGomId').value;
+  const c = {
+    id: existId || crypto.randomUUID(),
+    patente,
+    nombre: document.getElementById('cliGomNombre').value.trim(),
+    tel: document.getElementById('cliGomTel').value.trim(),
+    km: parseInt(document.getElementById('cliGomKm').value)||0,
+    marca_veh: document.getElementById('cliGomMarcaVeh').value.trim(),
+    modelo: document.getElementById('cliGomModelo').value.trim(),
+    notas: document.getElementById('cliGomNotas').value.trim()
+  };
+  closeM('mClienteGomeria');
+  const ok = await dbUpsertClienteGomeria(c);
+  if(!ok){ showToast('Error al guardar','err'); return; }
+  if(existId){ S.clientesGomeria = S.clientesGomeria.map(x=>x.id===existId?c:x); }
+  else { S.clientesGomeria.push(c); }
+  showToast((existId?'Cliente actualizado':'Cliente guardado')+' ✓');
+  rClientesGomeria();
+}
+
+async function eliminarClienteGomeria(id){
+  if(!confirm('¿Eliminar este cliente y todo su historial?')) return;
+  const ok = await dbDeleteClienteGomeria(id);
+  if(!ok){ showToast('Error al eliminar','err'); return; }
+  S.clientesGomeria = S.clientesGomeria.filter(c=>c.id!==id);
+  S.historialGomeria = (S.historialGomeria||[]).filter(h=>h.cliente_id!==id);
+  showToast('Cliente eliminado');
+  rClientesGomeria();
+}
+
+// ─── Historial de cliente ─────────────────────────────────────────────────────
+let _histGomClienteActivo = null;
+
+async function verHistorialGomeria(clienteId){
+  const c = S.clientesGomeria.find(x=>x.id===clienteId);
+  if(!c) return;
+  _histGomClienteActivo = c;
+  document.getElementById('mHistGomTitle').textContent = `Historial — ${c.patente}`;
+  const info = document.getElementById('mHistGomInfo');
+  if(info) info.innerHTML = `<span style="font-weight:600">${c.nombre||'Sin nombre'}</span>${c.tel?' &nbsp;·&nbsp; '+c.tel:''} &nbsp;·&nbsp; ${[c.marca_veh,c.modelo].filter(Boolean).join(' ')||'Vehículo sin datos'}${c.km?' &nbsp;·&nbsp; '+c.km.toLocaleString()+' km':''}`;
+
+  const historial = await dbLoadHistorialGomeria(clienteId);
+  S.historialGomeria = [...(S.historialGomeria||[]).filter(h=>h.cliente_id!==clienteId), ...historial];
+  _renderHistorialGomeria(historial);
+  openM('mHistorialGomeria');
+}
+
+function _renderHistorialGomeria(lista){
+  const el = document.getElementById('mHistGomLista');
+  if(!el) return;
+  if(!lista.length){ el.innerHTML='<div style="text-align:center;padding:24px;color:var(--mut);font-size:.82rem">Sin servicios registrados aún.</div>'; return; }
+  el.innerHTML = lista.map(s=>{
+    const cubInfo = (s.tipo==='Cambio de cubiertas'||s.tipo==='Rotación de cubiertas') && s.medida
+      ? `<div style="font-size:.76rem;color:var(--tx2);margin-top:3px">${s.medida} · ${s.marca||'—'} · ${s.cant_cubiertas||1} unid.${s.km_rotacion?' · Rotación en +'+s.km_rotacion.toLocaleString()+' km':''}</div>`
+      : '';
+    const proxRotacion = s.km_rotacion && s.km ? `<div style="font-size:.74rem;color:var(--gld);margin-top:2px">⏱ Próxima rotación aprox. a los ${(s.km+s.km_rotacion).toLocaleString()} km</div>` : '';
+    return `<div style="border:1px solid var(--bor2);border-radius:10px;padding:12px 14px;margin-bottom:8px;background:var(--bg)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div style="font-weight:600;font-size:.86rem">${s.tipo}</div>
+          ${cubInfo}${proxRotacion}
+          ${s.obs?`<div style="font-size:.76rem;color:var(--tx2);margin-top:3px">${s.obs}</div>`:''}
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:.78rem;color:var(--tx2)">${_fmtFechaCorta(s.fecha)}</div>
+          ${s.km?`<div style="font-size:.75rem;color:var(--mut)">${s.km.toLocaleString()} km</div>`:''}
+          ${s.precio?`<div style="font-weight:700;font-size:.84rem;color:var(--gld);margin-top:2px">$${fmt(s.precio)}</div>`:''}
+          <div style="font-size:.72rem;color:var(--mut)">${s.pago||''}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:8px">
+        <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08);font-size:.72rem" onclick="eliminarServicioGomeria('${s.id}')">Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function _abrirNuevoServicio(){
+  if(!_histGomClienteActivo) return;
+  closeM('mHistorialGomeria');
+  abrirFormServicioGomeria(_histGomClienteActivo.id);
+}
+
+// ─── Formulario registrar servicio ───────────────────────────────────────────
+function abrirFormServicioGomeria(clienteId){
+  const c = S.clientesGomeria.find(x=>x.id===clienteId);
+  if(!c) return;
+  document.getElementById('srvGomClienteId').value = clienteId;
+  const info = document.getElementById('srvGomClienteInfo');
+  if(info) info.innerHTML = `<span style="font-weight:600">${c.patente}</span> · ${c.nombre||'Sin nombre'}${c.km?' · '+c.km.toLocaleString()+' km':''}`;
+  document.getElementById('srvGomFecha').value = tod();
+  document.getElementById('srvGomKm').value = c.km||'';
+  document.getElementById('srvGomTipo').value = '';
+  document.getElementById('srvGomCubiertasBloque').style.display='none';
+  document.getElementById('srvGomMedida').value='';
+  document.getElementById('srvGomMarca').value='';
+  document.getElementById('srvGomCantCub').value='4';
+  document.getElementById('srvGomKmRotacion').value='10000';
+  document.getElementById('srvGomPrecio').value='';
+  document.getElementById('srvGomPago').value='Efectivo';
+  document.getElementById('srvGomObs').value='';
+  // Autocompletar medidas y marcas desde stock de cubiertas
+  const medidas = [...new Set(S.cubiertas.map(x=>x.medida).filter(Boolean))];
+  const marcas  = [...new Set(S.cubiertas.map(x=>x.marca).filter(Boolean))];
+  const dlMedidas = document.getElementById('srvGomMedidasList');
+  const dlMarcas  = document.getElementById('srvGomMarcasList');
+  if(dlMedidas) dlMedidas.innerHTML = medidas.map(m=>`<option value="${m}">`).join('');
+  if(dlMarcas)  dlMarcas.innerHTML  = marcas.map(m=>`<option value="${m}">`).join('');
+  openM('mServicioGomeria');
+}
+
+function _srvGomTipoChange(){
+  const tipo = document.getElementById('srvGomTipo').value;
+  const bloque = document.getElementById('srvGomCubiertasBloque');
+  if(bloque) bloque.style.display = (tipo==='Cambio de cubiertas'||tipo==='Rotación de cubiertas') ? '' : 'none';
+}
+
+async function guardarServicioGomeria(){
+  const clienteId = document.getElementById('srvGomClienteId').value;
+  const tipo = document.getElementById('srvGomTipo').value;
+  if(!tipo){ showToast('Seleccioná el tipo de servicio','err'); return; }
+  const esCubierta = tipo==='Cambio de cubiertas'||tipo==='Rotación de cubiertas';
+  const s = {
+    id: crypto.randomUUID(),
+    cliente_id: clienteId,
+    fecha: document.getElementById('srvGomFecha').value || tod(),
+    km: parseInt(document.getElementById('srvGomKm').value)||0,
+    tipo,
+    medida: esCubierta ? document.getElementById('srvGomMedida').value.trim() : '',
+    marca: esCubierta ? document.getElementById('srvGomMarca').value.trim() : '',
+    cant_cubiertas: esCubierta ? parseInt(document.getElementById('srvGomCantCub').value)||1 : 0,
+    km_rotacion: esCubierta ? parseInt(document.getElementById('srvGomKmRotacion').value)||0 : 0,
+    precio: parseFloat(document.getElementById('srvGomPrecio').value)||0,
+    pago: document.getElementById('srvGomPago').value,
+    obs: document.getElementById('srvGomObs').value.trim()
+  };
+  closeM('mServicioGomeria');
+  const ok = await dbUpsertServicioGomeria(s);
+  if(!ok){ showToast('Error al guardar servicio','err'); return; }
+  if(!S.historialGomeria) S.historialGomeria=[];
+  S.historialGomeria.push(s);
+  // Actualizar km del cliente si es mayor al registrado
+  const c = S.clientesGomeria.find(x=>x.id===clienteId);
+  if(c && s.km > (c.km||0)){
+    c.km = s.km;
+    await dbUpsertClienteGomeria(c);
+  }
+  showToast('Servicio registrado ✓');
+  rClientesGomeria();
+  // Volver a abrir historial actualizado
+  await verHistorialGomeria(clienteId);
+}
+
+async function eliminarServicioGomeria(id){
+  if(!confirm('¿Eliminar este servicio del historial?')) return;
+  const ok = await dbDeleteServicioGomeria(id);
+  if(!ok){ showToast('Error al eliminar','err'); return; }
+  S.historialGomeria = (S.historialGomeria||[]).filter(s=>s.id!==id);
+  showToast('Servicio eliminado');
+  if(_histGomClienteActivo){
+    const historial = (S.historialGomeria||[]).filter(h=>h.cliente_id===_histGomClienteActivo.id);
+    _renderHistorialGomeria(historial);
+  }
+  rClientesGomeria();
+}
+
 async function dbUpsertPedido(p){
   setSyncing();
   const row = {
@@ -4674,12 +5075,12 @@ async function loadAll(){
   try { localStorage.setItem('activeTenant', thisTenant); } catch(e){}
   document.getElementById('loadingScreen').style.display='flex';
   try{
-    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas] = await Promise.all([
+    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas,clientesGomeria] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbLoad('mov_caja'),
-      dbLoadPedidos(), dbLoadCubiertas()
+      dbLoadPedidos(), dbLoadCubiertas(), dbLoadClientesGomeria()
     ]);
     S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
@@ -4732,6 +5133,8 @@ async function loadAll(){
     S.movCaja=movCaja||[];
     S.pedidos=pedidos||[];
     S.cubiertas=cubiertas||[];
+    S.clientesGomeria=clientesGomeria||[];
+    S.historialGomeria=[];
     // Auto-precargar servicios para tenants nuevos (primer login tras confirmar email)
     if(currentRole === 'admin' && !S.precios.length && !S.reparaciones.length && !S.ventas.length && currentTenant?.rubro){
       const _pcKey = 'precargado_' + (currentTenant?.id||'');
@@ -4821,7 +5224,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes' };
 
 function go(id){
   // Bug 2: cerrar sidebar en móvil y ocultar overlay
@@ -4840,7 +5243,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:rCubiertas };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:rCubiertas, clientesGomeria:rClientesGomeria };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -14691,7 +15094,7 @@ function aplicarModulosPorRubro(rubro){
   const mods = currentTenant?.modulos || {};
 
   // Ocultar todos los nav items opcionales antes de mostrar solo los del rubro activo
-  ['nav-taller','nav-equipos','nav-stock','nav-cubiertas','nav-ventas','nav-pedidos',
+  ['nav-taller','nav-equipos','nav-stock','nav-cubiertas','nav-clientesGomeria','nav-ventas','nav-pedidos',
    'nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-fichas',
    'nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config',
    'nav-auditoria','nav-turnosTec','nav-listaEspera','nav-objetivosCompra',
@@ -14708,7 +15111,7 @@ function aplicarModulosPorRubro(rubro){
     showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
   } else if(esGomeria){
     // 🔧 GOMERÍA / NEUMÁTICOS
-    showNav('nav-cubiertas','nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
+    showNav('nav-cubiertas','nav-clientesGomeria','nav-turnos','nav-turnosOnline','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else if(esBarberia){
     // ✂️ BARBERÍA
     showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
@@ -14967,7 +15370,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores,cubiertas:rCubiertas};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores,cubiertas:rCubiertas,clientesGomeria:rClientesGomeria};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
     // Siempre actualizar badge de reservas pendientes (independiente de qué sección está activa)
     refreshBadgeSolicitudes();
