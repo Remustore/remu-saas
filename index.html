@@ -4566,7 +4566,7 @@ async function dbLoadPedidos(){
 // ═══ GOMERÍA — CUBIERTAS ═══════════════════════════════════════════════════
 async function dbLoadCubiertas(){
   try{
-    const { data, error } = await sb.from('cubiertas').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
+    const { data, error } = await sb.from('cubiertas').select('*').order('created_at', { ascending: true });
     if(error) throw error;
     return (data||[]).map(r => ({ id:r.id, medida:r.medida||'', marca:r.marca||'', segmento:r.segmento||'Media', stock:r.stock||0, costo:r.costo||0, precio_contado:r.precio_contado||0, precio_3c:r.precio_3c||0, precio_6c:r.precio_6c||0, precio_12c:r.precio_12c||0 }));
   }catch(e){ console.error('[cubiertas] load error', e); return []; }
@@ -4736,7 +4736,7 @@ async function eliminarCubierta(id){
 
 async function dbLoadClientesGomeria(){
   try{
-    const { data, error } = await sb.from('clientes_gomeria').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
+    const { data, error } = await sb.from('clientes_gomeria').select('*').order('created_at', { ascending: true });
     if(error) throw error;
     return (data||[]).map(r=>({
       id:r.id, patente:r.patente||'', nombre:r.nombre||'', tel:r.tel||'',
