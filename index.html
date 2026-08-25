@@ -1005,6 +1005,7 @@ $$;</pre>
   <div class="ni" onclick="go('taller')" id="nav-taller" style="display:none"><span class="nico"><i data-lucide="wrench"></i></span>Reparaciones</div>
   <div class="ni" onclick="go('ventas')" id="nav-ventas" style="display:none"><span class="nico"><i data-lucide="receipt"></i></span>Ventas</div>
   <div class="ni" onclick="go('stock')" id="nav-stock" style="display:none"><span class="nico"><i data-lucide="package"></i></span>Productos<span id="stockBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('cubiertas')" id="nav-cubiertas" style="display:none"><span class="nico"><i data-lucide="circle-dot"></i></span>Cubiertas<span id="cubBadge" class="nav-badge" style="display:none">0</span></div>
   <!-- BARBERÍA / SALÓN -->
   <div class="ni" onclick="go('turnos')" id="nav-turnos" style="display:none"><span class="nico"><i data-lucide="calendar"></i></span>Agenda del día</div>
   <div class="ni" onclick="go('clientes')" id="nav-clientes" style="display:none"><span class="nico"><i data-lucide="users"></i></span>Clientes</div>
@@ -1875,6 +1876,69 @@ $$;</pre>
           <div id="invConfig"></div>
         </div>
       </div>
+    <!-- CUBIERTAS GOMERÍA -->
+    <div class="sec" id="sec-cubiertas">
+      <div class="pt">Cubiertas</div>
+      <div class="ps">Stock, precios y configuración de cuotas</div>
+
+      <!-- Config cuotas -->
+      <div class="card" id="cubCuotasCard" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+          <div style="font-weight:600;font-size:.88rem">⚙️ Coeficientes de cuotas</div>
+          <button class="btn bg bsm" onclick="_guardarCuotasCfg()">Guardar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div>
+            <div style="font-size:.7rem;color:var(--tx2);margin-bottom:4px">3 cuotas ×</div>
+            <input id="cubC3" type="number" step="0.01" value="1.15" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-size:.88rem;text-align:center;outline:none">
+          </div>
+          <div>
+            <div style="font-size:.7rem;color:var(--tx2);margin-bottom:4px">6 cuotas ×</div>
+            <input id="cubC6" type="number" step="0.01" value="1.30" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-size:.88rem;text-align:center;outline:none">
+          </div>
+          <div>
+            <div style="font-size:.7rem;color:var(--tx2);margin-bottom:4px">12 cuotas ×</div>
+            <input id="cubC12" type="number" step="0.01" value="1.60" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-size:.88rem;text-align:center;outline:none">
+          </div>
+        </div>
+        <div style="font-size:.72rem;color:var(--mut);margin-top:8px">Ejemplo: contado $100.000 → 3c $<span id="cubEjC3">115.000</span> · 6c $<span id="cubEjC6">130.000</span> · 12c $<span id="cubEjC12">160.000</span></div>
+      </div>
+
+      <!-- Filtros + agregar -->
+      <div class="card">
+        <div class="ch" style="flex-wrap:wrap;gap:10px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:0">
+            <div class="srch"><span>⌕</span><input id="cubQ" placeholder="Medida o marca..." oninput="rCubiertas()"></div>
+            <select id="cubFSegmento" onchange="rCubiertas()" style="padding:8px 12px;border-radius:8px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);font-family:var(--fb);font-size:.83rem;outline:none">
+              <option value="">Todos los segmentos</option>
+              <option>Económica</option><option>Media</option><option>Premium</option><option>Deportiva</option><option>Moto</option>
+            </select>
+          </div>
+          <button class="btn bg" onclick="abrirFormCubierta()">+ Agregar cubierta</button>
+        </div>
+        <div style="overflow-x:auto;margin-top:4px">
+          <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:780px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--bor)">
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600;white-space:nowrap">Medida</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Marca</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Segmento</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">Stock</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">Costo</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--gld);font-weight:600">Contado</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">3c</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">6c</th>
+                <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">12c</th>
+                <th style="padding:9px 8px"></th>
+              </tr>
+            </thead>
+            <tbody id="cubTbody"></tbody>
+          </table>
+        </div>
+        <div id="cubEmpty" style="display:none;text-align:center;padding:32px;color:var(--mut);font-size:.82rem">Sin cubiertas cargadas. Usá "+ Agregar cubierta" para empezar.</div>
+      </div>
+    </div>
+
     </div>
   </div>
 </div>
@@ -1883,6 +1947,57 @@ $$;</pre>
 <div id="undoBar"><span id="undoMsg">Deshacer</span><button class="undo-btn" onclick="doUndo()">↩ Deshacer</button></div>
 
 <!-- MODALES -->
+<!-- Cubierta form -->
+<div class="mb" id="mCubierta"><div class="md" style="max-width:520px"><div class="mh"><div class="mt2" id="mCubTitle">Nueva cubierta</div><button class="xbtn" onclick="closeM('mCubierta')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="cubId">
+  <div class="fr">
+    <div style="flex:2"><label>Medida <span style="color:var(--mut);font-weight:400;font-size:.72rem">ej: 185/65 R15</span></label>
+      <input id="cubMedida" list="cubMedidasSug" placeholder="185/65 R15" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+      <datalist id="cubMedidasSug">
+        <option>155/70 R13</option><option>165/70 R13</option><option>175/70 R13</option>
+        <option>175/65 R14</option><option>185/60 R14</option><option>185/65 R14</option>
+        <option>185/65 R15</option><option>195/65 R15</option><option>195/55 R16</option>
+        <option>205/55 R16</option><option>205/65 R15</option><option>215/65 R16</option>
+        <option>225/45 R17</option><option>225/65 R17</option><option>235/65 R17</option>
+        <option>245/45 R18</option><option>265/60 R18</option><option>275/55 R19</option>
+      </datalist>
+    </div>
+    <div style="flex:2"><label>Marca</label>
+      <input id="cubMarca" list="cubMarcasSug" placeholder="Ej: Bridgestone, Michelin..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+      <datalist id="cubMarcasSug">
+        <option>Bridgestone</option><option>Michelin</option><option>Goodyear</option>
+        <option>Pirelli</option><option>Continental</option><option>Dunlop</option>
+        <option>Yokohama</option><option>Toyo</option><option>Fate</option>
+        <option>Firestone</option><option>BF Goodrich</option><option>General</option>
+      </datalist>
+    </div>
+    <div style="flex:1"><label>Segmento</label>
+      <select id="cubSegmento" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+        <option>Económica</option><option>Media</option><option>Premium</option><option>Deportiva</option><option>Moto</option>
+      </select>
+    </div>
+  </div>
+  <div class="fr" style="margin-top:10px">
+    <div><label>Stock (unidades)</label><input id="cubStock" type="number" min="0" value="0" placeholder="0" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:center"></div>
+    <div><label>Precio costo ($)</label><input id="cubCosto" type="number" min="0" placeholder="0" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:right" oninput="_cubAutoCalc()"></div>
+    <div><label>Precio contado ($)</label><input id="cubContado" type="number" min="0" placeholder="0" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:right;border-color:var(--gld)" oninput="_cubAutoCalc()"></div>
+  </div>
+  <div style="margin-top:10px;padding:12px;background:var(--bg);border-radius:8px">
+    <div style="font-size:.72rem;font-weight:600;color:var(--tx2);margin-bottom:8px;display:flex;justify-content:space-between">
+      <span>Precios en cuotas <span style="color:var(--mut);font-weight:400">(auto-calculados o editables)</span></span>
+      <button onclick="_cubResetCuotas()" style="background:none;border:none;color:var(--tx2);font-size:.7rem;cursor:pointer;padding:0">↺ Recalcular</button>
+    </div>
+    <div class="fr">
+      <div><label>3 cuotas ($)</label><input id="cubP3" type="number" min="0" placeholder="0" style="width:100%;background:var(--sur);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none;text-align:right"></div>
+      <div><label>6 cuotas ($)</label><input id="cubP6" type="number" min="0" placeholder="0" style="width:100%;background:var(--sur);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none;text-align:right"></div>
+      <div><label>12 cuotas ($)</label><input id="cubP12" type="number" min="0" placeholder="0" style="width:100%;background:var(--sur);border:1px solid var(--bor2);color:var(--tx);padding:8px 10px;border-radius:7px;font-family:var(--fb);font-size:.83rem;outline:none;text-align:right"></div>
+    </div>
+  </div>
+</div>
+<div class="mf"><button class="btn" onclick="closeM('mCubierta')">Cancelar</button><button class="btn bg" onclick="guardarCubierta()">Guardar cubierta</button></div>
+</div></div>
+
 <!-- Stock -->
 <div class="mb" id="mStock"><div class="md"><div class="mh"><div class="mt2">Agregar Producto</div><button class="xbtn" onclick="closeM('mStock')">✕</button></div>
 <div class="mc"><input type="hidden" id="sId">
@@ -2508,7 +2623,7 @@ function esNegocioTurnos(rubro){
 let currentUser = null;    // usuario Supabase Auth
 let currentTenant = null;  // objeto tenant { id, nombre, rubro, modulos }
 let currentRole = null;    // 'admin' | 'superadmin'
-let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
+let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[] };
 let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 
 // ═══ SYNC UI ═══
@@ -4338,6 +4453,169 @@ async function dbLoadPedidos(){
   }catch(e){ console.error('Load error pedidos', e); return []; }
 }
 
+// ═══ GOMERÍA — CUBIERTAS ═══════════════════════════════════════════════════
+async function dbLoadCubiertas(){
+  try{
+    const { data, error } = await sb.from('cubiertas').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
+    if(error) throw error;
+    return (data||[]).map(r => ({ id:r.id, medida:r.medida||'', marca:r.marca||'', segmento:r.segmento||'Media', stock:r.stock||0, costo:r.costo||0, precio_contado:r.precio_contado||0, precio_3c:r.precio_3c||0, precio_6c:r.precio_6c||0, precio_12c:r.precio_12c||0 }));
+  }catch(e){ console.error('[cubiertas] load error', e); return []; }
+}
+
+async function dbUpsertCubierta(c){
+  setSyncing();
+  try{
+    const row = { id:c.id, tenant_id: currentTenant.id, medida:c.medida, marca:c.marca, segmento:c.segmento, stock:c.stock, costo:c.costo, precio_contado:c.precio_contado, precio_3c:c.precio_3c, precio_6c:c.precio_6c, precio_12c:c.precio_12c };
+    const { error } = await sb.from('cubiertas').upsert(row, { onConflict: 'id' });
+    if(error) throw error;
+    setSynced(); return true;
+  }catch(e){ console.error('[cubiertas] upsert error', e); setSyncErr(e?.message||''); return false; }
+}
+
+async function dbDeleteCubierta(id){
+  setSyncing();
+  try{
+    const { error } = await sb.from('cubiertas').delete().eq('id', id).eq('tenant_id', currentTenant.id);
+    if(error) throw error;
+    setSynced(); return true;
+  }catch(e){ console.error('[cubiertas] delete error', e); setSyncErr(); return false; }
+}
+
+function _getCuotasCfg(){
+  try{ return JSON.parse(dbGetConfig('gomCuotas')||'{}'); }catch(e){ return {}; }
+}
+function _cubCoefs(){ const c=_getCuotasCfg(); return { c3: c.c3||1.15, c6: c.c6||1.30, c12: c.c12||1.60 }; }
+function _calcCuotas(contado){ const {c3,c6,c12}=_cubCoefs(); return { p3: Math.round(contado*c3), p6: Math.round(contado*c6), p12: Math.round(contado*c12) }; }
+
+function _cubAutoCalc(){
+  const contado = parseFloat(document.getElementById('cubContado')?.value)||0;
+  if(!contado) return;
+  const {p3,p6,p12} = _calcCuotas(contado);
+  ['cubP3','cubP6','cubP12'].forEach((id,i)=>{ const el=document.getElementById(id); if(el&&!el.dataset.manual) el.value=[p3,p6,p12][i]; });
+}
+function _cubResetCuotas(){
+  ['cubP3','cubP6','cubP12'].forEach(id=>{ const el=document.getElementById(id); if(el) delete el.dataset.manual; });
+  _cubAutoCalc();
+}
+
+async function _guardarCuotasCfg(){
+  const c3 = parseFloat(document.getElementById('cubC3')?.value)||1.15;
+  const c6 = parseFloat(document.getElementById('cubC6')?.value)||1.30;
+  const c12 = parseFloat(document.getElementById('cubC12')?.value)||1.60;
+  dbSetConfig('gomCuotas', JSON.stringify({c3,c6,c12}));
+  // actualizar ejemplo
+  const e = Math.round(100000);
+  const el3=document.getElementById('cubEjC3'), el6=document.getElementById('cubEjC6'), el12=document.getElementById('cubEjC12');
+  if(el3) el3.textContent=fmt(Math.round(e*c3));
+  if(el6) el6.textContent=fmt(Math.round(e*c6));
+  if(el12) el12.textContent=fmt(Math.round(e*c12));
+  showToast('Coeficientes guardados ✓');
+  rCubiertas();
+}
+
+function rCubiertas(){
+  const cfg = _getCuotasCfg();
+  const c3 = cfg.c3||1.15, c6=cfg.c6||1.30, c12=cfg.c12||1.60;
+  // Cargar valores actuales de cuotas
+  ['cubC3','cubC6','cubC12'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.value=[c3,c6,c12][i]; });
+  const ej=100000;
+  ['cubEjC3','cubEjC6','cubEjC12'].forEach((id,i)=>{ const el=document.getElementById(id); if(el) el.textContent=fmt(Math.round(ej*[c3,c6,c12][i])); });
+
+  const q = (document.getElementById('cubQ')?.value||'').toLowerCase();
+  const seg = document.getElementById('cubFSegmento')?.value||'';
+  let lista = S.cubiertas.filter(c =>
+    (!q || c.medida.toLowerCase().includes(q) || c.marca.toLowerCase().includes(q)) &&
+    (!seg || c.segmento === seg)
+  );
+
+  const badge = document.getElementById('cubBadge');
+  if(badge){ badge.textContent=S.cubiertas.length; badge.style.display=S.cubiertas.length?'':'none'; }
+
+  const tbody = document.getElementById('cubTbody');
+  const empty = document.getElementById('cubEmpty');
+  if(!tbody) return;
+
+  if(!lista.length){
+    tbody.innerHTML='';
+    if(empty) empty.style.display='';
+    return;
+  }
+  if(empty) empty.style.display='none';
+
+  const segColor = {Económica:'var(--ok)',Media:'var(--inf)',Premium:'var(--gld)',Deportiva:'#b08ad4',Moto:'var(--wrn)'};
+  tbody.innerHTML = lista.map(c => {
+    const margen = c.precio_contado > 0 && c.costo > 0 ? Math.round((c.precio_contado-c.costo)/c.precio_contado*100) : null;
+    const stockColor = c.stock <= 0 ? 'var(--bad)' : c.stock <= 2 ? 'var(--wrn)' : 'var(--ok)';
+    return `<tr style="border-bottom:1px solid var(--bor)">
+      <td style="padding:9px 8px;font-weight:700;color:var(--tx);white-space:nowrap">${esc(c.medida)}</td>
+      <td style="padding:9px 8px;color:var(--tx)">${esc(c.marca)}</td>
+      <td style="padding:9px 8px"><span style="font-size:.72rem;font-weight:600;color:${segColor[c.segmento]||'var(--tx2)'};background:${segColor[c.segmento]||'var(--tx2)'}18;padding:2px 8px;border-radius:10px">${esc(c.segmento)}</span></td>
+      <td style="padding:9px 8px;text-align:right;font-weight:700;color:${stockColor}">${c.stock}</td>
+      <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.costo)}</td>
+      <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--gld)">${fmt(c.precio_contado)}${margen!==null?`<div style="font-size:.65rem;color:var(--ok);font-weight:400">${margen}% mg</div>`:''}</td>
+      <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.precio_3c)}</td>
+      <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.precio_6c)}</td>
+      <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.precio_12c)}</td>
+      <td style="padding:9px 8px;white-space:nowrap">
+        <button class="btn bsm be" onclick="abrirFormCubierta('${c.id}')">✎</button>
+        <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarCubierta('${c.id}')">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function abrirFormCubierta(id=null){
+  const c = id ? S.cubiertas.find(x=>x.id===id) : null;
+  document.getElementById('mCubTitle').textContent = c ? 'Editar cubierta' : 'Nueva cubierta';
+  document.getElementById('cubId').value = c?.id||'';
+  document.getElementById('cubMedida').value = c?.medida||'';
+  document.getElementById('cubMarca').value = c?.marca||'';
+  document.getElementById('cubSegmento').value = c?.segmento||'Media';
+  document.getElementById('cubStock').value = c?.stock??0;
+  document.getElementById('cubCosto').value = c?.costo||'';
+  document.getElementById('cubContado').value = c?.precio_contado||'';
+  document.getElementById('cubP3').value = c?.precio_3c||'';
+  document.getElementById('cubP6').value = c?.precio_6c||'';
+  document.getElementById('cubP12').value = c?.precio_12c||'';
+  openM('mCubierta');
+}
+
+async function guardarCubierta(){
+  const medida = (document.getElementById('cubMedida').value||'').trim();
+  const marca = (document.getElementById('cubMarca').value||'').trim();
+  if(!medida){ showToast('Ingresá la medida','err'); return; }
+  const contado = parseFloat(document.getElementById('cubContado').value)||0;
+  let p3 = parseFloat(document.getElementById('cubP3').value)||0;
+  let p6 = parseFloat(document.getElementById('cubP6').value)||0;
+  let p12 = parseFloat(document.getElementById('cubP12').value)||0;
+  if(!p3 && contado){ const cp=_calcCuotas(contado); p3=cp.p3; p6=cp.p6; p12=cp.p12; }
+  const existId = document.getElementById('cubId').value;
+  const c = {
+    id: existId || crypto.randomUUID(),
+    medida, marca,
+    segmento: document.getElementById('cubSegmento').value||'Media',
+    stock: parseInt(document.getElementById('cubStock').value)||0,
+    costo: parseFloat(document.getElementById('cubCosto').value)||0,
+    precio_contado: contado, precio_3c: p3, precio_6c: p6, precio_12c: p12
+  };
+  closeM('mCubierta');
+  const ok = await dbUpsertCubierta(c);
+  if(!ok){ showToast('Error al guardar. Verificá conexión.','err'); return; }
+  if(existId){ S.cubiertas = S.cubiertas.map(x=>x.id===existId?c:x); }
+  else { S.cubiertas.push(c); }
+  showToast((existId?'Cubierta actualizada':'Cubierta agregada')+' ✓');
+  rCubiertas();
+}
+
+async function eliminarCubierta(id){
+  if(!confirm('¿Eliminar esta cubierta del stock?')) return;
+  const ok = await dbDeleteCubierta(id);
+  if(!ok){ showToast('Error al eliminar','err'); return; }
+  S.cubiertas = S.cubiertas.filter(c=>c.id!==id);
+  showToast('Cubierta eliminada');
+  rCubiertas();
+}
+
 async function dbUpsertPedido(p){
   setSyncing();
   const row = {
@@ -4396,12 +4674,12 @@ async function loadAll(){
   try { localStorage.setItem('activeTenant', thisTenant); } catch(e){}
   document.getElementById('loadingScreen').style.display='flex';
   try{
-    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos] = await Promise.all([
+    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbLoad('mov_caja'),
-      dbLoadPedidos()
+      dbLoadPedidos(), dbLoadCubiertas()
     ]);
     S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
@@ -4453,6 +4731,7 @@ async function loadAll(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     S.pedidos=pedidos||[];
+    S.cubiertas=cubiertas||[];
     // Auto-precargar servicios para tenants nuevos (primer login tras confirmar email)
     if(currentRole === 'admin' && !S.precios.length && !S.reparaciones.length && !S.ventas.length && currentTenant?.rubro){
       const _pcKey = 'precargado_' + (currentTenant?.id||'');
@@ -4561,7 +4840,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:rCubiertas };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -14421,7 +14700,7 @@ function aplicarModulosPorRubro(rubro){
     showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
   } else if(esGomeria){
     // 🔧 GOMERÍA / NEUMÁTICOS
-    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-stock','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
+    showNav('nav-cubiertas','nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
   } else if(esBarberia){
     // ✂️ BARBERÍA
     showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
@@ -14680,7 +14959,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores,cubiertas:rCubiertas};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
     // Siempre actualizar badge de reservas pendientes (independiente de qué sección está activa)
     refreshBadgeSolicitudes();
