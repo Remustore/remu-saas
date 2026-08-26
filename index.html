@@ -4794,6 +4794,11 @@ async function dbDeleteServicioGomeria(id){
 }
 
 // ─── Render lista clientes gomería ───────────────────────────────────────────
+async function _iniciarClientesGomeria(){
+  S.clientesGomeria = await dbLoadClientesGomeria();
+  rClientesGomeria();
+}
+
 function rClientesGomeria(){
   const q = (document.getElementById('cliGomQ')?.value||'').toLowerCase();
   const tbody = document.getElementById('cliGomTbody');
@@ -5255,7 +5260,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:rClientesGomeria };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
