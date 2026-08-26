@@ -7492,6 +7492,7 @@ function rDash(){
   const rubD=(currentTenant?.rubro||'').toLowerCase();
   const esBarberiaD=esNegocioTurnos(rubD);
   const esGomeriaD=rubD.includes('gomeria')||rubD.includes('gomería')||rubD.includes('neumat')||rubD.includes('cubiert');
+  if(esGomeriaD){ rDashGomeria(); return; }
   // Para barberías/salones: ingresos de servicio desde getTurnos() (localStorage, sin duplicados).
   // S.ventas puede tener duplicados históricos → no usar para servicios en barberías.
   const tVProducto = esBarberiaD ? vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0) : 0;
@@ -7802,6 +7803,87 @@ function rAnalisis(){
   const mets={};vFilt.forEach(v=>{mets[v.metodo]=(mets[v.metodo]||0)+v.total;});
   const totP=Object.values(mets).reduce((a,b)=>a+b,0);
   document.getElementById('pagos').innerHTML=totP?Object.entries(mets).sort((a,b)=>b[1]-a[1]).map(([met,tot])=>{const p=Math.round(tot/totP*100);return`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.79rem"><span>${met}</span><span style="color:var(--gld);font-weight:600">${fmt(tot)} (${p}%)</span></div><div class="pb"><div class="pf" style="width:${p}%"></div></div></div>`;}).join(''):emp('💳','Sin ventas');
+}
+
+function rDashGomeria(){
+  const hoy = tod();
+  const mesActual = hoy.slice(0,7);
+
+  // Ventas de cubiertas del período
+  const vGom = filtrarDash(S.ventas.filter(v=>v.tipo==='cubierta'), 'fecha');
+  const tV   = vGom.reduce((a,v)=>a+v.total,0);
+  const tC   = vGom.reduce((a,v)=>a+(v.costo||0)*v.cantidad,0);
+  const tG   = filtrarDash(S.gastos,'fecha').reduce((a,g)=>a+g.monto,0);
+  const ganReal = tV - tC - tG;
+
+  // Servicios del mes (historial_gomeria)
+  const srvMes = (S.historialGomeria||[]).filter(h=>h.fecha&&h.fecha.startsWith(mesActual)).length;
+
+  // — Stats —
+  const filtLabel = getDFiltLabel();
+  document.getElementById('dStats').innerHTML=`
+    <div class="stat"><div class="sl">${filtLabel}</div><div class="sv" style="color:var(--ok)">${fmt(tV)}</div><div class="ss">${vGom.length} venta${vGom.length!==1?'s':''} de cubiertas</div></div>
+    <div class="stat"><div class="sl">Gastos del período</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div>
+    <div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${ganReal>=0?'var(--gld)':'var(--bad)'}"> ${fmt(ganReal)}</div></div>
+    <div class="stat"><div class="sl">🚗 Vehículos registrados</div><div class="sv" style="color:var(--wrn)">${S.clientesGomeria.length}</div><div class="ss">${srvMes} servicio${srvMes!==1?'s':''} este mes</div></div>`;
+
+  // — Meta —
+  const meta=S.meta||0, pct=meta>0?Math.min(100,Math.round(tV/meta*100)):0;
+  document.getElementById('metaArc').style.strokeDashoffset=157-(157*pct/100);
+  document.getElementById('mPct').textContent=pct+'%';
+  document.getElementById('mVal').textContent=fmt(meta);
+  document.getElementById('mVen').textContent=fmt(tV);
+
+  // — Flujo —
+  const mg = tV>0?Math.round(ganReal/tV*100):0;
+  document.getElementById('flujo').innerHTML=`
+    <div class="fi2"><span>Ventas cubiertas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>
+    <div class="fi2"><span>Costo de cubiertas</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div>
+    <div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div>
+    <div class="gl"></div>
+    <div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div>
+    <div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
+
+  // — Top cubiertas más vendidas —
+  const topSCard=document.getElementById('topSCard'); if(topSCard) topSCard.style.display='';
+  const cntCub={}; vGom.forEach(v=>{cntCub[v.nombre]=(cntCub[v.nombre]||0)+v.cantidad;});
+  const topCub=Object.entries(cntCub).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  document.getElementById('topS').innerHTML=topCub.length
+    ?topCub.map(([n,q],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${esc(n)}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${q} u</div></div>`).join('')
+    :emp('🛞','Sin ventas de cubiertas en este período');
+
+  // — Alertas —
+  const als=[];
+  // Cubiertas con stock bajo
+  const cubBajas = S.cubiertas.filter(c=>c.stock<=(c.minimo??2));
+  cubBajas.slice(0,4).forEach(c=>als.push({t:'w',m:`<strong>${esc(c.medida)}${c.marca?' '+esc(c.marca):''}</strong>: stock bajo (${c.stock} ud${c.stock!==1?'s':''})`}));
+  if(cubBajas.length>4) als.push({t:'w',m:`...y ${cubBajas.length-4} cubiertas más con stock bajo`});
+  // Cubiertas agotadas
+  const cubAgotadas = S.cubiertas.filter(c=>c.stock===0);
+  if(cubAgotadas.length) als.push({t:'b',m:`${cubAgotadas.length} cubierta${cubAgotadas.length!==1?'s':''} <strong>agotada${cubAgotadas.length!==1?'s':''}</strong>: ${cubAgotadas.slice(0,2).map(c=>esc(c.medida)).join(', ')}${cubAgotadas.length>2?'…':''}`});
+  // Próximos servicios en los próximos 30 días
+  const en30 = new Date(); en30.setDate(en30.getDate()+30); const en30s = en30.toISOString().slice(0,10);
+  const proxOk = (S.clientesGomeria||[]).filter(cli=>{
+    const ults = (S.historialGomeria||[]).filter(h=>h.cliente_id===cli.id).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+    const ult = ults[0]; return ult?.prox_fecha && ult.prox_fecha>=hoy && ult.prox_fecha<=en30s;
+  });
+  if(proxOk.length) als.push({t:'o',m:`${proxOk.length} cliente${proxOk.length!==1?'s':''} con servicio próximo en los próximos 30 días`});
+  // Resultado negativo
+  if(ganReal<0) als.push({t:'b',m:`Los gastos superan los ingresos en <strong>${fmt(Math.abs(ganReal))}</strong>`});
+  if(meta>0&&pct>=100) als.push({t:'o',m:`¡Meta de ${fmt(meta)} alcanzada! 🎉`});
+  document.getElementById('alerts').innerHTML=als.length
+    ?als.map(a=>`<div class="al ${a.t==='w'?'aw':a.t==='o'?'ao':'ab'}"><span>${a.t==='w'?'⚠':a.t==='o'?'✓':'✕'}</span><span>${a.m}</span></div>`).join('')
+    :`<div class="al ai"><span>✓</span><span>Sin alertas. Todo en orden.</span></div>`;
+
+  // — Consejos —
+  const cns=[];
+  if(cubBajas.length) cns.push({i:'📦',t:'Reponé stock',d:`Tenés ${cubBajas.length} cubierta${cubBajas.length!==1?'s':''} en o por debajo del mínimo. Aprovechá para hacer el pedido antes de quedarte sin.`});
+  if(mg<20&&tV>0) cns.push({i:'📊',t:'Revisá tus márgenes',d:'El margen está por debajo del 20%. Analizá si el precio de lista de cubiertas refleja el costo actual.'});
+  if(proxOk.length) cns.push({i:'📱',t:'Contactá clientes con servicio próximo',d:`${proxOk.length} cliente${proxOk.length!==1?'s tienen':' tiene'} servicio programado en los próximos 30 días. Recordales para que te elijan.`});
+  if(topCub.length) cns.push({i:'⭐',t:`Más vendida: ${topCub[0][0]}`,d:'Asegurate de tener siempre stock de tu cubierta más vendida.'});
+  if(ganReal>0) cns.push({i:'🏦',t:'Resultado positivo',d:'Guardá un 20% del resultado neto como fondo de emergencia del negocio.'});
+  if(!cns.length) cns.push({i:'💼',t:'Seguí cargando operaciones',d:'Con más datos el sistema te dará consejos personalizados para hacer crecer tu gomería.'});
+  document.getElementById('cons').innerHTML=cns.slice(0,4).map(c=>`<div class="co"><span class="coi">${c.i}</span><div class="cot"><strong>${c.t}</strong>${c.d}</div></div>`).join('');
 }
 
 function rAnalisisGomeria(){
