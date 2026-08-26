@@ -1920,6 +1920,7 @@ $$;</pre>
               <option>Económica</option><option>Media</option><option>Premium</option><option>Deportiva</option><option>Moto</option>
             </select>
           </div>
+          <button class="btn bgh" onclick="abrirPresupuestoGom()">📋 Presupuesto</button>
           <button class="btn bg" onclick="abrirFormCubierta()">+ Agregar cubierta</button>
         </div>
         <div style="overflow-x:auto;margin-top:4px">
@@ -2033,6 +2034,100 @@ $$;</pre>
   </div>
 </div>
 <div class="mf"><button class="btn" onclick="closeM('mCubierta')">Cancelar</button><button class="btn bg" onclick="guardarCubierta()">Guardar cubierta</button></div>
+</div></div>
+
+<!-- GOMERÍA: Reposición de stock -->
+<div class="mb" id="mReposCub"><div class="md" style="max-width:360px">
+  <div class="mh"><div class="mt2">📦 Reponer stock</div><button class="xbtn" onclick="closeM('mReposCub')">✕</button></div>
+  <div class="mc" style="display:flex;flex-direction:column;gap:12px">
+    <input type="hidden" id="rcCubId">
+    <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:10px;padding:12px 14px">
+      <div id="rcNombre" style="font-weight:700;font-size:.95rem"></div>
+      <div id="rcStockActual" style="font-size:.8rem;color:var(--tx2);margin-top:3px"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Unidades a agregar</label>
+        <input type="number" id="rcCant" value="1" min="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:1.2rem;font-weight:700;text-align:center">
+      </div>
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Costo unitario ($)</label>
+        <input type="number" id="rcCosto" min="0" placeholder="0" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem;text-align:right">
+      </div>
+    </div>
+    <div>
+      <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Proveedor <span style="color:var(--mut);font-weight:400">(opcional)</span></label>
+      <input type="text" id="rcProveedor" placeholder="Nombre del proveedor" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem">
+    </div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeM('mReposCub')">Cancelar</button>
+    <button class="btn bg" onclick="confirmarReposicion()">✓ Confirmar ingreso</button>
+  </div>
+</div></div>
+
+<!-- GOMERÍA: Presupuesto -->
+<div class="mb" id="mPresupGom"><div class="md" style="max-width:420px">
+  <div class="mh"><div class="mt2">📋 Presupuesto</div><button class="xbtn" onclick="closeM('mPresupGom')">✕</button></div>
+  <div class="mc" style="display:flex;flex-direction:column;gap:12px">
+    <input type="hidden" id="pgCubId">
+    <!-- Buscar cubierta -->
+    <div>
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Cubierta</label>
+      <input type="text" id="pgBuscar" placeholder="Buscá medida o marca..." autocomplete="off"
+        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem"
+        oninput="pgBuscarCub(this.value)">
+      <div id="pgSugg" style="display:none;border:1px solid var(--bor);border-radius:8px;margin-top:4px;overflow:hidden;max-height:160px;overflow-y:auto;background:var(--bg2)"></div>
+    </div>
+    <!-- Cubierta seleccionada -->
+    <div id="pgSelBox" style="display:none;background:var(--bg2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px">
+      <div id="pgNombre" style="font-weight:700;font-size:.95rem"></div>
+      <div id="pgPrecios" style="font-size:.8rem;color:var(--tx2);margin-top:4px"></div>
+    </div>
+    <!-- Cantidad y cuotas -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Cantidad</label>
+        <input type="number" id="pgCant" value="4" min="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:1.1rem;font-weight:700;text-align:center" oninput="pgActualizar()">
+      </div>
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Modalidad</label>
+        <select id="pgCuotas" onchange="pgActualizar()" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.82rem">
+          <option value="contado">Contado</option>
+          <option value="3c">3 cuotas</option>
+          <option value="6c">6 cuotas</option>
+          <option value="12c">12 cuotas</option>
+        </select>
+      </div>
+    </div>
+    <!-- Mano de obra -->
+    <div>
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Mano de obra ($) <span style="color:var(--mut);font-weight:400">opcional</span></label>
+      <input type="number" id="pgManoObra" value="0" min="0" placeholder="0" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem;text-align:right" oninput="pgActualizar()">
+    </div>
+    <!-- Total -->
+    <div id="pgTotalBox" style="display:none;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px">
+      <div id="pgDetalle" style="font-size:.78rem;color:var(--tx2);margin-bottom:8px"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px">Total</span>
+        <span id="pgTotal" style="font-size:1.6rem;font-weight:900;color:var(--gld)"></span>
+      </div>
+    </div>
+    <!-- Cliente (para WA) -->
+    <div>
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Cliente <span style="color:var(--mut);font-weight:400">y teléfono (para WhatsApp)</span></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input type="text" id="pgCliNom" placeholder="Nombre del cliente" style="padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem">
+        <input type="tel" id="pgCliTel" placeholder="11 2345 6789" oninput="pgActualizar()" style="padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem">
+      </div>
+    </div>
+  </div>
+  <div class="mf" style="flex-wrap:wrap;gap:8px">
+    <button class="btn" onclick="closeM('mPresupGom')">Cancelar</button>
+    <button class="btn bgh" id="pgWaBtn" onclick="pgEnviarWA()" disabled>💬 Enviar WA</button>
+    <button class="btn bgh" onclick="pgImprimir()">🖨 Imprimir</button>
+    <button class="btn bg" id="pgVentaBtn" onclick="pgConfirmarVenta()" disabled>✓ Confirmar venta</button>
+  </div>
 </div></div>
 
 <!-- GOMERÍA: Formulario cliente -->
@@ -4702,6 +4797,8 @@ function rCubiertas(){
       <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.precio_12c)}</td>
       <td style="padding:9px 8px;white-space:nowrap">
         <button class="btn bsm" style="color:var(--ok);border-color:rgba(76,175,125,.3);background:rgba(76,175,125,.08)" onclick="abrirVentaDesdeCubierta('${c.id}')">🛒 Vender</button>
+        <button class="btn bsm" style="color:var(--inf);border-color:rgba(100,149,237,.3);background:rgba(100,149,237,.08)" onclick="abrirReposicion('${c.id}')">📦 Reponer</button>
+        <button class="btn bsm" style="color:var(--tx2);border-color:rgba(100,149,237,.3);background:rgba(100,149,237,.08)" onclick="abrirPresupuestoGom('${c.id}')">📋</button>
         <button class="btn bsm be" onclick="abrirFormCubierta('${c.id}')">✎</button>
         <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarCubierta('${c.id}')">✕</button>
       </td>
@@ -5620,6 +5717,186 @@ function abrirVentaDesdeCubierta(cubId){
   document.getElementById('vrSugg').style.display = 'none';
   document.getElementById('vrCant').value = 1;
   vrSeleccionarProd('cub_'+cubId);
+}
+
+// ── Reposición de stock cubiertas ─────────────────────────────────────────
+function abrirReposicion(cubId){
+  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
+  if(!cub) return;
+  document.getElementById('rcCubId').value = cub.id;
+  document.getElementById('rcNombre').textContent = cub.medida+(cub.marca?' — '+cub.marca:'');
+  document.getElementById('rcStockActual').textContent = `Stock actual: ${cub.stock} unidades · Mínimo: ${cub.minimo??2}`;
+  document.getElementById('rcCant').value = 1;
+  document.getElementById('rcCosto').value = cub.costo||'';
+  document.getElementById('rcProveedor').value = '';
+  openM('mReposCub', null);
+  setTimeout(()=>document.getElementById('rcCant').focus(), 80);
+}
+
+async function confirmarReposicion(){
+  const cubId = document.getElementById('rcCubId').value;
+  const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===String(cubId));
+  if(ci<0) return;
+  const cant = parseInt(document.getElementById('rcCant').value)||0;
+  if(cant<=0){ showToast('Ingresá una cantidad válida','err'); return; }
+  const costo = parseFloat(document.getElementById('rcCosto').value)||0;
+  S.cubiertas[ci].stock += cant;
+  if(costo>0) S.cubiertas[ci].costo = costo; // actualiza costo si viene distinto
+  const ok = await dbUpsertCubierta(S.cubiertas[ci]);
+  if(!ok){ S.cubiertas[ci].stock -= cant; showToast('Error al guardar','err'); return; }
+  closeM('mReposCub');
+  showToast(`✓ +${cant} unidades ingresadas — stock actual: ${S.cubiertas[ci].stock}`);
+  rCubiertas();
+}
+
+// ── Presupuesto Gomería ────────────────────────────────────────────────────
+function abrirPresupuestoGom(cubId){
+  openM('mPresupGom', null);
+  document.getElementById('pgBuscar').value = '';
+  document.getElementById('pgSugg').style.display = 'none';
+  document.getElementById('pgSelBox').style.display = 'none';
+  document.getElementById('pgTotalBox').style.display = 'none';
+  document.getElementById('pgCubId').value = '';
+  document.getElementById('pgCant').value = 4;
+  document.getElementById('pgCuotas').value = 'contado';
+  document.getElementById('pgManoObra').value = 0;
+  document.getElementById('pgCliNom').value = '';
+  document.getElementById('pgCliTel').value = '';
+  document.getElementById('pgWaBtn').disabled = true;
+  document.getElementById('pgVentaBtn').disabled = true;
+  if(cubId){
+    const cub = S.cubiertas.find(c=>String(c.id)===String(cubId));
+    if(cub){ document.getElementById('pgBuscar').value = cub.medida+(cub.marca?' — '+cub.marca:''); pgSeleccionarCub(cub.id); }
+  } else {
+    setTimeout(()=>{ pgBuscarCub(''); document.getElementById('pgBuscar').focus(); }, 100);
+  }
+}
+
+function pgBuscarCub(q){
+  const box = document.getElementById('pgSugg');
+  const ql = (q||'').toLowerCase();
+  const lista = (S.cubiertas||[])
+    .filter(c=>c.stock>0 && (!ql || c.medida.toLowerCase().includes(ql)||(c.marca||'').toLowerCase().includes(ql)))
+    .slice(0,8);
+  if(!lista.length){ box.style.display='none'; return; }
+  box.innerHTML = lista.map(c=>`<div onclick="pgSeleccionarCub('${c.id}')"
+    style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center"
+    onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+    <span style="font-size:.88rem">${esc(c.medida+(c.marca?' — '+c.marca:''))}</span>
+    <span style="font-size:.8rem;color:var(--gld);font-weight:700">${fmt(c.precio_contado)}</span>
+  </div>`).join('');
+  box.style.display='block';
+}
+
+function pgSeleccionarCub(cubId){
+  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
+  if(!cub) return;
+  document.getElementById('pgCubId').value = cub.id;
+  document.getElementById('pgBuscar').value = cub.medida+(cub.marca?' — '+cub.marca:'');
+  document.getElementById('pgSugg').style.display = 'none';
+  document.getElementById('pgNombre').textContent = cub.medida+(cub.marca?' — '+cub.marca:'');
+  document.getElementById('pgPrecios').innerHTML =
+    `Contado: <strong>${fmt(cub.precio_contado)}</strong> · 3c: ${fmt(cub.precio_3c)} · 6c: ${fmt(cub.precio_6c)} · 12c: ${fmt(cub.precio_12c)} · Stock: ${cub.stock}`;
+  document.getElementById('pgSelBox').style.display = 'block';
+  document.getElementById('pgVentaBtn').disabled = false;
+  pgActualizar();
+}
+
+function pgActualizar(){
+  const cubId = document.getElementById('pgCubId').value;
+  if(!cubId){ document.getElementById('pgTotalBox').style.display='none'; return; }
+  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
+  if(!cub) return;
+  const cuotas = document.getElementById('pgCuotas').value;
+  const cant = parseInt(document.getElementById('pgCant').value)||1;
+  const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+  const totalCub = pCub * cant;
+  const totalFinal = totalCub + manoObra;
+  const modLabel = cuotas==='contado'?'Contado':cuotas==='3c'?'3 cuotas':cuotas==='6c'?'6 cuotas':'12 cuotas';
+  document.getElementById('pgDetalle').innerHTML =
+    `${cant} x ${esc(cub.medida)} (${modLabel}): ${fmt(totalCub)}${manoObra>0?`<br>Mano de obra: ${fmt(manoObra)}`:''}`;
+  document.getElementById('pgTotal').textContent = fmt(totalFinal);
+  document.getElementById('pgTotalBox').style.display = 'block';
+  const tel = document.getElementById('pgCliTel').value.trim();
+  document.getElementById('pgWaBtn').disabled = !tel;
+}
+
+function pgEnviarWA(){
+  const cubId = document.getElementById('pgCubId').value;
+  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
+  if(!cub) return;
+  const cant = parseInt(document.getElementById('pgCant').value)||1;
+  const cuotas = document.getElementById('pgCuotas').value;
+  const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+  const totalFinal = pCub * cant + manoObra;
+  const modLabel = cuotas==='contado'?'al contado':cuotas==='3c'?'en 3 cuotas':cuotas==='6c'?'en 6 cuotas':'en 12 cuotas';
+  const cliente = document.getElementById('pgCliNom').value.trim() || 'Cliente';
+  const tel = document.getElementById('pgCliTel').value.replace(/\D/g,'');
+  const negocio = currentTenant?.nombre || 'nuestra gomería';
+  let msg = `🛞 *Presupuesto de ${negocio}*\n\n`;
+  msg += `Hola ${cliente}! Te enviamos el presupuesto:\n\n`;
+  msg += `• ${cant}x *${cub.medida}${cub.marca?' '+cub.marca:''}*\n`;
+  msg += `  Precio ${modLabel}: *${fmt(pCub)} c/u*\n`;
+  if(manoObra>0) msg += `• Mano de obra: *${fmt(manoObra)}*\n`;
+  msg += `\n💰 *Total: ${fmt(totalFinal)}*\n`;
+  msg += `\nCualquier consulta estamos a disposición. ¡Gracias!`;
+  window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function pgImprimir(){
+  const cubId = document.getElementById('pgCubId').value;
+  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
+  const cant = parseInt(document.getElementById('pgCant').value)||1;
+  const cuotas = document.getElementById('pgCuotas').value;
+  const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const cliente = document.getElementById('pgCliNom').value.trim()||'—';
+  const negocio = currentTenant?.nombre || 'Gomería';
+  const pCub = cub?(cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado):0;
+  const totalFinal = pCub*cant+manoObra;
+  const modLabel = cuotas==='contado'?'Contado':cuotas==='3c'?'3 cuotas':cuotas==='6c'?'6 cuotas':'12 cuotas';
+  const w = window.open('','_blank','width=600,height=700');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Presupuesto</title>
+  <style>body{font-family:Arial,sans-serif;padding:32px;color:#222;max-width:520px;margin:auto}
+  h2{margin:0 0 4px}p{margin:4px 0;color:#555;font-size:.9rem}.lin{border-top:1px solid #ddd;margin:16px 0}
+  .row{display:flex;justify-content:space-between;padding:7px 0;font-size:.95rem}
+  .total{font-size:1.3rem;font-weight:700;color:#1a1a1a}.footer{margin-top:24px;font-size:.8rem;color:#888;text-align:center}
+  @media print{body{padding:16px}}</style></head><body>
+  <h2>${negocio}</h2><p>Presupuesto · ${new Date().toLocaleDateString('es-AR')}</p>
+  <div class="lin"></div>
+  <div class="row"><span>Cliente</span><span>${cliente}</span></div>
+  ${cub?`<div class="row"><span>${cant}x ${cub.medida}${cub.marca?' '+cub.marca:''} (${modLabel})</span><span>${fmt(pCub)} c/u</span></div>`:''}
+  ${manoObra>0?`<div class="row"><span>Mano de obra</span><span>${fmt(manoObra)}</span></div>`:''}
+  <div class="lin"></div>
+  <div class="row total"><span>TOTAL</span><span>${fmt(totalFinal)}</span></div>
+  <div class="footer">Presupuesto generado con Remu Gestión · remugestion.ar<br>Válido por 48 horas sujeto a disponibilidad de stock</div>
+  <script>window.onload=()=>window.print()<\/script></body></html>`);
+  w.document.close();
+}
+
+async function pgConfirmarVenta(){
+  const cubId = document.getElementById('pgCubId').value;
+  if(!cubId) return;
+  const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===String(cubId));
+  if(ci<0) return;
+  const cub = S.cubiertas[ci];
+  const cant = parseInt(document.getElementById('pgCant').value)||1;
+  if(cant > cub.stock){ showToast('Stock insuficiente (disponible: '+cub.stock+')','err'); return; }
+  const cuotas = document.getElementById('pgCuotas').value;
+  const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+  const total = pCub * cant + manoObra;
+  if(!confirm(`¿Confirmar venta por ${fmt(total)}? Esto descuenta ${cant} unidad${cant!==1?'es':''} de stock.`)) return;
+  const venta = {id:Date.now(),tipo:'cubierta',nombre:cub.medida+(cub.marca?' — '+cub.marca:''),cubId:cub.id,
+    cantidad:cant,precio:pCub,total,costo:cub.costo||0,metodo:'Efectivo',fecha:tod(),cuotas,comPct:0,comision:0};
+  S.ventas.push(venta);
+  await dbUpsert('ventas',venta);
+  S.cubiertas[ci].stock -= cant;
+  await dbUpsertCubierta(S.cubiertas[ci]);
+  closeM('mPresupGom');
+  showToast('✓ Venta confirmada — '+fmt(total));
+  rVentas(); rCubiertas();
 }
 
 function vrBuscarProd(q){
