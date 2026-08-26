@@ -5124,8 +5124,8 @@ function rClientesGomeria(){
     const ult=hist[0]; if(!ult) return false;
     return (ult.prox_fecha&&ult.prox_fecha<=en60dias)||(ult.prox_km>0&&c.km>0&&(ult.prox_km-c.km)<=2000&&ult.prox_km>=c.km);
   }).length;
-  const badge=document.getElementById('cliRecBadge');
-  if(badge){ badge.textContent=urgentes; badge.style.display=urgentes?'':'none'; }
+  const recBadge=document.getElementById('cliRecBadge');
+  if(recBadge){ recBadge.textContent=urgentes; recBadge.style.display=urgentes?'':'none'; }
 
   // Si estamos en la pestaña recordatorios, refrescar
   if(_cliGomTab==='recordatorios'){ rRecordatoriosGom(); return; }
