@@ -4567,6 +4567,7 @@ async function dbLoadPedidos(){
 async function dbLoadCubiertas(){
   try{
     const { data, error } = await sb.from('cubiertas').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
+    console.log('[cubiertas] data:', data, 'error:', error);
     if(error) throw error;
     return (data||[]).map(r => ({ id:r.id, medida:r.medida||'', marca:r.marca||'', segmento:r.segmento||'Media', stock:r.stock||0, costo:r.costo||0, precio_contado:r.precio_contado||0, precio_3c:r.precio_3c||0, precio_6c:r.precio_6c||0, precio_12c:r.precio_12c||0 }));
   }catch(e){ console.error('[cubiertas] load error', e); return []; }
