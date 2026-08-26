@@ -1907,6 +1907,9 @@ $$;</pre>
         <div style="font-size:.72rem;color:var(--mut);margin-top:8px">Ejemplo: contado $100.000 → 3c <span id="cubEjC3">$115.000</span> · 6c <span id="cubEjC6">$130.000</span> · 12c <span id="cubEjC12">$160.000</span></div>
       </div>
 
+      <!-- Alerta stock bajo cubiertas -->
+      <div id="cubStockBanner" style="display:none;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.82rem;color:var(--bad)"></div>
+
       <!-- Filtros + agregar -->
       <div class="card">
         <div class="ch" style="flex-wrap:wrap;gap:10px">
@@ -2013,6 +2016,7 @@ $$;</pre>
   </div>
   <div class="fr" style="margin-top:10px">
     <div><label>Stock (unidades)</label><input id="cubStock" type="number" min="0" value="0" placeholder="0" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:center"></div>
+    <div><label>Stock mínimo <span style="color:var(--mut);font-weight:400;font-size:.68rem">(alerta)</span></label><input id="cubMinimo" type="number" min="0" value="2" placeholder="2" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:center"></div>
     <div><label>Precio costo ($)</label><input id="cubCosto" type="number" min="0" placeholder="0" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:right" oninput="_cubAutoCalc()"></div>
     <div><label>Precio contado ($)</label><input id="cubContado" type="number" min="0" placeholder="0" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;text-align:right;border-color:var(--gld)" oninput="_cubAutoCalc()"></div>
   </div>
@@ -4587,14 +4591,14 @@ async function dbLoadCubiertas(){
   try{
     const { data, error } = await sb.from('cubiertas').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
     if(error) throw error;
-    return (data||[]).map(r => ({ id:r.id, medida:r.medida||'', marca:r.marca||'', segmento:r.segmento||'Media', stock:r.stock||0, costo:r.costo||0, precio_contado:r.precio_contado||0, precio_3c:r.precio_3c||0, precio_6c:r.precio_6c||0, precio_12c:r.precio_12c||0 }));
+    return (data||[]).map(r => ({ id:r.id, medida:r.medida||'', marca:r.marca||'', segmento:r.segmento||'Media', stock:r.stock||0, minimo:r.minimo??2, costo:r.costo||0, precio_contado:r.precio_contado||0, precio_3c:r.precio_3c||0, precio_6c:r.precio_6c||0, precio_12c:r.precio_12c||0 }));
   }catch(e){ console.error('[cubiertas] load error', e); return []; }
 }
 
 async function dbUpsertCubierta(c){
   setSyncing();
   try{
-    const row = { id:c.id, tenant_id: currentTenant.id, medida:c.medida, marca:c.marca, segmento:c.segmento, stock:c.stock, costo:c.costo, precio_contado:c.precio_contado, precio_3c:c.precio_3c, precio_6c:c.precio_6c, precio_12c:c.precio_12c };
+    const row = { id:c.id, tenant_id: currentTenant.id, medida:c.medida, marca:c.marca, segmento:c.segmento, stock:c.stock, minimo:c.minimo??2, costo:c.costo, precio_contado:c.precio_contado, precio_3c:c.precio_3c, precio_6c:c.precio_6c, precio_12c:c.precio_12c };
     const { error } = await sb.from('cubiertas').upsert(row, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
@@ -4659,6 +4663,17 @@ function rCubiertas(){
   const badge = document.getElementById('cubBadge');
   if(badge){ badge.textContent=S.cubiertas.length; badge.style.display=S.cubiertas.length?'':'none'; }
 
+  // Banner de stock bajo
+  const banner = document.getElementById('cubStockBanner');
+  if(banner){
+    const bajas = S.cubiertas.filter(c=>c.stock <= (c.minimo??2));
+    if(bajas.length){
+      const items = bajas.slice(0,5).map(c=>`${esc(c.medida)}${c.marca?' '+esc(c.marca):''} (${c.stock} ud${c.stock!==1?'s':''})`).join(', ');
+      banner.innerHTML = `⚠ <strong>${bajas.length} cubierta${bajas.length!==1?'s':''} con stock bajo:</strong> ${items}${bajas.length>5?` y ${bajas.length-5} más`:''}`;
+      banner.style.display='block';
+    } else { banner.style.display='none'; }
+  }
+
   const tbody = document.getElementById('cubTbody');
   const empty = document.getElementById('cubEmpty');
   if(!tbody) return;
@@ -4673,7 +4688,8 @@ function rCubiertas(){
   const segColor = {Económica:'var(--ok)',Media:'var(--inf)',Premium:'var(--gld)',Deportiva:'#b08ad4',Moto:'var(--wrn)'};
   tbody.innerHTML = lista.map(c => {
     const margen = c.precio_contado > 0 && c.costo > 0 ? Math.round((c.precio_contado-c.costo)/c.precio_contado*100) : null;
-    const stockColor = c.stock <= 0 ? 'var(--bad)' : c.stock <= 2 ? 'var(--wrn)' : 'var(--ok)';
+    const min = c.minimo??2;
+    const stockColor = c.stock <= 0 ? 'var(--bad)' : c.stock <= min ? 'var(--wrn)' : 'var(--ok)';
     return `<tr style="border-bottom:1px solid var(--bor)">
       <td style="padding:9px 8px;font-weight:700;color:var(--tx);white-space:nowrap">${esc(c.medida)}</td>
       <td style="padding:9px 8px;color:var(--tx)">${esc(c.marca)}</td>
@@ -4706,6 +4722,7 @@ function abrirFormCubierta(id=null){
   document.getElementById('cubMarca').value = c?.marca||'';
   document.getElementById('cubSegmento').value = c?.segmento||'Media';
   document.getElementById('cubStock').value = c?.stock??0;
+  document.getElementById('cubMinimo').value = c?.minimo??2;
   document.getElementById('cubCosto').value = c?.costo||'';
   document.getElementById('cubContado').value = c?.precio_contado||'';
   document.getElementById('cubP3').value = c?.precio_3c||'';
@@ -4729,6 +4746,7 @@ async function guardarCubierta(){
     medida, marca,
     segmento: document.getElementById('cubSegmento').value||'Media',
     stock: parseInt(document.getElementById('cubStock').value)||0,
+    minimo: parseInt(document.getElementById('cubMinimo').value)||2,
     costo: parseFloat(document.getElementById('cubCosto').value)||0,
     precio_contado: contado, precio_3c: p3, precio_6c: p6, precio_12c: p12
   };
