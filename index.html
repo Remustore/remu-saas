@@ -1951,6 +1951,7 @@ $$;</pre>
           <div class="srch"><span>⌕</span><input id="cliGomQ" placeholder="Buscar por nombre, patente o teléfono..." oninput="rClientesGomeria()"></div>
           <button class="btn bg" onclick="abrirFormClienteGomeria()">+ Nuevo cliente</button>
         </div>
+        <div id="cliGomAlertas" style="display:none;margin-top:12px;padding:12px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:10px"></div>
         <div style="overflow-x:auto;margin-top:8px">
           <table style="width:100%;border-collapse:collapse;font-size:.8rem;min-width:600px">
             <thead>
@@ -1960,7 +1961,7 @@ $$;</pre>
                 <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Teléfono</th>
                 <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Vehículo</th>
                 <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">Visitas</th>
-                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Última visita</th>
+                <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Última visita / Próximo</th>
                 <th style="padding:9px 8px"></th>
               </tr>
             </thead>
@@ -2094,6 +2095,14 @@ $$;</pre>
     </div>
   </div>
   <div><label>Observaciones del servicio</label><input id="srvGomObs" placeholder="Detalles adicionales..."></div>
+  <div style="border-top:1px solid var(--bor);padding-top:12px;margin-top:4px">
+    <div style="font-size:.72rem;color:var(--gld);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:8px">Próximo servicio recomendado</div>
+    <div class="fr">
+      <div><label>Servicio a realizar</label><input id="srvGomProxTipo" placeholder="Ej: Rotación, cambio aceite..."></div>
+      <div><label>Fecha estimada</label><input id="srvGomProxFecha" type="date"></div>
+    </div>
+    <div><label>KM estimado (opcional)</label><input id="srvGomProxKm" type="number" placeholder="Ej: 55000"></div>
+  </div>
 </div>
 <div class="mf"><button class="btn" onclick="closeM('mServicioGomeria')">Cancelar</button><button class="btn bg" onclick="guardarServicioGomeria()">Registrar servicio</button></div>
 </div></div>
@@ -2153,6 +2162,16 @@ $$;</pre>
       <div id="vrSelBox" style="display:none;background:var(--bg2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px">
         <div id="vrNombre" style="font-weight:700;font-size:.95rem"></div>
         <div id="vrPrecioLabel" style="color:var(--gld);font-weight:700;font-size:.85rem;margin-top:2px"></div>
+      </div>
+      <!-- Modalidad cuotas (solo cubiertas) -->
+      <div id="vrCuotasBox" style="display:none">
+        <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Modalidad de pago</label>
+        <select id="vrCuotas" onchange="vrActualizarTotal()" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.82rem">
+          <option value="contado">Contado</option>
+          <option value="3c">3 cuotas</option>
+          <option value="6c">6 cuotas</option>
+          <option value="12c">12 cuotas</option>
+        </select>
       </div>
       <!-- Cantidad y método -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -4666,6 +4685,7 @@ function rCubiertas(){
       <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.precio_6c)}</td>
       <td style="padding:9px 8px;text-align:right;color:var(--tx2)">${fmt(c.precio_12c)}</td>
       <td style="padding:9px 8px;white-space:nowrap">
+        <button class="btn bsm" style="color:var(--ok);border-color:rgba(76,175,125,.3);background:rgba(76,175,125,.08)" onclick="abrirVentaDesdeCubierta('${c.id}')">🛒 Vender</button>
         <button class="btn bsm be" onclick="abrirFormCubierta('${c.id}')">✎</button>
         <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarCubierta('${c.id}')">✕</button>
       </td>
@@ -4771,7 +4791,8 @@ async function dbLoadHistorialGomeria(clienteId){
       id:r.id, cliente_id:r.cliente_id, fecha:r.fecha||'', km:r.km||0,
       tipo:r.tipo||'', medida:r.medida||'', marca:r.marca||'',
       cant_cubiertas:r.cant_cubiertas||0, km_rotacion:r.km_rotacion||0,
-      precio:r.precio||0, pago:r.pago||'Efectivo', obs:r.obs||''
+      precio:r.precio||0, pago:r.pago||'Efectivo', obs:r.obs||'',
+      prox_servicio:r.prox_servicio||'', prox_fecha:r.prox_fecha||null, prox_km:r.prox_km||0
     }));
   }catch(e){ console.error('[historialGomeria] load error', e); return []; }
 }
@@ -4779,7 +4800,7 @@ async function dbLoadHistorialGomeria(clienteId){
 async function dbUpsertServicioGomeria(s){
   setSyncing();
   try{
-    const row = { id:s.id, tenant_id:currentTenant.id, cliente_id:s.cliente_id, fecha:s.fecha, km:s.km, tipo:s.tipo, medida:s.medida, marca:s.marca, cant_cubiertas:s.cant_cubiertas, km_rotacion:s.km_rotacion, precio:s.precio, pago:s.pago, obs:s.obs };
+    const row = { id:s.id, tenant_id:currentTenant.id, cliente_id:s.cliente_id, fecha:s.fecha, km:s.km, tipo:s.tipo, medida:s.medida, marca:s.marca, cant_cubiertas:s.cant_cubiertas, km_rotacion:s.km_rotacion, precio:s.precio, pago:s.pago, obs:s.obs, prox_servicio:s.prox_servicio||'', prox_fecha:s.prox_fecha||null, prox_km:s.prox_km||0 };
     const { error } = await sb.from('historial_gomeria').insert(row);
     if(error) throw error;
     setSynced(); return true;
@@ -4814,19 +4835,79 @@ function rClientesGomeria(){
   });
 
   if(badge){ badge.textContent=S.clientesGomeria.length; badge.style.display=S.clientesGomeria.length?'':'none'; }
+
+  // Alertas de próximos servicios
+  const hoy = tod();
+  const en60dias = new Date(Date.now()+60*24*60*60*1000).toISOString().slice(0,10);
+  const alertasEl = document.getElementById('cliGomAlertas');
+  if(alertasEl){
+    const alertas = S.clientesGomeria.map(c=>{
+      const hist = (S.historialGomeria||[]).filter(h=>h.cliente_id===c.id).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+      const ult = hist[0];
+      if(!ult) return null;
+      const porFecha = ult.prox_fecha && ult.prox_fecha<=en60dias;
+      const porKm = ult.prox_km>0 && c.km>0 && (ult.prox_km - c.km) <= 2000 && ult.prox_km >= c.km;
+      if(!porFecha && !porKm) return null;
+      const vencido = ult.prox_fecha && ult.prox_fecha<hoy;
+      return {c, ult, porFecha, porKm, vencido};
+    }).filter(Boolean);
+
+    if(alertas.length){
+      alertasEl.style.display='';
+      alertasEl.innerHTML = `<div style="font-size:.72rem;font-weight:700;color:var(--wrn);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">⏰ Próximos servicios (${alertas.length})</div>` +
+        alertas.map(({c,ult,porFecha,porKm,vencido})=>{
+          const color = vencido?'var(--bad)':porKm?'var(--wrn)':'var(--gld)';
+          const detalle = ult.prox_servicio||'servicio programado';
+          const cuando = [porFecha&&ult.prox_fecha?_fmtFechaCorta(ult.prox_fecha):'',porKm&&ult.prox_km?ult.prox_km.toLocaleString()+' km':''].filter(Boolean).join(' / ');
+          const negocio = currentTenant?.nombre||'la gomería';
+          const veh = [c.marca_veh,c.modelo].filter(Boolean).join(' ')||c.patente;
+          const cuandoMsg = [ult.prox_fecha?`el ${_fmtFechaCorta(ult.prox_fecha)}`:'',ult.prox_km?`a los ${ult.prox_km.toLocaleString()} km`:''].filter(Boolean).join(' o ');
+          const waMsg = `Hola${c.nombre?' '+c.nombre:''}! 👋 Te escribimos de ${negocio}. Según nuestros registros, tu vehículo ${veh} (${c.patente}) tiene pendiente: *${detalle}*${cuandoMsg?' para '+cuandoMsg:''}. Avisanos cuando quieras coordinarlo. 🔧`;
+          const telFmt = (c.tel||'').replace(/\D/g,'');
+          const waBtn = telFmt
+            ? `<a href="https://wa.me/549${telFmt}?text=${encodeURIComponent(waMsg)}" target="_blank" class="btn bsm" style="background:rgba(37,211,102,.15);color:#25d366;border:1px solid rgba(37,211,102,.3);white-space:nowrap;flex-shrink:0">💬 WA</a>`
+            : '';
+          return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:var(--bg2);border:1px solid ${color}33;border-radius:8px;margin-bottom:6px">
+            <div style="flex:1;min-width:0">
+              <span style="font-weight:700;font-size:.82rem">${esc(c.patente)}</span>
+              <span style="color:var(--tx2);font-size:.78rem"> · ${esc(c.nombre||'')}</span>
+              <div style="font-size:.75rem;color:${color};font-weight:600;margin-top:1px">${esc(detalle)}${cuando?' — '+cuando:''}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-shrink:0;margin-left:8px">
+              ${waBtn}
+              <button class="btn bsm" onclick="verHistorialGomeria('${c.id}')">Ver</button>
+            </div>
+          </div>`;
+        }).join('');
+    } else {
+      alertasEl.style.display='none';
+      alertasEl.innerHTML='';
+    }
+  }
+
   if(!lista.length){ tbody.innerHTML=''; if(empty) empty.style.display=''; return; }
   if(empty) empty.style.display='none';
 
   tbody.innerHTML = lista.map(c=>{
-    const visitas = (S.historialGomeria||[]).filter(h=>h.cliente_id===c.id).length;
-    const ultima = (S.historialGomeria||[]).filter(h=>h.cliente_id===c.id).sort((a,b)=>b.fecha.localeCompare(a.fecha))[0];
+    const hist = (S.historialGomeria||[]).filter(h=>h.cliente_id===c.id);
+    const visitas = hist.length;
+    const ultima = hist.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''))[0];
+    const proxSrv = ultima?.prox_servicio;
+    const proxFecha = ultima?.prox_fecha;
+    const proxKm = ultima?.prox_km;
+    const alertaFecha = proxFecha && proxFecha<=en60dias;
+    const alertaKm = proxKm>0 && c.km>0 && (proxKm-c.km)<=2000 && proxKm>=c.km;
+    const alerta = alertaFecha||alertaKm;
+    const proxHtml = proxSrv
+      ? `<div style="font-size:.7rem;color:${alerta?'var(--wrn)':'var(--tx2)'};margin-top:2px">${alerta?'⏰ ':''}${esc(proxSrv)}${proxFecha?' · '+_fmtFechaCorta(proxFecha):''}${proxKm?' · '+proxKm.toLocaleString()+' km':''}</div>`
+      : '';
     return `<tr style="border-bottom:1px solid var(--bor2)">
       <td style="padding:9px 8px;font-weight:700;font-size:.85rem;color:var(--tx);letter-spacing:.5px">${c.patente||'—'}</td>
       <td style="padding:9px 8px">${c.nombre||'—'}</td>
       <td style="padding:9px 8px">${c.tel ? `<a href="tel:${c.tel}" style="color:var(--gld)">${c.tel}</a>` : '—'}</td>
       <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${[c.marca_veh,c.modelo].filter(Boolean).join(' ')||'—'}</td>
       <td style="padding:9px 8px;text-align:right">${visitas}</td>
-      <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${ultima ? _fmtFechaCorta(ultima.fecha) : '—'}</td>
+      <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${ultima ? _fmtFechaCorta(ultima.fecha) : '—'}${proxHtml}</td>
       <td style="padding:9px 8px;display:flex;gap:6px">
         <button class="btn bsm" onclick="verHistorialGomeria('${c.id}')">📋 Historial</button>
         <button class="btn bsm be" onclick="abrirFormClienteGomeria('${c.id}')">✎</button>
@@ -4969,6 +5050,9 @@ function abrirFormServicioGomeria(clienteId){
   document.getElementById('srvGomPrecio').value='';
   document.getElementById('srvGomPago').value='Efectivo';
   document.getElementById('srvGomObs').value='';
+  document.getElementById('srvGomProxTipo').value='';
+  document.getElementById('srvGomProxFecha').value='';
+  document.getElementById('srvGomProxKm').value='';
   // Autocompletar medidas y marcas desde stock de cubiertas
   const medidas = [...new Set(S.cubiertas.map(x=>x.medida).filter(Boolean))];
   const marcas  = [...new Set(S.cubiertas.map(x=>x.marca).filter(Boolean))];
@@ -5002,7 +5086,10 @@ async function guardarServicioGomeria(){
     km_rotacion: esCubierta ? parseInt(document.getElementById('srvGomKmRotacion').value)||0 : 0,
     precio: parseFloat(document.getElementById('srvGomPrecio').value)||0,
     pago: document.getElementById('srvGomPago').value,
-    obs: document.getElementById('srvGomObs').value.trim()
+    obs: document.getElementById('srvGomObs').value.trim(),
+    prox_servicio: document.getElementById('srvGomProxTipo').value.trim(),
+    prox_fecha: document.getElementById('srvGomProxFecha').value||null,
+    prox_km: parseInt(document.getElementById('srvGomProxKm').value)||0
   };
   closeM('mServicioGomeria');
   const ok = await dbUpsertServicioGomeria(s);
@@ -5476,6 +5563,7 @@ function abrirVentaRapida(){
   document.getElementById('vrTotalBox').style.display = 'none';
   document.getElementById('vrCant').value = 1;
   document.getElementById('vrConfBtn').disabled = true;
+  const cb = document.getElementById('vrCuotasBox'); if(cb) cb.style.display='none';
   setTimeout(()=>document.getElementById('vrBuscar').focus(), 80);
 }
 
@@ -5484,51 +5572,128 @@ function abrirVentaDesdeProd(prodId){
   document.getElementById('vrBuscar').value = '';
   document.getElementById('vrSugg').style.display = 'none';
   document.getElementById('vrCant').value = 1;
-  vrSeleccionarProd(prodId);
+  const cb = document.getElementById('vrCuotasBox'); if(cb) cb.style.display='none';
+  vrSeleccionarProd('stock_'+prodId);
+}
+
+function abrirVentaDesdeCubierta(cubId){
+  openM('mVentaRapida', null);
+  document.getElementById('vrBuscar').value = '';
+  document.getElementById('vrSugg').style.display = 'none';
+  document.getElementById('vrCant').value = 1;
+  vrSeleccionarProd('cub_'+cubId);
 }
 
 function vrBuscarProd(q){
   const box = document.getElementById('vrSugg');
   if(!q){ box.style.display='none'; return; }
-  const resultados = S.stock.filter(s=>s.cantidad>0 && s.nombre.toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  const ql = q.toLowerCase();
+  const rub = (currentTenant?.rubro||'').toLowerCase();
+  const esGom = rub.includes('gomeria')||rub.includes('gomería')||rub.includes('neumat')||rub.includes('cubiert');
+
+  let resultados = [];
+  if(esGom){
+    const cubRes = (S.cubiertas||[])
+      .filter(c=>c.stock>0 && (c.medida.toLowerCase().includes(ql)||c.marca.toLowerCase().includes(ql)))
+      .map(c=>({ sid:'cub_'+c.id, nombre:c.medida+(c.marca?' — '+c.marca:''), precio:c.precio_contado, stock:c.stock }));
+    resultados = [...cubRes];
+  }
+  const stockRes = S.stock
+    .filter(s=>s.cantidad>0 && s.nombre.toLowerCase().includes(ql))
+    .map(s=>({ sid:'stock_'+s.id, nombre:s.nombre, precio:s.precio, stock:s.cantidad }));
+  resultados = [...resultados, ...stockRes].slice(0,8);
+
   if(!resultados.length){ box.style.display='none'; return; }
-  box.innerHTML = resultados.map(s=>
-    `<div onclick="vrSeleccionarProd(${s.id})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
-      <span style="font-size:.88rem">${esc(s.nombre)}</span>
-      <span style="font-size:.8rem;color:var(--gld);font-weight:700;white-space:nowrap;margin-left:8px">${fmt(s.precio)}</span>
+  box.innerHTML = resultados.map(r=>
+    `<div onclick="vrSeleccionarProd('${r.sid}')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+      <span style="font-size:.88rem">${esc(r.nombre)}</span>
+      <span style="font-size:.8rem;color:var(--gld);font-weight:700;white-space:nowrap;margin-left:8px">${fmt(r.precio)}</span>
     </div>`
   ).join('');
   box.style.display = 'block';
 }
 
-function vrSeleccionarProd(prodId){
-  const prod = S.stock.find(s=>s.id===prodId);
-  if(!prod) return;
-  document.getElementById('vrProdId').value = prodId;
-  document.getElementById('vrBuscar').value = prod.nombre;
+function vrSeleccionarProd(sid){
+  const esCub = String(sid).startsWith('cub_');
+  let nombre, precio, stockDisp;
+  if(esCub){
+    const cubId = String(sid).replace('cub_','');
+    const cub = (S.cubiertas||[]).find(c=>String(c.id)===cubId);
+    if(!cub) return;
+    nombre = cub.medida+(cub.marca?' — '+cub.marca:'');
+    precio = cub.precio_contado;
+    stockDisp = cub.stock;
+  } else {
+    const prodId = parseInt(String(sid).replace('stock_',''));
+    const prod = S.stock.find(s=>s.id===prodId);
+    if(!prod) return;
+    nombre = prod.nombre;
+    precio = prod.precio;
+    stockDisp = prod.cantidad;
+  }
+  document.getElementById('vrProdId').value = sid;
+  document.getElementById('vrBuscar').value = nombre;
   document.getElementById('vrSugg').style.display = 'none';
-  document.getElementById('vrNombre').textContent = prod.nombre;
-  document.getElementById('vrPrecioLabel').textContent = fmt(prod.precio)+' c/u — stock: '+prod.cantidad;
+  document.getElementById('vrNombre').textContent = nombre;
+  document.getElementById('vrPrecioLabel').textContent = fmt(precio)+' c/u — stock: '+stockDisp;
   document.getElementById('vrSelBox').style.display = 'block';
   document.getElementById('vrTotalBox').style.display = 'block';
   document.getElementById('vrConfBtn').disabled = false;
+  const cb = document.getElementById('vrCuotasBox');
+  if(cb) cb.style.display = esCub ? 'block' : 'none';
+  if(esCub){ const vc=document.getElementById('vrCuotas'); if(vc) vc.value='contado'; }
   vrActualizarTotal();
   setTimeout(()=>document.getElementById('vrCant').focus(), 50);
 }
 
 function vrActualizarTotal(){
-  const prodId = parseInt(document.getElementById('vrProdId').value);
-  const prod   = S.stock.find(s=>s.id===prodId);
-  const cant   = parseInt(document.getElementById('vrCant').value)||1;
-  if(prod) document.getElementById('vrTotal').textContent = fmt(prod.precio * cant);
+  const sid = String(document.getElementById('vrProdId').value||'');
+  const cant = parseInt(document.getElementById('vrCant').value)||1;
+  let precio = 0;
+  if(sid.startsWith('cub_')){
+    const cubId = sid.replace('cub_','');
+    const cub = (S.cubiertas||[]).find(c=>String(c.id)===cubId);
+    if(cub){
+      const cuotas = document.getElementById('vrCuotas')?.value||'contado';
+      precio = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+      document.getElementById('vrPrecioLabel').textContent = fmt(precio)+' c/u — stock: '+cub.stock;
+    }
+  } else if(sid.startsWith('stock_')){
+    const prodId = parseInt(sid.replace('stock_',''));
+    const prod = S.stock.find(s=>s.id===prodId);
+    if(prod) precio = prod.precio;
+  }
+  document.getElementById('vrTotal').textContent = fmt(precio * cant);
 }
 
 async function confirmarVentaRapida(){
-  const prodId = parseInt(document.getElementById('vrProdId').value);
-  const prod   = S.stock.find(s=>s.id===prodId);
-  if(!prod) return;
-  const cant   = parseInt(document.getElementById('vrCant').value)||1;
+  const sid = String(document.getElementById('vrProdId').value||'');
+  const cant = parseInt(document.getElementById('vrCant').value)||1;
   const metodo = document.getElementById('vrMet').value;
+
+  if(sid.startsWith('cub_')){
+    const cubId = sid.replace('cub_','');
+    const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===cubId);
+    if(ci<0) return;
+    const cub = S.cubiertas[ci];
+    if(cant > cub.stock){ showToast('Stock insuficiente (disponible: '+cub.stock+')'); return; }
+    const cuotas = document.getElementById('vrCuotas')?.value||'contado';
+    const precio = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+    const venta = {id:Date.now(),tipo:'cubierta',nombre:cub.medida+(cub.marca?' — '+cub.marca:''),cubId:cub.id,
+      cantidad:cant,precio,total:precio*cant,costo:cub.costo||0,metodo,fecha:tod(),cuotas,comPct:0,comision:0};
+    S.ventas.push(venta);
+    await dbUpsert('ventas',venta);
+    S.cubiertas[ci].stock -= cant;
+    await dbUpsertCubierta(S.cubiertas[ci]);
+    closeM('mVentaRapida');
+    showToast('✓ Venta registrada — '+fmt(venta.total));
+    rVentas(); rCubiertas();
+    return;
+  }
+
+  const prodId = parseInt(sid.replace('stock_',''));
+  const prod = S.stock.find(s=>s.id===prodId);
+  if(!prod) return;
   if(cant > prod.cantidad){ showToast('Stock insuficiente (disponible: '+prod.cantidad+')'); return; }
   const venta = {id:Date.now(), tipo:'producto', nombre:prod.nombre, productoId:prod.id,
     cantidad:cant, precio:prod.precio, total:prod.precio*cant,
@@ -7689,19 +7854,28 @@ async function registrarLiquidacion(accion){
 
 // ═══ CAJAS ═══
 function getCajas(){
-  const cajas={servicio:0,accesorios:0,equipos:0,general:0};
   const hoy=tod();
   const rubC=(currentTenant?.rubro||'').toLowerCase();
   const esSalonC=/barber|barbería|salon|belleza/i.test(rubC);
+  const esGomC=rubC.includes('gomeria')||rubC.includes('gomería')||rubC.includes('neumat')||rubC.includes('cubiert');
 
+  if(esGomC){
+    const cajas={cubiertas:0,servicios:0,general:0};
+    S.ventas.filter(v=>v.fecha===hoy).forEach(v=>{
+      if(v.tipo==='cubierta') cajas.cubiertas+=v.total||0;
+      else if(v.tipo==='servicio') cajas.servicios+=v.total||0;
+      else cajas.general+=v.total||0;
+    });
+    S.gastos.filter(g=>g.fecha===hoy).forEach(g=>{const c=g.caja||'general';if(cajas[c]!==undefined)cajas[c]-=g.monto||0;else cajas.general-=g.monto||0;});
+    (S.movCaja||[]).filter(m=>(!m.fecha||m.fecha===hoy)).forEach(m=>{const c=m.caja||'general';if(cajas[c]===undefined)m.caja='general';if(m.tipo==='ingreso')cajas[m.caja]+=m.monto||0;else if(m.tipo==='egreso')cajas[m.caja]-=m.monto||0;});
+    return cajas;
+  }
+
+  const cajas={servicio:0,accesorios:0,equipos:0,general:0};
   if(esSalonC){
-    // Para barberías/salones: servicio desde getTurnos() que es localStorage (sin duplicados posibles).
-    // S.ventas puede tener duplicados históricos por bug anterior → NO usarla para servicios.
     if(getTurnos){
       getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').forEach(t=>{cajas.servicio+=t.precio||0;});
     }
-    console.log('[getCajas] salon/barbería | turnos terminados hoy:', getTurnos?getTurnos().filter(t=>t.fecha===hoy&&t.estado==='terminado').length:0, '| cajas.servicio:', cajas.servicio);
-    // Productos/accesorios siguen viniendo de S.ventas (no se duplican)
     S.ventas.filter(v=>v.fecha===hoy&&v.tipo!=='servicio').forEach(v=>{
       if(v.tipo==='producto')cajas.accesorios+=v.total||0;
       else if(v.tipo==='equipo')cajas.equipos+=v.comision||v.total||0;
@@ -7785,11 +7959,24 @@ function rCajas(){
   const c=getCajas();
   const rubro2 = (currentTenant?.rubro||'').toLowerCase();
   const esSalonCaja = esNegocioTurnos(rubro2);
+  const esGomCaja = rubro2.includes('gomeria')||rubro2.includes('gomería')||rubro2.includes('neumat')||rubro2.includes('cubiert');
   _renderBotonesCierreEmpleadas();
-  const items = esSalonCaja
-    ? [{k:'servicio',l:'✂ Servicios',obj:0},{k:'accesorios',l:'🛍 Productos',obj:0},{k:'general',l:'💼 General',obj:0}]
-    : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
-  document.getElementById('cajasGrid').innerHTML=items.map(i=>`<div class="stat"><div class="sl">${i.l}</div><div class="sv" style="color:${c[i.k]>=0?'var(--ok)':'var(--bad)'}">${fmt(c[i.k])}</div>${i.obj>0?`<div style="margin-top:6px"><div class="pb"><div class="pf" style="width:${Math.min(100,Math.round(c[i.k]/i.obj*100))}%"></div></div><div style="font-size:.68rem;color:var(--mut);margin-top:3px">Meta día: ${fmt(i.obj)}</div></div>`:''}</div>`).join('');
+  const items = esGomCaja
+    ? [{k:'cubiertas',l:'🛞 Cubiertas',obj:0},{k:'servicios',l:'🔧 Servicios',obj:0},{k:'general',l:'💼 General',obj:0}]
+    : esSalonCaja
+      ? [{k:'servicio',l:'✂ Servicios',obj:0},{k:'accesorios',l:'🛍 Productos',obj:0},{k:'general',l:'💼 General',obj:0}]
+      : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
+  document.getElementById('cajasGrid').innerHTML=items.map(i=>`<div class="stat"><div class="sl">${i.l}</div><div class="sv" style="color:${(c[i.k]||0)>=0?'var(--ok)':'var(--bad)'}">${fmt(c[i.k]||0)}</div>${i.obj>0?`<div style="margin-top:6px"><div class="pb"><div class="pf" style="width:${Math.min(100,Math.round((c[i.k]||0)/i.obj*100))}%"></div></div><div style="font-size:.68rem;color:var(--mut);margin-top:3px">Meta día: ${fmt(i.obj)}</div></div>`:''}</div>`).join('');
+
+  // Adaptar select de caja en modal de movimientos
+  const mcCajaSel = document.getElementById('mcCaja');
+  if(mcCajaSel){
+    if(esGomCaja){
+      mcCajaSel.innerHTML='<option value="cubiertas">🛞 Cubiertas</option><option value="servicios">🔧 Servicios</option><option value="general">💼 General</option>';
+    } else if(!esSalonCaja && mcCajaSel.querySelector('option[value="equipos"]')){
+      mcCajaSel.innerHTML='<option value="general">💼 General</option><option value="servicio">✂ Servicios</option><option value="accesorios">📦 Productos</option><option value="equipos">📱 Equipos</option>';
+    }
+  }
   rMovCaja();
 }
 
@@ -10498,6 +10685,12 @@ function verHistorialCliente(nombre){
 }
 
 async function rTurnosConfig(){
+  // Adaptar labels para gomería
+  const _rubCfg = (currentTenant?.rubro||'').toLowerCase();
+  const _esGomCfg = _rubCfg.includes('gomeria')||_rubCfg.includes('gomería')||_rubCfg.includes('neumat')||_rubCfg.includes('cubiert');
+  const _horLabel = document.querySelector('#cardHorarioSalon h3');
+  if(_horLabel) _horLabel.textContent = _esGomCfg ? '🕐 Horario de atención' : '🕐 Horario del salón';
+
   // Si no hay servicios en localStorage, intentar restaurar desde Supabase
   let cfg = getTurnosCfg();
   if(!cfg.servicios.length){
