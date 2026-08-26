@@ -5042,7 +5042,7 @@ async function dbLoadHistorialGomeria(clienteId){
 async function dbUpsertServicioGomeria(s){
   setSyncing();
   try{
-    const row = { id:s.id, tenant_id:currentTenant.id, cliente_id:s.cliente_id, fecha:s.fecha, km:s.km, tipo:s.tipo, medida:s.medida, marca:s.marca, cant_cubiertas:s.cant_cubiertas, km_rotacion:s.km_rotacion, precio:s.precio, pago:s.pago, obs:s.obs, prox_servicio:s.prox_servicio||'', prox_fecha:s.prox_fecha||null, prox_km:s.prox_km||0 };
+    const row = { id:s.id, tenant_id:currentTenant.id, cliente_id:s.cliente_id||null, fecha:s.fecha, km:s.km, tipo:s.tipo, medida:s.medida, marca:s.marca, cant_cubiertas:s.cant_cubiertas, km_rotacion:s.km_rotacion, precio:s.precio, pago:s.pago, obs:s.obs, prox_servicio:s.prox_servicio||'', prox_fecha:s.prox_fecha||null, prox_km:s.prox_km||0 };
     const { error } = await sb.from('historial_gomeria').insert(row);
     if(error) throw error;
     setSynced(); return true;
@@ -5564,6 +5564,7 @@ function _srvGomTipoChange(){
 async function guardarServicioGomeria(){
   const clienteId = document.getElementById('srvGomClienteId').value;
   const tipo = document.getElementById('srvGomTipo').value;
+  if(!clienteId){ showToast('Error: cliente no identificado. Cerrá y volvé a abrir el historial.','err'); return; }
   if(!tipo){ showToast('Seleccioná el tipo de servicio','err'); return; }
   const esCubierta = tipo==='Cambio de cubiertas'||tipo==='Rotación de cubiertas';
   const s = {
