@@ -2,7 +2,7 @@
 // index.html: network-first (siempre toma la versión más nueva)
 // CDN / assets: cache-first (sin cambios frecuentes)
 
-const CACHE_NAME = 'remu-v46';
+const CACHE_NAME = 'remu-v47';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon.svg',
@@ -84,12 +84,13 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // index.html y navegación: NETWORK-FIRST
-  // Garantiza que siempre se sirve el código más nuevo.
+  // index.html y navegación: NETWORK-FIRST con cache:'reload'
+  // cache:'reload' envía Cache-Control:no-cache al CDN (Cloudflare),
+  // forzando revalidación con el origen en cada carga — cambios al instante.
   // Fallback a caché solo si hay error de red (offline).
   if (request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('/index.html')) {
     event.respondWith(
-      fetch(request)
+      fetch(new Request(request, { cache: 'reload' }))
         .then(res => {
           if (res.ok) {
             const clone = res.clone();
