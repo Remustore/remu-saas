@@ -5553,6 +5553,11 @@ function abrirFormServicioGomeria(clienteId){
   if(dlMedidas) dlMedidas.innerHTML = medidas.map(m=>`<option value="${m}">`).join('');
   if(dlMarcas)  dlMarcas.innerHTML  = marcas.map(m=>`<option value="${m}">`).join('');
   openM('mServicioGomeria');
+  // openM resetea todos los inputs — seteamos el id oculto DESPUÉS
+  document.getElementById('srvGomClienteId').value = clienteId;
+  document.getElementById('srvGomFecha').value = tod();
+  document.getElementById('srvGomKm').value = c.km||'';
+  document.getElementById('srvGomPago').value = 'Efectivo';
 }
 
 function _srvGomTipoChange(){
