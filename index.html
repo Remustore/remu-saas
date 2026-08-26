@@ -5111,7 +5111,7 @@ function rClientesGomeria(){
 
   let lista = S.clientesGomeria.filter(c=>{
     if(!q) return true;
-    return (c.patente+c.nombre+c.tel).toLowerCase().includes(q);
+    return ((c.patente||'')+(c.nombre||'')+(c.tel||'')).toLowerCase().includes(q);
   });
 
   if(badge){ badge.textContent=S.clientesGomeria.length; badge.style.display=S.clientesGomeria.length?'':'none'; }
@@ -5430,11 +5430,8 @@ async function eliminarServicioGomeria(id){
   if(!ok){ showToast('Error al eliminar','err'); return; }
   S.historialGomeria = (S.historialGomeria||[]).filter(s=>s.id!==id);
   showToast('Servicio eliminado');
-  if(_histGomClienteActivo){
-    const historial = (S.historialGomeria||[]).filter(h=>h.cliente_id===_histGomClienteActivo.id);
-    _renderHistorialGomeria(historial);
-  }
   rClientesGomeria();
+  if(_histGomClienteActivo) await verHistorialGomeria(_histGomClienteActivo.id);
 }
 
 async function dbUpsertPedido(p){
