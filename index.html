@@ -3191,7 +3191,7 @@ async function borrarTodosMisDatos(){
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
     // Reset estado en memoria
-    S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[] };
+    S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
     showToast('✓ Todos los datos fueron borrados');
     setTimeout(()=>{ renderAll(); rDash(); }, 300);
   } catch(e) {
@@ -3220,7 +3220,7 @@ async function doLogout(){
   currentUser = null; currentTenant = null; currentRole = null;
   window._currentSection = null;
   window.__adminExternoTenants = null;
-  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
   document.getElementById('sb').style.display='none';
   document.getElementById('mn').style.display='none';
   document.getElementById('loginScreen').style.display='flex';
@@ -4415,8 +4415,7 @@ async function accederComoTenant(id){
   const { data: t, error } = await sb.from('tenants').select('*').eq('id', id).single();
   if(error || !t){ alert('No se pudo cargar el tenant'); return; }
 
-  // Limpiar estado del tenant anterior completamente
-  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
 
   currentTenant = t;
   currentRole = 'admin';
@@ -4431,8 +4430,7 @@ async function accederComoTenant(id){
 }
 
 function volverAlSuperadmin(){
-  // Limpiar estado del tenant visitado
-  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[] };
+  S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
   currentTenant = null;
   currentRole = 'superadmin';
 
@@ -4567,7 +4565,6 @@ async function dbLoadPedidos(){
 async function dbLoadCubiertas(){
   try{
     const { data, error } = await sb.from('cubiertas').select('*').eq('tenant_id', currentTenant.id).order('created_at', { ascending: true });
-    console.log('[cubiertas] data:', data, 'error:', error);
     if(error) throw error;
     return (data||[]).map(r => ({ id:r.id, medida:r.medida||'', marca:r.marca||'', segmento:r.segmento||'Media', stock:r.stock||0, costo:r.costo||0, precio_contado:r.precio_contado||0, precio_3c:r.precio_3c||0, precio_6c:r.precio_6c||0, precio_12c:r.precio_12c||0 }));
   }catch(e){ console.error('[cubiertas] load error', e); return []; }
@@ -4672,6 +4669,11 @@ function rCubiertas(){
       </td>
     </tr>`;
   }).join('');
+}
+
+async function _iniciarCubiertas(){
+  S.cubiertas = await dbLoadCubiertas();
+  rCubiertas();
 }
 
 function abrirFormCubierta(id=null){
@@ -5253,7 +5255,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:rCubiertas, clientesGomeria:rClientesGomeria };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:rClientesGomeria };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
