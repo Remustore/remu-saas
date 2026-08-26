@@ -5424,7 +5424,15 @@ function openM(id, editId){
 
 function fillModalEdit(modal, id){
   if(modal==='mStock'){const s=S.stock.find(x=>x.id===id);if(!s)return;document.getElementById('mStock').querySelector('div.mt2').textContent='Editar Producto';document.getElementById('sId').value=id;document.getElementById('sNom').value=s.nombre;document.getElementById('sCat').value=s.categoria;const _snc=document.getElementById('sNewCat');if(_snc){_snc.style.display='none';_snc.value='';}document.getElementById('sCant').value=s.cantidad;document.getElementById('sMin').value=s.minimo;document.getElementById('sPre').value=s.precio;document.getElementById('sCos').value=s.costo;document.getElementById('sNot').value=s.notas||'';}
-  if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;document.getElementById('vTipo').value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
+  if(modal==='mVenta'){const v=S.ventas.find(x=>x.id===id);if(!v)return;document.getElementById('mVentaTitle').textContent='Editar Venta';document.getElementById('vId').value=id;
+    // Adaptar tipos para gomería
+    const vTipoSel=document.getElementById('vTipo');
+    if(/gomer|neumat|cubiert/i.test((currentTenant?.rubro||'').toLowerCase())){
+      vTipoSel.innerHTML='<option value="cubierta">🛞 Cubierta</option><option value="servicio">🔧 Servicio</option><option value="producto">📦 Producto</option>';
+    } else {
+      vTipoSel.innerHTML='<option value="producto">Producto / Accesorio</option><option value="equipo">Equipo</option><option value="servicio">Servicio técnico</option>';
+    }
+    vTipoSel.value=v.tipo;uVUI();document.getElementById('vCant').value=v.cantidad;document.getElementById('vPre').value=v.precio;document.getElementById('vMet').value=v.metodo;document.getElementById('vFec').value=v.fecha;if(v.tipo==='servicio')document.getElementById('vSDesc').value=v.nombre;return;}
   if(modal==='mTaller'){const t=S.reparaciones.find(x=>x.id===id);if(!t)return;
     document.getElementById('mTallerTitle').textContent='Editar Trabajo';
     document.getElementById('tId').value=id;
@@ -7773,7 +7781,9 @@ function getDFiltLabel(){
 function rAnalisis(){
   const rub = (currentTenant?.rubro||'').toLowerCase();
   const esBarberSalon = /barber|salon|belleza|peluq|manicur|uña|pestañ/i.test(rub);
+  const esGomA = /gomer|neumat|cubiert/i.test(rub);
   if(esBarberSalon){ rAnalisisBarber(); return; }
+  if(esGomA){ rAnalisisGomeria(); return; }
 
   // Restablece títulos para rubros no-barbería
   const tl=document.getElementById('anTitLeft'); if(tl) tl.textContent='Rentabilidad por producto';
@@ -7792,6 +7802,42 @@ function rAnalisis(){
   const mets={};vFilt.forEach(v=>{mets[v.metodo]=(mets[v.metodo]||0)+v.total;});
   const totP=Object.values(mets).reduce((a,b)=>a+b,0);
   document.getElementById('pagos').innerHTML=totP?Object.entries(mets).sort((a,b)=>b[1]-a[1]).map(([met,tot])=>{const p=Math.round(tot/totP*100);return`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.79rem"><span>${met}</span><span style="color:var(--gld);font-weight:600">${fmt(tot)} (${p}%)</span></div><div class="pb"><div class="pf" style="width:${p}%"></div></div></div>`;}).join(''):emp('💳','Sin ventas');
+}
+
+function rAnalisisGomeria(){
+  // Ocultar tab de reparaciones (no aplica a gomería)
+  const tabRep = document.getElementById('tabRep'); if(tabRep) tabRep.style.display='none';
+  if(aTab==='reparaciones'){ aTab='general'; document.querySelectorAll('#atabs .tab').forEach((b,i)=>b.classList.toggle('active',i===0)); document.getElementById('aGeneral').style.display=''; document.getElementById('aRep').style.display='none'; }
+
+  const tl=document.getElementById('anTitLeft'); if(tl) tl.textContent='🛞 Rentabilidad por cubierta';
+  const tp=document.getElementById('anTitPagos'); if(tp) tp.textContent='Ventas por método de pago';
+
+  const vFilt = filtrarPorRango(S.ventas.filter(v=>v.tipo==='cubierta'), 'fecha');
+  const gFilt = filtrarPorRango(S.gastos, 'fecha');
+  const tV = vFilt.reduce((a,v)=>a+v.total,0);
+  const tC = vFilt.reduce((a,v)=>a+(v.costo||0)*v.cantidad,0);
+  const tG = gFilt.reduce((a,g)=>a+g.monto,0);
+
+  // Rentabilidad por cubierta
+  const cubRent = S.cubiertas.filter(c=>c.precio_contado>0&&c.costo>0)
+    .map(c=>({n:c.medida+(c.marca?' '+c.marca:''),mg:Math.round((c.precio_contado-c.costo)/c.precio_contado*100)}))
+    .sort((a,b)=>b.mg-a.mg).slice(0,8);
+  document.getElementById('rent').innerHTML = cubRent.length
+    ? cubRent.map(p=>`<div class="pb2"><div class="pn2" title="${p.n}">${esc(p.n)}</div><div class="pt2"><div class="pb"><div class="pf ${p.mg>30?'ok2':p.mg>15?'':'bad2'}" style="width:${Math.min(100,p.mg)}%"></div></div></div><div class="pv2">${p.mg}%</div></div>`).join('')
+    : emp('🛞','Cargá cubiertas con costo y precio para ver rentabilidad');
+
+  // Resumen financiero gomería
+  document.getElementById('resFin').innerHTML=`
+    <div class="fi2"><span>Ventas cubiertas</span><span style="color:var(--ok);font-weight:600">${fmt(tV)}</span></div>
+    <div class="fi2"><span>Costo de cubiertas</span><span style="color:var(--wrn);font-weight:600">- ${fmt(tC)}</span></div>
+    <div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div>
+    <div class="gl"></div>
+    <div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:var(--gld);font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(tV-tC-tG)}</span></div>`;
+
+  // Métodos de pago
+  const mets={}; vFilt.forEach(v=>{mets[v.metodo]=(mets[v.metodo]||0)+v.total;});
+  const totP=Object.values(mets).reduce((a,b)=>a+b,0);
+  document.getElementById('pagos').innerHTML=totP?Object.entries(mets).sort((a,b)=>b[1]-a[1]).map(([met,tot])=>{const p=Math.round(tot/totP*100);return`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.79rem"><span>${met}</span><span style="color:var(--gld);font-weight:600">${fmt(tot)} (${p}%)</span></div><div class="pb"><div class="pf" style="width:${p}%"></div></div></div>`;}).join(''):emp('💳','Sin ventas de cubiertas');
 }
 
 function rAnalisisBarber(){
