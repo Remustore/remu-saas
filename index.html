@@ -2153,7 +2153,7 @@ $$;</pre>
       <!-- Buscador de producto -->
       <div>
         <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Producto</label>
-        <input type="text" id="vrBuscar" placeholder="Buscá un producto..." autocomplete="off"
+        <input type="text" id="vrBuscar" placeholder="Buscá por medida, marca o producto..." autocomplete="off"
           style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem"
           oninput="vrBuscarProd(this.value)">
         <div id="vrSugg" style="display:none;border:1px solid var(--bor);border-radius:8px;margin-top:4px;overflow:hidden;max-height:180px;overflow-y:auto;background:var(--bg2)"></div>
@@ -4804,7 +4804,16 @@ async function dbUpsertServicioGomeria(s){
     const { error } = await sb.from('historial_gomeria').insert(row);
     if(error) throw error;
     setSynced(); return true;
-  }catch(e){ console.error('[historialGomeria] upsert error', e); setSyncErr(e?.message||''); return false; }
+  }catch(e){
+    console.warn('[historialGomeria] insert con prox_* falló:', e?.message, '— reintentando sin campos nuevos');
+    // Fallback: si los campos nuevos aún no existen en el schema cache, guardamos sin ellos
+    try{
+      const rowBase = { id:s.id, tenant_id:currentTenant.id, cliente_id:s.cliente_id, fecha:s.fecha, km:s.km, tipo:s.tipo, medida:s.medida, marca:s.marca, cant_cubiertas:s.cant_cubiertas, km_rotacion:s.km_rotacion, precio:s.precio, pago:s.pago, obs:s.obs };
+      const { error:e2 } = await sb.from('historial_gomeria').insert(rowBase);
+      if(e2) throw e2;
+      setSynced(); return true;
+    }catch(e2){ console.error('[historialGomeria] upsert error', e2); setSyncErr(e2?.message||''); return false; }
+  }
 }
 
 async function dbDeleteServicioGomeria(id){
@@ -5564,7 +5573,10 @@ function abrirVentaRapida(){
   document.getElementById('vrCant').value = 1;
   document.getElementById('vrConfBtn').disabled = true;
   const cb = document.getElementById('vrCuotasBox'); if(cb) cb.style.display='none';
-  setTimeout(()=>document.getElementById('vrBuscar').focus(), 80);
+  const rub = (currentTenant?.rubro||'').toLowerCase();
+  const esGom = rub.includes('gomeria')||rub.includes('gomería')||rub.includes('neumat')||rub.includes('cubiert');
+  if(esGom){ setTimeout(()=>{ vrBuscarProd(''); document.getElementById('vrBuscar').focus(); }, 100); }
+  else { setTimeout(()=>document.getElementById('vrBuscar').focus(), 80); }
 }
 
 function abrirVentaDesdeProd(prodId){
@@ -5586,22 +5598,26 @@ function abrirVentaDesdeCubierta(cubId){
 
 function vrBuscarProd(q){
   const box = document.getElementById('vrSugg');
-  if(!q){ box.style.display='none'; return; }
-  const ql = q.toLowerCase();
+  const ql = (q||'').toLowerCase();
   const rub = (currentTenant?.rubro||'').toLowerCase();
   const esGom = rub.includes('gomeria')||rub.includes('gomería')||rub.includes('neumat')||rub.includes('cubiert');
+
+  if(!q && !esGom){ box.style.display='none'; return; }
 
   let resultados = [];
   if(esGom){
     const cubRes = (S.cubiertas||[])
-      .filter(c=>c.stock>0 && (c.medida.toLowerCase().includes(ql)||c.marca.toLowerCase().includes(ql)))
+      .filter(c=>c.stock>0 && (!ql || c.medida.toLowerCase().includes(ql)||(c.marca||'').toLowerCase().includes(ql)))
       .map(c=>({ sid:'cub_'+c.id, nombre:c.medida+(c.marca?' — '+c.marca:''), precio:c.precio_contado, stock:c.stock }));
     resultados = [...cubRes];
   }
-  const stockRes = S.stock
-    .filter(s=>s.cantidad>0 && s.nombre.toLowerCase().includes(ql))
-    .map(s=>({ sid:'stock_'+s.id, nombre:s.nombre, precio:s.precio, stock:s.cantidad }));
-  resultados = [...resultados, ...stockRes].slice(0,8);
+  if(ql){
+    const stockRes = S.stock
+      .filter(s=>s.cantidad>0 && s.nombre.toLowerCase().includes(ql))
+      .map(s=>({ sid:'stock_'+s.id, nombre:s.nombre, precio:s.precio, stock:s.cantidad }));
+    resultados = [...resultados, ...stockRes];
+  }
+  resultados = resultados.slice(0,8);
 
   if(!resultados.length){ box.style.display='none'; return; }
   box.innerHTML = resultados.map(r=>
@@ -6085,14 +6101,18 @@ async function delVenta(id){
   rVentas(); rStock();
 }
 
-function _ventaRow(v){ return `<tr>
+function _ventaRow(v){
+  const cuotasBadge = v.tipo==='cubierta'&&v.cuotas&&v.cuotas!=='contado'
+    ? `<br><span style="font-size:.69rem;color:var(--ok)">🛞 ${v.cuotas==='3c'?'3 cuotas':v.cuotas==='6c'?'6 cuotas':'12 cuotas'}</span>` : '';
+  return `<tr>
     <td>${fD(v.fecha)}</td>
-    <td>${esc(v.nombre)}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}</td>
+    <td>${esc(v.nombre)}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}${cuotasBadge}</td>
     <td class="col-hide">${v.cantidad}</td><td class="col-hide">${fmt(v.precio)}</td>
     <td><strong style="color:var(--gld)">${fmt(v.tipo==='equipo'&&v.comision?v.comision:v.total)}</strong></td>
     <td class="col-hide"><span class="bx bg2">${esc(v.metodo)}</span></td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mVenta',${v.id})">✎</button><button class="btn bd bsm" onclick="delVenta(${v.id})">✕</button></td>
-  </tr>`; }
+  </tr>`;
+}
 function _mostrarVentasAntiguas(){
   const row = document.getElementById('trVerMasVentas');
   if(!row) return;
