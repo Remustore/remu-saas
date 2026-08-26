@@ -4762,13 +4762,38 @@ async function _guardarCuotasCfg(){
   const c3 = parseFloat(document.getElementById('cubC3')?.value)||1.15;
   const c6 = parseFloat(document.getElementById('cubC6')?.value)||1.30;
   const c12 = parseFloat(document.getElementById('cubC12')?.value)||1.60;
+  const prev = _getCuotasCfg();
+  const cambiaron = prev.c3!==c3 || prev.c6!==c6 || prev.c12!==c12;
   dbSetConfig('gomCuotas', JSON.stringify({c3,c6,c12}));
   // actualizar ejemplo
-  const e = Math.round(100000);
+  const e = 100000;
   const el3=document.getElementById('cubEjC3'), el6=document.getElementById('cubEjC6'), el12=document.getElementById('cubEjC12');
   if(el3) el3.textContent=fmt(Math.round(e*c3));
   if(el6) el6.textContent=fmt(Math.round(e*c6));
   if(el12) el12.textContent=fmt(Math.round(e*c12));
+  // recalcular cubiertas existentes si cambiaron los coeficientes
+  if(cambiaron && S.cubiertas && S.cubiertas.length){
+    const confirmar = confirm(`¿Actualizar los precios de cuotas de todas tus cubiertas (${S.cubiertas.length}) con los nuevos coeficientes?\n\nEsto recalcula 3c/6c/12c a partir del precio contado de cada una.`);
+    if(confirmar){
+      showToast('Actualizando cubiertas...');
+      let actualizadas = 0;
+      for(const cub of S.cubiertas){
+        if(!cub.precio_contado) continue;
+        const nuevo3c = Math.round(cub.precio_contado * c3);
+        const nuevo6c = Math.round(cub.precio_contado * c6);
+        const nuevo12c = Math.round(cub.precio_contado * c12);
+        if(cub.precio_3c===nuevo3c && cub.precio_6c===nuevo6c && cub.precio_12c===nuevo12c) continue;
+        cub.precio_3c = nuevo3c;
+        cub.precio_6c = nuevo6c;
+        cub.precio_12c = nuevo12c;
+        await dbUpsertCubierta(cub);
+        actualizadas++;
+      }
+      showToast(`✓ Coeficientes guardados — ${actualizadas} cubierta${actualizadas!==1?'s':''} actualizadas`);
+      rCubiertas();
+      return;
+    }
+  }
   showToast('Coeficientes guardados ✓');
   rCubiertas();
 }
