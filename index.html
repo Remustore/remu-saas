@@ -4691,7 +4691,7 @@ function abrirFormCubierta(id=null){
   document.getElementById('cubP3').value = c?.precio_3c||'';
   document.getElementById('cubP6').value = c?.precio_6c||'';
   document.getElementById('cubP12').value = c?.precio_12c||'';
-  openM('mCubierta');
+  openM('mCubierta', id);
 }
 
 async function guardarCubierta(){
@@ -4854,7 +4854,7 @@ function abrirFormClienteGomeria(id=null){
   document.getElementById('cliGomMarcaVeh').value = c?.marca_veh||'';
   document.getElementById('cliGomModelo').value = c?.modelo||'';
   document.getElementById('cliGomNotas').value = c?.notas||'';
-  openM('mClienteGomeria');
+  openM('mClienteGomeria', id);
 }
 
 async function guardarClienteGomeria(){
