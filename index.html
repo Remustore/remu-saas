@@ -2067,22 +2067,41 @@ $$;</pre>
 </div></div>
 
 <!-- GOMERÍA: Presupuesto -->
-<div class="mb" id="mPresupGom"><div class="md" style="max-width:420px">
+<div class="mb" id="mPresupGom"><div class="md" style="max-width:440px">
   <div class="mh"><div class="mt2">📋 Presupuesto</div><button class="xbtn" onclick="closeM('mPresupGom')">✕</button></div>
+  <!-- FORMULARIO -->
+  <div id="pgForm">
   <div class="mc" style="display:flex;flex-direction:column;gap:12px">
     <input type="hidden" id="pgCubId">
+    <input type="hidden" id="pgServId">
+    <!-- Tabs modo -->
+    <div class="tabs" style="margin:-4px 0 -2px">
+      <button class="tab active" id="pgTabCub" onclick="pgSetMode('cubierta')">🛞 Cubierta</button>
+      <button class="tab" id="pgTabServ" onclick="pgSetMode('servicio')">🔧 Servicio</button>
+    </div>
     <!-- Buscar cubierta -->
-    <div>
+    <div id="pgCubSection">
       <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Cubierta</label>
       <input type="text" id="pgBuscar" placeholder="Buscá medida o marca..." autocomplete="off"
         style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem"
         oninput="pgBuscarCub(this.value)">
       <div id="pgSugg" style="display:none;border:1px solid var(--bor);border-radius:8px;margin-top:4px;overflow:hidden;max-height:160px;overflow-y:auto;background:var(--bg2)"></div>
+      <div id="pgSelBox" style="display:none;background:var(--bg2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px;margin-top:8px">
+        <div id="pgNombre" style="font-weight:700;font-size:.95rem"></div>
+        <div id="pgPrecios" style="font-size:.8rem;color:var(--tx2);margin-top:4px"></div>
+      </div>
     </div>
-    <!-- Cubierta seleccionada -->
-    <div id="pgSelBox" style="display:none;background:var(--bg2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px">
-      <div id="pgNombre" style="font-weight:700;font-size:.95rem"></div>
-      <div id="pgPrecios" style="font-size:.8rem;color:var(--tx2);margin-top:4px"></div>
+    <!-- Buscar servicio -->
+    <div id="pgServSection" style="display:none">
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Servicio</label>
+      <input type="text" id="pgServBuscar" placeholder="Buscá un servicio..." autocomplete="off"
+        style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem"
+        oninput="pgBuscarServ(this.value)">
+      <div id="pgServSugg" style="display:none;border:1px solid var(--bor);border-radius:8px;margin-top:4px;overflow:hidden;max-height:160px;overflow-y:auto;background:var(--bg2)"></div>
+      <div id="pgServSelBox" style="display:none;background:var(--bg2);border:1px solid rgba(201,168,76,.25);border-radius:10px;padding:12px 14px;margin-top:8px">
+        <div id="pgServNombre" style="font-weight:700;font-size:.95rem"></div>
+        <div id="pgServPrecioInfo" style="font-size:.8rem;color:var(--tx2);margin-top:4px"></div>
+      </div>
     </div>
     <!-- Cantidad y cuotas -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
@@ -2090,7 +2109,7 @@ $$;</pre>
         <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Cantidad</label>
         <input type="number" id="pgCant" value="4" min="1" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:1.1rem;font-weight:700;text-align:center" oninput="pgActualizar()">
       </div>
-      <div>
+      <div id="pgCuotasGroup">
         <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Modalidad</label>
         <select id="pgCuotas" onchange="pgActualizar()" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.82rem">
           <option value="contado">Contado</option>
@@ -2124,9 +2143,22 @@ $$;</pre>
   </div>
   <div class="mf" style="flex-wrap:wrap;gap:8px">
     <button class="btn" onclick="closeM('mPresupGom')">Cancelar</button>
-    <button class="btn bgh" id="pgWaBtn" onclick="pgEnviarWA()" disabled>💬 Enviar WA</button>
+    <button class="btn bgh" id="pgWaBtn" onclick="pgPreviewWA()" disabled>💬 Enviar WA</button>
     <button class="btn bgh" onclick="pgImprimir()">🖨 Imprimir</button>
     <button class="btn bg" id="pgVentaBtn" onclick="pgConfirmarVenta()" disabled>✓ Confirmar venta</button>
+  </div>
+  </div>
+  <!-- VISTA PREVIA WA -->
+  <div id="pgWAPreview" style="display:none">
+  <div class="mc" style="display:flex;flex-direction:column;gap:10px">
+    <div style="font-size:.78rem;color:var(--tx2)">Editá el mensaje antes de enviarlo — podés personalizarlo a tu estilo:</div>
+    <textarea id="pgWAMsg" rows="11" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.84rem;font-family:var(--fb);resize:vertical;line-height:1.5"></textarea>
+    <div style="font-size:.7rem;color:var(--mut)">📱 Destino: <strong id="pgWATel"></strong></div>
+  </div>
+  <div class="mf" style="flex-wrap:wrap;gap:8px">
+    <button class="btn" onclick="pgVolverForm()">← Volver</button>
+    <button class="btn bgh" onclick="pgEnviarWAFinal()">💬 Abrir WhatsApp</button>
+  </div>
   </div>
 </div></div>
 
@@ -5750,13 +5782,42 @@ async function confirmarReposicion(){
 }
 
 // ── Presupuesto Gomería ────────────────────────────────────────────────────
+let _pgMode = 'cubierta';
+
+function pgSetMode(mode){
+  _pgMode = mode;
+  document.getElementById('pgTabCub').classList.toggle('active', mode==='cubierta');
+  document.getElementById('pgTabServ').classList.toggle('active', mode==='servicio');
+  document.getElementById('pgCubSection').style.display = mode==='cubierta'?'':'none';
+  document.getElementById('pgServSection').style.display = mode==='servicio'?'':'none';
+  const cuotasGrp = document.getElementById('pgCuotasGroup');
+  if(cuotasGrp) cuotasGrp.style.display = mode==='cubierta'?'':'none';
+  document.getElementById('pgCubId').value = '';
+  document.getElementById('pgServId').value = '';
+  document.getElementById('pgSelBox').style.display = 'none';
+  document.getElementById('pgServSelBox').style.display = 'none';
+  document.getElementById('pgTotalBox').style.display = 'none';
+  document.getElementById('pgWaBtn').disabled = true;
+  document.getElementById('pgVentaBtn').disabled = true;
+  if(mode==='servicio'){
+    document.getElementById('pgCant').value = 1;
+    setTimeout(()=>{ pgBuscarServ(''); document.getElementById('pgServBuscar').focus(); }, 80);
+  }
+}
+
 function abrirPresupuestoGom(cubId){
   openM('mPresupGom', null);
+  document.getElementById('pgForm').style.display = '';
+  document.getElementById('pgWAPreview').style.display = 'none';
   document.getElementById('pgBuscar').value = '';
+  document.getElementById('pgServBuscar').value = '';
   document.getElementById('pgSugg').style.display = 'none';
+  document.getElementById('pgServSugg').style.display = 'none';
   document.getElementById('pgSelBox').style.display = 'none';
+  document.getElementById('pgServSelBox').style.display = 'none';
   document.getElementById('pgTotalBox').style.display = 'none';
   document.getElementById('pgCubId').value = '';
+  document.getElementById('pgServId').value = '';
   document.getElementById('pgCant').value = 4;
   document.getElementById('pgCuotas').value = 'contado';
   document.getElementById('pgManoObra').value = 0;
@@ -5764,6 +5825,12 @@ function abrirPresupuestoGom(cubId){
   document.getElementById('pgCliTel').value = '';
   document.getElementById('pgWaBtn').disabled = true;
   document.getElementById('pgVentaBtn').disabled = true;
+  _pgMode = 'cubierta';
+  document.getElementById('pgTabCub').classList.add('active');
+  document.getElementById('pgTabServ').classList.remove('active');
+  document.getElementById('pgCubSection').style.display = '';
+  document.getElementById('pgServSection').style.display = 'none';
+  const cg = document.getElementById('pgCuotasGroup'); if(cg) cg.style.display = '';
   if(cubId){
     const cub = S.cubiertas.find(c=>String(c.id)===String(cubId));
     if(cub){ document.getElementById('pgBuscar').value = cub.medida+(cub.marca?' — '+cub.marca:''); pgSeleccionarCub(cub.id); }
@@ -5802,60 +5869,135 @@ function pgSeleccionarCub(cubId){
   pgActualizar();
 }
 
-function pgActualizar(){
-  const cubId = document.getElementById('pgCubId').value;
-  if(!cubId){ document.getElementById('pgTotalBox').style.display='none'; return; }
-  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
-  if(!cub) return;
-  const cuotas = document.getElementById('pgCuotas').value;
-  const cant = parseInt(document.getElementById('pgCant').value)||1;
-  const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
-  const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
-  const totalCub = pCub * cant;
-  const totalFinal = totalCub + manoObra;
-  const modLabel = cuotas==='contado'?'Contado':cuotas==='3c'?'3 cuotas':cuotas==='6c'?'6 cuotas':'12 cuotas';
-  document.getElementById('pgDetalle').innerHTML =
-    `${cant} x ${esc(cub.medida)} (${modLabel}): ${fmt(totalCub)}${manoObra>0?`<br>Mano de obra: ${fmt(manoObra)}`:''}`;
-  document.getElementById('pgTotal').textContent = fmt(totalFinal);
-  document.getElementById('pgTotalBox').style.display = 'block';
-  const tel = document.getElementById('pgCliTel').value.trim();
-  document.getElementById('pgWaBtn').disabled = !tel;
+function pgBuscarServ(q){
+  const box = document.getElementById('pgServSugg');
+  const ql = (q||'').toLowerCase();
+  const lista = (S.precios||[])
+    .filter(p=>p.disponibilidad!=='no disponible' && (!ql || (p.nombre||'').toLowerCase().includes(ql)))
+    .slice(0,8);
+  if(!lista.length){ box.style.display='none'; return; }
+  box.innerHTML = lista.map(p=>`<div onclick="pgSeleccionarServ(${p.id})"
+    style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center"
+    onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background=''">
+    <span style="font-size:.88rem">${esc(p.nombre)}</span>
+    <span style="font-size:.8rem;color:var(--gld);font-weight:700">${p.precio>0?fmt(p.precio):'Sin precio'}</span>
+  </div>`).join('');
+  box.style.display='block';
 }
 
-function pgEnviarWA(){
-  const cubId = document.getElementById('pgCubId').value;
-  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
-  if(!cub) return;
-  const cant = parseInt(document.getElementById('pgCant').value)||1;
-  const cuotas = document.getElementById('pgCuotas').value;
+function pgSeleccionarServ(precioId){
+  const p = (S.precios||[]).find(x=>String(x.id)===String(precioId));
+  if(!p) return;
+  document.getElementById('pgServId').value = p.id;
+  document.getElementById('pgServBuscar').value = p.nombre;
+  document.getElementById('pgServSugg').style.display = 'none';
+  document.getElementById('pgServNombre').textContent = p.nombre;
+  document.getElementById('pgServPrecioInfo').innerHTML = `Precio: <strong>${p.precio>0?fmt(p.precio):'A confirmar'}</strong>`;
+  document.getElementById('pgServSelBox').style.display = 'block';
+  document.getElementById('pgVentaBtn').disabled = false;
+  pgActualizar();
+}
+
+function pgActualizar(){
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
-  const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
-  const totalFinal = pCub * cant + manoObra;
-  const modLabel = cuotas==='contado'?'al contado':cuotas==='3c'?'en 3 cuotas':cuotas==='6c'?'en 6 cuotas':'en 12 cuotas';
+  const cant = parseInt(document.getElementById('pgCant').value)||1;
+  const tel = document.getElementById('pgCliTel').value.trim();
+  if(_pgMode==='cubierta'){
+    const cubId = document.getElementById('pgCubId').value;
+    if(!cubId){ document.getElementById('pgTotalBox').style.display='none'; document.getElementById('pgWaBtn').disabled=true; return; }
+    const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
+    if(!cub) return;
+    const cuotas = document.getElementById('pgCuotas').value;
+    const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+    const totalCub = pCub * cant;
+    const totalFinal = totalCub + manoObra;
+    const modLabel = cuotas==='contado'?'Contado':cuotas==='3c'?'3 cuotas':cuotas==='6c'?'6 cuotas':'12 cuotas';
+    document.getElementById('pgDetalle').innerHTML =
+      `${cant} x ${esc(cub.medida)} (${modLabel}): ${fmt(totalCub)}${manoObra>0?`<br>Mano de obra: ${fmt(manoObra)}`:''}`;
+    document.getElementById('pgTotal').textContent = fmt(totalFinal);
+    document.getElementById('pgTotalBox').style.display = 'block';
+    document.getElementById('pgWaBtn').disabled = !tel;
+  } else {
+    const servId = document.getElementById('pgServId').value;
+    if(!servId){ document.getElementById('pgTotalBox').style.display='none'; document.getElementById('pgWaBtn').disabled=true; return; }
+    const p = (S.precios||[]).find(x=>String(x.id)===String(servId));
+    if(!p) return;
+    const totalServ = p.precio * cant;
+    const totalFinal = totalServ + manoObra;
+    document.getElementById('pgDetalle').innerHTML =
+      `${cant} x ${esc(p.nombre)}: ${fmt(totalServ)}${manoObra>0?`<br>Mano de obra: ${fmt(manoObra)}`:''}`;
+    document.getElementById('pgTotal').textContent = fmt(totalFinal);
+    document.getElementById('pgTotalBox').style.display = 'block';
+    document.getElementById('pgWaBtn').disabled = !tel;
+  }
+}
+
+function pgPreviewWA(){
+  const cant = parseInt(document.getElementById('pgCant').value)||1;
+  const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
   const cliente = document.getElementById('pgCliNom').value.trim() || 'Cliente';
   const tel = document.getElementById('pgCliTel').value.replace(/\D/g,'');
   const negocio = currentTenant?.nombre || 'nuestra gomería';
+  let itemLine = '';
+  let totalFinal = 0;
+  if(_pgMode==='cubierta'){
+    const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(document.getElementById('pgCubId').value));
+    if(!cub) return;
+    const cuotas = document.getElementById('pgCuotas').value;
+    const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+    const modLabel = cuotas==='contado'?'al contado':cuotas==='3c'?'en 3 cuotas':cuotas==='6c'?'en 6 cuotas':'en 12 cuotas';
+    totalFinal = pCub * cant + manoObra;
+    itemLine = `• ${cant}x *${cub.medida}${cub.marca?' '+cub.marca:''}*\n  Precio ${modLabel}: *${fmt(pCub)} c/u*`;
+  } else {
+    const p = (S.precios||[]).find(x=>String(x.id)===String(document.getElementById('pgServId').value));
+    if(!p) return;
+    totalFinal = p.precio * cant + manoObra;
+    itemLine = `• ${cant>1?cant+'x ':''} *${p.nombre}*: *${fmt(p.precio)}*`;
+  }
   let msg = `🛞 *Presupuesto de ${negocio}*\n\n`;
   msg += `Hola ${cliente}! Te enviamos el presupuesto:\n\n`;
-  msg += `• ${cant}x *${cub.medida}${cub.marca?' '+cub.marca:''}*\n`;
-  msg += `  Precio ${modLabel}: *${fmt(pCub)} c/u*\n`;
+  msg += itemLine + '\n';
   if(manoObra>0) msg += `• Mano de obra: *${fmt(manoObra)}*\n`;
   msg += `\n💰 *Total: ${fmt(totalFinal)}*\n`;
   msg += `\nCualquier consulta estamos a disposición. ¡Gracias!`;
+  document.getElementById('pgWAMsg').value = msg;
+  document.getElementById('pgWATel').textContent = '549' + tel;
+  document.getElementById('pgForm').style.display = 'none';
+  document.getElementById('pgWAPreview').style.display = '';
+}
+
+function pgVolverForm(){
+  document.getElementById('pgForm').style.display = '';
+  document.getElementById('pgWAPreview').style.display = 'none';
+}
+
+function pgEnviarWAFinal(){
+  const tel = document.getElementById('pgCliTel').value.replace(/\D/g,'');
+  const msg = document.getElementById('pgWAMsg').value;
   window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function pgImprimir(){
-  const cubId = document.getElementById('pgCubId').value;
-  const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(cubId));
   const cant = parseInt(document.getElementById('pgCant').value)||1;
-  const cuotas = document.getElementById('pgCuotas').value;
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
   const cliente = document.getElementById('pgCliNom').value.trim()||'—';
   const negocio = currentTenant?.nombre || 'Gomería';
-  const pCub = cub?(cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado):0;
-  const totalFinal = pCub*cant+manoObra;
-  const modLabel = cuotas==='contado'?'Contado':cuotas==='3c'?'3 cuotas':cuotas==='6c'?'6 cuotas':'12 cuotas';
+  let itemHTML = '';
+  let totalFinal = 0;
+  if(_pgMode==='cubierta'){
+    const cub = (S.cubiertas||[]).find(c=>String(c.id)===String(document.getElementById('pgCubId').value));
+    if(cub){
+      const cuotas = document.getElementById('pgCuotas').value;
+      const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+      const modLabel = cuotas==='contado'?'Contado':cuotas==='3c'?'3 cuotas':cuotas==='6c'?'6 cuotas':'12 cuotas';
+      totalFinal = pCub*cant+manoObra;
+      itemHTML = `<div class="row"><span>${cant}x ${cub.medida}${cub.marca?' '+cub.marca:''} (${modLabel})</span><span>${fmt(pCub)} c/u</span></div>`;
+    }
+  } else {
+    const p = (S.precios||[]).find(x=>String(x.id)===String(document.getElementById('pgServId').value));
+    if(p){ totalFinal = p.precio*cant+manoObra; itemHTML = `<div class="row"><span>${cant>1?cant+'x ':''} ${p.nombre}</span><span>${fmt(p.precio)}</span></div>`; }
+  }
+  if(manoObra>0) itemHTML += `<div class="row"><span>Mano de obra</span><span>${fmt(manoObra)}</span></div>`;
   const w = window.open('','_blank','width=600,height=700');
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Presupuesto</title>
   <style>body{font-family:Arial,sans-serif;padding:32px;color:#222;max-width:520px;margin:auto}
@@ -5866,8 +6008,7 @@ function pgImprimir(){
   <h2>${negocio}</h2><p>Presupuesto · ${new Date().toLocaleDateString('es-AR')}</p>
   <div class="lin"></div>
   <div class="row"><span>Cliente</span><span>${cliente}</span></div>
-  ${cub?`<div class="row"><span>${cant}x ${cub.medida}${cub.marca?' '+cub.marca:''} (${modLabel})</span><span>${fmt(pCub)} c/u</span></div>`:''}
-  ${manoObra>0?`<div class="row"><span>Mano de obra</span><span>${fmt(manoObra)}</span></div>`:''}
+  ${itemHTML}
   <div class="lin"></div>
   <div class="row total"><span>TOTAL</span><span>${fmt(totalFinal)}</span></div>
   <div class="footer">Presupuesto generado con Remu Gestión · remugestion.ar<br>Válido por 48 horas sujeto a disponibilidad de stock</div>
@@ -5876,27 +6017,43 @@ function pgImprimir(){
 }
 
 async function pgConfirmarVenta(){
-  const cubId = document.getElementById('pgCubId').value;
-  if(!cubId) return;
-  const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===String(cubId));
-  if(ci<0) return;
-  const cub = S.cubiertas[ci];
   const cant = parseInt(document.getElementById('pgCant').value)||1;
-  if(cant > cub.stock){ showToast('Stock insuficiente (disponible: '+cub.stock+')','err'); return; }
-  const cuotas = document.getElementById('pgCuotas').value;
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
-  const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
-  const total = pCub * cant + manoObra;
-  if(!confirm(`¿Confirmar venta por ${fmt(total)}? Esto descuenta ${cant} unidad${cant!==1?'es':''} de stock.`)) return;
-  const venta = {id:Date.now(),tipo:'cubierta',nombre:cub.medida+(cub.marca?' — '+cub.marca:''),cubId:cub.id,
-    cantidad:cant,precio:pCub,total,costo:cub.costo||0,metodo:'Efectivo',fecha:tod(),cuotas,comPct:0,comision:0};
-  S.ventas.push(venta);
-  await dbUpsert('ventas',venta);
-  S.cubiertas[ci].stock -= cant;
-  await dbUpsertCubierta(S.cubiertas[ci]);
-  closeM('mPresupGom');
-  showToast('✓ Venta confirmada — '+fmt(total));
-  rVentas(); rCubiertas();
+  if(_pgMode==='cubierta'){
+    const cubId = document.getElementById('pgCubId').value;
+    if(!cubId) return;
+    const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===String(cubId));
+    if(ci<0) return;
+    const cub = S.cubiertas[ci];
+    if(cant > cub.stock){ showToast('Stock insuficiente (disponible: '+cub.stock+')','err'); return; }
+    const cuotas = document.getElementById('pgCuotas').value;
+    const pCub = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
+    const total = pCub * cant + manoObra;
+    if(!confirm(`¿Confirmar venta por ${fmt(total)}? Descuenta ${cant} unidad${cant!==1?'es':''} de stock.`)) return;
+    const venta = {id:Date.now(),tipo:'cubierta',nombre:cub.medida+(cub.marca?' — '+cub.marca:''),cubId:cub.id,
+      cantidad:cant,precio:pCub,total,costo:cub.costo||0,metodo:'Efectivo',fecha:tod(),cuotas,comPct:0,comision:0};
+    S.ventas.push(venta);
+    await dbUpsert('ventas',venta);
+    S.cubiertas[ci].stock -= cant;
+    await dbUpsertCubierta(S.cubiertas[ci]);
+    closeM('mPresupGom');
+    showToast('✓ Venta confirmada — '+fmt(total));
+    rVentas(); rCubiertas();
+  } else {
+    const servId = document.getElementById('pgServId').value;
+    if(!servId) return;
+    const p = (S.precios||[]).find(x=>String(x.id)===String(servId));
+    if(!p) return;
+    const total = p.precio * cant + manoObra;
+    if(!confirm(`¿Confirmar venta por ${fmt(total)}?`)) return;
+    const venta = {id:Date.now(),tipo:'servicio',nombre:p.nombre,
+      cantidad:cant,precio:p.precio,total,costo:0,metodo:'Efectivo',fecha:tod(),cuotas:'contado',comPct:0,comision:0};
+    S.ventas.push(venta);
+    await dbUpsert('ventas',venta);
+    closeM('mPresupGom');
+    showToast('✓ Venta confirmada — '+fmt(total));
+    rVentas();
+  }
 }
 
 function vrBuscarProd(q){
@@ -7399,8 +7556,10 @@ function initPrCatSelect(valorActual){
   const rub = (currentTenant?.rubro||'').toLowerCase();
   const esBarber = /barber/i.test(rub);
   const esSalon = esBarber || /salon|belleza|peluq|manicur/i.test(rub);
+  const esGomC = /gomer|neumat|cubiert/i.test(rub);
   let opts;
-  if(esBarber) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'barba',l:'🪒 Barba'},{v:'coloracion',l:'🎨 Coloración'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'otro',l:'🔧 Otros'}];
+  if(esGomC) opts = [{v:'',l:'— Sin categoría'},{v:'cubierta',l:'🛞 Cubierta'},{v:'servicio',l:'🔧 Servicio'},{v:'otro',l:'📦 Otros'}];
+  else if(esBarber) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'barba',l:'🪒 Barba'},{v:'coloracion',l:'🎨 Coloración'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'otro',l:'🔧 Otros'}];
   else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'manicuria',l:'💅 Manicuria'},{v:'pedicuria',l:'🦶 Pedicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
   else opts = [{v:'',l:'— Sin categoría'},{v:'pantalla',l:'📱 Pantallas'},{v:'tapa',l:'🔲 Tapas'},{v:'bateria',l:'🔋 Baterías'},{v:'conector',l:'🔌 Conectores'},{v:'camara',l:'📸 Cámaras'},{v:'otro',l:'🔧 Otros'}];
   sel.innerHTML = opts.map(o=>`<option value="${o.v}"${o.v===valorActual?' selected':''}>${o.l}</option>`).join('');
@@ -7441,8 +7600,9 @@ function setupPreciosTabs(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esBarber = /barber/i.test(rubro);
   const esSalon = esBarber || rubro.includes('salon')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur');
+  const esGom = /gomer|neumat|cubiert/i.test(rubro);
   const tabsEl = document.getElementById('prTabs');
-  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
+  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : esGom ? '🛞' : '📱';
 
   // Dynamic notice
   const notice = document.getElementById('preciosNotice');
@@ -7468,6 +7628,13 @@ function setupPreciosTabs(){
          <button class="tab" onclick="setPrFilt('maquillaje',this)">💄 Maquillaje</button>
          <button class="tab" onclick="setPrFilt('lifting',this)">👁 Lifting</button>
          <button class="tab" onclick="setPrFilt('depilacion',this)">✨ Depilación</button>`;
+  } else if(esGom) {
+    tabsEl.innerHTML = `
+      <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+      <button class="tab" onclick="setPrFilt('cubierta',this)">🛞 Cubiertas</button>
+      <button class="tab" onclick="setPrFilt('servicio',this)">🔧 Servicios</button>
+      <button class="tab" onclick="setPrFilt('otro',this)">📦 Otros</button>
+    `;
   } else {
     tabsEl.innerHTML = `
       <button class="tab active" onclick="setPrFilt('',this)">Todos</button>
@@ -7509,7 +7676,7 @@ function rPrecios(){
   if(currentTenant && !document.getElementById('sec-precios').dataset.rubroIconInit){
     document.getElementById('sec-precios').dataset.rubroIconInit = '1';
     const rubI = (currentTenant.rubro||'').toLowerCase();
-    const rubroIconI = /barber/i.test(rubI) ? '💈' : /salon|belleza|peluq|manicur/i.test(rubI) ? '💇' : '📱';
+    const rubroIconI = /barber/i.test(rubI) ? '💈' : /salon|belleza|peluq|manicur/i.test(rubI) ? '💇' : /gomer|neumat|cubiert/i.test(rubI) ? '🛞' : '📱';
     const ptEl = document.querySelector('#sec-precios .pt');
     const psEl = document.querySelector('#sec-precios .ps');
     if(ptEl) ptEl.textContent = rubroIconI + ' Lista de Precios';
@@ -7521,6 +7688,18 @@ function rPrecios(){
     const rub = (currentTenant.rubro||'').toLowerCase();
     const esBarberP = /barber/i.test(rub);
     const esSalonP  = /salon|belleza|peluq|manicur/i.test(rub);
+    const esGomP    = /gomer|neumat|cubiert/i.test(rub);
+    // Auto-asignar categoria gomería
+    if(esGomP && S.precios.some(p=>!p.categoria)){
+      S.precios.forEach(p=>{
+        if(!p.categoria){
+          const n=(p.nombre||'').toLowerCase();
+          p.categoria = /cubierta|neumático|neumático|llanta|goma/i.test(n)?'cubierta':
+                        /alineac|balanc|rotac|pinchad|válvula|presión|cambio/i.test(n)?'servicio':'otro';
+          dbUpsert('precios', p).catch(()=>{});
+        }
+      });
+    }
     // Auto-asignar categoria a servicios precargados sin categoría
     if((esBarberP||esSalonP) && S.precios.some(p=>!p.categoria)){
       const tipo2 = esBarberP?'barberia':'salon';
@@ -7543,10 +7722,15 @@ function rPrecios(){
         }
       });
     }
-    if(esBarberP || esSalonP){
+    if(esBarberP || esSalonP || esGomP){
       prTabs.dataset.rubroInit = '1';
       prFilt = '';
-      prTabs.innerHTML = esBarberP
+      prTabs.innerHTML = esGomP
+        ? `<button class="tab active" onclick="setPrFilt('',this)">Todos</button>
+           <button class="tab" onclick="setPrFilt('cubierta',this)">🛞 Cubiertas</button>
+           <button class="tab" onclick="setPrFilt('servicio',this)">🔧 Servicios</button>
+           <button class="tab" onclick="setPrFilt('otro',this)">📦 Otros</button>`
+        : esBarberP
         ? `<button class="tab active" onclick="setPrFilt('',this)">Todos</button>
            <button class="tab" onclick="setPrFilt('corte',this)">✂ Corte</button>
            <button class="tab" onclick="setPrFilt('barba',this)">🪒 Barba</button>
