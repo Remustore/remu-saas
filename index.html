@@ -1921,6 +1921,7 @@ $$;</pre>
               <option>Económica</option><option>Media</option><option>Premium</option><option>Deportiva</option><option>Moto</option>
             </select>
           </div>
+          <button class="btn" onclick="abrirGomListas()">⚙️ Mis listas</button>
           <button class="btn" onclick="abrirPedidosGom()">📋 Pedidos</button>
           <button class="btn bgh" onclick="abrirPresupuestoGom()">📄 Presupuesto</button>
           <button class="btn bg" onclick="abrirFormCubierta()">+ Agregar cubierta</button>
@@ -2015,9 +2016,6 @@ $$;</pre>
     <div style="flex:2"><label>Marca</label>
       <input id="cubMarca" list="cubMarcasSug" placeholder="Ej: Bridgestone, Michelin..." style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
       <datalist id="cubMarcasSug">
-        <option>Bridgestone</option><option>Michelin</option><option>Goodyear</option>
-        <option>Pirelli</option><option>Continental</option><option>Dunlop</option>
-        <option>Yokohama</option><option>Toyo</option><option>Fate</option>
         <option>Firestone</option><option>BF Goodrich</option><option>General</option>
       </datalist>
     </div>
@@ -2248,6 +2246,30 @@ $$;</pre>
 <div class="mf"><button class="btn" onclick="closeM('mClienteGomeria')">Cancelar</button><button class="btn bg" onclick="guardarClienteGomeria()">Guardar cliente</button></div>
 </div></div>
 
+<!-- GOMERÍA: Configuración de listas (marcas y servicios) -->
+<div class="mb" id="mGomListas"><div class="md" style="max-width:500px">
+<div class="mh"><div class="mt2">⚙️ Mis listas</div><button class="xbtn" onclick="closeM('mGomListas')">✕</button></div>
+<div class="mc" style="display:flex;flex-direction:column;gap:18px">
+  <div>
+    <div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px">Marcas de cubiertas</div>
+    <div id="gomListaMarcas" style="max-height:160px;overflow-y:auto;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <input id="gomNuevaMarca" placeholder="Nueva marca..." style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none" onkeydown="if(event.key==='Enter') _addGomMarca()">
+      <button class="btn bg bsm" onclick="_addGomMarca()">Agregar</button>
+    </div>
+  </div>
+  <div>
+    <div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px">Tipos de servicio</div>
+    <div id="gomListaServicios" style="max-height:200px;overflow-y:auto;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <input id="gomNuevoServicio" placeholder="Nuevo tipo de servicio..." style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none" onkeydown="if(event.key==='Enter') _addGomServicio()">
+      <button class="btn bg bsm" onclick="_addGomServicio()">Agregar</button>
+    </div>
+  </div>
+</div>
+<div class="mf"><button class="btn bg" onclick="closeM('mGomListas')">Listo</button></div>
+</div></div>
+
 <!-- GOMERÍA: Registrar servicio en historial -->
 <div class="mb" id="mServicioGomeria"><div class="md" style="max-width:520px"><div class="mh"><div class="mt2">Registrar servicio</div><button class="xbtn" onclick="closeM('mServicioGomeria')">✕</button></div>
 <div class="mc">
@@ -2260,16 +2282,14 @@ $$;</pre>
   <div><label>Servicio realizado *</label>
     <select id="srvGomTipo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:8px;font-family:var(--fb);font-size:.86rem;outline:none" onchange="_srvGomTipoChange()">
       <option value="">— Seleccionar —</option>
-      <option>Cambio de cubiertas</option>
-      <option>Rotación de cubiertas</option>
-      <option>Reparación de pinchadura</option>
-      <option>Alineación y balanceo</option>
-      <option>Cambio de aceite</option>
-      <option>Cambio de filtros</option>
-      <option>Reparación tren delantero</option>
-      <option>Cambio de amortiguadores</option>
-      <option>Otro</option>
     </select>
+  </div>
+  <div id="srvGomTipoOtroBox" style="display:none">
+    <label>Nombre del servicio</label>
+    <div style="display:flex;gap:8px">
+      <input id="srvGomTipoCustom" placeholder="Ej: Cambio de bujías..." style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none" onkeydown="if(event.key==='Enter') _confirmarNuevoTipo()">
+      <button class="btn bg bsm" onclick="_confirmarNuevoTipo()">➕ Guardar en mi lista</button>
+    </div>
   </div>
   <!-- Solo visible si es cambio/rotación de cubiertas -->
   <div id="srvGomCubiertasBloque" style="display:none">
@@ -4938,12 +4958,73 @@ async function _iniciarCubiertas(){
   rCubiertas();
 }
 
+// ── Listas personalizables por tenant ────────────────────────────────────────
+const _GOM_MARCAS_DEF = ['Fate','Pirelli','Bridgestone','Michelin','Goodyear','Continental','Yokohama','Toyo','Dunlop','Hankook'];
+const _GOM_SERV_DEF   = ['Cambio de cubiertas','Rotación de cubiertas','Reparación de pinchadura','Alineación y balanceo','Cambio de aceite','Cambio de filtros','Reparación tren delantero','Cambio de amortiguadores'];
+
+function _getGomMarcas(){ try{ return JSON.parse(dbGetConfig('gomMarcas')||'null')||_GOM_MARCAS_DEF; }catch(e){ return _GOM_MARCAS_DEF; } }
+function _getGomServicios(){ try{ return JSON.parse(dbGetConfig('gomServicios')||'null')||_GOM_SERV_DEF; }catch(e){ return _GOM_SERV_DEF; } }
+function _saveGomMarcas(l){ dbSetConfig('gomMarcas', JSON.stringify(l)); }
+function _saveGomServicios(l){ dbSetConfig('gomServicios', JSON.stringify(l)); }
+
+function abrirGomListas(){
+  rGomListas();
+  const el = document.getElementById('mGomListas');
+  if(el) el.classList.add('open');
+}
+function rGomListas(){
+  const marcas = _getGomMarcas();
+  const servs  = _getGomServicios();
+  const rowStyle = 'display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bor2)';
+  document.getElementById('gomListaMarcas').innerHTML = marcas.length
+    ? marcas.map((m,i)=>`<div style="${rowStyle}"><span style="font-size:.85rem">${esc(m)}</span><button class="btn bsm be" onclick="_delGomMarca(${i})">✕</button></div>`).join('')
+    : '<div style="color:var(--mut);font-size:.8rem;padding:6px 0">Sin marcas. Agregá una abajo.</div>';
+  document.getElementById('gomListaServicios').innerHTML = servs.length
+    ? servs.map((s,i)=>`<div style="${rowStyle}"><span style="font-size:.85rem">${esc(s)}</span><button class="btn bsm be" onclick="_delGomServicio(${i})">✕</button></div>`).join('')
+    : '<div style="color:var(--mut);font-size:.8rem;padding:6px 0">Sin servicios.</div>';
+}
+function _delGomMarca(i){ const l=_getGomMarcas(); l.splice(i,1); _saveGomMarcas(l); rGomListas(); }
+function _delGomServicio(i){ const l=_getGomServicios(); l.splice(i,1); _saveGomServicios(l); rGomListas(); }
+function _addGomMarca(){
+  const v=document.getElementById('gomNuevaMarca').value.trim();
+  if(!v) return;
+  const l=_getGomMarcas();
+  if(l.map(x=>x.toLowerCase()).includes(v.toLowerCase())){ showToast('Ya está en la lista','err'); return; }
+  l.push(v); _saveGomMarcas(l);
+  document.getElementById('gomNuevaMarca').value='';
+  rGomListas();
+  showToast(`"${v}" agregada ✓`);
+}
+function _addGomServicio(){
+  const v=document.getElementById('gomNuevoServicio').value.trim();
+  if(!v) return;
+  const l=_getGomServicios();
+  if(l.map(x=>x.toLowerCase()).includes(v.toLowerCase())){ showToast('Ya está en la lista','err'); return; }
+  l.push(v); _saveGomServicios(l);
+  document.getElementById('gomNuevoServicio').value='';
+  rGomListas();
+  showToast(`"${v}" agregado ✓`);
+}
+function _confirmarNuevoTipo(){
+  const v=document.getElementById('srvGomTipoCustom').value.trim();
+  if(!v){ showToast('Escribí el nombre del servicio','err'); return; }
+  const l=_getGomServicios();
+  if(!l.map(x=>x.toLowerCase()).includes(v.toLowerCase())){ l.push(v); _saveGomServicios(l); showToast(`"${v}" guardado en tu lista ✓`); }
+  const sel=document.getElementById('srvGomTipo');
+  let opt=[...sel.options].find(o=>o.value===v);
+  if(!opt){ opt=new Option(v,v); sel.insertBefore(opt, sel.options[sel.options.length-1]); }
+  sel.value=v;
+  document.getElementById('srvGomTipoOtroBox').style.display='none';
+  document.getElementById('srvGomCubiertasBloque').style.display='none';
+}
+
 function abrirFormCubierta(id=null){
   const c = id ? S.cubiertas.find(x=>x.id===id) : null;
   document.getElementById('mCubTitle').textContent = c ? 'Editar cubierta' : 'Nueva cubierta';
   document.getElementById('cubId').value = c?.id||'';
   document.getElementById('cubMedida').value = c?.medida||'';
   document.getElementById('cubMarca').value = c?.marca||'';
+  document.getElementById('cubMarcasSug').innerHTML = _getGomMarcas().map(m=>`<option value="${esc(m)}">`).join('');
   document.getElementById('cubSegmento').value = c?.segmento||'Media';
   document.getElementById('cubStock').value = c?.stock??0;
   document.getElementById('cubMinimo').value = c?.minimo??2;
@@ -5553,24 +5634,38 @@ function abrirFormServicioGomeria(clienteId){
   if(dlMedidas) dlMedidas.innerHTML = medidas.map(m=>`<option value="${m}">`).join('');
   if(dlMarcas)  dlMarcas.innerHTML  = marcas.map(m=>`<option value="${m}">`).join('');
   openM('mServicioGomeria');
-  // openM resetea todos los inputs — seteamos el id oculto DESPUÉS
+  // openM resetea todos los inputs — seteamos los valores DESPUÉS
   document.getElementById('srvGomClienteId').value = clienteId;
   document.getElementById('srvGomFecha').value = tod();
   document.getElementById('srvGomKm').value = c.km||'';
   document.getElementById('srvGomPago').value = 'Efectivo';
+  // Poblar select de tipos desde lista personalizada
+  const _servs = _getGomServicios();
+  document.getElementById('srvGomTipo').innerHTML =
+    '<option value="">— Seleccionar —</option>' +
+    _servs.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join('') +
+    '<option value="__otro__">Otro (nuevo)...</option>';
+  document.getElementById('srvGomTipoOtroBox').style.display='none';
+  // Poblar marcas desde lista personalizada + stock
+  const _marcasCfg = _getGomMarcas();
+  const _marcasStock = [...new Set((S.cubiertas||[]).map(x=>x.marca).filter(Boolean))];
+  const _marcasTodas = [...new Set([..._marcasCfg, ..._marcasStock])];
+  document.getElementById('srvGomMarcasList').innerHTML = _marcasTodas.map(m=>`<option value="${esc(m)}">`).join('');
 }
 
 function _srvGomTipoChange(){
   const tipo = document.getElementById('srvGomTipo').value;
   const bloque = document.getElementById('srvGomCubiertasBloque');
+  const otroBox = document.getElementById('srvGomTipoOtroBox');
   if(bloque) bloque.style.display = (tipo==='Cambio de cubiertas'||tipo==='Rotación de cubiertas') ? '' : 'none';
+  if(otroBox) otroBox.style.display = tipo==='__otro__' ? '' : 'none';
 }
 
 async function guardarServicioGomeria(){
   const clienteId = document.getElementById('srvGomClienteId').value;
   const tipo = document.getElementById('srvGomTipo').value;
   if(!clienteId){ showToast('Error: cliente no identificado. Cerrá y volvé a abrir el historial.','err'); return; }
-  if(!tipo){ showToast('Seleccioná el tipo de servicio','err'); return; }
+  if(!tipo || tipo==='__otro__'){ showToast('Completá el nombre del servicio nuevo primero','err'); return; }
   const esCubierta = tipo==='Cambio de cubiertas'||tipo==='Rotación de cubiertas';
   const s = {
     id: crypto.randomUUID(),
