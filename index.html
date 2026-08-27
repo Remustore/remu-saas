@@ -2129,7 +2129,7 @@ $$;</pre>
 
 <!-- GOMERÍA: Presupuesto (multi-ítem) -->
 <div class="mb" id="mPresupGom"><div class="md" style="max-width:480px">
-  <div class="mh"><div class="mt2">📋 Presupuesto</div><button class="xbtn" onclick="closeM('mPresupGom')">✕</button></div>
+  <div class="mh"><div class="mt2">📋 Presupuesto <span id="pgNumBadge" style="font-size:.78rem;color:var(--gld);font-weight:500;letter-spacing:.3px"></span></div><button class="xbtn" onclick="closeM('mPresupGom')">✕</button></div>
   <!-- FORMULARIO -->
   <div id="pgForm">
   <div class="mc" style="display:flex;flex-direction:column;gap:12px">
@@ -2190,18 +2190,26 @@ $$;</pre>
         <label style="font-size:.78rem;color:var(--tx2);white-space:nowrap">Mano de obra ($):</label>
         <input type="number" id="pgManoObra" value="0" min="0" placeholder="0" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.9rem;text-align:right" oninput="pgRenderCart()">
       </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bor2)">
+        <label style="font-size:.78rem;color:var(--tx2);white-space:nowrap">Descuento:</label>
+        <input type="number" id="pgDescuento" value="0" min="0" placeholder="0" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.9rem;text-align:right" oninput="pgRenderCart()">
+        <button id="pgDescTipoBtn" class="btn bsm" onclick="_pgToggleDescTipo()" style="min-width:38px;font-weight:700;padding:7px 10px">%</button>
+      </div>
+      <div id="pgDesglose" style="display:none;font-size:.75rem;color:var(--tx2);margin-top:6px;text-align:right"></div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:2px solid var(--bor)">
         <span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px">Total</span>
         <span id="pgTotal" style="font-size:1.6rem;font-weight:900;color:var(--gld)"></span>
       </div>
     </div>
-    <!-- Cliente (para WA) -->
-    <div>
-      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Cliente <span style="color:var(--mut);font-weight:400">y teléfono (para WhatsApp)</span></label>
+    <!-- Cliente, vehículo y observaciones -->
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px">Cliente y vehículo</label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <input type="text" id="pgCliNom" placeholder="Nombre del cliente" style="padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem">
-        <input type="tel" id="pgCliTel" placeholder="11 2345 6789" oninput="pgRenderCart()" style="padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem">
+        <input type="text" id="pgPatente" placeholder="Patente (ej: ABC 123)" style="padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
       </div>
+      <input type="tel" id="pgCliTel" placeholder="Teléfono (para WhatsApp, ej: 3472 123456)" oninput="pgRenderCart()" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.85rem">
+      <textarea id="pgObs" rows="2" placeholder="Observaciones (ej: incluye colocación y balanceo)" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.84rem;font-family:var(--fb);resize:none"></textarea>
     </div>
   </div>
   <div class="mf" style="flex-wrap:wrap;gap:8px">
@@ -2264,6 +2272,22 @@ $$;</pre>
     <div style="display:flex;gap:8px">
       <input id="gomNuevoServicio" placeholder="Nuevo tipo de servicio..." style="flex:1;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none" onkeydown="if(event.key==='Enter') _addGomServicio()">
       <button class="btn bg bsm" onclick="_addGomServicio()">Agregar</button>
+    </div>
+  </div>
+</div>
+  <div>
+    <div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:10px">Configuración de presupuesto</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:.85rem;flex:1">Vigencia del presupuesto</label>
+        <input id="gomPresupVigencia" type="number" min="1" max="720" placeholder="48" style="width:70px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:7px 10px;border-radius:7px;font-family:var(--fb);font-size:.85rem;text-align:center">
+        <span style="font-size:.85rem;color:var(--tx2)">horas</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <label style="font-size:.85rem;flex:1">Teléfono del negocio</label>
+        <input id="gomPresupTel" type="tel" placeholder="Ej: 3472 123456" style="width:140px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:7px 10px;border-radius:7px;font-family:var(--fb);font-size:.85rem">
+      </div>
+      <button class="btn bg bsm" onclick="_savePresupConfig()" style="align-self:flex-start">Guardar configuración</button>
     </div>
   </div>
 </div>
@@ -4969,6 +4993,9 @@ function _saveGomServicios(l){ dbSetConfig('gomServicios', JSON.stringify(l)); }
 
 function abrirGomListas(){
   rGomListas();
+  const cfg = _getPresupConfig();
+  document.getElementById('gomPresupVigencia').value = cfg.vigencia||48;
+  document.getElementById('gomPresupTel').value = cfg.tel||'';
   const el = document.getElementById('mGomListas');
   if(el) el.classList.add('open');
 }
@@ -6218,6 +6245,27 @@ async function confirmarReposicion(){
 // ── Presupuesto Gomería (multi-ítem) ─────────────────────────────────────
 let _pgMode = 'cubierta';
 let _pgCart = []; // [{tipo,id,nombre,precio,cant,cuotas,subtotal}]
+let _pgDescTipo = '%'; // '%' o '$'
+let _pgNumActual = '';
+
+function _getPresupConfig(){ try{ return JSON.parse(dbGetConfig('gomPresupCfg')||'null')||{vigencia:48,tel:''}; }catch(e){ return {vigencia:48,tel:''}; } }
+function _savePresupConfig(){
+  const v = parseInt(document.getElementById('gomPresupVigencia').value)||48;
+  const t = document.getElementById('gomPresupTel').value.trim();
+  dbSetConfig('gomPresupCfg', JSON.stringify({vigencia:v, tel:t}));
+  showToast('Configuración guardada ✓');
+}
+function _nextPresupNum(){
+  const last = parseInt(dbGetConfig('gomPresupNum')||'0');
+  const next = last + 1;
+  dbSetConfig('gomPresupNum', String(next));
+  return String(next).padStart(4,'0');
+}
+function _pgToggleDescTipo(){
+  _pgDescTipo = _pgDescTipo==='%' ? '$' : '%';
+  document.getElementById('pgDescTipoBtn').textContent = _pgDescTipo;
+  pgRenderCart();
+}
 
 function pgSetMode(mode){
   _pgMode = mode;
@@ -6260,6 +6308,14 @@ function abrirPresupuestoGom(cubId){
   document.getElementById('pgAddBtn').disabled = true;
   document.getElementById('pgWaBtn').disabled = true;
   document.getElementById('pgVentaBtn').disabled = true;
+  document.getElementById('pgDescuento').value = 0;
+  document.getElementById('pgDescTipoBtn').textContent = '%';
+  document.getElementById('pgDesglose').style.display = 'none';
+  document.getElementById('pgPatente').value = '';
+  document.getElementById('pgObs').value = '';
+  _pgDescTipo = '%';
+  _pgNumActual = _nextPresupNum();
+  document.getElementById('pgNumBadge').textContent = '#' + _pgNumActual;
   _pgMode = 'cubierta';
   document.getElementById('pgTabCub').classList.add('active');
   document.getElementById('pgTabServ').classList.remove('active');
@@ -6370,14 +6426,18 @@ function pgAddToCart(){
 
 function pgRenderCart(){
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const descValor = parseFloat(document.getElementById('pgDescuento').value)||0;
   const tel = document.getElementById('pgCliTel').value.trim();
   const box = document.getElementById('pgCartBox');
   const itemsEl = document.getElementById('pgCartItems');
   const totalEl = document.getElementById('pgTotal');
+  const desglose = document.getElementById('pgDesglose');
   if(!_pgCart.length){ box.style.display='none'; document.getElementById('pgWaBtn').disabled=true; document.getElementById('pgVentaBtn').disabled=true; return; }
   box.style.display='';
   const subtotalItems = _pgCart.reduce((a,i)=>a+i.subtotal,0);
-  const total = subtotalItems + manoObra;
+  const base = subtotalItems + manoObra;
+  const descMonto = _pgDescTipo==='%' ? Math.round(base * descValor / 100) : descValor;
+  const total = Math.max(0, base - descMonto);
   itemsEl.innerHTML = _pgCart.map((item,idx)=>`
     <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor2);gap:8px">
       <div style="flex:1;min-width:0">
@@ -6389,6 +6449,12 @@ function pgRenderCart(){
         <button onclick="_pgRemove(${idx})" style="font-size:.68rem;color:var(--bad);background:none;border:none;cursor:pointer;padding:2px">✕ quitar</button>
       </div>
     </div>`).join('');
+  if(descMonto>0){
+    desglose.style.display='block';
+    desglose.innerHTML = `Subtotal ${fmt(base)} · Descuento −${fmt(descMonto)}${_pgDescTipo==='%'?' ('+descValor+'%)':''}`;
+  } else {
+    desglose.style.display='none';
+  }
   totalEl.textContent = fmt(total);
   document.getElementById('pgWaBtn').disabled = !tel;
   document.getElementById('pgVentaBtn').disabled = false;
@@ -6402,21 +6468,33 @@ function _pgRemove(idx){
 function pgPreviewWA(){
   if(!_pgCart.length) return;
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const descValor = parseFloat(document.getElementById('pgDescuento').value)||0;
   const cliente = document.getElementById('pgCliNom').value.trim() || 'Cliente';
+  const patente = document.getElementById('pgPatente').value.trim();
+  const obs = document.getElementById('pgObs').value.trim();
   const tel = document.getElementById('pgCliTel').value.replace(/\D/g,'');
   const negocio = currentTenant?.nombre || 'nuestra gomería';
-  const subtotal = _pgCart.reduce((a,i)=>a+i.subtotal,0);
-  const totalFinal = subtotal + manoObra;
+  const cfg = _getPresupConfig();
+  const subtotalItems = _pgCart.reduce((a,i)=>a+i.subtotal,0);
+  const base = subtotalItems + manoObra;
+  const descMonto = _pgDescTipo==='%' ? Math.round(base * descValor / 100) : descValor;
+  const totalFinal = Math.max(0, base - descMonto);
   let lines = _pgCart.map(item=>{
     if(item.tipo==='cubierta'){
       const mod = item.modLabel?` (${item.modLabel})`:'';
-      return `• ${item.cant}x *${item.nombre}*${mod}: *${fmt(item.precio)} c/u*`;
+      return `• ${item.cant}x *${item.nombre}*${mod}: *${fmt(item.precio)} c/u* — ${fmt(item.subtotal)}`;
     }
-    return `• ${item.cant>1?item.cant+'x ':''} *${item.nombre}*: *${fmt(item.precio)}*`;
+    return `• ${item.cant>1?item.cant+'x ':''} *${item.nombre}*: *${fmt(item.subtotal)}*`;
   }).join('\n');
-  let msg = `🛞 *Presupuesto de ${negocio}*\n\nHola ${cliente}! Te enviamos el presupuesto:\n\n${lines}\n`;
+  let msg = `🛞 *Presupuesto ${negocio}*`;
+  msg += `\n📋 Nro. #${_pgNumActual} · ${new Date().toLocaleDateString('es-AR')}`;
+  if(patente) msg += `\n🚗 Vehículo: *${patente}*`;
+  msg += `\n\nHola ${cliente}! Te enviamos el presupuesto:\n\n${lines}\n`;
   if(manoObra>0) msg += `• Mano de obra: *${fmt(manoObra)}*\n`;
-  msg += `\n💰 *Total: ${fmt(totalFinal)}*\n\nCualquier consulta estamos a disposición. ¡Gracias!`;
+  if(descMonto>0) msg += `• Descuento: −*${fmt(descMonto)}*${_pgDescTipo==='%'?' ('+descValor+'%)':''}\n`;
+  msg += `\n💰 *TOTAL: ${fmt(totalFinal)}*`;
+  if(obs) msg += `\n\n📝 ${obs}`;
+  msg += `\n\n⏱ Válido por ${cfg.vigencia||48} hs. ¡Gracias!`;
   document.getElementById('pgWAMsg').value = msg;
   document.getElementById('pgWATel').textContent = '549' + tel;
   document.getElementById('pgForm').style.display = 'none';
@@ -6437,29 +6515,66 @@ function pgEnviarWAFinal(){
 function pgImprimir(){
   if(!_pgCart.length){ showToast('Agregá al menos un ítem','err'); return; }
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
+  const descValor = parseFloat(document.getElementById('pgDescuento').value)||0;
   const cliente = document.getElementById('pgCliNom').value.trim()||'—';
+  const patente = document.getElementById('pgPatente').value.trim();
+  const obs = document.getElementById('pgObs').value.trim();
   const negocio = currentTenant?.nombre || 'Gomería';
-  const subtotal = _pgCart.reduce((a,i)=>a+i.subtotal,0);
-  const totalFinal = subtotal + manoObra;
+  const cfg = _getPresupConfig();
+  const subtotalItems = _pgCart.reduce((a,i)=>a+i.subtotal,0);
+  const base = subtotalItems + manoObra;
+  const descMonto = _pgDescTipo==='%' ? Math.round(base * descValor / 100) : descValor;
+  const totalFinal = Math.max(0, base - descMonto);
   const itemHTML = _pgCart.map(item=>{
-    if(item.tipo==='cubierta') return `<div class="row"><span>${item.cant}x ${esc(item.nombre)}${item.modLabel?' ('+item.modLabel+')':''}</span><span>${fmt(item.precio)} c/u — ${fmt(item.subtotal)}</span></div>`;
-    return `<div class="row"><span>${item.cant>1?item.cant+'x ':''} ${esc(item.nombre)}</span><span>${fmt(item.subtotal)}</span></div>`;
-  }).join('') + (manoObra>0?`<div class="row"><span>Mano de obra</span><span>${fmt(manoObra)}</span></div>`:'');
-  const w = window.open('','_blank','width=600,height=700');
-  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Presupuesto</title>
-  <style>body{font-family:Arial,sans-serif;padding:32px;color:#222;max-width:520px;margin:auto}
-  h2{margin:0 0 4px}p{margin:4px 0;color:#555;font-size:.9rem}.lin{border-top:1px solid #ddd;margin:16px 0}
-  .row{display:flex;justify-content:space-between;padding:7px 0;font-size:.95rem;border-bottom:1px solid #f0f0f0}
-  .total{font-size:1.3rem;font-weight:700;color:#1a1a1a}.footer{margin-top:24px;font-size:.8rem;color:#888;text-align:center}
-  @media print{body{padding:16px}}</style></head><body>
-  <h2>${negocio}</h2><p>Presupuesto · ${new Date().toLocaleDateString('es-AR')}</p>
-  <div class="lin"></div>
-  <div class="row"><span>Cliente</span><span>${cliente}</span></div>
-  <div class="lin"></div>
+    if(item.tipo==='cubierta') return `<tr><td>${item.cant}x ${item.nombre}</td><td>${item.modLabel||'Contado'}</td><td style="text-align:right">${fmt(item.precio)} c/u</td><td style="text-align:right;font-weight:600">${fmt(item.subtotal)}</td></tr>`;
+    return `<tr><td colspan="2">${item.cant>1?item.cant+'x ':''} ${item.nombre}</td><td></td><td style="text-align:right;font-weight:600">${fmt(item.subtotal)}</td></tr>`;
+  }).join('');
+  const w = window.open('','_blank','width=640,height=800');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Presupuesto #${_pgNumActual}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;padding:36px;color:#1a1a1a;max-width:580px;margin:auto;font-size:14px}
+    .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;padding-bottom:20px;border-bottom:3px solid #1a1a1a}
+    .negocio{font-size:1.5rem;font-weight:800;letter-spacing:-.5px}
+    .neg-sub{font-size:.82rem;color:#555;margin-top:3px}
+    .presup-num{text-align:right}
+    .presup-num .num{font-size:1.8rem;font-weight:900;color:#b8860b;letter-spacing:-1px}
+    .presup-num .fecha{font-size:.78rem;color:#666;margin-top:2px}
+    .infobox{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#f8f8f8;border-radius:8px;padding:14px 16px;margin-bottom:22px}
+    .infobox .lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#888;font-weight:600;margin-bottom:2px}
+    .infobox .val{font-size:.9rem;font-weight:600}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{background:#1a1a1a;color:#fff;padding:9px 10px;font-size:.75rem;text-transform:uppercase;letter-spacing:.4px;text-align:left}
+    th:last-child,th:nth-last-child(2){text-align:right}
+    td{padding:9px 10px;border-bottom:1px solid #eee;font-size:.9rem;vertical-align:middle}
+    .subtotals{display:flex;flex-direction:column;gap:4px;align-items:flex-end;margin-bottom:16px;font-size:.88rem;color:#555}
+    .total-box{background:#1a1a1a;color:#fff;display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-radius:8px;margin-bottom:20px}
+    .total-box .tl{font-size:.78rem;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
+    .total-box .tv{font-size:1.6rem;font-weight:900;letter-spacing:-1px}
+    .obs-box{background:#fffbea;border:1px solid #e8d97a;border-radius:7px;padding:10px 14px;font-size:.83rem;color:#5a4a00;margin-bottom:20px}
+    .footer{text-align:center;font-size:.72rem;color:#aaa;border-top:1px solid #eee;padding-top:14px;line-height:1.6}
+    .vigencia{background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 12px;font-size:.78rem;color:#856404;text-align:center;margin-bottom:16px;font-weight:600}
+    @media print{body{padding:20px}.header{page-break-inside:avoid}}
+  </style></head><body>
+  <div class="header">
+    <div><div class="negocio">${negocio}</div><div class="neg-sub">Gomería${cfg.tel?' · Tel: '+cfg.tel:''}</div></div>
+    <div class="presup-num"><div class="num">#${_pgNumActual}</div><div class="fecha">📅 ${new Date().toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</div></div>
+  </div>
+  <div class="infobox">
+    <div><div class="lbl">Cliente</div><div class="val">${cliente}</div></div>
+    ${patente?`<div><div class="lbl">Vehículo / Patente</div><div class="val">${patente}</div></div>`:'<div></div>'}
+  </div>
+  <table><thead><tr><th>Ítem</th><th>Modalidad</th><th style="text-align:right">Precio u.</th><th style="text-align:right">Subtotal</th></tr></thead><tbody>
   ${itemHTML}
-  <div class="lin"></div>
-  <div class="row total"><span>TOTAL</span><span>${fmt(totalFinal)}</span></div>
-  <div class="footer">Presupuesto generado con Remu Gestión · remugestion.ar<br>Válido por 48 horas sujeto a disponibilidad de stock</div>
+  ${manoObra>0?`<tr><td colspan="3" style="font-style:italic;color:#666">Mano de obra</td><td style="text-align:right;font-weight:600">${fmt(manoObra)}</td></tr>`:''}
+  </tbody></table>
+  <div class="subtotals">
+    ${descMonto>0?`<span>Subtotal: ${fmt(base)}</span><span style="color:#c00">Descuento${_pgDescTipo==='%'?' ('+descValor+'%)':''}: −${fmt(descMonto)}</span>`:''}
+  </div>
+  <div class="total-box"><span class="tl">Total a pagar</span><span class="tv">${fmt(totalFinal)}</span></div>
+  ${obs?`<div class="obs-box">📝 ${obs}</div>`:''}
+  <div class="vigencia">⏱ Presupuesto válido por ${cfg.vigencia||48} horas · Sujeto a disponibilidad de stock</div>
+  <div class="footer">Presupuesto generado con <strong>Remu Gestión</strong> · remugestion.ar<br>${negocio}${cfg.tel?' · '+cfg.tel:''}</div>
   <script>window.onload=()=>window.print()<\/script></body></html>`);
   w.document.close();
 }
@@ -6467,8 +6582,11 @@ function pgImprimir(){
 async function pgConfirmarVenta(){
   if(!_pgCart.length) return;
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
-  const subtotal = _pgCart.reduce((a,i)=>a+i.subtotal,0);
-  const total = subtotal + manoObra;
+  const descValor = parseFloat(document.getElementById('pgDescuento').value)||0;
+  const subtotalItems = _pgCart.reduce((a,i)=>a+i.subtotal,0);
+  const base = subtotalItems + manoObra;
+  const descMonto = _pgDescTipo==='%' ? Math.round(base * descValor / 100) : descValor;
+  const total = Math.max(0, base - descMonto);
   // validar stock de cubiertas antes de confirmar
   for(const item of _pgCart.filter(i=>i.tipo==='cubierta')){
     const cub = S.cubiertas.find(c=>String(c.id)===String(item.id));
