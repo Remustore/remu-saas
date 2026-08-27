@@ -9901,6 +9901,47 @@ function exportarExcel(){
   ws4['!cols'] = [{wch:32},{wch:18}];
   XLSX.utils.book_append_sheet(wb, ws4, 'Resumen');
 
+  // Hojas gomería (solo si es rubro gomería)
+  const esGom = rub.includes('gomeria')||rub.includes('gomería')||rub.includes('neumat')||rub.includes('cubiert');
+  if(esGom){
+    // Clientes gomería
+    if((S.clientesGomeria||[]).length){
+      const cliData = [
+        ['Patente','Nombre','Teléfono','Vehículo','Modelo','KM','Notas'],
+        ...(S.clientesGomeria).map(c=>[c.patente||'',c.nombre||'',c.tel||'',c.marca_veh||'',c.modelo||'',c.km||0,c.notas||''])
+      ];
+      const wsCli = XLSX.utils.aoa_to_sheet(cliData);
+      wsCli['!cols'] = [{wch:12},{wch:28},{wch:16},{wch:16},{wch:16},{wch:10},{wch:30}];
+      XLSX.utils.book_append_sheet(wb, wsCli, 'Clientes gomería');
+    }
+    // Historial servicios
+    if((S.historialGomeria||[]).length){
+      const histData = [
+        ['Fecha','Patente/Cliente','Tipo servicio','Medida','Marca','Cant.cub.','KM','KM rotación','Precio','Pago','Obs','Próximo serv.','Próx. fecha','Próx. km'],
+        ...(S.historialGomeria).map(h=>{
+          const cli = (S.clientesGomeria||[]).find(c=>c.id===h.cliente_id);
+          return [h.fecha||'',cli?(cli.patente||cli.nombre||''):'',h.tipo||'',h.medida||'',h.marca||'',h.cant_cubiertas||'',h.km||'',h.km_rotacion||'',h.precio||0,h.pago||'',h.obs||'',h.prox_servicio||'',h.prox_fecha||'',h.prox_km||''];
+        })
+      ];
+      const wsHist = XLSX.utils.aoa_to_sheet(histData);
+      wsHist['!cols'] = [{wch:12},{wch:20},{wch:28},{wch:14},{wch:14},{wch:8},{wch:10},{wch:10},{wch:12},{wch:12},{wch:25},{wch:20},{wch:12},{wch:10}];
+      XLSX.utils.book_append_sheet(wb, wsHist, 'Historial servicios');
+    }
+    // Stock cubiertas
+    if((S.cubiertas||[]).length){
+      const cubData = [
+        ['Medida','Marca','Segmento','Stock','Mínimo','Costo','Precio contado','3 cuotas','6 cuotas','12 cuotas','Margen %','Estado'],
+        ...(S.cubiertas).map(c=>{
+          const mg = c.precio_contado&&c.costo ? Math.round((c.precio_contado-c.costo)/c.precio_contado*100) : 0;
+          return [c.medida||'',c.marca||'',c.segmento||'',c.stock||0,c.minimo||0,c.costo||0,c.precio_contado||0,c.precio_3c||0,c.precio_6c||0,c.precio_12c||0,mg+'%',(c.stock||0)<=(c.minimo||0)?'BAJO':'OK'];
+        })
+      ];
+      const wsCub = XLSX.utils.aoa_to_sheet(cubData);
+      wsCub['!cols'] = [{wch:14},{wch:14},{wch:12},{wch:8},{wch:8},{wch:12},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:8}];
+      XLSX.utils.book_append_sheet(wb, wsCub, 'Stock cubiertas');
+    }
+  }
+
   const fecha = tod().replace(/-/g,'');
   XLSX.writeFile(wb, `Reporte_${currentTenant?.nombre||'negocio'}_${fecha}.xlsx`);
   showToast('Excel descargado ✓');
@@ -16489,6 +16530,39 @@ function gsSearch(q){
       <div><div class="gsr-name">${esc(t.cliente)}</div><div class="gsr-sub">${esc(t.equipo||'')} · ${esc(t.falla||'')} · ${esc(t.estado)}</div></div>
       <span class="bx byw">${esc(t.estado)}</span>
     </div>`));
+  }
+
+  // Clientes gomería (patente, nombre, tel)
+  const rub = (currentTenant?.rubro||'').toLowerCase();
+  const esGom = rub.includes('gomeria')||rub.includes('gomería')||rub.includes('neumat')||rub.includes('cubiert');
+  if(esGom && S.clientesGomeria?.length){
+    const cliGom = S.clientesGomeria.filter(c=>
+      (c.patente||'').toLowerCase().includes(ql)||
+      (c.nombre||'').toLowerCase().includes(ql)||
+      (c.tel||'').includes(ql)||
+      (c.marca_veh||'').toLowerCase().includes(ql)||
+      (c.modelo||'').toLowerCase().includes(ql)
+    ).slice(0,4);
+    if(cliGom.length){
+      results.push('<div class="gsr-section">🚗 Clientes gomería</div>');
+      cliGom.forEach(c=>results.push(`<div class="gsr-item" onclick="go('clientesGomeria');setTimeout(()=>{const el=document.getElementById('cliGomQ');if(el){el.value='${esc(c.patente||c.nombre)}';rClientesGomeria();}},200);document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+        <div><div class="gsr-name">${esc(c.patente||'Sin patente')} · ${esc(c.nombre||'Sin nombre')}</div><div class="gsr-sub">${esc(c.marca_veh||'')} ${esc(c.modelo||'')} · ${c.km?c.km.toLocaleString()+' km':''}</div></div>
+      </div>`));
+    }
+  }
+  // Cubiertas gomería (medida, marca)
+  if(esGom && S.cubiertas?.length){
+    const cubGom = S.cubiertas.filter(c=>
+      (c.medida||'').toLowerCase().includes(ql)||
+      (c.marca||'').toLowerCase().includes(ql)
+    ).slice(0,4);
+    if(cubGom.length){
+      results.push('<div class="gsr-section">🛞 Cubiertas</div>');
+      cubGom.forEach(c=>results.push(`<div class="gsr-item" onclick="go('cubiertas');document.getElementById('gsResults').style.display='none';document.getElementById('globalSearch').value=''">
+        <div><div class="gsr-name">${esc(c.medida||'')}${c.marca?' · '+esc(c.marca):''}</div><div class="gsr-sub">Stock: ${c.stock||0} · ${c.precio_contado?'$'+Number(c.precio_contado).toLocaleString():''}</div></div>
+        <span class="bx ${(c.stock||0)<=(c.minimo||2)?'brd':'bgr'}">${(c.stock||0)<=(c.minimo||2)?'Bajo':'OK'}</span>
+      </div>`));
+    }
   }
 
   if(!results.length){

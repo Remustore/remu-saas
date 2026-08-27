@@ -407,7 +407,8 @@ function renderPage(){
   const rubroLC = rubro.toLowerCase();
   const esBarber = /barber/i.test(rubroLC);
   const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
-  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : '📱';
+  const esGomeria = /gomel|gomer|neumat|cubiert/i.test(rubroLC);
+  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : esGomeria ? '🛞' : '📱';
 
   document.title = nombre + ' — ' + T('titulo');
   document.getElementById('bkPanTitle').textContent = T('reservarTurno');
@@ -417,10 +418,13 @@ function renderPage(){
     ? [{k:'',l:T('todos')},{k:'corte',l:T('catCorte')},{k:'barba',l:T('catBarba')},{k:'coloracion',l:T('catColoracion')},{k:'tratamiento',l:T('catTratamiento')},{k:'otro',l:T('catOtros')}]
     : esSalon
     ? [{k:'',l:T('todos')},{k:'corte',l:T('catCorte')},{k:'tintura',l:T('catTintura')},{k:'manicuria',l:T('catManicuria')},{k:'maquillaje',l:T('catMaquillaje')},{k:'lifting',l:T('catLifting')},{k:'depilacion',l:T('catDepilacion')}]
+    : esGomeria
+    ? [{k:'',l:T('todos')},{k:'cubierta',l:'🛞 Cubiertas'},{k:'aceite',l:'🛢 Aceite'},{k:'alineacion',l:'⚙️ Alineación'},{k:'otro',l:T('catOtros')}]
     : [{k:'',l:T('todos')},{k:'pantalla',l:T('catPantallas')},{k:'tapa',l:T('catTapas')},{k:'bateria',l:T('catBaterias')},{k:'conector',l:T('catConectores')},{k:'camara',l:T('catCamaras')},{k:'otro',l:T('catOtros')}];
 
   // Nota de precios
   const textoNota = oc.notaPrecios || (
+    esGomeria ? 'Precios de referencia. Consultanos por tu medida específica y stock disponible. 🛞 Instalación y balanceo incluidos salvo indicación contraria.' :
     (esBarber||esSalon) ? T('notaSalon') : T('notaTelefonia')
   );
 
@@ -451,7 +455,7 @@ function renderPage(){
 
     <!-- MENSAJE -->
     <div style="background:rgba(201,168,76,.06);border-bottom:1px solid rgba(201,168,76,.1);padding:10px 20px;text-align:center;font-size:.82rem;color:#a89880">
-      ${esc(oc.mensaje||T('bienvenido'))}
+      ${esc(oc.mensaje||(esGomeria?'🛞 Consultá nuestros precios y servicios. Trabajamos con todas las marcas y medidas.':T('bienvenido')))}
     </div>
 
     <!-- CONTENIDO -->
