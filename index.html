@@ -1887,6 +1887,11 @@ $$;</pre>
       <div class="pt">Cubiertas</div>
       <div class="ps">Stock, precios y configuración de cuotas</div>
 
+      <!-- Dashboard gomería -->
+      <div id="gomDashboard" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+      <!-- Alerta stock crítico -->
+      <div id="gomStockAlert" style="display:none;padding:10px 14px;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:9px;margin-bottom:12px;font-size:.8rem;color:var(--bad)"></div>
+
       <!-- Config cuotas -->
       <div class="card" id="cubCuotasCard" style="margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
@@ -4651,6 +4656,17 @@ async function editarTenant(id){
           <input id="etLogo" value="${mods.logo||''}" placeholder="https://... pega el link de tu logo" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:4px">
           <div style="font-size:.72rem;color:var(--mut)">Subí tu logo a Google Drive (compartir > cualquiera con el link) o Imgur y pegá la URL acá</div>
         </div>
+
+        <div style="border-top:1px solid var(--bor);padding-top:14px;margin-top:4px">
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">⭐ Plan</div>
+          <div style="padding:8px 12px;background:${mods.plan==='premium'?'rgba(201,168,76,.1)':'var(--bg)'};border:1px solid ${mods.plan==='premium'?'rgba(201,168,76,.3)':'var(--bor2)'};border-radius:7px;margin-bottom:10px;font-size:.8rem">
+            Plan actual: <strong style="color:${mods.plan==='premium'?'var(--gld)':'var(--tx)'}">${mods.plan==='premium'?'⭐ Premium':'📦 Esencial'}</strong>
+            ${mods.plan==='premium'?`<button onclick="desactivarPremiumTenant('${id}')" style="margin-left:10px;padding:3px 8px;background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.3);border-radius:5px;font-size:.72rem;cursor:pointer">Desactivar</button>`:''}
+          </div>
+          <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Código de activación Premium <span style="color:var(--mut);text-transform:none;font-weight:400">(solo vos lo sabés)</span></label>
+          <input id="etPremiumCode" value="${mods.premium_code||''}" placeholder="Ej: GOMERIA2025" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:4px">
+          <div style="font-size:.71rem;color:var(--mut)">El cliente lo ingresa en su Configuración para activar Premium sin que tengas que hacerlo vos. Cambialo si el cliente deja de pagar.</div>
+        </div>
       </div>
       <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;gap:10px;justify-content:flex-end">
         <button class="sa-btn outline" style="margin:0" onclick="document.getElementById('editTenantOverlay')?.remove()">Cancelar</button>
@@ -4685,7 +4701,10 @@ async function guardarEdicionTenant(id){
     inversores:!!(document.getElementById('etModInversores')?.checked)
   };
   if(logo) mods.logo = logo;
-  
+  const premiumCode = document.getElementById('etPremiumCode')?.value.trim();
+  if(premiumCode) mods.premium_code = premiumCode;
+  else delete mods.premium_code;
+
   const { error } = await sb.from('tenants').update({ nombre, rubro, modulos: mods }).eq('id', id);
   if(error){ alert('Error al guardar: ' + error.message); return; }
   
@@ -5028,6 +5047,50 @@ function rCubiertas(){
 async function _iniciarCubiertas(){
   S.cubiertas = await dbLoadCubiertas();
   rCubiertas();
+  rGomDashboard();
+}
+
+// ─── Dashboard Gomería ────────────────────────────────────────────────────────
+async function rGomDashboard(){
+  const el = document.getElementById('gomDashboard');
+  const alertEl = document.getElementById('gomStockAlert');
+  if(!el) return;
+
+  const hoy = tod();
+  // Cargar historial de hoy
+  const { data: srvHoy } = await sb.from('historial_gomeria')
+    .select('precio,pago').eq('tenant_id', currentTenant.id).eq('fecha', hoy);
+
+  const countHoy    = srvHoy?.length || 0;
+  const ingresosHoy = (srvHoy||[]).reduce((s,r)=>s+(r.precio||0), 0);
+  const criticos    = (S.cubiertas||[]).filter(c => c.stock <= (c.minimo??2));
+  const { count: pedPend } = await sb.from('pedidos_gomeria')
+    .select('*', {count:'exact', head:true})
+    .eq('tenant_id', currentTenant.id).eq('estado_ped','pendiente');
+
+  const stat = (icon, label, val, color='var(--tx)') => `
+    <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:10px;padding:12px 14px">
+      <div style="font-size:1.1rem">${icon}</div>
+      <div style="font-size:1.3rem;font-weight:800;color:${color};margin:4px 0">${val}</div>
+      <div style="font-size:.72rem;color:var(--tx2)">${label}</div>
+    </div>`;
+
+  el.innerHTML =
+    stat('🔧', 'Servicios hoy', countHoy, 'var(--tx)') +
+    stat('💰', 'Ingresos hoy', '$'+ingresosHoy.toLocaleString('es-AR'), 'var(--ok)') +
+    stat('⚠️', 'Stock crítico', criticos.length, criticos.length ? 'var(--bad)' : 'var(--ok)') +
+    stat('📦', 'Pedidos pend.', pedPend||0, pedPend ? 'var(--wrn)' : 'var(--ok)');
+
+  // Alerta detallada de stock crítico
+  if(alertEl){
+    if(criticos.length){
+      alertEl.innerHTML = `⚠ <strong>${criticos.length} cubierta${criticos.length>1?'s':''} con stock bajo o agotado:</strong> ` +
+        criticos.map(c=>`${esc(c.medida)} ${c.marca||''} (stock: ${c.stock}, mín: ${c.minimo??2})`).join(' · ');
+      alertEl.style.display = 'block';
+    } else {
+      alertEl.style.display = 'none';
+    }
+  }
 }
 
 // ── Listas personalizables por tenant ────────────────────────────────────────
@@ -5633,6 +5696,7 @@ function rClientesGomeria(){
       <td style="padding:9px 8px;text-align:right">${visitas}</td>
       <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${ultima ? _fmtFechaCorta(ultima.fecha) : '—'}${proxHtml}</td>
       <td style="padding:9px 8px;display:flex;gap:6px">
+        <button class="btn bsm" onclick="verFichaVehiculo('${c.id}')">🚗 Ficha</button>
         <button class="btn bsm" onclick="verHistorialGomeria('${c.id}')">📋 Historial</button>
         <button class="btn bsm be" onclick="abrirFormClienteGomeria('${c.id}')">✎</button>
         <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarClienteGomeria('${c.id}')">✕</button>
@@ -5705,6 +5769,87 @@ async function eliminarClienteGomeria(id){
 
 // ─── Historial de cliente ─────────────────────────────────────────────────────
 let _histGomClienteActivo = null;
+
+// ─── Ficha completa del vehículo ──────────────────────────────────────────────
+async function verFichaVehiculo(clienteId){
+  const c = S.clientesGomeria.find(x=>x.id===clienteId);
+  if(!c) return;
+  const hist = (S.historialGomeria||[])
+    .filter(h=>h.cliente_id===clienteId)
+    .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+
+  let ov = document.getElementById('fichaVehOverlay');
+  if(!ov){ ov=document.createElement('div'); ov.id='fichaVehOverlay';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:9990;display:flex;align-items:center;justify-content:center;padding:16px;overflow-y:auto';
+    ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+    document.body.appendChild(ov); }
+
+  const totalGastado = hist.reduce((s,h)=>s+(h.precio||0),0);
+  const proxSrv = hist[0]?.prox_servicio;
+  const proxFecha = hist[0]?.prox_fecha;
+  const proxKm = hist[0]?.prox_km;
+
+  const lineaTL = h => {
+    const itms = h.marca?`${esc(h.tipo||'')} — ${esc(h.marca)}`:(h.tipo||'Servicio');
+    return `<div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--bor2)">
+      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:0">
+        <div style="width:10px;height:10px;border-radius:50%;background:var(--gld);margin-top:4px"></div>
+        <div style="width:2px;flex:1;background:var(--bor2);margin-top:4px"></div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="font-weight:700;font-size:.85rem">${esc(h.tipo||'Servicio')}</div>
+          <div style="font-size:.78rem;color:var(--gld);font-weight:600;flex-shrink:0">${h.precio?'$'+h.precio.toLocaleString():''}</div>
+        </div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">
+          ${_fmtFechaCorta(h.fecha)}${h.km?' · '+h.km.toLocaleString()+' km':''}${h.medida?' · '+esc(h.medida):''}${h.marca?' '+esc(h.marca):''}${h.cant>1?' ('+h.cant+' u)':''}
+        </div>
+        ${h.obs?`<div style="font-size:.73rem;color:var(--mut);margin-top:2px">📝 ${esc(h.obs)}</div>`:''}
+        ${h.prox_servicio?`<div style="font-size:.72rem;color:var(--wrn);margin-top:3px">→ Próx: ${esc(h.prox_servicio)}${h.prox_fecha?' · '+_fmtFechaCorta(h.prox_fecha):''}${h.prox_km?' · '+h.prox_km.toLocaleString()+' km':''}</div>`:''}
+      </div>
+    </div>`;
+  };
+
+  ov.innerHTML = `
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:16px;width:100%;max-width:480px;max-height:90vh;display:flex;flex-direction:column">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <div>
+          <div style="font-size:1.1rem;font-weight:800;letter-spacing:.5px">${esc(c.patente||'Sin patente')}</div>
+          <div style="font-size:.78rem;color:var(--tx2)">${[c.nombre,c.marca_veh,c.modelo].filter(Boolean).join(' · ')||'Vehículo'}</div>
+        </div>
+        <button onclick="document.getElementById('fichaVehOverlay')?.remove()" style="background:none;border:none;color:var(--tx2);font-size:1.2rem;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:14px 20px;overflow-y:auto;flex:1">
+        <!-- Stats -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+          <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:9px;padding:10px;text-align:center">
+            <div style="font-size:1.3rem;font-weight:800;color:var(--tx)">${hist.length}</div>
+            <div style="font-size:.68rem;color:var(--tx2)">Visitas</div>
+          </div>
+          <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:9px;padding:10px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:800;color:var(--ok)">$${totalGastado.toLocaleString('es-AR')}</div>
+            <div style="font-size:.68rem;color:var(--tx2)">Total gastado</div>
+          </div>
+          <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:9px;padding:10px;text-align:center">
+            <div style="font-size:1.1rem;font-weight:800;color:var(--tx)">${c.km?c.km.toLocaleString():'-'}</div>
+            <div style="font-size:.68rem;color:var(--tx2)">KM actuales</div>
+          </div>
+        </div>
+        ${proxSrv?`<div style="padding:10px 14px;background:rgba(201,148,76,.1);border:1px solid rgba(201,148,76,.25);border-radius:9px;margin-bottom:14px;font-size:.8rem">
+          <div style="font-weight:700;color:var(--wrn);margin-bottom:2px">🔔 Próximo servicio</div>
+          ${esc(proxSrv)}${proxFecha?' · '+_fmtFechaCorta(proxFecha):''}${proxKm?' · '+proxKm.toLocaleString()+' km':''}
+        </div>`:''}
+        <!-- Timeline -->
+        <div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px">Historial de servicios</div>
+        ${hist.length ? hist.map(lineaTL).join('') : '<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">Sin servicios registrados</div>'}
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid var(--bor);display:flex;gap:8px;flex-shrink:0">
+        ${c.tel?`<a href="https://wa.me/549${c.tel.replace(/\D/g,'')}" target="_blank" class="btn bsm" style="color:#25d366;border-color:rgba(37,211,102,.3);background:rgba(37,211,102,.08);text-decoration:none">📱 WA</a>`:''}
+        <button class="btn bsm bg" onclick="document.getElementById('fichaVehOverlay')?.remove();verHistorialGomeria('${c.id}')">📋 Ver historial completo</button>
+        <button class="btn bsm bg" onclick="document.getElementById('fichaVehOverlay')?.remove();abrirFormServicioGomeria('${c.id}')">+ Nuevo servicio</button>
+      </div>
+    </div>`;
+}
 
 async function verHistorialGomeria(clienteId){
   const c = S.clientesGomeria.find(x=>x.id===clienteId);
@@ -5918,6 +6063,21 @@ async function guardarServicioGomeria(){
     await dbUpsertClienteGomeria(c);
   }
   showToast('Servicio registrado ✓');
+  // Integración caja: registrar cobro en mov_caja si tiene precio
+  if(s.precio > 0){
+    const c = S.clientesGomeria.find(x=>x.id===clienteId);
+    const desc = `Gomería — ${s.tipo}${c?(' · '+(c.patente||c.nombre||'')):''}`;
+    await sb.from('mov_caja').insert({
+      tenant_id: currentTenant.id,
+      fecha: s.fecha,
+      tipo: 'ingreso',
+      monto: s.precio,
+      descripcion: desc,
+      metodo_pago: s.pago||'Efectivo',
+      origen: 'gomeria',
+      referencia_id: s.id
+    }).then(({error})=>{ if(error) console.warn('[movCaja] gomería insert:', error.message); });
+  }
   rClientesGomeria();
   // Volver a abrir historial actualizado
   await verHistorialGomeria(clienteId);
@@ -12196,6 +12356,7 @@ function verHistorialCliente(nombre){
 }
 
 async function rTurnosConfig(){
+  _renderPremiumCard();
   // Adaptar labels para gomería
   const _rubCfg = (currentTenant?.rubro||'').toLowerCase();
   const _esGomCfg = _rubCfg.includes('gomeria')||_rubCfg.includes('gomería')||_rubCfg.includes('neumat')||_rubCfg.includes('cubiert');
@@ -18475,6 +18636,57 @@ function _renderNotifCard(){
      <div style="font-size:.72rem;color:var(--mut);margin-top:10px;line-height:1.5">
        Las notificaciones aparecen aunque la app esté minimizada o en otra pestaña.
      </div>`;
+}
+
+// ─── Sistema Premium — activación por código ──────────────────────────────────
+function _renderPremiumCard(){
+  const sec = document.getElementById('sec-turnosConfig');
+  if(!sec) return;
+  let card = document.getElementById('premiumActivCard');
+  if(!card){ card = document.createElement('div'); card.id='premiumActivCard'; card.className='card'; card.style.marginTop='16px'; sec.appendChild(card); }
+  const isPremium = currentTenant?.modulos?.plan === 'premium';
+  card.innerHTML = isPremium
+    ? `<div class="ch"><h3 style="color:var(--gld)">⭐ Plan Premium activo</h3></div>
+       <div style="font-size:.8rem;color:var(--tx2);line-height:1.6">
+         Tu negocio tiene acceso a todas las funciones premium: informe nocturno, WA automático y más.<br>
+         <span style="font-size:.72rem;color:var(--mut)">Para desactivar o renovar, contactá con Remu.</span>
+       </div>`
+    : `<div class="ch"><h3>🔓 Activar Plan Premium</h3></div>
+       <div style="font-size:.8rem;color:var(--tx2);margin-bottom:12px;line-height:1.6">
+         Ingresá el código que te dió Remu para desbloquear: resumen nocturno, WA automático y más.
+       </div>
+       <div style="display:flex;gap:8px">
+         <input id="premiumCodeInput" type="password" placeholder="Código de activación" style="flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
+         <button class="btn bg" onclick="activarPremiumCodigo()" style="padding:9px 18px;white-space:nowrap">Activar</button>
+       </div>
+       <div id="premiumMsg" style="margin-top:8px;font-size:.78rem"></div>`;
+}
+
+async function activarPremiumCodigo(){
+  const code = document.getElementById('premiumCodeInput')?.value.trim();
+  const msgEl = document.getElementById('premiumMsg');
+  if(!code){ if(msgEl) msgEl.innerHTML='<span style="color:var(--bad)">Ingresá el código</span>'; return; }
+  if(msgEl) msgEl.innerHTML='<span style="color:var(--tx2)">Verificando...</span>';
+  const { data, error } = await sb.rpc('activate_premium', { p_code: code });
+  if(error || !data){
+    if(msgEl) msgEl.innerHTML='<span style="color:var(--bad)">Código incorrecto. Contactá con Remu para obtenerlo.</span>';
+    return;
+  }
+  // Actualizar estado local y re-renderizar
+  if(currentTenant?.modulos) currentTenant.modulos.plan = 'premium';
+  showToast('⭐ Plan Premium activado correctamente!');
+  _renderPremiumCard();
+}
+
+async function desactivarPremiumTenant(tenantId){
+  if(!confirm('¿Desactivar Premium para este cliente?')) return;
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
+  if(!t) return;
+  const mods = { ...t.modulos, plan: 'esencial' };
+  delete mods.premium_code;
+  await sb.from('tenants').update({ modulos: mods }).eq('id', tenantId);
+  showToast('Premium desactivado');
+  loadTenants();
 }
 
 // ── Wrappers sobre funciones existentes ──────────────────────────────
