@@ -718,8 +718,10 @@ textarea{resize:vertical;min-height:70px;}
           <input id="saRubro" placeholder="Ej: Telefonía · Servicio técnico">
           <label>Email del cliente (login)</label>
           <input type="email" id="saEmail" placeholder="cliente@email.com">
-          <label>Teléfono / WhatsApp <span style="color:var(--mut);font-weight:400">(opcional)</span></label>
+          <label>Teléfono / WhatsApp <span style="color:var(--bad);font-size:.75rem">* obligatorio</span></label>
           <input type="tel" id="saTelefono" placeholder="Ej: 3472628087">
+          <label>Instagram <span style="color:var(--bad);font-size:.75rem">* obligatorio</span></label>
+          <input type="text" id="saInstagram" placeholder="@nombredelcliente o link completo">
           <label>Contraseña inicial</label>
           <input type="password" id="saPass" placeholder="Mínimo 6 caracteres">
           <label>Módulos habilitados</label>
@@ -2076,53 +2078,90 @@ $$;</pre>
   </div>
 </div></div>
 
-<!-- GOMERÍA: Pedidos a proveedor -->
-<div class="mb" id="mPedidosGom"><div class="md" style="max-width:480px">
-  <div class="mh"><div class="mt2">📋 Pedidos a proveedor</div><button class="xbtn" onclick="closeM('mPedidosGom')">✕</button></div>
+<!-- GOMERÍA: Pedidos (proveedor / cliente) -->
+<div class="mb" id="mPedidosGom"><div class="md" style="max-width:510px">
+  <div class="mh"><div class="mt2">📋 Pedidos</div><button class="xbtn" onclick="closeM('mPedidosGom')">✕</button></div>
   <div class="mc" style="display:flex;flex-direction:column;gap:14px">
-    <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px">
-      <div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:700">Nuevo pedido</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Descripción / Medida</label>
-          <input type="text" id="pedGomDesc" placeholder="185/65R15" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
-        </div>
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Marca</label>
-          <input type="text" id="pedGomMarca" placeholder="Fate, Pirelli..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Cantidad</label>
-          <input type="number" id="pedGomCant" value="4" min="1" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.9rem;text-align:center">
-        </div>
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Costo unit. ($)</label>
-          <input type="number" id="pedGomCosto" min="0" placeholder="0" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.9rem;text-align:right">
-        </div>
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Llegada est.</label>
-          <input type="date" id="pedGomFechaEst" style="width:100%;padding:9px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.82rem">
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Proveedor</label>
-          <input type="text" id="pedGomProv" placeholder="Nombre del proveedor" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
-        </div>
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Vincular a cubierta <span style="color:var(--mut)">(opcional)</span></label>
-          <select id="pedGomCubId" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.82rem;outline:none">
-            <option value="">— Sin vincular</option>
-          </select>
-        </div>
-      </div>
-      <button class="btn bg" onclick="agregarPedidoGom()" style="align-self:flex-end;padding:9px 18px">+ Agregar pedido</button>
+
+    <!-- Tabs -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--bor);border-radius:9px;overflow:hidden;flex-shrink:0">
+      <button id="pedTabProv" onclick="pedSetTab('prov')" style="padding:10px;border:none;background:var(--gld);color:#000;font-weight:700;font-size:.82rem;cursor:pointer;font-family:var(--fb)">📦 Proveedor</button>
+      <button id="pedTabCli"  onclick="pedSetTab('cli')"  style="padding:10px;border:none;background:var(--bg2);color:var(--tx2);font-size:.82rem;cursor:pointer;font-family:var(--fb)">🚗 Encargo de cliente</button>
     </div>
+
+    <!-- Header proveedor -->
+    <div id="pedHdrProv" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Proveedor</label>
+        <input id="pedProvNombre" list="pedProvSugg" placeholder="Nombre del proveedor" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
+        <datalist id="pedProvSugg"></datalist>
+      </div>
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Tel. WA <span style="color:var(--mut)">(sin 0 ni 15)</span></label>
+        <input id="pedProvTel" type="tel" placeholder="3472628087" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
+      </div>
+    </div>
+
+    <!-- Header cliente -->
+    <div id="pedHdrCli" style="display:none;flex-direction:column;gap:8px">
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Cliente (por patente o nombre)</label>
+        <select id="pedCliSel" onchange="pedOnCliChange()" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem;outline:none">
+          <option value="">— Seleccionar cliente</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Nombre</label>
+          <input id="pedCliNombre" readonly style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--car2);color:var(--tx2);font-size:.85rem">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Tel. WA</label>
+          <input id="pedCliTel" readonly style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--car2);color:var(--tx2);font-size:.85rem">
+        </div>
+      </div>
+    </div>
+
+    <!-- Fecha estimada (shared) -->
+    <div style="display:flex;align-items:center;gap:12px">
+      <div>
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Llegada estimada</label>
+        <input type="date" id="pedFechaEst" style="padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.82rem">
+      </div>
+    </div>
+
+    <!-- Cart de ítems (shared) -->
+    <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:10px;padding:12px">
+      <div style="font-size:.7rem;color:var(--tx2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+        Ítems del pedido <span id="pedCartCount" style="color:var(--gld);font-weight:400"></span>
+      </div>
+      <div id="pedCartList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px"></div>
+      <div style="display:grid;gap:6px" id="pedItemRow">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:6px">
+          <input id="pedIDesc"  placeholder="Medida / descripción (ej: 185/65R15)" style="padding:8px 10px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.82rem">
+          <input id="pedIMarca" placeholder="Marca" style="padding:8px 10px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.82rem">
+          <input id="pedICant" type="number" value="4" min="1" style="padding:8px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem;text-align:center">
+        </div>
+        <div id="pedCostoRow" style="display:flex;gap:6px;align-items:center">
+          <input id="pedICosto" type="number" placeholder="Costo estimado ($)" min="0" style="flex:1;padding:8px 10px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.82rem">
+          <span style="font-size:.72rem;color:var(--tx2)">por unidad</span>
+        </div>
+      </div>
+      <button onclick="_pedAddItem()" style="margin-top:8px;width:100%;padding:8px;background:rgba(76,175,125,.08);color:var(--ok);border:1px solid rgba(76,175,125,.25);border-radius:7px;font-size:.8rem;cursor:pointer;font-family:var(--fb)">+ Agregar ítem a la lista</button>
+    </div>
+
+    <!-- Notas (visible solo en cliente) -->
+    <div id="pedNotasBox" style="display:none">
+      <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Notas</label>
+      <input id="pedNotasVal" placeholder="Ej: son para camioneta, llanta 16..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.85rem">
+    </div>
+
+    <button class="btn bg" onclick="agregarPedidoGom()" style="align-self:flex-end;padding:10px 24px">Crear pedido</button>
+
+    <!-- Pendientes -->
     <div>
       <div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px">Pendientes</div>
-      <div id="pedGomLista"><div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">Sin pedidos pendientes</div></div>
+      <div id="pedGomLista"></div>
     </div>
   </div>
 </div></div>
@@ -3566,10 +3605,13 @@ async function crearTenant(){
   const rubro   = document.getElementById('saRubro').value.trim();
   const email   = document.getElementById('saEmail').value.trim().toLowerCase();
   const pass    = document.getElementById('saPass').value.trim();
-  const telefono = document.getElementById('saTelefono')?.value.trim() || '';
-  const msg     = document.getElementById('saMsg');
+  const telefono  = document.getElementById('saTelefono')?.value.trim() || '';
+  const instagram = document.getElementById('saInstagram')?.value.trim() || '';
+  const msg       = document.getElementById('saMsg');
 
   if(!nombre || !email || !pass){ showSaMsg('Completá todos los campos obligatorios', 'err'); return; }
+  if(!telefono){ showSaMsg('El WhatsApp es obligatorio para hacer seguimiento', 'err'); return; }
+  if(!instagram){ showSaMsg('El Instagram es obligatorio para hacer seguimiento', 'err'); return; }
   if(pass.length < 6){ showSaMsg('La contraseña debe tener al menos 6 caracteres', 'err'); return; }
 
   const planSel = document.getElementById('saPlan')?.value || 'profesional';
@@ -3592,6 +3634,7 @@ async function crearTenant(){
     pago_activo:    false,
     trial_hasta:    new Date(Date.now()+30*24*60*60*1000).toISOString(),
     telefono:       telefono,
+    instagram:      instagram,
     crm_estado:     'nuevo',
     crm_notas:      ''
   };
@@ -3640,6 +3683,7 @@ async function crearTenant(){
     document.getElementById('saEmail').value='';
     document.getElementById('saPass').value='';
     if(document.getElementById('saTelefono')) document.getElementById('saTelefono').value='';
+    if(document.getElementById('saInstagram')) document.getElementById('saInstagram').value='';
     loadTenants();
 
   } catch(e) {
@@ -3829,6 +3873,9 @@ async function loadTenants(){
           : '';
     const tel = mods.telefono || '';
     const telWa = tel.replace(/\D/g,'');
+    const igRaw = mods.instagram || '';
+    const igHandle = igRaw.replace(/^@/,'').replace(/https?:\/\/(?:www\.)?instagram\.com\//,'').replace(/\//,'');
+    const igUrl = igHandle ? `https://instagram.com/${igHandle}` : '';
     const crmEstado = mods.crm_estado || 'nuevo';
     const crmNotas = mods.crm_notas || '';
     const crmColors = { nuevo:'rgba(76,142,201,.15)', contactado:'rgba(201,168,76,.15)', interesado:'rgba(76,175,125,.15)', descartado:'rgba(201,82,76,.15)' };
@@ -3843,7 +3890,8 @@ async function loadTenants(){
           <div class="tenant-email">${esc(t.rubro||'Sin rubro')} · Registrado: ${fechaReg}</div>
           <div style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap">
             ${t.email ? `<span style="font-size:.7rem;color:var(--tx2)">${esc(t.email)}</span><button onclick="navigator.clipboard.writeText('${esc(t.email||'')}');showToast('Email copiado')" style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:.7rem;padding:0">📋</button>` : ''}
-            ${tel ? `<a href="https://wa.me/549${telWa}" target="_blank" style="font-size:.7rem;color:#25d366;text-decoration:none">📱 WA ${tel}</a>` : ''}
+            ${tel ? `<a href="https://wa.me/549${telWa}" target="_blank" style="font-size:.7rem;color:#25d366;text-decoration:none">📱 WA ${tel}</a>` : '<span style="font-size:.7rem;color:var(--bad)">⚠ Sin WA</span>'}
+            ${igUrl ? `<a href="${igUrl}" target="_blank" style="font-size:.7rem;color:#c13584;text-decoration:none">📸 @${igHandle}</a>` : '<span style="font-size:.7rem;color:var(--bad)">⚠ Sin IG</span>'}
           </div>
         </div>
         <span class="tenant-badge ${t.activo?'t-active':'t-inactive'}">${t.activo?'Activo':'Inactivo'}</span>
@@ -5175,91 +5223,238 @@ async function dbDeleteServicioGomeria(id){
   }catch(e){ console.error('[historialGomeria] delete error', e); setSyncErr(); return false; }
 }
 
-// ─── Pedidos a proveedor (Feature 2) ─────────────────────────────────────────
-function _getPedidosGom(){
-  try{ return JSON.parse(dbGetConfig('gomPedidos')||'[]'); }catch(e){ return []; }
-}
-function _savePedidosGom(list){ dbSetConfig('gomPedidos', JSON.stringify(list)); }
+// ─── Pedidos (Proveedor / Cliente) → Supabase ────────────────────────────────
+let _pedGomTab  = 'prov';
+let _pedGomCart = [];  // items temporales antes de crear el pedido
 
-function abrirPedidosGom(){
-  const sel = document.getElementById('pedGomCubId');
-  if(sel){
-    sel.innerHTML = '<option value="">— Sin vincular</option>' +
-      (S.cubiertas||[]).map(c=>`<option value="${c.id}">${esc(c.medida+(c.marca?' — '+c.marca:''))}</option>`).join('');
+function pedSetTab(t){
+  _pedGomTab  = t;
+  _pedGomCart = [];
+  _pedRenderCart();
+  const activo   = t==='prov' ? 'pedTabProv' : 'pedTabCli';
+  const inactivo = t==='prov' ? 'pedTabCli'  : 'pedTabProv';
+  document.getElementById(activo).style.cssText   += ';background:var(--gld);color:#000;font-weight:700';
+  document.getElementById(inactivo).style.cssText += ';background:var(--bg2);color:var(--tx2);font-weight:400';
+  document.getElementById('pedHdrProv').style.display   = t==='prov' ? 'grid' : 'none';
+  document.getElementById('pedHdrCli').style.display    = t==='cli'  ? 'flex' : 'none';
+  document.getElementById('pedCostoRow').style.display  = t==='prov' ? 'flex' : 'none';
+  document.getElementById('pedNotasBox').style.display  = t==='cli'  ? 'block': 'none';
+  document.getElementById('pedICant').value = t==='prov' ? 4 : 1;
+}
+
+function _pedAddItem(){
+  const desc  = document.getElementById('pedIDesc').value.trim();
+  const marca = document.getElementById('pedIMarca').value.trim();
+  const cant  = parseInt(document.getElementById('pedICant').value)||1;
+  const costo = parseFloat(document.getElementById('pedICosto')?.value)||0;
+  if(!desc){ showToast('Ingresá medida o descripción','err'); return; }
+  _pedGomCart.push({ desc, marca, cant, costo });
+  document.getElementById('pedIDesc').value='';
+  document.getElementById('pedIMarca').value='';
+  document.getElementById('pedICant').value = _pedGomTab==='prov' ? 4 : 1;
+  document.getElementById('pedICosto').value='';
+  _pedRenderCart();
+}
+
+function _pedRenderCart(){
+  const el = document.getElementById('pedCartList');
+  const ct = document.getElementById('pedCartCount');
+  if(!el) return;
+  if(!_pedGomCart.length){
+    el.innerHTML='<div style="font-size:.75rem;color:var(--mut);padding:4px 0">Sin ítems aún — agregá al menos uno</div>';
+    if(ct) ct.textContent='';
+    return;
   }
-  rPedidosGom();
+  if(ct) ct.textContent = `(${_pedGomCart.length})`;
+  el.innerHTML = _pedGomCart.map((it,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1px solid var(--bor);border-radius:7px;font-size:.8rem">
+      <div style="flex:1">
+        <span style="font-weight:600">${esc(it.desc)}</span>${it.marca?` — ${esc(it.marca)}`:''}
+        <span style="color:var(--tx2)">× ${it.cant}</span>
+        ${it.costo ? `<span style="color:var(--tx2)"> · $${it.costo.toLocaleString()} c/u</span>` : ''}
+      </div>
+      <button onclick="_pedDelItem(${i})" style="background:none;border:none;color:var(--mut);cursor:pointer;font-size:.85rem;padding:0 4px">✕</button>
+    </div>`).join('');
+}
+
+function _pedDelItem(i){ _pedGomCart.splice(i,1); _pedRenderCart(); }
+
+function pedOnCliChange(){
+  const sel   = document.getElementById('pedCliSel');
+  const cid   = sel.value;
+  const c     = (S.clientesGomeria||[]).find(x=>x.id===cid);
+  document.getElementById('pedCliNombre').value = c ? (c.nombre||c.patente||'') : '';
+  document.getElementById('pedCliTel').value    = c ? (c.tel||'') : '';
+}
+
+async function _loadPedidosGom(){
+  try{
+    const { data, error } = await sb.from('pedidos_gomeria')
+      .select('*').eq('tenant_id', currentTenant.id)
+      .eq('estado_ped','pendiente').order('created_at',{ascending:true});
+    if(error) throw error;
+    return data||[];
+  }catch(e){ console.error('[pedidosGom] load error', e); return []; }
+}
+
+async function abrirPedidosGom(){
+  // Poblar select de clientes
+  const selCli = document.getElementById('pedCliSel');
+  if(selCli){
+    selCli.innerHTML = '<option value="">— Seleccionar cliente</option>' +
+      (S.clientesGomeria||[])
+        .sort((a,b)=>(a.patente||'').localeCompare(b.patente||''))
+        .map(c=>`<option value="${c.id}">${esc(c.patente||'')}${c.nombre?' — '+esc(c.nombre):''}</option>`)
+        .join('');
+  }
+  // Sugerir proveedores existentes
+  const { data: prevPed } = await sb.from('pedidos_gomeria')
+    .select('prov_nombre').eq('tenant_id', currentTenant.id)
+    .eq('tipo','proveedor').not('prov_nombre','eq','');
+  const sugg = document.getElementById('pedProvSugg');
+  if(sugg && prevPed){
+    const nombres = [...new Set(prevPed.map(p=>p.prov_nombre).filter(Boolean))];
+    sugg.innerHTML = nombres.map(n=>`<option value="${esc(n)}">`).join('');
+  }
+  pedSetTab('prov');
+  _pedGomCart = [];
+  _pedRenderCart();
+  await rPedidosGom();
   openM('mPedidosGom');
 }
 
-function rPedidosGom(){
-  const el = document.getElementById('pedGomLista');
-  if(!el) return;
-  const lista = _getPedidosGom().filter(p=>p.estado==='pendiente');
-  if(!lista.length){ el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">Sin pedidos pendientes</div>'; return; }
-  const hoy = tod();
-  el.innerHTML = lista.map(p=>{
-    const vencido = p.fechaEst && p.fechaEst < hoy;
-    const colorFecha = vencido ? 'var(--bad)' : 'var(--tx2)';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg2);border-radius:9px;margin-bottom:6px;border:1px solid var(--bor)">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:700;font-size:.87rem">${esc(p.desc)}${p.marca?' — '+esc(p.marca):''} <span style="font-weight:400;color:var(--tx2)">(${p.cant} u)</span></div>
-        <div style="font-size:.74rem;color:var(--tx2);margin-top:2px">${p.prov||'Sin proveedor'}${p.costo?` · $${p.costo.toLocaleString()} c/u`:''}${p.fechaEst?` · <span style="color:${colorFecha}">${vencido?'⚠ Venció: ':' Llegada est.: '}${_fmtFechaCorta(p.fechaEst)}</span>`:''}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
-        <button class="btn bsm" style="background:rgba(76,175,125,.12);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="recibirPedidoGom('${p.id}')">✓ Recibir</button>
-        <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarPedidoGom('${p.id}')">✕</button>
-      </div>
-    </div>`;
-  }).join('');
+async function agregarPedidoGom(){
+  if(!_pedGomCart.length){ showToast('Agregá al menos un ítem primero','err'); return; }
+  const esP = _pedGomTab === 'prov';
+  const row = {
+    tenant_id: currentTenant.id,
+    tipo: esP ? 'proveedor' : 'cliente',
+    items: JSON.stringify(_pedGomCart),
+    fecha_est: document.getElementById('pedFechaEst').value||null,
+    estado_ped: 'pendiente'
+  };
+  if(esP){
+    const prov = document.getElementById('pedProvNombre').value.trim();
+    if(!prov){ showToast('Ingresá el nombre del proveedor','err'); return; }
+    row.prov_nombre = prov;
+    row.prov_tel    = document.getElementById('pedProvTel').value.trim();
+  } else {
+    const cid = document.getElementById('pedCliSel').value;
+    if(!cid){ showToast('Seleccioná un cliente','err'); return; }
+    row.cliente_id     = cid;
+    row.cliente_nombre = document.getElementById('pedCliNombre').value;
+    row.cliente_tel    = document.getElementById('pedCliTel').value;
+    row.notas          = document.getElementById('pedNotasVal').value.trim();
+  }
+  const { error } = await sb.from('pedidos_gomeria').insert(row);
+  if(error){ showToast('Error al guardar','err'); console.error(error); return; }
+  _pedGomCart = [];
+  _pedRenderCart();
+  document.getElementById('pedProvNombre').value='';
+  document.getElementById('pedProvTel').value='';
+  document.getElementById('pedCliSel').value='';
+  document.getElementById('pedCliNombre').value='';
+  document.getElementById('pedCliTel').value='';
+  document.getElementById('pedFechaEst').value='';
+  showToast(esP ? 'Pedido a proveedor registrado ✓' : 'Encargo de cliente registrado ✓');
+  await rPedidosGom();
 }
 
-function agregarPedidoGom(){
-  const desc = document.getElementById('pedGomDesc').value.trim();
-  if(!desc){ showToast('Ingresá descripción o medida','err'); return; }
-  const p = {
-    id: Date.now()+'', desc,
-    marca: document.getElementById('pedGomMarca').value.trim(),
-    cant: parseInt(document.getElementById('pedGomCant').value)||1,
-    costo: parseFloat(document.getElementById('pedGomCosto').value)||0,
-    fechaEst: document.getElementById('pedGomFechaEst').value||'',
-    prov: document.getElementById('pedGomProv').value.trim(),
-    cubId: document.getElementById('pedGomCubId').value||'',
-    fechaPedido: tod(), estado:'pendiente'
-  };
-  const lista = _getPedidosGom();
-  lista.push(p);
-  _savePedidosGom(lista);
-  document.getElementById('pedGomDesc').value=''; document.getElementById('pedGomMarca').value='';
-  document.getElementById('pedGomCant').value=4; document.getElementById('pedGomCosto').value='';
-  document.getElementById('pedGomFechaEst').value=''; document.getElementById('pedGomProv').value='';
-  document.getElementById('pedGomCubId').value='';
-  showToast('Pedido registrado ✓');
-  rPedidosGom();
+async function rPedidosGom(){
+  const el = document.getElementById('pedGomLista');
+  if(!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--mut);font-size:.8rem">Cargando...</div>';
+  const lista = await _loadPedidosGom();
+  if(!lista.length){ el.innerHTML='<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">Sin pedidos pendientes 🎉</div>'; return; }
+  const hoy = tod();
+  let html = '';
+
+  // ── PROVEEDORES ──
+  const provPeds = lista.filter(p=>p.tipo==='proveedor');
+  if(provPeds.length){
+    const grupos = {};
+    provPeds.forEach(p=>{ const k=p.prov_nombre||'Sin proveedor'; (grupos[k]=grupos[k]||[]).push(p); });
+    Object.entries(grupos).forEach(([prov, peds])=>{
+      const tel      = peds.find(p=>p.prov_tel)?.prov_tel || '';
+      const telNum   = tel.replace(/\D/g,'');
+      const allItems = peds.flatMap(p=>{ try{ return JSON.parse(p.items||'[]'); }catch(e){ return []; } });
+      const fechaMin = peds.map(p=>p.fecha_est).filter(Boolean).sort()[0];
+      const vencido  = fechaMin && fechaMin < hoy;
+      // Armar mensaje WA
+      const negocio  = currentTenant?.nombre || 'La gomería';
+      let waMsg  = `*Pedido — ${negocio}*\n📦 Para: ${prov}\n\n`;
+      allItems.forEach(it=>{ waMsg += `• ${it.desc}${it.marca?' '+it.marca:''} × ${it.cant}${it.costo?' ($'+it.costo.toLocaleString()+' c/u)':''}\n`; });
+      if(fechaMin) waMsg += `\nLlegada estimada: ${_fmtFechaCorta(fechaMin)}`;
+      waMsg += `\nConfirmame disponibilidad y precio. Gracias!`;
+      const waUrl = tel ? `https://wa.me/549${telNum}?text=${encodeURIComponent(waMsg)}` : `https://wa.me/?text=${encodeURIComponent(waMsg)}`;
+
+      html += `<div style="border:1px solid var(--bor);border-radius:10px;overflow:hidden;margin-bottom:10px">
+        <div style="padding:10px 14px;background:var(--bg2);display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div>
+            <div style="font-weight:700;font-size:.88rem">📦 ${esc(prov)}</div>
+            ${tel?`<div style="font-size:.72rem;color:var(--tx2)">📱 ${esc(tel)}</div>`:''}
+            ${fechaMin?`<div style="font-size:.72rem;color:${vencido?'var(--bad)':'var(--tx2)'}">${vencido?'⚠ Venció':'Est.'}: ${_fmtFechaCorta(fechaMin)}</div>`:''}
+          </div>
+          <a href="${waUrl}" target="_blank" style="display:flex;align-items:center;gap:5px;padding:7px 12px;background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:7px;font-size:.75rem;font-weight:600;text-decoration:none;flex-shrink:0">📤 Enviar todo a ${esc(prov)} por WA</a>
+        </div>
+        <div style="padding:8px 14px">
+          ${allItems.map(it=>`<div style="font-size:.8rem;padding:4px 0;border-bottom:1px solid var(--bor2)">${esc(it.desc)}${it.marca?' — '+esc(it.marca):''} <span style="color:var(--tx2)">× ${it.cant}</span>${it.costo?` <span style="color:var(--tx2)">$${it.costo.toLocaleString()}</span>`:''}</div>`).join('')}
+        </div>
+        <div style="padding:8px 14px;display:flex;gap:6px;flex-wrap:wrap">
+          ${peds.map(p=>`<button class="btn bsm" style="background:rgba(76,175,125,.1);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="recibirPedidoGom('${p.id}')">✓ Recibir pedido #${peds.indexOf(p)+1}</button>`).join('')}
+          ${peds.map(p=>`<button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarPedidoGom('${p.id}')">🗑</button>`).join('')}
+        </div>
+      </div>`;
+    });
+  }
+
+  // ── CLIENTES ──
+  const cliPeds = lista.filter(p=>p.tipo==='cliente');
+  if(cliPeds.length){
+    html += `<div style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:10px 0 6px">🚗 Encargos de clientes</div>`;
+    cliPeds.forEach(p=>{
+      const items    = (()=>{ try{ return JSON.parse(p.items||'[]'); }catch(e){ return []; } })();
+      const tel      = p.cliente_tel||'';
+      const telNum   = tel.replace(/\D/g,'');
+      const vencido  = p.fecha_est && p.fecha_est < hoy;
+      const negocio  = currentTenant?.nombre || 'La gomería';
+      const itemsStr = items.map(it=>`${it.desc}${it.marca?' '+it.marca:''} × ${it.cant}`).join(', ');
+      const waMsg    = `Hola${p.cliente_nombre?' '+p.cliente_nombre:''}! 🛞\nTu encargo llegó: *${itemsStr}*.\nPasá cuando quieras a buscarlo.\n${negocio}`;
+      const waUrl    = tel ? `https://wa.me/549${telNum}?text=${encodeURIComponent(waMsg)}` : '';
+      html += `<div style="border:1px solid var(--bor);border-radius:10px;overflow:hidden;margin-bottom:8px">
+        <div style="padding:10px 14px;background:var(--bg2);display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div>
+            <div style="font-weight:700;font-size:.88rem">🚗 ${esc(p.cliente_nombre||'Cliente')}</div>
+            ${p.notas?`<div style="font-size:.72rem;color:var(--tx2)">📝 ${esc(p.notas)}</div>`:''}
+            ${p.fecha_est?`<div style="font-size:.72rem;color:${vencido?'var(--bad)':'var(--tx2)'}">${vencido?'⚠ Venció':'Est.'}: ${_fmtFechaCorta(p.fecha_est)}</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">
+            ${waUrl?`<a href="${waUrl}" target="_blank" style="display:flex;align-items:center;gap:4px;padding:6px 10px;background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:7px;font-size:.73rem;font-weight:600;text-decoration:none">📱 Avisar por WA</a>`:''}
+            <button class="btn bsm" style="background:rgba(76,175,125,.1);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="recibirPedidoGom('${p.id}')">✓ Llegó / Entregado</button>
+          </div>
+        </div>
+        <div style="padding:8px 14px">
+          ${items.map(it=>`<div style="font-size:.8rem;padding:3px 0;border-bottom:1px solid var(--bor2)">${esc(it.desc)}${it.marca?' — '+esc(it.marca):''} <span style="color:var(--tx2)">× ${it.cant}</span></div>`).join('')}
+        </div>
+        <div style="padding:6px 14px">
+          <button class="btn bsm" style="color:var(--bad);border-color:rgba(201,82,76,.3);background:rgba(201,82,76,.08)" onclick="eliminarPedidoGom('${p.id}')">🗑 Eliminar</button>
+        </div>
+      </div>`;
+    });
+  }
+  el.innerHTML = html || '<div style="text-align:center;padding:20px;color:var(--mut);font-size:.82rem">Sin pedidos pendientes 🎉</div>';
 }
 
 async function recibirPedidoGom(pid){
-  const lista = _getPedidosGom();
-  const p = lista.find(x=>x.id===pid);
-  if(!p) return;
-  if(p.cubId){
-    const ci = S.cubiertas.findIndex(c=>String(c.id)===String(p.cubId));
-    if(ci>=0){
-      S.cubiertas[ci].stock += p.cant;
-      if(p.costo) S.cubiertas[ci].costo = p.costo;
-      await dbUpsertCubierta(S.cubiertas[ci]);
-      showToast(`✓ Recibido — ${p.cant} u agregadas a ${S.cubiertas[ci].medida}`);
-      rCubiertas();
-    } else { showToast('✓ Pedido recibido'); }
-  } else { showToast(`✓ Recibido: ${p.desc} (${p.cant} u). Actualizá el stock manualmente.`); }
-  p.estado = 'recibido';
-  _savePedidosGom(lista);
-  rPedidosGom();
+  await sb.from('pedidos_gomeria').update({estado_ped:'recibido'}).eq('id',pid).eq('tenant_id',currentTenant.id);
+  showToast('Pedido marcado como recibido ✓');
+  await rPedidosGom();
 }
 
-function eliminarPedidoGom(pid){
+async function eliminarPedidoGom(pid){
   if(!confirm('¿Eliminar este pedido?')) return;
-  _savePedidosGom(_getPedidosGom().filter(p=>p.id!==pid));
-  rPedidosGom();
+  await sb.from('pedidos_gomeria').delete().eq('id',pid).eq('tenant_id',currentTenant.id);
+  await rPedidosGom();
 }
 
 // ─── Cierre del día gomería (Feature 3) ──────────────────────────────────────
@@ -18012,10 +18207,13 @@ if ('serviceWorker' in navigator) {
           if (!newSW) return;
           newSW.addEventListener('statechange', () => {
             if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
-              // Nuevo SW instalado — activarlo ya (skipWaiting está en el SW)
               newSW.postMessage({ type: 'SKIP_WAITING' });
             }
           });
+        });
+        // Cuando el SW nuevo toma control → recargar para ver la versión nueva
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
         });
       })
       .catch(e => console.warn('[SW] Registration failed:', e));
