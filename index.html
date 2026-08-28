@@ -4601,9 +4601,20 @@ async function editarTenant(id){
         
         <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Nombre del negocio</label>
         <input id="etNombre" value="${t.nombre}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
-        
+
         <label style="font-size:.67rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">Rubro</label>
-        <input id="etRubro" value="${t.rubro||''}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:14px">
+        <input id="etRubro" value="${t.rubro||''}" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          <div>
+            <label style="font-size:.67rem;color:#25d366;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">📱 WhatsApp</label>
+            <input id="etTelefono" value="${mods.telefono||''}" placeholder="Ej: 3472628087" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+          </div>
+          <div>
+            <label style="font-size:.67rem;color:#e1306c;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:4px">📸 Instagram</label>
+            <input id="etInstagram" value="${mods.instagram||''}" placeholder="@usuario" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+          </div>
+        </div>
 
         <div style="border-top:1px solid var(--bor);padding-top:14px;margin-bottom:14px">
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:10px">📦 Módulos habilitados</div>
@@ -4702,7 +4713,9 @@ async function guardarEdicionTenant(id){
     gastos:    !!(document.getElementById('etModGastos')?.checked),
     precios:   !!(document.getElementById('etModPrecios')?.checked),
     pedidos:   !!(document.getElementById('etModPedidos')?.checked),
-    inversores:!!(document.getElementById('etModInversores')?.checked)
+    inversores:!!(document.getElementById('etModInversores')?.checked),
+    telefono:  (document.getElementById('etTelefono')?.value||'').trim(),
+    instagram: (document.getElementById('etInstagram')?.value||'').trim()
   };
   if(logo) mods.logo = logo;
   const premiumCode = document.getElementById('etPremiumCode')?.value.trim();
