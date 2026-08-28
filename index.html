@@ -577,7 +577,7 @@ textarea{resize:vertical;min-height:70px;}
 <div id="trialScreen" style="position:fixed;inset:0;background:#080808;z-index:9500;display:none;align-items:center;justify-content:center;padding:20px;font-family:'Outfit',sans-serif;overflow-y:auto">
   <div style="max-width:460px;width:100%;text-align:center;padding:8px 0">
     <div id="trialScreenIcon" style="font-size:3rem;margin-bottom:12px">⏰</div>
-    <div id="trialScreenTitle" style="font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:800;color:#c9a84c;margin-bottom:8px">Tu período de prueba terminó</div>
+    <div id="trialScreenTitle" style="font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:800;color:#c9a84c;margin-bottom:8px">Activá tu suscripción para empezar</div>
     <div id="trialScreenSub" style="color:#a89880;font-size:.88rem;line-height:1.7;margin-bottom:20px"></div>
     <!-- Datos del negocio (lo que tendrían que perder) -->
     <div id="trialDataSummary" style="display:none;background:#0a0a0a;border:1px solid #1e1e1e;border-radius:12px;padding:14px;margin-bottom:16px;text-align:left">
@@ -4507,8 +4507,8 @@ async function showTrialScreen(diasVencido){
     if(subEl)   subEl.innerHTML     = `<strong style="color:#f5f0e8">${esc(nombre)}</strong> está suspendido hace ${Math.abs(diasVencido||0)} días.<br>Activá tu suscripción para recuperar el acceso completo.`;
   } else {
     if(iconEl)  iconEl.textContent  = '⏰';
-    if(titleEl) titleEl.textContent = 'Tu período de prueba terminó';
-    if(subEl)   subEl.innerHTML     = `Los 30 días gratuitos de <strong style="color:#f5f0e8">${esc(nombre)}</strong> finalizaron.<br>Activá para seguir sin perder nada.`;
+    if(titleEl) titleEl.textContent = 'Activá tu suscripción para empezar';
+    if(subEl)   subEl.innerHTML     = `<strong style="color:#f5f0e8">${esc(nombre)}</strong>, completá el pago para activar tu acceso completo.<br>Solo te lleva un minuto.`;
   }
 
   // Datos del negocio (FOMO)
@@ -6640,15 +6640,29 @@ function abrirReposicion(cubId){
 
 async function confirmarReposicion(){
   const cubId = document.getElementById('rcCubId').value;
+  if(!cubId){ showToast('Error: sin cubierta seleccionada','err'); return; }
   const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===String(cubId));
-  if(ci<0) return;
+  if(ci<0){ showToast('Error: cubierta no encontrada en memoria','err'); return; }
   const cant = parseInt(document.getElementById('rcCant').value)||0;
   if(cant<=0){ showToast('Ingresá una cantidad válida','err'); return; }
   const costo = parseFloat(document.getElementById('rcCosto').value)||0;
+  const proveedor = document.getElementById('rcProveedor').value.trim();
   S.cubiertas[ci].stock += cant;
-  if(costo>0) S.cubiertas[ci].costo = costo; // actualiza costo si viene distinto
+  if(costo>0) S.cubiertas[ci].costo = costo;
   const ok = await dbUpsertCubierta(S.cubiertas[ci]);
-  if(!ok){ S.cubiertas[ci].stock -= cant; showToast('Error al guardar','err'); return; }
+  if(!ok){ S.cubiertas[ci].stock -= cant; showToast('Error al guardar en Supabase','err'); return; }
+  // Registrar egreso en caja si se informó costo
+  if(costo>0 && sb && currentTenant?.id){
+    const total = costo * cant;
+    const desc = `Reposición ${S.cubiertas[ci].medida}${S.cubiertas[ci].marca?' '+S.cubiertas[ci].marca:''}${proveedor?' — '+proveedor:''} (×${cant})`;
+    try {
+      const { data: row } = await sb.from('mov_caja').insert({
+        tenant_id: currentTenant.id, tipo:'egreso', monto: total,
+        descripcion: desc, origen:'gomeria', fecha: new Date().toISOString()
+      }).select().single();
+      if(row) S.movCaja = [...(S.movCaja||[]), row];
+    } catch(e){ console.warn('[reposicion] mov_caja egreso error', e); }
+  }
   closeM('mReposCub');
   showToast(`✓ +${cant} unidades ingresadas — stock actual: ${S.cubiertas[ci].stock}`);
   rCubiertas();
@@ -7130,7 +7144,7 @@ async function confirmarVentaRapida(){
   if(sid.startsWith('cub_')){
     const cubId = sid.replace('cub_','');
     const ci = (S.cubiertas||[]).findIndex(c=>String(c.id)===cubId);
-    if(ci<0) return;
+    if(ci<0){ showToast('Error: cubierta no encontrada, recargá la página','err'); return; }
     const cub = S.cubiertas[ci];
     if(cant > cub.stock){ showToast('Stock insuficiente (disponible: '+cub.stock+')'); return; }
     const cuotas = document.getElementById('vrCuotas')?.value||'contado';
@@ -14018,7 +14032,7 @@ async function _rwFinish(btn){
   try {
     // 1. Crear tenant en Supabase (ID generado en cliente — evita SELECT con RLS anon)
     const tenantId = crypto.randomUUID();
-    const trialHasta = new Date(Date.now()+30*24*60*60*1000).toISOString();
+    const trialHasta = new Date(Date.now()-1000).toISOString(); // vence de inmediato → pago desde día 1
     const {error:te} = await sb.from('tenants').insert({
       id: tenantId, nombre: __rw.nombre, rubro: __rw.rubro, email,
       modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true, telefono:__rw.telefono||'', instagram:__rw.instagram||'', crm_estado:'nuevo', crm_notas:''},
