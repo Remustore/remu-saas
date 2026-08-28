@@ -17845,10 +17845,14 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
         // Auto-activar si regresa de pago exitoso de Mercado Pago
         const urlPago = new URLSearchParams(window.location.search);
         if(urlPago.get('mp_ok') === '1' && !mods.pago_activo){
+          // Verificar que MP incluyó un ID de pago real (evita activación por URL manual)
+          const pagoId = urlPago.get('payment_id') || urlPago.get('preapproval_id') || urlPago.get('collection_id');
           history.replaceState({}, '', window.location.pathname);
-          // Cliente regresó desde Mercado Pago → activar automáticamente
-          await activarSuscripcionTenant('mp_ok');
-          return;
+          if(pagoId){
+            await activarSuscripcionTenant('mp_ok');
+            return;
+          }
+          // Sin ID de MP → puede ser URL manipulada, cae al check de trial normal
         }
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
