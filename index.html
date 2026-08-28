@@ -3934,6 +3934,7 @@ async function loadTenants(){
         ${planBadge}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="activarPago('${t.id}')">✓ Marcar pagado</button>`:'<button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="desactivarPago(\''+t.id+'\')">Cancelar pago</button>'}
         ${!mods.pago_activo?`<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="extenderTrial('${t.id}')">+30 días trial</button>`:''}
+        ${(!mods.pago_activo && diasTrial > 0 && diasTrial <= 3) ? `<button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:#25d366;border-color:rgba(37,211,102,.4);background:rgba(37,211,102,.08)" onclick="_waAvisarTrialVence('${esc(t.nombre)}','${esc(mods.telefono||'')}',${diasTrial})">💬 Avisar vencimiento</button>` : ''}
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="gestionarUsuarios('${t.id}')">👥 ${(mods.usuarios||[]).length||1} usuario${((mods.usuarios||[]).length||1)!==1?'s':''}</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:#9a7fd4;border-color:rgba(154,127,212,.4)" onclick="configurarModuloHL('${t.id}')">⚙ Horas extra</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
@@ -3946,6 +3947,20 @@ async function loadTenants(){
 }
 
 // ── CRM SEGUIMIENTO ───────────────────────────────────────────────────
+function _waAvisarTrialVence(nombre, tel, dias){
+  const diaStr = dias === 1 ? 'mañana' : `en ${dias} días`;
+  const msg = `Hola ${nombre}! 👋\n\nTe escribimos de *Remu Gestión*. Tu período de prueba vence ${diaStr}.\n\nEsperamos que el sistema te esté siendo útil 🙌 Si querés continuar, activá tu suscripción y seguís gestionando tu negocio sin interrupciones.\n\n¿Tenés alguna duda o algo que mejorar? Respondé este mensaje, estamos acá para ayudarte. ¡Gracias!`;
+  if(tel){
+    const telLimpio = tel.replace(/\D/g,'');
+    window.open(`https://wa.me/549${telLimpio}?text=${encodeURIComponent(msg)}`, '_blank');
+  } else {
+    if(confirm('Este cliente no tiene WA cargado. ¿Copiamos el mensaje igual?')){
+      navigator.clipboard.writeText(msg);
+      showToast('Mensaje copiado al portapapeles');
+    }
+  }
+}
+
 async function actualizarCrmEstado(tenantId, estado){
   const { data: t } = await sb.from('tenants').select('modulos').eq('id', tenantId).single();
   if(!t) return;
@@ -8897,8 +8912,58 @@ function mostrarAvisosDaily(){
 }
 
 // ═══ DASHBOARD ═══
+function rOnboardingChecklist(){
+  const el = document.getElementById('dashAvisos');
+  if(!el || !currentTenant) return;
+  const mods = currentTenant.modulos || {};
+  const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : null;
+  const diasRestantes = trialHasta ? Math.ceil((trialHasta - new Date()) / 86400000) : 99;
+  // Solo mostrar si es auto_registro y trial con más de 20 días restantes (nuevo)
+  if(!mods.auto_registro || diasRestantes < 20) return;
+  const cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
+  const tienePrecios = (S.precios||[]).filter(p=>!(p.nombre||'').startsWith('__')).length > 0;
+  const tieneHorarios = (cfg.servicios||[]).length > 0;
+  const tieneEmpleados = (cfg.empleados||[]).length > 0;
+  const negocioSlug = typeof tenantSlug === 'function' ? tenantSlug(currentTenant.nombre||'') : '';
+  const linkPublico = negocioSlug ? (window.location.origin + '/p/?s=' + negocioSlug) : '';
+  const items = [
+    { ok: true,          txt: 'Cuenta creada',                  action: '' },
+    { ok: tienePrecios,  txt: 'Cargá tus precios y servicios',  action: `go('precios')` },
+    { ok: tieneHorarios, txt: 'Configurá tus horarios',         action: `go('turnosConfig')` },
+    { ok: tieneEmpleados,txt: 'Invitá a tu equipo (opcional)',   action: `go('turnosConfig')` },
+    { ok: false,         txt: linkPublico ? `Compartí tu link de turnos` : 'Compartí tu link', action: linkPublico ? `navigator.clipboard.writeText('${linkPublico}');showToast('Link copiado ✓')` : `go('turnosOnline')` },
+  ];
+  const completados = items.filter(i=>i.ok).length;
+  if(completados === items.length) return; // checklist completo, no mostrar
+  const pct = Math.round(completados / items.length * 100);
+  const existing = document.getElementById('_onboardCard');
+  if(existing) existing.remove();
+  const card = document.createElement('div');
+  card.id = '_onboardCard';
+  card.className = 'card';
+  card.style.cssText = 'margin-bottom:14px;border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.03)';
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h3 style="color:var(--gld)">🚀 Primeros pasos</h3>
+      <span style="font-size:.72rem;color:var(--tx2)">${completados}/${items.length} completados</span>
+    </div>
+    <div style="height:4px;background:var(--bg);border-radius:2px;margin-bottom:14px;overflow:hidden">
+      <div style="height:4px;background:var(--gld);width:${pct}%;border-radius:2px;transition:width .4s"></div>
+    </div>
+    ${items.map(i=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bor2);cursor:${i.ok||!i.action?'default':'pointer'}" ${!i.ok&&i.action?`onclick="${i.action}"`:''}>
+        <div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;${i.ok?'background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)':'background:var(--bg);border:1px solid var(--bor2);color:var(--mut)'}">
+          ${i.ok?'✓':''}
+        </div>
+        <span style="font-size:.84rem;${i.ok?'color:var(--mut);text-decoration:line-through':'color:var(--tx)'}">${i.txt}</span>
+        ${!i.ok&&i.action?'<span style="margin-left:auto;font-size:.7rem;color:var(--gld)">→</span>':''}
+      </div>`).join('')}`;
+  el.insertBefore(card, el.firstChild);
+}
+
 function rDash(){
   updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily(); rFiadosPendientes();
+  setTimeout(rOnboardingChecklist, 200);
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
   setTimeout(rDashPareja, 200);
