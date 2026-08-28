@@ -13851,6 +13851,16 @@ function _rwS4(){
     </div>
     <label style="${_OBL}">Email</label>
     <input id="rwEmail" type="email" value="${esc(__rw.email)}" placeholder="tu@email.com" style="${_OB}margin-bottom:14px" autocomplete="email">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div>
+        <label style="${_OBL}">WhatsApp</label>
+        <input id="rwTelefono" type="tel" value="${esc(__rw.telefono||'')}" placeholder="Ej: 11 1234-5678" style="${_OB}">
+      </div>
+      <div>
+        <label style="${_OBL}">Instagram</label>
+        <input id="rwInstagram" value="${esc(__rw.instagram||'')}" placeholder="@tu_negocio" style="${_OB}">
+      </div>
+    </div>
     <label style="${_OBL}">Contraseña</label>
     <input id="rwPass" type="password" value="${esc(__rw.pass)}" placeholder="Mínimo 6 caracteres" style="${_OB}margin-bottom:14px" autocomplete="new-password">
     <label style="${_OBL}">Confirmá la contraseña</label>
@@ -13864,8 +13874,10 @@ function _rwS4(){
   </div>`;
 }
 function _rwS4Back(){
-  __rw.email = document.getElementById('rwEmail')?.value||'';
-  __rw.pass  = document.getElementById('rwPass')?.value||'';
+  __rw.email     = document.getElementById('rwEmail')?.value||'';
+  __rw.pass      = document.getElementById('rwPass')?.value||'';
+  __rw.telefono  = document.getElementById('rwTelefono')?.value||'';
+  __rw.instagram = document.getElementById('rwInstagram')?.value||'';
   __rw.step=3; _rwR();
 }
 
@@ -13880,6 +13892,8 @@ async function _rwFinish(btn){
   if(pass.length<6){ showErr('La contraseña debe tener al menos 6 caracteres.'); return; }
   if(pass!==pass2){ showErr('Las contraseñas no coinciden.'); return; }
   __rw.email=email; __rw.pass=pass;
+  __rw.telefono  = (document.getElementById('rwTelefono')?.value||'').trim();
+  __rw.instagram = (document.getElementById('rwInstagram')?.value||'').trim();
   btn.disabled=true; btn.textContent='Creando tu negocio...';
   try {
     // 1. Crear tenant en Supabase (ID generado en cliente — evita SELECT con RLS anon)
@@ -13887,7 +13901,7 @@ async function _rwFinish(btn){
     const trialHasta = new Date(Date.now()+30*24*60*60*1000).toISOString();
     const {error:te} = await sb.from('tenants').insert({
       id: tenantId, nombre: __rw.nombre, rubro: __rw.rubro, email,
-      modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true},
+      modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true, telefono:__rw.telefono||'', instagram:__rw.instagram||'', crm_estado:'nuevo', crm_notas:''},
       activo: true, created_at: new Date().toISOString()
     });
     if(te) throw new Error('Error al crear el negocio: '+(te.message||JSON.stringify(te)));
