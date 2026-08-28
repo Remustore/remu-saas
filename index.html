@@ -2286,8 +2286,12 @@ $$;</pre>
     <div><label>Nombre del cliente</label><input id="cliGomNombre" placeholder="Nombre y apellido"></div>
   </div>
   <div class="fr">
-    <div><label>Teléfono</label><input id="cliGomTel" type="tel" placeholder="Ej: 11 1234-5678"></div>
+    <div><label>WhatsApp</label><input id="cliGomTel" type="tel" placeholder="Ej: 11 1234-5678"></div>
+    <div><label>Instagram</label><input id="cliGomInstagram" placeholder="Ej: @usuario"></div>
+  </div>
+  <div class="fr">
     <div><label>KM actuales del vehículo</label><input id="cliGomKm" type="number" placeholder="Ej: 45000"></div>
+    <div></div>
   </div>
   <div class="fr">
     <div><label>Marca del vehículo</label><input id="cliGomMarcaVeh" placeholder="Ej: Ford, VW, Renault"></div>
@@ -5653,7 +5657,7 @@ function rClientesGomeria(){
 
   let lista = S.clientesGomeria.filter(c=>{
     if(!q) return true;
-    return ((c.patente||'')+(c.nombre||'')+(c.tel||'')).toLowerCase().includes(q);
+    return ((c.patente||'')+(c.nombre||'')+(c.tel||'')+(c.instagram||'')).toLowerCase().includes(q);
   });
 
   if(badge){ badge.textContent=S.clientesGomeria.length; badge.style.display=S.clientesGomeria.length?'':'none'; }
@@ -5691,7 +5695,11 @@ function rClientesGomeria(){
     return `<tr style="border-bottom:1px solid var(--bor2)">
       <td style="padding:9px 8px;font-weight:700;font-size:.85rem;color:var(--tx);letter-spacing:.5px">${c.patente||'—'}</td>
       <td style="padding:9px 8px">${c.nombre||'—'}</td>
-      <td style="padding:9px 8px">${c.tel ? `<a href="tel:${c.tel}" style="color:var(--gld)">${c.tel}</a>` : '—'}</td>
+      <td style="padding:9px 8px;white-space:nowrap">
+        ${c.tel?`<a href="https://wa.me/549${c.tel.replace(/\D/g,'')}" target="_blank" style="color:#25d366;text-decoration:none;font-size:.78rem">📱 ${c.tel}</a>`:''}
+        ${c.instagram?(()=>{const h=c.instagram.replace(/^@/,'');return `<br><a href="https://instagram.com/${h}" target="_blank" style="color:#e1306c;text-decoration:none;font-size:.75rem">📸 @${h}</a>`;})():''}
+        ${!c.tel&&!c.instagram?'—':''}
+      </td>
       <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${[c.marca_veh,c.modelo].filter(Boolean).join(' ')||'—'}</td>
       <td style="padding:9px 8px;text-align:right">${visitas}</td>
       <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${ultima ? _fmtFechaCorta(ultima.fecha) : '—'}${proxHtml}</td>
@@ -5719,6 +5727,7 @@ function abrirFormClienteGomeria(id=null){
   document.getElementById('cliGomPatente').value = c?.patente||'';
   document.getElementById('cliGomNombre').value = c?.nombre||'';
   document.getElementById('cliGomTel').value = c?.tel||'';
+  document.getElementById('cliGomInstagram').value = c?.instagram||'';
   document.getElementById('cliGomKm').value = c?.km||'';
   document.getElementById('cliGomMarcaVeh').value = c?.marca_veh||'';
   document.getElementById('cliGomModelo').value = c?.modelo||'';
@@ -5735,6 +5744,7 @@ async function guardarClienteGomeria(){
     patente,
     nombre: document.getElementById('cliGomNombre').value.trim(),
     tel: document.getElementById('cliGomTel').value.trim(),
+    instagram: document.getElementById('cliGomInstagram').value.trim(),
     km: parseInt(document.getElementById('cliGomKm').value)||0,
     marca_veh: document.getElementById('cliGomMarcaVeh').value.trim(),
     modelo: document.getElementById('cliGomModelo').value.trim(),
@@ -5845,6 +5855,7 @@ async function verFichaVehiculo(clienteId){
       </div>
       <div style="padding:12px 20px;border-top:1px solid var(--bor);display:flex;gap:8px;flex-shrink:0">
         ${c.tel?`<a href="https://wa.me/549${c.tel.replace(/\D/g,'')}" target="_blank" class="btn bsm" style="color:#25d366;border-color:rgba(37,211,102,.3);background:rgba(37,211,102,.08);text-decoration:none">📱 WA</a>`:''}
+        ${c.instagram?(()=>{const h=c.instagram.replace(/^@/,'');return `<a href="https://instagram.com/${h}" target="_blank" class="btn bsm" style="color:#e1306c;border-color:rgba(225,48,108,.3);background:rgba(225,48,108,.08);text-decoration:none">📸 IG</a>`;})():''}
         <button class="btn bsm bg" onclick="document.getElementById('fichaVehOverlay')?.remove();verHistorialGomeria('${c.id}')">📋 Ver historial completo</button>
         <button class="btn bsm bg" onclick="document.getElementById('fichaVehOverlay')?.remove();abrirFormServicioGomeria('${c.id}')">+ Nuevo servicio</button>
       </div>
@@ -5864,7 +5875,7 @@ async function verHistorialGomeria(clienteId){
     fichaEl.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
       <div>
         <div style="font-size:1.15rem;font-weight:800;letter-spacing:.6px;color:var(--tx)">${esc(c.patente)}</div>
-        <div style="font-size:.84rem;color:var(--tx2);margin-top:3px">${esc(c.nombre||'Sin nombre')}${c.tel?' · '+esc(c.tel):''}</div>
+        <div style="font-size:.84rem;color:var(--tx2);margin-top:3px">${esc(c.nombre||'Sin nombre')}${c.tel?` · <a href="https://wa.me/549${c.tel.replace(/\D/g,'')}" target="_blank" style="color:#25d366;text-decoration:none">📱 ${esc(c.tel)}</a>`:''}${c.instagram?(()=>{const h=c.instagram.replace(/^@/,'');return ` · <a href="https://instagram.com/${h}" target="_blank" style="color:#e1306c;text-decoration:none">📸 @${h}</a>`;})():''}</div>
         ${veh||c.km?`<div style="font-size:.78rem;color:var(--mut);margin-top:2px">${veh?esc(veh):''}${c.km?' · '+c.km.toLocaleString()+' km':''}</div>`:''}
       </div>
       ${c.notas?`<div style="font-size:.76rem;color:var(--mut);font-style:italic;max-width:200px;text-align:right">${esc(c.notas)}</div>`:''}
