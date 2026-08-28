@@ -5277,7 +5277,7 @@ async function dbLoadClientesGomeria(){
 async function dbUpsertClienteGomeria(c){
   setSyncing();
   try{
-    const row = { id:c.id, tenant_id:currentTenant.id, patente:c.patente, nombre:c.nombre, tel:c.tel, km:c.km, marca_veh:c.marca_veh, modelo:c.modelo, notas:c.notas };
+    const row = { id:c.id, tenant_id:currentTenant.id, patente:c.patente, nombre:c.nombre, tel:c.tel, instagram:c.instagram||null, km:c.km, marca_veh:c.marca_veh, modelo:c.modelo, notas:c.notas };
     const { error } = await sb.from('clientes_gomeria').upsert(row, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
@@ -7005,21 +7005,28 @@ async function pgConfirmarVenta(){
     if(!cub||item.cant>cub.stock){ showToast(`Stock insuficiente: ${item.nombre} (disponible: ${cub?.stock||0})`,'err'); return; }
   }
   if(!confirm(`¿Confirmar venta por ${fmt(total)}?\n${_pgCart.length} ítem${_pgCart.length!==1?'s':''}${manoObra>0?' + mano de obra':''}`)) return;
+  const fechaVenta = tod();
   for(const item of _pgCart){
     if(item.tipo==='cubierta'){
       const ci = S.cubiertas.findIndex(c=>String(c.id)===String(item.id));
       if(ci<0) continue;
       const venta = {id:Date.now()+Math.random(),tipo:'cubierta',nombre:item.nombre,cubId:item.id,
         cantidad:item.cant,precio:item.precio,total:item.subtotal,costo:S.cubiertas[ci].costo||0,
-        metodo:'Efectivo',fecha:tod(),cuotas:item.cuotas,comPct:0,comision:0};
+        metodo:'Efectivo',fecha:fechaVenta,cuotas:item.cuotas,comPct:0,comision:0};
       S.ventas.push(venta);
       await dbUpsert('ventas',venta);
       S.cubiertas[ci].stock -= item.cant;
       await dbUpsertCubierta(S.cubiertas[ci]);
+      // registrar en mov_caja para que aparezca en el estado de cajas
+      await sb.from('mov_caja').insert({
+        tenant_id: currentTenant.id, fecha: fechaVenta, tipo:'ingreso',
+        monto: item.subtotal, descripcion:`Gomería — ${item.nombre} × ${item.cant}`,
+        metodo_pago:'Efectivo', origen:'gomeria', referencia_id: String(venta.id)
+      }).then(({error})=>{ if(error) console.warn('[movCaja] cubierta venta insert:', error.message); });
     } else {
       const venta = {id:Date.now()+Math.random(),tipo:'servicio',nombre:item.nombre,
         cantidad:item.cant,precio:item.precio,total:item.subtotal,costo:0,
-        metodo:'Efectivo',fecha:tod(),cuotas:'contado',comPct:0,comision:0};
+        metodo:'Efectivo',fecha:fechaVenta,cuotas:'contado',comPct:0,comision:0};
       S.ventas.push(venta);
       await dbUpsert('ventas',venta);
     }
