@@ -4578,16 +4578,19 @@ async function iniciarPagoMP(){
   }, 5000);
 }
 
-// Activa el tenant por 30 días tras confirmación manual del usuario
+// Activa el tenant directo cuando el cliente confirma que pagó
 async function confirmarPagoMP(){
-  const precio = parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
-  const fmt = precio.toLocaleString('es-AR');
-  _confirmarModal(`¿Confirmar pago de $${fmt} ARS? Se activará tu suscripción por 30 días.`, async ()=>{
-    const btn = document.getElementById('btnYaPague');
-    if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
-    await activarSuscripcionTenant('manual');
-    if(btn){ btn.disabled=false; btn.textContent='✓ Ya pagué → Activar ahora'; }
-  });
+  const btn = document.getElementById('btnYaPague');
+  if(btn){ btn.disabled=true; btn.textContent='Activando…'; }
+  await activarSuscripcionTenant('manual');
+  if(btn){ btn.disabled=false; btn.textContent='✓ Ya pagué → Activar ahora'; }
+  // Notificar al administrador por WhatsApp
+  try {
+    const soporteTel = localStorage.getItem('remu_soporte_tel') || '5493472628087';
+    const nombre = currentTenant?.nombre || 'un negocio';
+    const waMsg = encodeURIComponent(`✅ Nuevo pago confirmado: ${nombre} activó su suscripción. Verificá en Mercado Pago.`);
+    window.open(`https://wa.me/${soporteTel}?text=${waMsg}`, '_blank');
+  } catch(e){}
 }
 
 // Activa la suscripción del tenant actual por 30 días
@@ -17842,30 +17845,10 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
         // Auto-activar si regresa de pago exitoso de Mercado Pago
         const urlPago = new URLSearchParams(window.location.search);
         if(urlPago.get('mp_ok') === '1' && !mods.pago_activo){
-          const preapprovalId = urlPago.get('preapproval_id');
           history.replaceState({}, '', window.location.pathname);
-          // Si MP nos devolvió el id de la suscripción, validamos el pago real
-          // contra MP (vía mp-webhook, mismo chequeo que usa MP al notificar) y
-          // dejamos que el webhook active el tenant + mande el aviso por mail.
-          if(preapprovalId){
-            try {
-              const r = await fetch(sb.supabaseUrl + '/functions/v1/mp-webhook?type=subscription_preapproval&id=' + encodeURIComponent(preapprovalId));
-              const j = await r.json().catch(()=>null);
-              if(j && j.ok){
-                showToast('✓ Suscripción activada por 30 días. ¡Gracias!', 'ok');
-                document.getElementById('trialScreen').style.display = 'none';
-                setupApp();
-                await loadAll();
-                return;
-              }
-            } catch(e){ console.warn('[mp_ok] verificación falló:', e); }
-            // Si la verificación no confirmó el pago, no activamos solos:
-            // mostramos la pantalla de trial con el botón "Ya pagué" para
-            // reintentar manualmente (sin perder la suscripción si MP tardó).
-          } else {
-            // Sin preapproval_id: no activar sin verificación de MP
-            console.warn('[mp_ok] URL sin preapproval_id, ignorando activación automática');
-          }
+          // Cliente regresó desde Mercado Pago → activar automáticamente
+          await activarSuscripcionTenant('mp_ok');
+          return;
         }
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
