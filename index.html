@@ -1471,6 +1471,24 @@ $$;</pre>
 
       <div id="preciosLinkBox" style="margin-bottom:14px"></div>
 
+      <!-- Datos de contacto del negocio -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><h3>📞 Tus datos de contacto</h3></div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-bottom:12px;line-height:1.5">Estos datos los usamos para poder contactarte. Completalos para que podamos ayudarte mejor.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div>
+            <label style="font-size:.72rem;color:#25d366;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">📱 WhatsApp</label>
+            <input id="cfgContactoWa" type="tel" placeholder="Ej: 11 1234-5678" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:#e1306c;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">📸 Instagram</label>
+            <input id="cfgContactoIg" placeholder="@tu_negocio" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none">
+          </div>
+        </div>
+        <button class="btn bg bsm" onclick="guardarContactoNegocio()">Guardar</button>
+        <div id="cfgContactoMsg" style="display:inline-block;margin-left:10px;font-size:.75rem"></div>
+      </div>
+
       <!-- Empleados -->
       <div class="card" id="cardGestionEmpleados" style="margin-bottom:14px">
         <div class="ch"><h3>👤 Empleados</h3><button class="btn bg bsm" onclick="agregarEmpleado()">+ Agregar</button></div>
@@ -12379,8 +12397,25 @@ function verHistorialCliente(nombre){
   document.body.appendChild(overlay);
 }
 
+async function guardarContactoNegocio(){
+  const wa = (document.getElementById('cfgContactoWa')?.value||'').trim();
+  const ig = (document.getElementById('cfgContactoIg')?.value||'').trim();
+  const msg = document.getElementById('cfgContactoMsg');
+  if(!wa && !ig){ if(msg){ msg.style.color='var(--bad)'; msg.textContent='Completá al menos uno.'; } return; }
+  const { data: t } = await sb.from('tenants').select('modulos').eq('id', currentTenant.id).single();
+  if(!t){ if(msg){ msg.style.color='var(--bad)'; msg.textContent='Error al guardar.'; } return; }
+  await sb.from('tenants').update({ modulos: { ...t.modulos, telefono: wa, instagram: ig } }).eq('id', currentTenant.id);
+  if(currentTenant.modulos){ currentTenant.modulos.telefono=wa; currentTenant.modulos.instagram=ig; }
+  if(msg){ msg.style.color='var(--ok)'; msg.textContent='¡Guardado! ✓'; setTimeout(()=>{ msg.textContent=''; },2500); }
+}
+
 async function rTurnosConfig(){
   _renderPremiumCard();
+  // Cargar datos de contacto del negocio
+  const _wa = currentTenant?.modulos?.telefono||'';
+  const _ig = currentTenant?.modulos?.instagram||'';
+  if(document.getElementById('cfgContactoWa')) document.getElementById('cfgContactoWa').value = _wa;
+  if(document.getElementById('cfgContactoIg')) document.getElementById('cfgContactoIg').value = _ig;
   // Adaptar labels para gomería
   const _rubCfg = (currentTenant?.rubro||'').toLowerCase();
   const _esGomCfg = _rubCfg.includes('gomeria')||_rubCfg.includes('gomería')||_rubCfg.includes('neumat')||_rubCfg.includes('cubiert');
