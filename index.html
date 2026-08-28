@@ -6417,7 +6417,7 @@ function openM(id, editId){
   if(!el) return;
   // Reset form fields for new entries
   if(editId === null || editId === undefined){
-    el.querySelectorAll('input:not([type=checkbox]):not([type=color])').forEach(i=>{ if(i.id!=='vFec') i.value=''; });
+    el.querySelectorAll('input:not([type=checkbox]):not([type=color]):not([type=hidden])').forEach(i=>{ if(i.id!=='vFec') i.value=''; });
     el.querySelectorAll('select').forEach(s=>s.selectedIndex=0);
     el.querySelectorAll('textarea').forEach(t=>t.value='');
     if(id==='mPrecio'){ el.querySelector('.mt2').textContent='Agregar Servicio'; initPrCatSelect(''); const _pd=document.getElementById('prDur'); if(_pd) _pd.value='30'; }
