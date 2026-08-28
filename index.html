@@ -11972,14 +11972,17 @@ async function _confirmarCobrarFiado(id, metodo){
   document.getElementById('_cobrarFiadoPanel')?.remove();
   const turnos = typeof getTurnos==='function' ? getTurnos() : [];
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
-  if(idx===-1) return;
-  turnos[idx] = {...turnos[idx], metodo};
-  if(typeof saveTurnosLocal==='function') saveTurnosLocal(turnos);
+  if(idx===-1){ showToast('Turno no encontrado','err'); return; }
+  const turno = turnos[idx];
+  // Usar _sbId (UUID de Supabase) si está disponible; fallback al id local
+  const sbId = turno._sbId || id;
   const { error } = await sb.from('turnos_solicitudes')
     .update({ metodo })
-    .eq('id', id)
-    .eq('tenant_id', currentTenant?.id);
-  if(error){ showToast('Error al registrar el cobro'); return; }
+    .eq('id', sbId);
+  if(error){ showToast('Error al registrar el cobro: ' + (error.message||''), 'err'); return; }
+  // Actualizar caché local solo después de confirmar en Supabase
+  turnos[idx] = {...turno, metodo};
+  if(typeof saveTurnosLocal==='function') saveTurnosLocal(turnos);
   showToast('✓ Cobrado · ' + metodo);
   if(typeof rTurnos==='function') rTurnos();
   if(typeof rDash==='function') rDash();
