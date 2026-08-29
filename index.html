@@ -2513,14 +2513,20 @@ $$;</pre>
         </div>
         <div>
           <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Método de pago</label>
-          <select id="vrMet" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.82rem">
+          <select id="vrMet" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.82rem" onchange="vrToggleCC()">
             <option>Efectivo</option>
             <option>Transferencia</option>
             <option>Mercado Pago</option>
             <option>Tarjeta débito</option>
             <option>Tarjeta crédito</option>
+            <option value="Cuenta corriente">Cuenta corriente</option>
           </select>
         </div>
+      </div>
+      <!-- Patente para cuenta corriente -->
+      <div id="vrCCBox" style="display:none">
+        <label style="font-size:.72rem;color:var(--tx2);display:block;margin-bottom:4px">Patente del cliente (para cargar al saldo)</label>
+        <input type="text" id="vrCCPatente" placeholder="Ej: ABC 123" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor);background:var(--bg2);color:var(--tx);font-size:.9rem;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
       </div>
       <!-- Total -->
       <div id="vrTotalBox" style="display:none;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:14px;text-align:center">
@@ -7250,6 +7256,23 @@ function vrActualizarTotal(){
   document.getElementById('vrTotal').textContent = fmt(precio * cant);
 }
 
+function vrToggleCC(){
+  const esCC = document.getElementById('vrMet')?.value === 'Cuenta corriente';
+  const box = document.getElementById('vrCCBox');
+  if(box) box.style.display = esCC ? '' : 'none';
+}
+
+async function _vrActualizarSaldoCC(total){
+  const patente = (document.getElementById('vrCCPatente')?.value||'').trim().toUpperCase();
+  if(!patente) return;
+  const cli = S.clientesGomeria.find(c=>(c.patente||'').toUpperCase()===patente);
+  if(cli){
+    cli.saldo = (cli.saldo||0) + total;
+    await dbUpsertClienteGomeria(cli);
+    rClientesGomeria();
+  }
+}
+
 async function confirmarVentaRapida(){
   const sid = String(document.getElementById('vrProdId').value||'');
   const cant = parseInt(document.getElementById('vrCant').value)||1;
@@ -7270,7 +7293,8 @@ async function confirmarVentaRapida(){
     S.ventas.push(venta);
     S.cubiertas[ci].stock -= cant;
     const okC = await dbUpsertCubierta(S.cubiertas[ci]);
-    if(!okC) S.cubiertas[ci].stock += cant; // revertir stock si falla
+    if(!okC) S.cubiertas[ci].stock += cant;
+    if(metodo === 'Cuenta corriente') await _vrActualizarSaldoCC(venta.total);
     closeM('mVentaRapida');
     showToast('✓ Venta registrada — '+fmt(venta.total));
     rVentas(); rCubiertas();
@@ -7290,6 +7314,7 @@ async function confirmarVentaRapida(){
   prod.cantidad -= cant;
   await dbUpsert('stock', prod);
   registrarMovStock(prod.id, prod.nombre, -cant, 'venta', 'Venta rápida');
+  if(metodo === 'Cuenta corriente') await _vrActualizarSaldoCC(venta.total);
   closeM('mVentaRapida');
   showToast('✓ Venta registrada — '+fmt(venta.total));
   rStock(); rVentas();
