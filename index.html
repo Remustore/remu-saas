@@ -6209,7 +6209,9 @@ async function loadAll(){
     _clearTenantCache(thisTenant);
   }
   try { localStorage.setItem('activeTenant', thisTenant); } catch(e){}
-  document.getElementById('loadingScreen').style.display='flex';
+  const _isFirstLoad = !window._appLoaded;
+  if(_isFirstLoad) document.getElementById('loadingScreen').style.display='flex';
+  else setSyncing();
   try{
     let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
@@ -6322,7 +6324,12 @@ async function loadAll(){
       else localStorage.setItem(_owKey, '1');
     }
   }catch(e){ console.error('Load error', e); }
-  document.getElementById('loadingScreen').style.display='none';
+  if(_isFirstLoad){
+    window._appLoaded = true;
+    document.getElementById('loadingScreen').style.display='none';
+  } else {
+    setSynced();
+  }
 }
 
 function getGastosFijos(){
