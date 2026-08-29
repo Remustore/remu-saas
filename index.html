@@ -11034,7 +11034,7 @@ async function saveTurnosConfig(){
   cfg.cierre = document.getElementById('horCierre')?.value || '20:00';
   cfg.dias = [...document.querySelectorAll('.diasSalon:checked')].map(c=>parseInt(c.value));
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
+  try{ await persistCfgToSupabase(); }catch(e){ console.error('[persistCfg]', e); showToast('⚠️ Error al sincronizar: ' + (e?.message||String(e))); return; }
   showToast('Configuración guardada ✓');
 }
 
@@ -12923,7 +12923,7 @@ async function agregarEmpleado(){
   const cfg = getTurnosCfg();
   cfg.empleados.push({id:Date.now().toString(), nombre, sectores:sectores.split(',').map(s=>s.trim()).filter(Boolean), comision, tel});
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
+  try{ await persistCfgToSupabase(); }catch(e){ console.error('[persistCfg]', e); showToast('⚠️ Error al sincronizar: ' + (e?.message||String(e))); return; }
   rTurnosConfig();
   showToast('Empleado agregado ✓');
 }
@@ -12949,7 +12949,7 @@ async function eliminarEmpleado(id){
   const cfg = getTurnosCfg();
   cfg.empleados = cfg.empleados.filter(e=>e.id!==id);
   localStorage.setItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
+  try{ await persistCfgToSupabase(); }catch(e){ console.error('[persistCfg]', e); showToast('⚠️ Error al sincronizar: ' + (e?.message||String(e))); return; }
   rTurnosConfig();
 }
 
@@ -13056,7 +13056,7 @@ async function guardarFichaCliente(ficha){
   const fichas = getFichas();
   fichas[ficha.nombre.toLowerCase()] = ficha;
   saveFichas(fichas);
-  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
+  try{ await persistCfgToSupabase(); }catch(e){ console.error('[persistCfg]', e); showToast('⚠️ Error al sincronizar: ' + (e?.message||String(e))); return; }
 }
 
 function rFichasClientes(){
@@ -13825,7 +13825,7 @@ async function saveOnlineConfig(){
     mapsResena: (document.getElementById('onlineMapsResena')?.value||'').trim()
   };
   localStorage.setItem(ONLINE_CFG_KEY + '_' + (currentTenant?.id||''), JSON.stringify(cfg));
-  try{ await persistCfgToSupabase(); }catch(e){ showToast('⚠️ Error al guardar en la nube. Intentá de nuevo.'); return; }
+  try{ await persistCfgToSupabase(); }catch(e){ console.error('[persistCfg]', e); showToast('⚠️ Error al sincronizar: ' + (e?.message||String(e))); return; }
   showToast('Configuración guardada ✓');
 }
 
@@ -21378,6 +21378,8 @@ async function _syncFijosSupabase(){
   // Reemplazar _iniciarRealtimeReservas con polling
   _iniciarRealtimeReservas = function(tenantId){
     if(tenantId) _startPolling(tenantId);
+    // Indica al watchdog que el canal está activo vía polling para evitar reconexiones infinitas
+    if(typeof _realtimeCh !== 'undefined') _realtimeCh = { state: 'joined', _mode: 'polling' };
   };
 
   // Reemplazar _detenerRealtimeReservas con stop del poll
