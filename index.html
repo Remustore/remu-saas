@@ -2258,6 +2258,17 @@ $$;</pre>
         <button id="pgDescTipoBtn" class="btn bsm" onclick="_pgToggleDescTipo()" style="min-width:38px;font-weight:700;padding:7px 10px">%</button>
       </div>
       <div id="pgDesglose" style="display:none;font-size:.75rem;color:var(--tx2);margin-top:6px;text-align:right"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid var(--bor2)">
+        <label style="font-size:.78rem;color:var(--tx2);white-space:nowrap">Método de pago:</label>
+        <select id="pgMetodoPago" style="flex:1;padding:7px 10px;border-radius:7px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:.88rem">
+          <option value="Efectivo">Efectivo</option>
+          <option value="Transferencia">Transferencia</option>
+          <option value="Tarjeta débito">Tarjeta débito</option>
+          <option value="Tarjeta crédito">Tarjeta crédito</option>
+          <option value="Mercado Pago">Mercado Pago</option>
+          <option value="Cuenta corriente">Cuenta corriente</option>
+        </select>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:2px solid var(--bor)">
         <span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px">Total</span>
         <span id="pgTotal" style="font-size:1.6rem;font-weight:900;color:var(--gld)"></span>
@@ -3525,7 +3536,7 @@ async function borrarTodosMisDatos(){
     // Reset estado en memoria
     S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
     showToast('✓ Todos los datos fueron borrados');
-    setTimeout(()=>{ renderAll(); rDash(); }, 300);
+    setTimeout(()=>{ if(typeof renderAll==='function') renderAll(); rDash(); }, 300);
   } catch(e) {
     alert('Error al borrar datos: ' + (e.message||e));
   }
@@ -4455,7 +4466,7 @@ async function loadMpConfig(){
   // Actualizar precio en trial screen si está visible
   _actualizarPrecioTrial(parseInt(precio) || 8000);
 
-  return { link, token, precio: parseInt(precio) || 8000, video };
+  return { link, precio: parseInt(precio) || 8000, video };
 }
 
 async function _cargarSoporteTel(){
@@ -6308,7 +6319,7 @@ async function loadAll(){
     _initTurnosRealtime(currentTenant.id);
     // ─────────────────────────────────────────────────────────────────────────
 
-    renderAll();
+    if(typeof renderAll==='function') renderAll();
     setupCategoriasStock();
     _initVTipoSelect();
     // Sincronizar fidelUmbral desde modulos (fuente de verdad cross-device)
@@ -6364,7 +6375,7 @@ async function doUndo(){
     for(const item of u.data) await sb.from(u.key).upsert({id:item.id, data:item, tenant_id:currentTenant.id},{onConflict:'id'});
     setSynced();
   }catch(e){ setSyncErr(); }
-  renderAll();
+  if(typeof renderAll==='function') renderAll();
   document.getElementById('undoBar').style.display='none';
 }
 
@@ -7019,6 +7030,7 @@ async function pgConfirmarVenta(){
   if(!_pgCart.length) return;
   const manoObra = parseFloat(document.getElementById('pgManoObra').value)||0;
   const descValor = parseFloat(document.getElementById('pgDescuento').value)||0;
+  const metodo = document.getElementById('pgMetodoPago')?.value || 'Efectivo';
   const subtotalItems = _pgCart.reduce((a,i)=>a+i.subtotal,0);
   const base = subtotalItems + manoObra;
   const descMonto = _pgDescTipo==='%' ? Math.round(base * descValor / 100) : descValor;
@@ -7036,7 +7048,7 @@ async function pgConfirmarVenta(){
       if(ci<0) continue;
       const venta = {id:Date.now()+Math.random(),tipo:'cubierta',nombre:item.nombre,cubId:item.id,
         cantidad:item.cant,precio:item.precio,total:item.subtotal,costo:S.cubiertas[ci].costo||0,
-        metodo:'Efectivo',fecha:fechaVenta,cuotas:item.cuotas,comPct:0,comision:0};
+        metodo,fecha:fechaVenta,cuotas:item.cuotas,comPct:0,comision:0};
       const okV = await dbUpsert('ventas',venta);
       if(!okV){ showToast('Error al guardar venta de '+item.nombre,'err'); continue; }
       S.ventas.push(venta);
@@ -7047,12 +7059,12 @@ async function pgConfirmarVenta(){
       await sb.from('mov_caja').insert({
         tenant_id: currentTenant.id, fecha: fechaVenta, tipo:'ingreso',
         monto: item.subtotal, descripcion:`Gomería — ${item.nombre} × ${item.cant}`,
-        metodo_pago:'Efectivo', origen:'gomeria', referencia_id: String(venta.id)
+        metodo_pago:metodo, origen:'gomeria', referencia_id: String(venta.id)
       }).then(({error})=>{ if(error) console.warn('[movCaja] cubierta venta insert:', error.message); });
     } else {
       const venta = {id:Date.now()+Math.random(),tipo:'servicio',nombre:item.nombre,
         cantidad:item.cant,precio:item.precio,total:item.subtotal,costo:0,
-        metodo:'Efectivo',fecha:fechaVenta,cuotas:'contado',comPct:0,comision:0};
+        metodo,fecha:fechaVenta,cuotas:'contado',comPct:0,comision:0};
       const okS = await dbUpsert('ventas',venta);
       if(!okS){ showToast('Error al guardar venta de '+item.nombre,'err'); continue; }
       S.ventas.push(venta);
@@ -13042,7 +13054,8 @@ const FICHAS_KEY = 'fichasClientes';
 
 function getFichas(){
   const raw = localStorage.getItem(FICHAS_KEY + '_' + (currentTenant?.id||''));
-  return raw ? JSON.parse(raw) : {};
+  if(!raw) return {};
+  try{ return JSON.parse(raw); }catch(e){ return {}; }
 }
 
 function saveFichas(fichas){
@@ -18644,7 +18657,7 @@ function descartarBannerNotif(){
 }
 
 function _notifLocal(titulo, cuerpo, seccion){
-  if(!_notifPermiso || Notification.permission !== 'granted') return;
+  if(!_notifPermiso || !('Notification' in window) || Notification.permission !== 'granted') return;
   try {
     const n = new Notification(titulo, {
       body: cuerpo,
@@ -18741,7 +18754,7 @@ async function _swNotif(title, body, section, tag){
 
 // ── Recordatorio: turno en 1 hora ────────────────────────────────────
 function checkTurnosEnUnaHora(){
-  if (!_isNotifEnabled('recordatorio') || Notification.permission !== 'granted') return;
+  if (!_isNotifEnabled('recordatorio') || !('Notification' in window) || Notification.permission !== 'granted') return;
   const turnos = typeof getTurnos === 'function' ? getTurnos() : [];
   if (!turnos.length) return;
   const now = new Date();
