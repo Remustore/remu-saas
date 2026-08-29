@@ -1342,6 +1342,7 @@ $$;</pre>
       <div class="card">
         <div class="ch">
           <div class="srch"><span>⌕</span><input id="cliQ" placeholder="Buscar cliente por nombre o teléfono..." oninput="rClientes()"></div>
+          <button class="btn bsm" onclick="exportarClientes()" title="Descargar lista de clientes como CSV">⬇ Exportar CSV</button>
         </div>
         <div id="cliList"></div>
       </div>
@@ -1863,6 +1864,7 @@ $$;</pre>
         </div>
         <div class="ch">
           <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rPrecios()" id="prQ"></div>
+          <button class="btn bsm" onclick="exportarPrecios()" title="Descargar lista de precios como CSV">⬇ Exportar CSV</button>
           <button class="btn bsm" onclick="ajustarPreciosMasivo()" title="Subir o bajar todos los precios en un porcentaje">📈 Ajustar %</button>
           <button class="btn bg" onclick="openM('mPrecio',null)">+ Agregar servicio</button>
         </div>
@@ -1950,6 +1952,7 @@ $$;</pre>
           <button class="btn" onclick="abrirGomListas()">⚙️ Mis listas</button>
           <button class="btn" onclick="abrirPedidosGom()">📋 Pedidos</button>
           <button class="btn bgh" onclick="abrirPresupuestoGom()">📄 Presupuesto</button>
+          <button class="btn bsm" onclick="exportarCubiertas()" title="Descargar lista de cubiertas como CSV">⬇ Exportar CSV</button>
           <button class="btn bsm" onclick="ajustarCubiertasMasivo()" title="Subir o bajar todos los precios en un porcentaje">📈 Ajustar %</button>
           <button class="btn bg" onclick="abrirFormCubierta()">+ Agregar cubierta</button>
         </div>
@@ -1989,6 +1992,7 @@ $$;</pre>
         <div id="cliGomTabLista">
           <div class="ch" style="flex-wrap:wrap;gap:10px;margin-bottom:8px">
             <div class="srch"><span>⌕</span><input id="cliGomQ" placeholder="Buscar por patente, nombre o teléfono — Enter abre historial..." oninput="rClientesGomeria()" onkeydown="cliGomSearchEnter(event)"></div>
+            <button class="btn bsm" onclick="exportarClientesGom()" title="Descargar lista de clientes como CSV">⬇ Exportar CSV</button>
             <button class="btn bg" onclick="abrirFormClienteGomeria()">+ Nuevo cliente</button>
           </div>
           <div style="overflow-x:auto">
@@ -2001,6 +2005,7 @@ $$;</pre>
                   <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Vehículo</th>
                   <th style="text-align:right;padding:9px 8px;color:var(--tx2);font-weight:600">Visitas</th>
                   <th style="text-align:left;padding:9px 8px;color:var(--tx2);font-weight:600">Última visita / Próximo</th>
+                  <th style="text-align:right;padding:9px 8px;color:var(--bad);font-weight:600">Saldo CC</th>
                   <th style="padding:9px 8px"></th>
                 </tr>
               </thead>
@@ -2433,6 +2438,7 @@ $$;</pre>
     <div id="mHistGomFicha" style="background:var(--bg2);border-radius:10px;padding:12px 16px"></div>
     <div id="mHistGomStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div>
     <div id="mHistGomProximo" style="display:none"></div>
+    <div id="mHistGomSaldo" style="display:none"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn bg bsm" onclick="_abrirNuevoServicio()">+ Registrar servicio</button>
       <button id="mHistGomWABtn" class="btn bsm" style="display:none;background:rgba(37,211,102,.12);color:#25d366;border:1px solid rgba(37,211,102,.3)" onclick="_waClienteGom()">💬 WhatsApp</button>
@@ -5285,7 +5291,8 @@ async function dbLoadClientesGomeria(){
     if(error) throw error;
     return (data||[]).map(r=>({
       id:r.id, patente:r.patente||'', nombre:r.nombre||'', tel:r.tel||'',
-      instagram:r.instagram||'', km:r.km||0, marca_veh:r.marca_veh||'', modelo:r.modelo||'', notas:r.notas||''
+      instagram:r.instagram||'', km:r.km||0, marca_veh:r.marca_veh||'', modelo:r.modelo||'', notas:r.notas||'',
+      saldo:r.saldo||0
     }));
   }catch(e){ console.error('[clientesGomeria] load error', e); return []; }
 }
@@ -5293,7 +5300,7 @@ async function dbLoadClientesGomeria(){
 async function dbUpsertClienteGomeria(c){
   setSyncing();
   try{
-    const row = { id:c.id, tenant_id:currentTenant.id, patente:c.patente, nombre:c.nombre, tel:c.tel, instagram:c.instagram||null, km:c.km, marca_veh:c.marca_veh, modelo:c.modelo, notas:c.notas };
+    const row = { id:c.id, tenant_id:currentTenant.id, patente:c.patente, nombre:c.nombre, tel:c.tel, instagram:c.instagram||null, km:c.km, marca_veh:c.marca_veh, modelo:c.modelo, notas:c.notas, saldo:c.saldo||0 };
     const { error } = await sb.from('clientes_gomeria').upsert(row, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
@@ -5765,6 +5772,7 @@ function rClientesGomeria(){
       <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${[c.marca_veh,c.modelo].filter(Boolean).join(' ')||'—'}</td>
       <td style="padding:9px 8px;text-align:right">${visitas}</td>
       <td style="padding:9px 8px;color:var(--tx2);font-size:.78rem">${ultima ? _fmtFechaCorta(ultima.fecha) : '—'}${proxHtml}</td>
+      <td style="padding:9px 8px;text-align:right">${c.saldo>0?`<span style="color:var(--bad);font-weight:700;font-size:.82rem">$${c.saldo.toLocaleString('es-AR')}</span>`:'<span style="color:var(--mut);font-size:.78rem">—</span>'}</td>
       <td style="padding:9px 8px;display:flex;gap:6px">
         <button class="btn bsm" onclick="verFichaVehiculo('${c.id}')">🚗 Ficha</button>
         <button class="btn bsm" onclick="verHistorialGomeria('${c.id}')">📋 Historial</button>
@@ -5980,8 +5988,76 @@ async function verHistorialGomeria(clienteId){
   const waBtn=document.getElementById('mHistGomWABtn');
   if(waBtn) waBtn.style.display=c.tel?'':'none';
 
+  // Panel cuenta corriente
+  const saldoEl = document.getElementById('mHistGomSaldo');
+  if(saldoEl){
+    if(c.saldo > 0){
+      saldoEl.style.display = '';
+      saldoEl.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;background:rgba(201,82,76,.1);border:1px solid rgba(201,82,76,.3);border-radius:9px;padding:12px 16px">
+        <div>
+          <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;color:var(--bad);font-weight:700">Cuenta corriente pendiente</div>
+          <div style="font-size:1.3rem;font-weight:900;color:var(--bad)">${fmt(c.saldo)}</div>
+        </div>
+        <button class="btn bsm" style="color:var(--ok);border-color:rgba(76,175,125,.4);background:rgba(76,175,125,.1)" onclick="cobrarCuentaCorriente('${c.id}')">💰 Cobrar</button>
+      </div>`;
+    } else {
+      saldoEl.style.display = 'none';
+    }
+  }
+
   _renderHistorialGomeria(historial);
   openM('mHistorialGomeria');
+}
+
+async function cobrarCuentaCorriente(clienteId){
+  const c = S.clientesGomeria.find(x=>x.id===clienteId);
+  if(!c) return;
+  _mostrarAjusteNum(`💰 Cobrar cuenta corriente — ${c.patente||c.nombre}`,
+    `Saldo actual: ${fmt(c.saldo)}. Ingresá el monto cobrado:`,
+    async (monto) => {
+      if(monto <= 0 || monto > c.saldo + 0.01){ showToast('Monto inválido','err'); return; }
+      const anterior = c.saldo;
+      c.saldo = Math.max(0, Math.round((c.saldo - monto) * 100) / 100);
+      const ok = await dbUpsertClienteGomeria(c);
+      if(!ok){ c.saldo = anterior; showToast('Error al guardar','err'); return; }
+      // registrar ingreso en caja
+      await sb.from('mov_caja').insert({
+        tenant_id: currentTenant.id, fecha: tod(), tipo:'ingreso',
+        monto, descripcion:`Cobro CC — ${c.patente||c.nombre}`,
+        metodo_pago:'Efectivo', origen:'gomeria'
+      }).then(({error})=>{ if(error) console.warn('[movCaja] cobro CC:', error.message); });
+      showToast(`✓ Cobrado ${fmt(monto)}. Saldo restante: ${fmt(c.saldo)}`);
+      verHistorialGomeria(clienteId);
+      rClientesGomeria();
+    }
+  );
+}
+
+function _mostrarAjusteNum(titulo, desc, onConfirm){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML = `
+    <div style="background:var(--bg2);border:1px solid var(--bor);border-radius:14px;padding:24px;width:100%;max-width:300px">
+      <div style="font-weight:700;font-size:.95rem;margin-bottom:4px">${titulo}</div>
+      <div style="font-size:.78rem;color:var(--mut);margin-bottom:14px">${desc}</div>
+      <input id="_ajusteNumInp" type="number" min="1" placeholder="Monto" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--bor);background:var(--bg);color:var(--tx);font-size:1rem;text-align:center;outline:none;margin-bottom:14px">
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1" id="_ajusteNumCancel">Cancelar</button>
+        <button class="btn bg" style="flex:1" id="_ajusteNumOk">Confirmar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const inp = ov.querySelector('#_ajusteNumInp');
+  ov.querySelector('#_ajusteNumCancel').onclick = () => ov.remove();
+  inp.focus();
+  const apply = async () => {
+    const val = parseFloat(inp.value);
+    if(isNaN(val) || val <= 0){ inp.style.borderColor='var(--bad)'; return; }
+    ov.remove();
+    await onConfirm(val);
+  };
+  ov.querySelector('#_ajusteNumOk').onclick = apply;
+  inp.onkeydown = e => { if(e.key==='Enter') apply(); };
 }
 
 function _waClienteGom(){
@@ -7072,9 +7148,20 @@ async function pgConfirmarVenta(){
       S.ventas.push(venta);
     }
   }
+  // Si el método es cuenta corriente, cargar el saldo al cliente por patente
+  if(metodo === 'Cuenta corriente'){
+    const patente = (document.getElementById('pgPatente')?.value||'').trim().toUpperCase();
+    if(patente){
+      const cli = S.clientesGomeria.find(c => (c.patente||'').toUpperCase() === patente);
+      if(cli){
+        cli.saldo = (cli.saldo||0) + total;
+        await dbUpsertClienteGomeria(cli);
+      }
+    }
+  }
   closeM('mPresupGom');
   showToast(`✓ Venta confirmada — ${fmt(total)}`);
-  rVentas(); rCubiertas();
+  rVentas(); rCubiertas(); rClientesGomeria();
 }
 
 function vrBuscarProd(q){
@@ -8697,6 +8784,47 @@ function rPreciosLink(){
       <button class="btn bs bsm" onclick="window.open(window.__preciosPublicLink,'_blank')">Ver</button>
     </div>
   </div>`;
+}
+
+function _exportarCSV(filename, headers, rows){
+  const BOM = '﻿';
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const lines = [headers.map(esc).join(','), ...rows.map(r => r.map(esc).join(','))];
+  const blob = new Blob([BOM + lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function exportarPrecios(){
+  const rows = (S.precios||[]).map(p => [p.nombre||'', p.categoria||'', p.precio||0, p.estado||'activo', p.notas||'']);
+  if(!rows.length){ showToast('No hay precios para exportar', 'err'); return; }
+  _exportarCSV('precios.csv', ['Servicio','Categoría','Precio','Estado','Notas'], rows);
+  showToast(`✓ ${rows.length} precios exportados`);
+}
+
+function exportarCubiertas(){
+  const rows = (S.cubiertas||[]).map(c => [c.medida, c.marca, c.segmento, c.stock, c.minimo??2, c.costo, c.precio_contado, c.precio_3c, c.precio_6c, c.precio_12c]);
+  if(!rows.length){ showToast('No hay cubiertas para exportar', 'err'); return; }
+  _exportarCSV('cubiertas.csv', ['Medida','Marca','Segmento','Stock','Mínimo','Costo','Contado','3 cuotas','6 cuotas','12 cuotas'], rows);
+  showToast(`✓ ${rows.length} cubiertas exportadas`);
+}
+
+function exportarClientes(){
+  const todos = typeof getClientes === 'function' ? getClientes() : [];
+  if(!todos.length){ showToast('No hay clientes para exportar', 'err'); return; }
+  const rows = todos.map(c => [c.nombre||'', c.tel||'', c.visitas||0, c.gasto||0, c.ultimaVisita||'', (c.servicios||[]).join(' | ')]);
+  _exportarCSV('clientes.csv', ['Nombre','Teléfono','Visitas','Gasto total','Última visita','Servicios'], rows);
+  showToast(`✓ ${rows.length} clientes exportados`);
+}
+
+function exportarClientesGom(){
+  const todos = S.clientesGomeria || [];
+  if(!todos.length){ showToast('No hay clientes para exportar', 'err'); return; }
+  const rows = todos.map(c => [c.nombre||'', c.patente||'', c.telefono||'', c.email||'', c.instagram||'', c.notas||'']);
+  _exportarCSV('clientes-gomeria.csv', ['Nombre','Patente','Teléfono','Email','Instagram','Notas'], rows);
+  showToast(`✓ ${rows.length} clientes exportados`);
 }
 
 function _mostrarAjustePct(titulo, onAplicar){
@@ -14905,9 +15033,7 @@ function rGrafico7Dias(){
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esTurnos = esNegocioTurnos(rubro);
 
-  // Para barberías: los ingresos viven en getTurnos() — esta card no aporta datos útiles
   const card7d = el.closest('.card');
-  if(esTurnos){ if(card7d) card7d.style.display='none'; return; }
   if(card7d) card7d.style.display='';
 
   const dias = [];
@@ -14917,6 +15043,12 @@ function rGrafico7Dias(){
   }
 
   const datos = dias.map(fecha=>{
+    if(esTurnos){
+      // barberías/salones: ingresos de turnos terminados (no Fiado)
+      return (typeof getTurnos==='function' ? getTurnos() : [])
+        .filter(t=>t.fecha===fecha && t.estado==='terminado' && t.metodo!=='Fiado')
+        .reduce((a,t)=>a+(parseFloat(t.precio)||0),0);
+    }
     return S.ventas.filter(v=>v.fecha===fecha).reduce((a,v)=>a+v.total,0);
   });
 
