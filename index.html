@@ -8939,26 +8939,39 @@ function mostrarAvisosDaily(){
 function rOnboardingChecklist(){
   const el = document.getElementById('dashAvisos');
   if(!el || !currentTenant) return;
-  // Gomería tiene su propio flujo — no aplica el checklist estándar
-  if(/gomer|neumat|cubiert/i.test((currentTenant.rubro||'').toLowerCase())) return;
   const mods = currentTenant.modulos || {};
   const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : null;
   const diasRestantes = trialHasta ? Math.ceil((trialHasta - new Date()) / 86400000) : 99;
   // Solo mostrar si es auto_registro y trial con más de 20 días restantes (nuevo)
   if(!mods.auto_registro || diasRestantes < 20) return;
-  const cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
-  const tienePrecios = (S.precios||[]).filter(p=>!(p.nombre||'').startsWith('__')).length > 0;
-  const tieneHorarios = (cfg.servicios||[]).length > 0;
-  const tieneEmpleados = (cfg.empleados||[]).length > 0;
-  const negocioSlug = typeof tenantSlug === 'function' ? tenantSlug(currentTenant.nombre||'') : '';
-  const linkPublico = negocioSlug ? (window.location.origin + '/p/?s=' + negocioSlug) : '';
-  const items = [
-    { ok: true,          txt: 'Cuenta creada',                  action: '' },
-    { ok: tienePrecios,  txt: 'Cargá tus precios y servicios',  action: `go('precios')` },
-    { ok: tieneHorarios, txt: 'Configurá tus horarios',         action: `go('turnosConfig')` },
-    { ok: tieneEmpleados,txt: 'Invitá a tu equipo (opcional)',   action: `go('turnosConfig')` },
-    { ok: false,         txt: linkPublico ? `Compartí tu link de turnos` : 'Compartí tu link', action: linkPublico ? `navigator.clipboard.writeText('${linkPublico}');showToast('Link copiado ✓')` : `go('turnosOnline')` },
-  ];
+  const esGomeria = /gomer|neumat|cubiert/i.test((currentTenant.rubro||'').toLowerCase());
+  let items;
+  if(esGomeria){
+    const tieneCubiertas = (S.cubiertas||[]).length > 0;
+    const tieneVentas    = (S.ventas||[]).length > 0;
+    const tieneCuotas    = !!localStorage.getItem('gomCuotas_' + currentTenant.id);
+    items = [
+      { ok: true,           txt: 'Cuenta creada',                           action: '' },
+      { ok: tieneCubiertas, txt: 'Cargá tu catálogo de cubiertas',          action: `go('cubiertas')` },
+      { ok: tieneCuotas,    txt: 'Configurá tus coeficientes de cuotas',    action: `go('gomConfig')` },
+      { ok: tieneVentas,    txt: 'Registrá tu primera venta',               action: `go('gomVentas')` },
+      { ok: false,          txt: 'Invitá a tu equipo (opcional)',            action: `go('configuracion')` },
+    ];
+  } else {
+    const cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
+    const tienePrecios   = (S.precios||[]).filter(p=>!(p.nombre||'').startsWith('__')).length > 0;
+    const tieneHorarios  = (cfg.servicios||[]).length > 0;
+    const tieneEmpleados = (cfg.empleados||[]).length > 0;
+    const negocioSlug    = typeof tenantSlug === 'function' ? tenantSlug(currentTenant.nombre||'') : '';
+    const linkPublico    = negocioSlug ? (window.location.origin + '/p/?s=' + negocioSlug) : '';
+    items = [
+      { ok: true,           txt: 'Cuenta creada',                  action: '' },
+      { ok: tienePrecios,   txt: 'Cargá tus precios y servicios',  action: `go('precios')` },
+      { ok: tieneHorarios,  txt: 'Configurá tus horarios',         action: `go('turnosConfig')` },
+      { ok: tieneEmpleados, txt: 'Invitá a tu equipo (opcional)',   action: `go('turnosConfig')` },
+      { ok: false,          txt: linkPublico ? `Compartí tu link de turnos` : 'Compartí tu link', action: linkPublico ? `navigator.clipboard.writeText('${linkPublico}');showToast('Link copiado ✓')` : `go('turnosOnline')` },
+    ];
+  }
   const completados = items.filter(i=>i.ok).length;
   if(completados === items.length) return; // checklist completo, no mostrar
   const pct = Math.round(completados / items.length * 100);
