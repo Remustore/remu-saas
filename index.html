@@ -6317,7 +6317,7 @@ async function loadAll(){
     // Onboarding wizard for fresh accounts
     const _owKey = 'onboarding_v1_' + (currentTenant?.id||'');
     if(!localStorage.getItem(_owKey)){
-      const _fresh = !S.precios.length && !S.reparaciones.length && !S.ventas.length;
+      const _fresh = !S.precios.length && !S.reparaciones.length && !S.ventas.length && !(S.cubiertas&&S.cubiertas.length);
       if(_fresh) showOnboardingWizard();
       else localStorage.setItem(_owKey, '1');
     }
