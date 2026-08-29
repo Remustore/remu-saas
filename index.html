@@ -5211,6 +5211,7 @@ function _confirmarNuevoTipo(){
 
 function abrirFormCubierta(id=null){
   const c = id ? S.cubiertas.find(x=>x.id===id) : null;
+  openM('mCubierta', id); // primero reset, luego seteamos para que los selects no vuelvan a index 0
   document.getElementById('mCubTitle').textContent = c ? 'Editar cubierta' : 'Nueva cubierta';
   document.getElementById('cubId').value = c?.id||'';
   document.getElementById('cubMedida').value = c?.medida||'';
@@ -5224,7 +5225,6 @@ function abrirFormCubierta(id=null){
   document.getElementById('cubP3').value = c?.precio_3c||'';
   document.getElementById('cubP6').value = c?.precio_6c||'';
   document.getElementById('cubP12').value = c?.precio_12c||'';
-  openM('mCubierta', id);
 }
 
 async function guardarCubierta(){
@@ -7037,10 +7037,12 @@ async function pgConfirmarVenta(){
       const venta = {id:Date.now()+Math.random(),tipo:'cubierta',nombre:item.nombre,cubId:item.id,
         cantidad:item.cant,precio:item.precio,total:item.subtotal,costo:S.cubiertas[ci].costo||0,
         metodo:'Efectivo',fecha:fechaVenta,cuotas:item.cuotas,comPct:0,comision:0};
+      const okV = await dbUpsert('ventas',venta);
+      if(!okV){ showToast('Error al guardar venta de '+item.nombre,'err'); continue; }
       S.ventas.push(venta);
-      await dbUpsert('ventas',venta);
       S.cubiertas[ci].stock -= item.cant;
-      await dbUpsertCubierta(S.cubiertas[ci]);
+      const okC = await dbUpsertCubierta(S.cubiertas[ci]);
+      if(!okC) S.cubiertas[ci].stock += item.cant;
       // registrar en mov_caja para que aparezca en el estado de cajas
       await sb.from('mov_caja').insert({
         tenant_id: currentTenant.id, fecha: fechaVenta, tipo:'ingreso',
@@ -7051,8 +7053,9 @@ async function pgConfirmarVenta(){
       const venta = {id:Date.now()+Math.random(),tipo:'servicio',nombre:item.nombre,
         cantidad:item.cant,precio:item.precio,total:item.subtotal,costo:0,
         metodo:'Efectivo',fecha:fechaVenta,cuotas:'contado',comPct:0,comision:0};
+      const okS = await dbUpsert('ventas',venta);
+      if(!okS){ showToast('Error al guardar venta de '+item.nombre,'err'); continue; }
       S.ventas.push(venta);
-      await dbUpsert('ventas',venta);
     }
   }
   closeM('mPresupGom');
@@ -7161,10 +7164,12 @@ async function confirmarVentaRapida(){
     const precio = cuotas==='3c'?cub.precio_3c:cuotas==='6c'?cub.precio_6c:cuotas==='12c'?cub.precio_12c:cub.precio_contado;
     const venta = {id:Date.now(),tipo:'cubierta',nombre:cub.medida+(cub.marca?' — '+cub.marca:''),cubId:cub.id,
       cantidad:cant,precio,total:precio*cant,costo:cub.costo||0,metodo,fecha:tod(),cuotas,comPct:0,comision:0};
+    const okV = await dbUpsert('ventas',venta);
+    if(!okV){ showToast('Error al guardar la venta — verificá tu conexión','err'); return; }
     S.ventas.push(venta);
-    await dbUpsert('ventas',venta);
     S.cubiertas[ci].stock -= cant;
-    await dbUpsertCubierta(S.cubiertas[ci]);
+    const okC = await dbUpsertCubierta(S.cubiertas[ci]);
+    if(!okC) S.cubiertas[ci].stock += cant; // revertir stock si falla
     closeM('mVentaRapida');
     showToast('✓ Venta registrada — '+fmt(venta.total));
     rVentas(); rCubiertas();
@@ -7178,8 +7183,9 @@ async function confirmarVentaRapida(){
   const venta = {id:Date.now(), tipo:'producto', nombre:prod.nombre, productoId:prod.id,
     cantidad:cant, precio:prod.precio, total:prod.precio*cant,
     costo:prod.costo||0, metodo, fecha:tod(), comPct:0, comision:0};
+  const okV = await dbUpsert('ventas', venta);
+  if(!okV){ showToast('Error al guardar la venta — verificá tu conexión','err'); return; }
   S.ventas.push(venta);
-  await dbUpsert('ventas', venta);
   prod.cantidad -= cant;
   await dbUpsert('stock', prod);
   registrarMovStock(prod.id, prod.nombre, -cant, 'venta', 'Venta rápida');
@@ -13738,7 +13744,7 @@ Tu turno en *${neg}* fue *confirmado* ✅
 
 async function rechazarSolicitud(id, nombre, tel){
   _confirmarModal(`¿Rechazar la solicitud de ${nombre}?`, async () => {
-    const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id);
+    const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id).eq('tenant_id', currentTenant.id);
     if(error){ showToast('Error al rechazar'); return; }
     showToast('Solicitud rechazada ✓');
     await cargarSolicitudes();
@@ -13754,7 +13760,7 @@ async function rechazarSolicitud(id, nombre, tel){
 
 async function cancelarReservaOnline(id, nombre, tel, fecha, hora){
   _confirmarModal(`¿Cancelar la reserva de ${nombre} el ${fecha} a las ${hora}?`, async () => {
-    const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id);
+    const { error } = await sb.from('turnos_solicitudes').delete().eq('id', id).eq('tenant_id', currentTenant.id);
     if(error){ showToast('Error al cancelar'); return; }
     // También eliminar de localStorage si existe un turno con esos datos
     const turnos = getTurnos();
