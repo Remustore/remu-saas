@@ -8993,9 +8993,12 @@ function rOnboardingChecklist(){
   if(completados === items.length) return; // checklist completo, no mostrar
   const pct = Math.round(completados / items.length * 100);
   const existing = document.getElementById('_onboardCard');
+  // Si ya está renderizado y nada cambió, no re-renderizar (evita flash)
+  if(existing && existing.dataset.completados === String(completados)) return;
   if(existing) existing.remove();
   const card = document.createElement('div');
   card.id = '_onboardCard';
+  card.dataset.completados = completados;
   card.className = 'card';
   card.style.cssText = 'margin-bottom:14px;border-color:rgba(201,168,76,.3);background:rgba(201,168,76,.03)';
   card.innerHTML = `
@@ -9018,8 +9021,7 @@ function rOnboardingChecklist(){
 }
 
 function rDash(){
-  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily(); rFiadosPendientes();
-  setTimeout(rOnboardingChecklist, 200);
+  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily(); rOnboardingChecklist(); rFiadosPendientes();
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
   setTimeout(rDashPareja, 200);
