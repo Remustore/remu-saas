@@ -8312,8 +8312,8 @@ async function _entregarPedidoCliente(p){
       registrarMovStock(match.id, match.nombre, -cantidad, 'venta', 'Pedido entregado: '+p.nombre);
     }
     const venta = {id:Date.now()+i, tipo:'producto', nombre:it.nombre, cantidad, precio:it.precio||0, total:cantidad*(it.precio||0), costo, metodo:'Efectivo', fecha:tod(), comPct:0, comision:0};
-    S.ventas.unshift(venta);
-    await dbUpsert('ventas', venta);
+    const okVp = await dbUpsert('ventas', venta);
+    if(okVp) S.ventas.unshift(venta);
   }
   if(typeof rVentas==='function') rVentas();
   if(typeof rStock==='function') rStock();
@@ -8332,9 +8332,9 @@ async function _recibirPedidoProveedor(p){
       await dbUpsert('stock', match);
       registrarMovStock(match.id, match.nombre, cantidad, 'ajuste', 'Recibido de proveedor: '+p.nombre);
     } else {
-      const nuevo = {id:Date.now()+Math.floor(Math.random()*1000), nombre:it.nombre, categoria:'General', cantidad, minimo:3, precio:0, costo:it.precio||0, vendidos:0, notas:'Agregado desde pedido a proveedor'};
-      S.stock.push(nuevo);
-      await dbUpsert('stock', nuevo);
+      const nuevo = {id:Date.now()+Math.floor(Math.random()*1000), tenant_id: currentTenant.id, nombre:it.nombre, categoria:'General', cantidad, minimo:3, precio:0, costo:it.precio||0, vendidos:0, notas:'Agregado desde pedido a proveedor'};
+      const okN = await dbUpsert('stock', nuevo);
+      if(okN) S.stock.push(nuevo);
       registrarMovStock(nuevo.id, nuevo.nombre, cantidad, 'ajuste', 'Recibido de proveedor: '+p.nombre);
     }
   }
@@ -8344,17 +8344,21 @@ async function _recibirPedidoProveedor(p){
 async function marcarPedidoEntregado(id){
   const p = S.pedidos.find(x => String(x.id) === String(id));
   if(!p) return;
+  const estadoOrig = p.estado;
+  const fechaOrig  = p.fechaEntregado;
   p.estado = 'entregado';
   p.fechaEntregado = tod();
 
   if(p.tipo === 'proveedor'){
     await _recibirPedidoProveedor(p);
-    await dbUpsertPedido(p);
+    const ok = await dbUpsertPedido(p);
+    if(!ok){ p.estado = estadoOrig; p.fechaEntregado = fechaOrig; showToast('Error al guardar — verificá tu conexión','err'); return; }
     rPedidos();
     showToast('Pedido recibido — stock actualizado ✓');
   } else {
     await _entregarPedidoCliente(p);
-    await dbUpsertPedido(p);
+    const ok = await dbUpsertPedido(p);
+    if(!ok){ p.estado = estadoOrig; p.fechaEntregado = fechaOrig; showToast('Error al guardar — verificá tu conexión','err'); return; }
     rPedidos();
     showToast('Pedido entregado — registrado en ventas ✓');
   }
