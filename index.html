@@ -8939,6 +8939,8 @@ function mostrarAvisosDaily(){
 function rOnboardingChecklist(){
   const el = document.getElementById('dashAvisos');
   if(!el || !currentTenant) return;
+  // Gomería tiene su propio flujo — no aplica el checklist estándar
+  if(/gomer|neumat|cubiert/i.test((currentTenant.rubro||'').toLowerCase())) return;
   const mods = currentTenant.modulos || {};
   const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : null;
   const diasRestantes = trialHasta ? Math.ceil((trialHasta - new Date()) / 86400000) : 99;
