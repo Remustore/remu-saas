@@ -5272,7 +5272,7 @@ async function dbLoadClientesGomeria(){
     if(error) throw error;
     return (data||[]).map(r=>({
       id:r.id, patente:r.patente||'', nombre:r.nombre||'', tel:r.tel||'',
-      km:r.km||0, marca_veh:r.marca_veh||'', modelo:r.modelo||'', notas:r.notas||''
+      instagram:r.instagram||'', km:r.km||0, marca_veh:r.marca_veh||'', modelo:r.modelo||'', notas:r.notas||''
     }));
   }catch(e){ console.error('[clientesGomeria] load error', e); return []; }
 }
