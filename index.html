@@ -16131,7 +16131,7 @@ function generarInformeContable(){
   // ── Gastos ──
   const FIJO_TIPOS = new Set(['fijo', 'servicios', 'personal', 'herramientas', 'marketing', 'mejoras', 'inversion']);
   const gastosM  = S.gastos.filter(g => g.fecha && g.fecha.startsWith(periodo));
-  const gastosFijos = S.gastos.filter(g => FIJO_TIPOS.has(g.tipo) && (g.frecuencia || 'mensual') === 'mensual');
+  const gastosFijos = gastosM.filter(g => FIJO_TIPOS.has(g.tipo));
   const gastosVar   = gastosM.filter(g => g.tipo === 'variable');
   const gastosStock = gastosM.filter(g => g.tipo === 'stock');
   const tGF = gastosFijos.reduce((a, g) => a + g.monto, 0);
