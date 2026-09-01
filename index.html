@@ -2484,7 +2484,7 @@ $$;</pre>
 <div class="fr"><div><label>IMEI (15 dígitos)</label><input id="eIme" maxlength="15" placeholder="000000000000000" oninput="this.value=this.value.replace(/\D/g,'')"></div><div><label>Batería (%)</label><input type="number" id="eBat" min="0" max="100" placeholder="85"></div></div>
 <div class="fr"><div><label>Estado físico</label><select id="eFis"><option>Excelente</option><option>Muy bueno</option><option>Bueno</option><option>Regular</option></select></div><div><label>Precio de reventa ($)</label><input type="number" id="ePre" placeholder="0"></div></div>
 <div class="fr"><div><label>Costo de compra ($)</label><input type="number" id="eCos" placeholder="0"></div><div><label>Margen estimado</label><input id="eMargen" readonly style="background:var(--car2);color:var(--ok)" placeholder="—"></div></div>
-<div class="fr"><div><label>Garantía (días)</label><input type="number" id="eGarDias" placeholder="Ej: 90" min="0" oninput="calcGarantiaEquipo()"></div><div><label>Vence el</label><input type="date" id="eGarVence" readonly style="background:var(--car2)"></div></div>
+<div class="fr"><div><label>Garantía (días)</label><input type="number" id="eGarDias" placeholder="Ej: 90" min="0" oninput="calcGarantiaEquipo()"></div><div><label>Vence el</label><input id="eGarVence" readonly placeholder="Se calcula al vender" style="background:var(--car2);font-size:.78rem;color:var(--mut)"></div></div>
 <div class="fr"><div><label>Proveedor / Vendedor</label><input id="eProvNombre" placeholder="Nombre del proveedor"></div><div><label>Tel. proveedor</label><input id="eProvTel" type="tel" placeholder="11 2345 6789"></div></div>
 <div class="fr full"><div><label>Observaciones</label><textarea id="eNot" placeholder="Opcional..."></textarea></div></div>
 </div><div class="mf"><button class="btn" onclick="closeM('mEquipo')">Cancelar</button><button class="btn bg" onclick="saveEquipo()">Guardar</button></div></div></div>
@@ -6584,7 +6584,10 @@ function fillModalEdit(modal, id){
     if(document.getElementById('tEstFisico'))document.getElementById('tEstFisico').value=t.estFisico||'excelente';
     if(document.getElementById('tAccesorios'))document.getElementById('tAccesorios').value=t.accesorios||'';
     updateGarantiaVence();calcGanTaller();}
-  if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo||'';document.getElementById('eMod').value=e.modelo||'';document.getElementById('eMem').value=e.memoria||'';document.getElementById('eCol').value=e.color||'';document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico||'Excelente';document.getElementById('ePre').value=e.precio||0;document.getElementById('eCos').value=e.costo||0;document.getElementById('eGarDias').value=e.garantiaDias||'';document.getElementById('eGarVence').value=e.garantiaVence||'';document.getElementById('eProvNombre').value=e.provNombre||'';document.getElementById('eProvTel').value=e.provTel||'';document.getElementById('eNot').value=e.notas||'';calcGarantiaEquipo();}
+  if(modal==='mEquipo'){const e=S.equipos.find(x=>x.id===id);if(!e)return;document.getElementById('mEquipoTitle').textContent='Editar Equipo';document.getElementById('eId').value=id;document.getElementById('eTipo').value=e.tipo||'';document.getElementById('eMod').value=e.modelo||'';document.getElementById('eMem').value=e.memoria||'';document.getElementById('eCol').value=e.color||'';document.getElementById('eIme').value=e.imei||'';document.getElementById('eBat').value=e.bateria||'';document.getElementById('eFis').value=e.estadoFisico||'Excelente';document.getElementById('ePre').value=e.precio||0;document.getElementById('eCos').value=e.costo||0;document.getElementById('eGarDias').value=e.garantiaDias||'';document.getElementById('eProvNombre').value=e.provNombre||'';document.getElementById('eProvTel').value=e.provTel||'';document.getElementById('eNot').value=e.notas||'';
+    // Si ya fue vendido con fecha real, mostrarla; si no, mostrar preview
+    const gv=document.getElementById('eGarVence');
+    if(gv){ if(e.estado==='vendido'&&e.garantiaVence) gv.value='Vence: '+fD(e.garantiaVence); else calcGarantiaEquipo(); }}
   if(modal==='mGasto'){
     const FIJO_TIPOS_M = new Set(['fijo','servicios','personal','herramientas','marketing','mejoras','inversion']);
     if(!id){
@@ -7443,12 +7446,8 @@ function calcGarantiaEquipo(){
   const venceEl = document.getElementById('eGarVence');
   const margenEl = document.getElementById('eMargen');
   if(venceEl){
-    if(dias > 0){
-      const d = new Date(); d.setDate(d.getDate() + dias);
-      venceEl.value = d.toISOString().slice(0,10);
-    } else {
-      venceEl.value = '';
-    }
+    // La fecha real se calcula al vender, no al cargar al inventario
+    venceEl.value = dias > 0 ? `${dias} días desde la venta` : '';
   }
   if(margenEl){
     const pre = parseFloat(document.getElementById('ePre')?.value)||0;
@@ -7471,7 +7470,9 @@ async function saveEquipo(){
   if(!modelo) return alert('Ingresá el modelo del equipo');
   const snap = JSON.parse(JSON.stringify(S.equipos));
   const garDias = parseInt(document.getElementById('eGarDias').value)||0;
-  const garVence = document.getElementById('eGarVence').value || '';
+  // garantiaVence se calcula al vender, no al registrar en inventario
+  const existente = S.equipos.find(e=>e.id===parseInt(id));
+  const garVence = existente?.garantiaVence || '';
   const obj = {
     tipo: document.getElementById('eTipo').value,
     modelo,
@@ -7571,6 +7572,11 @@ async function confirmarVentaEquipo(id, btn){
   if(clienteNombre) e.clienteNombre = clienteNombre;
   if(clienteTel) e.clienteTel = clienteTel;
   if(tradeChk && tradeDesc){ e.tradeDesc = tradeDesc; e.tradeVal = tradeVal; }
+  // Recalcular garantiaVence desde la fecha de venta (no desde cuando se cargó al stock)
+  if(e.garantiaDias > 0){
+    const gv = new Date(); gv.setDate(gv.getDate() + parseInt(e.garantiaDias));
+    e.garantiaVence = gv.toISOString().slice(0,10);
+  }
   await dbUpsert('equipos',e);
   pushUndo('Vender equipo','equipos',snapEq);
   // Registrar en ventas
