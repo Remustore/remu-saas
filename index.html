@@ -1275,6 +1275,7 @@ $$;</pre>
             <button class="tab" onclick="setEF('nuevo',1)">Nuevos</button>
             <button class="tab" onclick="setEF('usado',2)">Usados</button>
             <button class="tab" onclick="setEF('vendido',3)">Vendidos</button>
+            <button class="tab" onclick="setEF('garantia',4)">Garantías</button>
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rEquipos()" id="eQ"></div>
@@ -1338,6 +1339,19 @@ $$;</pre>
           </label>
         </div>
         <div id="fidelStats" style="margin-top:14px;display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <!-- Recompra / fidelización por WhatsApp (talleres, celulares, gomerías, etc.) -->
+      <div class="card" id="recompraCard" style="margin-bottom:14px;display:none">
+        <div style="font-weight:600;font-size:.88rem">🔁 Recompra y fidelización</div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-top:3px;margin-bottom:12px">Detectá clientes que no vuelven hace tiempo y ofreceles un upgrade por WhatsApp con un clic desde el Dashboard</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <label style="font-size:.78rem;color:var(--tx2)">Recontactar si no compra hace</label>
+          <input type="number" id="recompraMesesInp" min="1" max="60" value="8" style="width:70px;padding:6px 10px;text-align:center;font-size:.9rem;font-weight:700" oninput="_saveRecompraConf()">
+          <label style="font-size:.78rem;color:var(--tx2)">meses</label>
+        </div>
+        <label style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Mensaje de WhatsApp (usá {nombre} y {negocio})</label>
+        <textarea id="recompraMsgInp" style="width:100%;min-height:70px;padding:10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.82rem" oninput="_saveRecompraConf()"></textarea>
+        <div style="font-size:.7rem;color:var(--mut);margin-top:6px">Los avisos aparecen en el Dashboard como sugerencia — vos elegís a quién contactar, no se envían solos.</div>
       </div>
       <div class="card">
         <div class="ch">
@@ -3092,6 +3106,7 @@ let currentTenant = null;  // objeto tenant { id, nombre, rubro, modulos }
 let currentRole = null;    // 'admin' | 'superadmin'
 let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
 let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
+const _RECOMPRA_MSG_DEFAULT = 'Hola {nombre}! 👋 Somos {negocio}. Hace un tiempo compraste tu equipo con nosotros y queríamos contarte que tenemos nuevos iPhones (nuevos y usados) con muy buen precio de recompra por el tuyo. ¿Te gustaría que te pasemos las opciones? 📱';
 
 // ═══ SYNC UI ═══
 function setSyncing(){ document.getElementById('syncDot').className='sync-dot syncing'; document.getElementById('syncTxt').textContent='Guardando...'; }
@@ -7501,6 +7516,10 @@ function abrirVentaEquipo(id){
     <select id="_veqMet" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;margin-bottom:16px">
       <option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta débito</option><option>Tarjeta crédito</option>
     </select>
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Cliente</label>
+    <input id="_veqCli" placeholder="Nombre del cliente" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:12px">
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Teléfono <span style="text-transform:none;font-weight:400">(para garantía y WhatsApp)</span></label>
+    <input id="_veqTel" type="tel" placeholder="11 2345 6789" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:16px">
     <div style="display:flex;gap:8px">
       <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
       <button class="btn bg" style="flex:1" onclick="confirmarVentaEquipo(${id},this)">Confirmar venta</button>
@@ -7514,10 +7533,18 @@ async function confirmarVentaEquipo(id, btn){
   if(!e) return;
   const precio = parseFloat(document.getElementById('_veqPre')?.value)||e.precio||0;
   const metodo = document.getElementById('_veqMet')?.value||'Efectivo';
+  const cliente = (document.getElementById('_veqCli')?.value||'').trim();
+  const tel = (document.getElementById('_veqTel')?.value||'').trim();
   btn.disabled=true; btn.textContent='Guardando...';
   // Marcar equipo como vendido
   const snapEq = JSON.parse(JSON.stringify(S.equipos));
   e.estado='vendido'; e.fechaVenta=tod(); e.precioVenta=precio;
+  e.clienteNombre = cliente; e.clienteTel = tel;
+  // La garantía cuenta desde la fecha de venta, no desde que el equipo entró al stock
+  if(e.garantiaDias>0){
+    const d = new Date(); d.setDate(d.getDate() + e.garantiaDias);
+    e.garantiaVence = d.toISOString().slice(0,10);
+  }
   await dbUpsert('equipos',e);
   pushUndo('Vender equipo','equipos',snapEq);
   // Registrar en ventas
@@ -7527,7 +7554,8 @@ async function confirmarVentaEquipo(id, btn){
     nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':''),
     cantidad: 1, precio, total: precio,
     costo: e.costo||0, metodo, fecha: tod(),
-    comPct: 0, comision: 0
+    comPct: 0, comision: 0,
+    cliente, tel
   };
   S.ventas.unshift(venta);
   await dbUpsert('ventas', venta);
@@ -7548,9 +7576,10 @@ function _diasGarantiaRestantes(vence){
 
 function rEquipos(){
   const q = (document.getElementById('eQ').value||'').toLowerCase();
-  const items = S.equipos.filter(e=>(eFilt==='todos'||e.tipo===eFilt||e.estado===eFilt)&&(!q||( (e.modelo||'').toLowerCase().includes(q)||(e.imei||'').includes(q)||(e.provNombre||'').toLowerCase().includes(q))));
+  let items = S.equipos.filter(e=>(eFilt==='todos'||e.tipo===eFilt||e.estado===eFilt||(eFilt==='garantia'&&e.estado==='vendido'&&e.garantiaVence))&&(!q||( (e.modelo||'').toLowerCase().includes(q)||(e.imei||'').includes(q)||(e.provNombre||'').toLowerCase().includes(q)||(e.clienteNombre||'').toLowerCase().includes(q))));
+  if(eFilt==='garantia') items = items.slice().sort((a,b)=>(a.garantiaVence||'').localeCompare(b.garantiaVence||''));
   const tb = document.getElementById('tbE');
-  if(!items.length){ tb.innerHTML=`<tr><td colspan="7">${emp('📱','Sin equipos')}</td></tr>`; return; }
+  if(!items.length){ tb.innerHTML=`<tr><td colspan="7">${emp('📱', eFilt==='garantia'?'Sin garantías activas':'Sin equipos')}</td></tr>`; return; }
   tb.innerHTML = items.map(e=>{
     const diasRest = _diasGarantiaRestantes(e.garantiaVence);
     const garHtml = diasRest === null
@@ -7570,14 +7599,178 @@ function rEquipos(){
     <td class="col-hide" style="font-size:.72rem;font-family:monospace;color:var(--mut)">${esc(e.imei||'—')}</td>
     <td>${tipoChip}<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.estadoFisico||'')}</span></td>
     <td><strong>${fmt(e.precio)}</strong>${margen!==null?`<br><span style="font-size:.68rem;color:${margen>20?'var(--ok)':'var(--wrn)'}">${margen}%</span>`:''}</td>
-    <td class="col-hide">${garHtml}${e.garantiaVence?`<br><span style="font-size:.65rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`:''}</td>
+    <td class="col-hide">${garHtml}${e.garantiaVence?`<br><span style="font-size:.65rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`:''}${e.estado==='vendido'&&e.clienteNombre?`<br><span style="font-size:.65rem;color:var(--tx2)">👤 ${esc(e.clienteNombre)}</span>`:''}${e.reclamos&&e.reclamos.length?`<br><span class="bx brd" style="font-size:.6rem">🛠 ${e.reclamos.length} reclamo${e.reclamos.length>1?'s':''}</span>`:''}</td>
     <td class="col-hide" style="font-size:.75rem">${e.provNombre?esc(e.provNombre):'<span style="color:var(--mut)">—</span>'}${e.provTel?`<br><span style="color:var(--mut);font-size:.68rem">${esc(e.provTel)}</span>`:''}</td>
     <td style="display:flex;gap:3px;flex-wrap:wrap">
       ${e.estado!=='vendido'?`<button class="btn bs bsm" onclick="abrirVentaEquipo(${e.id})" title="Registrar venta">💸 Vender</button>`:''}
+      ${e.estado!=='vendido'?`<button class="btn bgh bsm" onclick="abrirPresupuestoEquipo(${e.id})" title="Generar presupuesto">🧾</button>`:''}
+      ${e.estado==='vendido'&&e.clienteTel?`<button class="btn bs bsm" onclick="window.open('https://wa.me/54${e.clienteTel.replace(/\D/g,'')}')" title="WhatsApp cliente">📲</button>`:''}
+      ${e.estado==='vendido'?`<button class="btn bgh bsm" onclick="abrirReclamoEquipo(${e.id})" title="Garantía / reclamos">🛠</button>`:''}
       <button class="btn be bsm" onclick="openM('mEquipo',${e.id})">✎</button>
       <button class="btn bd bsm" onclick="delEquipo(${e.id})">✕</button>
     </td></tr>`;
   }).join('');
+}
+
+// ═══ GARANTÍAS / RECLAMOS DE EQUIPOS ═══
+function abrirReclamoEquipo(id){
+  const e = S.equipos.find(eq=>eq.id===id);
+  if(!e) return;
+  const dias = _diasGarantiaRestantes(e.garantiaVence);
+  const estadoGar = dias===null ? 'Sin garantía registrada' : dias<0 ? 'Garantía vencida' : `Garantía vigente — ${dias} día${dias!==1?'s':''} restantes`;
+  const reclamos = e.reclamos||[];
+  document.getElementById('_reclamoEquipoOverlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = '_reclamoEquipoOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick = ev=>{ if(ev.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:420px;padding:24px;max-height:85vh;overflow-y:auto">
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:4px">🛠 Garantía — ${esc(e.modelo)} ${esc(e.memoria||'')}</div>
+    <div style="font-size:.8rem;color:var(--tx2);margin-bottom:4px">${e.clienteNombre?'👤 '+esc(e.clienteNombre):'Sin cliente registrado'}${e.clienteTel?' · 📱 '+esc(e.clienteTel):''}</div>
+    <div style="font-size:.8rem;font-weight:600;margin-bottom:16px;color:${dias!==null&&dias<0?'var(--bad)':'var(--ok)'}">${estadoGar}</div>
+    ${reclamos.length?`<div style="margin-bottom:14px;max-height:160px;overflow-y:auto">${reclamos.map((rc,i)=>`<div style="padding:8px 0;border-bottom:1px solid var(--bor);font-size:.8rem;display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+      <div><strong>${fD(rc.fecha)}</strong> — ${esc(rc.detalle)}</div>
+      <button class="btn bsm" style="font-size:.65rem;white-space:nowrap;border:1px solid ${rc.resuelto?'var(--bor2)':'var(--ok)'};color:${rc.resuelto?'var(--tx2)':'var(--ok)'}" onclick="toggleReclamoResuelto(${id},${i})">${rc.resuelto?'Resuelto ✓':'Marcar resuelto'}</button>
+    </div>`).join('')}</div>`:'<div style="font-size:.78rem;color:var(--mut);margin-bottom:14px">Sin reclamos registrados</div>'}
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Registrar nuevo reclamo</label>
+    <textarea id="_reclDet" placeholder="Ej: no carga bien la batería..." style="width:100%;min-height:70px;padding:10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.85rem;margin-bottom:12px"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cerrar</button>
+      <button class="btn bg" style="flex:1" onclick="guardarReclamoEquipo(${id})">Guardar reclamo</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function guardarReclamoEquipo(id){
+  const det = (document.getElementById('_reclDet')?.value||'').trim();
+  if(!det) return;
+  const e = S.equipos.find(eq=>eq.id===id);
+  if(!e) return;
+  const snap = JSON.parse(JSON.stringify(S.equipos));
+  e.reclamos = e.reclamos||[];
+  e.reclamos.push({fecha: tod(), detalle: det, resuelto:false});
+  await dbUpsert('equipos', e);
+  pushUndo('Reclamo de garantía','equipos',snap);
+  document.getElementById('_reclamoEquipoOverlay')?.remove();
+  rEquipos();
+  showToast('Reclamo registrado ✓');
+}
+
+async function toggleReclamoResuelto(id, idx){
+  const e = S.equipos.find(eq=>eq.id===id);
+  if(!e || !e.reclamos || !e.reclamos[idx]) return;
+  const snap = JSON.parse(JSON.stringify(S.equipos));
+  e.reclamos[idx].resuelto = !e.reclamos[idx].resuelto;
+  await dbUpsert('equipos', e);
+  pushUndo('Reclamo de garantía','equipos',snap);
+  abrirReclamoEquipo(id);
+  rEquipos();
+}
+
+// ═══ PRESUPUESTOS DE EQUIPOS ═══
+function abrirPresupuestoEquipo(id){
+  const e = S.equipos.find(eq=>eq.id===id);
+  if(!e) return;
+  document.getElementById('_presEquipoOverlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = '_presEquipoOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick = ev=>{ if(ev.target===overlay) overlay.remove(); };
+  overlay.innerHTML = `<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:420px;padding:24px;max-height:85vh;overflow-y:auto">
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:4px">🧾 Presupuesto</div>
+    <div style="font-size:.82rem;color:var(--tx2);margin-bottom:16px">${esc(e.modelo)} ${esc(e.memoria||'')} — ${fmt(e.precio)}</div>
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Cliente</label>
+    <input id="_pgeCli" placeholder="Nombre" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:10px">
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Teléfono</label>
+    <input id="_pgeTel" type="tel" placeholder="11 2345 6789" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:10px">
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Canje de equipo usado ($, opcional)</label>
+    <input id="_pgeCanje" type="number" placeholder="0" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:10px">
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Descuento ($, opcional)</label>
+    <input id="_pgeDesc" type="number" placeholder="0" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="btn bs" style="flex:1" onclick="generarPresupuestoEquipoWA(${id})">📲 WhatsApp</button>
+      <button class="btn bg" style="flex:1" onclick="generarPresupuestoEquipoPDF(${id})">🖨 PDF</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function _nextPresupEquipoNum(){
+  let n = parseInt(dbGetConfig('celPresupNum'))||0;
+  n++;
+  dbSetConfig('celPresupNum', n);
+  return n;
+}
+
+function _datosPresupEquipo(id){
+  const e = S.equipos.find(eq=>eq.id===id);
+  const cliente = (document.getElementById('_pgeCli')?.value||'').trim();
+  const tel = (document.getElementById('_pgeTel')?.value||'').trim();
+  const canje = parseFloat(document.getElementById('_pgeCanje')?.value)||0;
+  const desc = parseFloat(document.getElementById('_pgeDesc')?.value)||0;
+  const total = Math.max(0, (e?.precio||0) - canje - desc);
+  return {e, cliente, tel, canje, desc, total};
+}
+
+function generarPresupuestoEquipoWA(id){
+  const {e, cliente, tel, canje, desc, total} = _datosPresupEquipo(id);
+  if(!e) return;
+  const neg = currentTenant?.nombre||'nuestro local';
+  const nro = _nextPresupEquipoNum();
+  let msg = `📋 *Presupuesto #${nro} — ${neg}*\n\n`;
+  msg += `📱 ${e.modelo} ${e.memoria||''} ${e.tipo==='usado'?'(Usado)':'(Nuevo)'}\n`;
+  msg += `💰 Precio: ${fmt(e.precio)}\n`;
+  if(canje>0) msg += `🔁 Canje de equipo usado: -${fmt(canje)}\n`;
+  if(desc>0) msg += `🏷 Descuento: -${fmt(desc)}\n`;
+  msg += `\n*Total: ${fmt(total)}*\n\n`;
+  msg += `Presupuesto válido por 3 días. ¡Cualquier consulta escribinos!`;
+  document.getElementById('_presEquipoOverlay')?.remove();
+  window.open(`https://wa.me/${tel?'54'+tel.replace(/\D/g,''):''}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+function generarPresupuestoEquipoPDF(id){
+  const {e, cliente, tel, canje, desc, total} = _datosPresupEquipo(id);
+  if(!e) return;
+  const neg = currentTenant?.nombre||'Mi Negocio';
+  const fecha = new Date().toLocaleDateString('es-AR');
+  const nro = _nextPresupEquipoNum();
+  document.getElementById('_presEquipoOverlay')?.remove();
+  const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><style>
+  body{font-family:Arial,sans-serif;color:#1a1a1a;max-width:600px;margin:0 auto;padding:30px}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;border-bottom:3px solid #1a1a1a;padding-bottom:16px}
+  .biz-name{font-size:1.6rem;font-weight:800;letter-spacing:2px}
+  .nro{font-size:.8rem;color:#888;margin-top:4px}
+  .titulo{font-size:1.1rem;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:2px;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse;margin:14px 0}
+  td{padding:8px 12px;border:1px solid #ddd;font-size:.85rem}
+  td:first-child{background:#f5f5f5;font-weight:600;width:45%}
+  .total-row td{background:#1a1a1a;color:#fff;font-size:1rem;font-weight:700}
+  .footer{margin-top:24px;font-size:.75rem;color:#888;border-top:1px solid #ddd;padding-top:14px}
+  @media print{body{padding:10px}}
+</style></head><body>
+<div class="header"><div><div class="biz-name">${esc(neg)}</div><div class="nro">Presupuesto N° ${nro} · ${fecha}</div></div></div>
+<div class="titulo">Presupuesto de venta</div>
+<table>
+  <tr><td>Cliente</td><td>${esc(cliente)||'—'}</td></tr>
+  <tr><td>Teléfono</td><td>${esc(tel)||'—'}</td></tr>
+  <tr><td>Equipo</td><td>${esc(e.modelo)} ${esc(e.memoria||'')} ${e.tipo==='usado'?'(Usado)':'(Nuevo)'}</td></tr>
+  <tr><td>IMEI</td><td>${esc(e.imei)||'—'}</td></tr>
+</table>
+<table>
+  <tr><td>Precio de venta</td><td>${fmt(e.precio)}</td></tr>
+  ${canje>0?`<tr><td>Canje equipo usado</td><td>-${fmt(canje)}</td></tr>`:''}
+  ${desc>0?`<tr><td>Descuento</td><td>-${fmt(desc)}</td></tr>`:''}
+  <tr class="total-row"><td>TOTAL</td><td>${fmt(total)}</td></tr>
+</table>
+<div class="footer">${esc(neg)} · Presupuesto generado el ${fecha} · Válido por 3 días.</div>
+</body></html>`;
+  const ventana = window.open('','_blank');
+  ventana.document.write(html);
+  ventana.document.close();
+  setTimeout(()=>ventana.print(), 500);
 }
 
 // ═══ VENTAS ═══
@@ -9071,6 +9264,63 @@ function rPrecios(){
 async function saveMeta(){ const v=parseFloat(document.getElementById('metaIn').value)||0; S.meta=v; await dbSetConfig('meta',v); rDash(); showToast('Meta guardada ✓'); }
 
 // ═══ AVISOS DIARIOS (recordatorios + horarios equipo) ═══
+function _saveRecompraConf(){
+  const m = parseInt(document.getElementById('recompraMesesInp')?.value)||8;
+  dbSetConfig('recompraMeses', m);
+  const msg = document.getElementById('recompraMsgInp')?.value||'';
+  dbSetConfig('recompraMsg', msg);
+}
+
+function _mesesDesde(fechaStr){
+  if(!fechaStr) return null;
+  const f = new Date(fechaStr+'T00:00:00');
+  const hoy = new Date();
+  return (hoy.getFullYear()-f.getFullYear())*12 + (hoy.getMonth()-f.getMonth());
+}
+
+function marcarRecompraContactado(nombre){
+  dbSetConfig('recompraContacto_'+nombre.toLowerCase().trim(), tod());
+  rDash();
+}
+
+// Avisa qué clientes de compraventa/reparación de equipos hace tiempo no vuelven,
+// para ofrecerles un upgrade por WhatsApp con un clic (no envía mensajes solo).
+function rAvisosRecompra(){
+  const box = document.getElementById('dashAvisos');
+  if(!box || !currentTenant || typeof getClientes!=='function') return;
+  const r = (currentTenant.rubro||'').toLowerCase();
+  const esCelu = r.includes('taller')||r.includes('celular')||r.includes('reparac')||r.includes('tecnico')||r.includes('técnico');
+  if(!esCelu) return;
+  const meses = parseInt(dbGetConfig('recompraMeses'))||8;
+  const msgTpl = dbGetConfig('recompraMsg') || _RECOMPRA_MSG_DEFAULT;
+  const negocio = currentTenant.nombre||'nuestro local';
+  const hoy = new Date();
+  const candidatos = getClientes().filter(c=>{
+    if(!c.ultimaVisita || !c.tel) return false;
+    const m = _mesesDesde(c.ultimaVisita);
+    if(m===null || m < meses) return false;
+    const ultCont = dbGetConfig('recompraContacto_'+c.nombre.toLowerCase().trim());
+    if(ultCont){
+      const diasDesdeContacto = Math.floor((hoy - new Date(ultCont+'T00:00:00')) / 86400000);
+      if(diasDesdeContacto < 30) return false;
+    }
+    return true;
+  }).sort((a,b)=>a.ultimaVisita.localeCompare(b.ultimaVisita)).slice(0,5);
+  if(!candidatos.length) return;
+  const rows = candidatos.map(c=>{
+    const m = _mesesDesde(c.ultimaVisita);
+    const msg = msgTpl.replace(/\{nombre\}/g, c.nombre).replace(/\{negocio\}/g, negocio);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bor);gap:8px;flex-wrap:wrap">
+      <span style="font-size:.82rem"><strong>${esc(c.nombre)}</strong> <span style="color:var(--mut)">— hace ${m} meses no vuelve</span></span>
+      <a href="https://wa.me/54${c.tel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}" target="_blank" onclick="marcarRecompraContactado('${c.nombre.replace(/'/g,"\\'")}')" class="btn bsm" style="background:rgba(37,211,102,.15);color:#25d366;border:1px solid rgba(37,211,102,.3);font-size:.7rem;padding:3px 10px;white-space:nowrap">📲 Ofrecer upgrade</a>
+    </div>`;
+  }).join('');
+  box.insertAdjacentHTML('beforeend', `<div class="card" style="margin-bottom:8px;border-left:3px solid var(--gld)">
+    <div style="font-weight:600;font-size:.85rem;color:var(--gld);margin-bottom:8px">🔁 Clientes para recontactar</div>
+    ${rows}
+  </div>`);
+}
+
 function mostrarAvisosDaily(){
   const box = document.getElementById('dashAvisos');
   if(!box) return;
@@ -9258,7 +9508,7 @@ function rOnboardingChecklist(){
 }
 
 function rDash(){
-  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily(); rOnboardingChecklist(); rFiadosPendientes();
+  updateGreeting(); updateBigNumbers(); updateEnergyBar(); rObjetivos(); rCajas(); mostrarAvisosDaily(); rAvisosRecompra(); rOnboardingChecklist(); rFiadosPendientes();
   setTimeout(rGraficos, 100);
   setTimeout(rPanelDinero, 150);
   setTimeout(rDashPareja, 200);
@@ -14125,7 +14375,7 @@ function _rwS1(){
   const rubros = [
     {v:'Barbería',          icon:'✂',  desc:'Cortes, barba, coloración'},
     {v:'Salón de belleza',  icon:'💅', desc:'Peluquería, manicuria, estética'},
-    {v:'Taller de celulares',icon:'📱',desc:'Reparaciones, diagnóstico, repuestos'},
+    {v:'Taller de celulares',icon:'📱',desc:'Reparaciones, compra-venta de equipos y repuestos'},
     {v:'Gomería',           icon:'🔧', desc:'Cubiertas, alineación, balanceo'},
     {v:'Otro',              icon:'🏠', desc:'Otro tipo de negocio'},
   ];
@@ -17067,6 +17317,7 @@ function getClientes(){
     getTurnos().filter(t=>t.estado==='terminado').forEach(t=>agregar(t.cliente,t.tel,t.fecha,t.precio||0,t.servicioNombre));
   } else {
     S.reparaciones.forEach(r=>agregar(r.cliente,r.tel,r.fecha,r.presupuesto||0,r.equipo));
+    S.ventas.filter(v=>v.tipo==='equipo'&&v.cliente).forEach(v=>agregar(v.cliente,v.tel,v.fecha,v.total||0,v.nombre));
   }
   return Object.values(mapa).sort((a,b)=>b.ultimaVisita.localeCompare(a.ultimaVisita));
 }
@@ -17213,6 +17464,15 @@ function rClientes(){
   // Mostrar fidelización card para salones/barberías
   const fCard = document.getElementById('fidelCard');
   if(fCard) fCard.style.display = esSalonR ? '' : 'none';
+  // Mostrar recompra/fidelización WA para negocios de producto (taller/celulares, etc.)
+  const rCard = document.getElementById('recompraCard');
+  if(rCard) rCard.style.display = esSalonR ? 'none' : '';
+  if(!esSalonR){
+    const inpM = document.getElementById('recompraMesesInp');
+    if(inpM) inpM.value = parseInt(dbGetConfig('recompraMeses'))||8;
+    const inpMsg = document.getElementById('recompraMsgInp');
+    if(inpMsg) inpMsg.value = dbGetConfig('recompraMsg') || _RECOMPRA_MSG_DEFAULT;
+  }
   if(esSalonR){
     const umbral = parseInt(dbGetConfig('fidelUmbral')||'10');
     const inp = document.getElementById('fidelUmbral');
@@ -17222,7 +17482,7 @@ function rClientes(){
     if(fStats) fStats.innerHTML = cerca.length ? cerca.map(c=>`<div style="background:rgba(201,168,76,.12);border:1px solid var(--gld);border-radius:8px;padding:8px 12px;font-size:.8rem"><div style="font-weight:700;color:var(--gld)">${esc(c.nombre)}</div><div style="color:var(--tx2);margin-top:2px">🎉 ${c.visitas} visitas — ¡fidelización!</div></div>`).join('') : `<div style="font-size:.78rem;color:var(--mut)">Nadie alcanzó el umbral aún. Umbral actual: cada ${umbral} visitas.</div>`;
   }
   if(!clientes.length){
-    box.innerHTML=`<div class="emp"><div class="ei">👥</div><div>Sin clientes registrados</div><div style="font-size:.75rem;color:var(--mut)">${esSalonR?'Los clientes se registran al completar turnos':'Los clientes se agregan al crear trabajos en Reparaciones'}</div></div>`;
+    box.innerHTML=`<div class="emp"><div class="ei">👥</div><div>Sin clientes registrados</div><div style="font-size:.75rem;color:var(--mut)">${esSalonR?'Los clientes se registran al completar turnos':'Los clientes se agregan al crear trabajos en Reparaciones o al vender un equipo'}</div></div>`;
     return;
   }
   const umbral = esSalonR ? parseInt(dbGetConfig('fidelUmbral')||'10') : 0;
@@ -17252,9 +17512,20 @@ function rClientes(){
 
 function verHistorial(nombre){
   const trabajos = S.reparaciones.filter(r=>r.cliente===nombre).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-  const ventas = [];
+  const equiposComprados = S.equipos.filter(e=>e.estado==='vendido'&&e.clienteNombre===nombre).sort((a,b)=>(b.fechaVenta||'').localeCompare(a.fechaVenta||''));
   const html = `<div style="padding:16px">
     <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:12px">📋 Historial — ${esc(nombre)}</div>
+    ${equiposComprados.length?`<div style="font-weight:600;font-size:.8rem;margin-bottom:6px;color:var(--tx2)">📱 Equipos comprados</div>${equiposComprados.map(e=>{
+      const dias = _diasGarantiaRestantes(e.garantiaVence);
+      const garTxt = dias===null ? '' : dias<0 ? '<span style="color:var(--bad)">Garantía vencida</span>' : `<span style="color:var(--ok)">Garantía: ${dias}d restantes</span>`;
+      return `<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;font-size:.82rem">
+        <span style="font-weight:600">${esc(e.modelo)} ${esc(e.memoria||'')}</span>
+        <span>${fmt(e.precioVenta||e.precio||0)}</span>
+      </div>
+      <div style="font-size:.75rem;color:var(--tx2);margin-top:4px">${fD(e.fechaVenta)}${e.imei?' · IMEI '+esc(e.imei):''}${garTxt?' · '+garTxt:''}</div>
+    </div>`;}).join('')}`:''}
+    ${trabajos.length?'<div style="font-weight:600;font-size:.8rem;margin:12px 0 6px;color:var(--tx2)">🔧 Reparaciones</div>':''}
     ${trabajos.map(t=>`<div style="padding:10px;background:var(--bg);border-radius:8px;margin-bottom:8px">
       <div style="display:flex;justify-content:space-between;font-size:.82rem">
         <span style="font-weight:600">${esc(t.equipo||'Trabajo')}</span>
@@ -17262,7 +17533,7 @@ function verHistorial(nombre){
       </div>
       <div style="font-size:.75rem;color:var(--tx2);margin-top:4px">${esc(t.falla||'')} · ${fD(t.fecha)} · ${fmt(t.presupuesto||0)}</div>
     </div>`).join('')}
-    ${!trabajos.length?'<div style="color:var(--mut);font-size:.82rem">Sin trabajos</div>':''}
+    ${!trabajos.length&&!equiposComprados.length?'<div style="color:var(--mut);font-size:.82rem">Sin historial</div>':''}
   </div>`;
   
   // Show in a modal-like overlay
@@ -17476,7 +17747,7 @@ function aplicarModulosPorRubro(rubro){
 
   if(esTaller){
     // 🔧 TALLER DE CELULARES / SERVICIO TÉCNICO / ACCESORIOS
-    showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-taller','nav-equipos','nav-clientes','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
   } else if(esGomeria){
     // 🔧 GOMERÍA / NEUMÁTICOS
     showNav('nav-cubiertas','nav-clientesGomeria','nav-turnos','nav-turnosOnline','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
