@@ -7506,6 +7506,35 @@ async function delEquipo(id){
   await dbDelete('equipos',id); pushUndo('Eliminar equipo','equipos',snap); rEquipos();
 }
 
+function _veqActualizarResumen(costo){
+  const res = document.getElementById('_veqResumen');
+  const body = document.getElementById('_veqResumenBody');
+  if(!res||!body) return;
+  const precio = parseFloat(document.getElementById('_veqPre')?.value)||0;
+  const tradeChk = document.getElementById('_veqTradeChk')?.checked;
+  const tradeVal = tradeChk ? (parseFloat(document.getElementById('_trVal')?.value)||0) : 0;
+  const cobrado = precio - tradeVal;
+  const ganancia = precio - costo;
+  if(!precio){ res.style.display='none'; return; }
+  res.style.display='block';
+  const row = (lbl,val,color='var(--tx)')=>`<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:var(--tx2)">${lbl}</span><strong style="color:${color}">${val}</strong></div>`;
+  const sep = `<div style="border-top:1px solid var(--bor2);margin:4px 0"></div>`;
+  let html = row('Precio de venta', fmt(precio));
+  if(tradeChk && tradeVal>0){
+    html += row('Trade-in (equipo recibido)', '− '+fmt(tradeVal), 'var(--bad)');
+    html += sep;
+    html += row('Cobrado en efectivo / transf.', fmt(cobrado), 'var(--gld)');
+    html += sep;
+  } else {
+    html += sep;
+  }
+  if(costo > 0){
+    html += row('Costo del equipo', '− '+fmt(costo), 'var(--bad)');
+    html += row('Ganancia bruta', fmt(ganancia), ganancia>0?'var(--ok)':'var(--bad)');
+  }
+  body.innerHTML = html;
+}
+
 function abrirVentaEquipo(id){
   const e = S.equipos.find(eq=>eq.id===id);
   if(!e) return;
@@ -7586,12 +7615,23 @@ function abrirVentaEquipo(id){
         <input id="_trNot" placeholder="Ej: rayón en la pantalla, botón de volumen flojo..." style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
       </div>
     </div>
+    <div id="_veqResumen" style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:none">
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:8px">Resumen de la operación</div>
+      <div style="display:flex;flex-direction:column;gap:5px;font-size:.82rem" id="_veqResumenBody"></div>
+    </div>
     <div style="display:flex;gap:8px">
       <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
       <button class="btn bg" style="flex:1" onclick="confirmarVentaEquipo(${id},this)">Confirmar venta</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  // Actualizar resumen cuando cambia precio o trade-in
+  const _costo = e.costo||0;
+  const _upd = ()=>_veqActualizarResumen(_costo);
+  overlay.querySelector('#_veqPre')?.addEventListener('input', _upd);
+  overlay.querySelector('#_veqTradeChk')?.addEventListener('change', _upd);
+  overlay.querySelector('#_trVal')?.addEventListener('input', _upd);
+  _upd();
 }
 
 async function confirmarVentaEquipo(id, btn){
@@ -7643,11 +7683,12 @@ async function confirmarVentaEquipo(id, btn){
   }
   // Registrar en ventas
   const snapV = JSON.parse(JSON.stringify(S.ventas));
+  const cobrado = precio - (tradeVal||0); // efectivo real recibido
   const tradeLabel = tradeChk && tradeMod ? ` [Trade-in: ${tradeMod}]` : '';
   const venta = {
     id: Date.now()+1, tipo:'equipo',
     nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':'') + (clienteNombre?' → '+clienteNombre:'') + tradeLabel,
-    cantidad: 1, precio, total: precio,
+    cantidad: 1, precio, total: cobrado,
     costo: e.costo||0, metodo, fecha: tod(),
     comPct: 0, comision: 0,
     tradeDesc: tradeMod||'', tradeVal: tradeVal||0
@@ -7987,11 +8028,26 @@ async function delVenta(id){
 function _ventaRow(v){
   const cuotasBadge = v.tipo==='cubierta'&&v.cuotas&&v.cuotas!=='contado'
     ? `<br><span style="font-size:.69rem;color:var(--ok)">🛞 ${v.cuotas==='3c'?'3 cuotas':v.cuotas==='6c'?'6 cuotas':'12 cuotas'}</span>` : '';
+  // Desglose para ventas de equipos con trade-in
+  let desglose = '';
+  if(v.tipo==='equipo'){
+    const ganancia = (v.precio||0) - (v.costo||0);
+    const tieneTradeIn = v.tradeVal > 0;
+    if(tieneTradeIn){
+      desglose = `<br><span style="font-size:.69rem;color:var(--mut)">Lista: ${fmt(v.precio)} &nbsp;·&nbsp; Trade-in: -${fmt(v.tradeVal)} &nbsp;·&nbsp; </span><span style="font-size:.69rem;color:var(--ok)">Ganancia: ${fmt(ganancia)}</span>`;
+    } else if(v.costo > 0){
+      desglose = `<br><span style="font-size:.69rem;color:var(--ok)">Ganancia: ${fmt(ganancia)}</span>`;
+    }
+  }
+  // Columna "Total" muestra lo cobrado en efectivo
+  const totalDisplay = v.tipo==='equipo' && v.tradeVal > 0
+    ? `<strong style="color:var(--gld)">${fmt(v.total)}</strong><br><span style="font-size:.65rem;color:var(--mut)">+${fmt(v.tradeVal)} en especie</span>`
+    : `<strong style="color:var(--gld)">${fmt(v.tipo==='equipo'&&v.comision?v.comision:v.total)}</strong>`;
   return `<tr>
     <td>${fD(v.fecha)}</td>
-    <td>${esc(v.nombre)}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}${cuotasBadge}</td>
+    <td>${esc(v.nombre)}${desglose}${v.tipo==='equipo'&&v.comision?`<br><span style="font-size:.69rem;color:var(--ok)">Comisión ${v.comPct||0}%: ${fmt(v.comision)}</span>`:''}${cuotasBadge}</td>
     <td class="col-hide">${v.cantidad}</td><td class="col-hide">${fmt(v.precio)}</td>
-    <td><strong style="color:var(--gld)">${fmt(v.tipo==='equipo'&&v.comision?v.comision:v.total)}</strong></td>
+    <td>${totalDisplay}</td>
     <td class="col-hide"><span class="bx bg2">${esc(v.metodo)}</span></td>
     <td style="display:flex;gap:3px"><button class="btn be bsm" onclick="openM('mVenta',${v.id})">✎</button><button class="btn bd bsm" onclick="delVenta(${v.id})">✕</button></td>
   </tr>`;
