@@ -7535,16 +7535,55 @@ function abrirVentaEquipo(id){
       <input type="checkbox" id="_veqTradeChk" onchange="document.getElementById('_veqTradeBox').style.display=this.checked?'block':'none'">
       Recibí un equipo en parte de pago (trade-in)
     </label>
-    <div id="_veqTradeBox" style="display:none;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:12px;margin-bottom:12px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div id="_veqTradeBox" style="display:none;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:14px;margin-bottom:12px">
+      <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);margin-bottom:10px">📱 Datos del equipo recibido — quedará en inventario como Usado</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
-          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:4px">Equipo recibido</label>
-          <input id="_veqTradeDesc" placeholder="Ej: iPhone 11 128GB negro" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Modelo *</label>
+          <input id="_trMod" placeholder="Ej: iPhone 11" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
         </div>
         <div>
-          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:4px">Valor asignado ($)</label>
-          <input id="_veqTradeVal" type="number" placeholder="0" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem">
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Capacidad</label>
+          <select id="_trMem" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem">
+            <option>64 GB</option><option selected>128 GB</option><option>256 GB</option><option>512 GB</option><option>1 TB</option>
+          </select>
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Color</label>
+          <input id="_trCol" placeholder="Negro, Blanco..." style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
+        </div>
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">IMEI (opcional)</label>
+          <input id="_trImei" maxlength="15" placeholder="000000000000000" oninput="this.value=this.value.replace(/\D/g,'')" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:monospace">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">% Batería</label>
+          <input id="_trBat" type="number" min="0" max="100" placeholder="85" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem">
+        </div>
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Estado físico</label>
+          <select id="_trFis" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem">
+            <option>Excelente</option><option>Muy bueno</option><option>Bueno</option><option>Regular</option><option>Mal estado</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Valor asignado ($) *</label>
+          <input id="_trVal" type="number" placeholder="0" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem">
+        </div>
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Accesorios / caja</label>
+          <input id="_trAcc" placeholder="Sin accesorios, con caja..." style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:3px">Defectos / observaciones</label>
+        <input id="_trNot" placeholder="Ej: rayón en la pantalla, botón de volumen flojo..." style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
       </div>
     </div>
     <div style="display:flex;gap:8px">
@@ -7563,15 +7602,16 @@ async function confirmarVentaEquipo(id, btn){
   const clienteNombre = (document.getElementById('_veqCli')?.value||'').trim();
   const clienteTel = (document.getElementById('_veqTel')?.value||'').trim().replace(/\D/g,'');
   const tradeChk = document.getElementById('_veqTradeChk')?.checked;
-  const tradeDesc = tradeChk ? (document.getElementById('_veqTradeDesc')?.value||'').trim() : '';
-  const tradeVal = tradeChk ? (parseFloat(document.getElementById('_veqTradeVal')?.value)||0) : 0;
+  const tradeVal = tradeChk ? (parseFloat(document.getElementById('_trVal')?.value)||0) : 0;
+  const tradeMod = tradeChk ? (document.getElementById('_trMod')?.value||'').trim() : '';
+  if(tradeChk && !tradeMod){ showToast('Ingresá el modelo del equipo recibido','err'); return; }
   btn.disabled=true; btn.textContent='Guardando...';
   // Marcar equipo como vendido
   const snapEq = JSON.parse(JSON.stringify(S.equipos));
   e.estado='vendido'; e.fechaVenta=tod(); e.precioVenta=precio;
   if(clienteNombre) e.clienteNombre = clienteNombre;
   if(clienteTel) e.clienteTel = clienteTel;
-  if(tradeChk && tradeDesc){ e.tradeDesc = tradeDesc; e.tradeVal = tradeVal; }
+  if(tradeChk && tradeMod){ e.tradeDesc = tradeMod; e.tradeVal = tradeVal; }
   // Recalcular garantiaVence desde la fecha de venta (no desde cuando se cargó al stock)
   if(e.garantiaDias > 0){
     const gv = new Date(); gv.setDate(gv.getDate() + parseInt(e.garantiaDias));
@@ -7579,22 +7619,48 @@ async function confirmarVentaEquipo(id, btn){
   }
   await dbUpsert('equipos',e);
   pushUndo('Vender equipo','equipos',snapEq);
+  // Si hay trade-in, registrar el equipo recibido en el inventario como Usado
+  if(tradeChk && tradeMod){
+    const tradeItem = {
+      id: Date.now(),
+      tipo: 'usado',
+      estado: 'disponible',
+      modelo: tradeMod,
+      memoria: document.getElementById('_trMem')?.value || '',
+      color: (document.getElementById('_trCol')?.value || '').trim(),
+      imei: (document.getElementById('_trImei')?.value || '').trim(),
+      bateria: parseInt(document.getElementById('_trBat')?.value) || null,
+      estadoFisico: document.getElementById('_trFis')?.value || 'Bueno',
+      notas: [(document.getElementById('_trAcc')?.value||'').trim(), (document.getElementById('_trNot')?.value||'').trim()].filter(Boolean).join(' · '),
+      costo: tradeVal,
+      precio: 0,
+      provNombre: clienteNombre || 'Trade-in',
+      provTel: clienteTel || '',
+      fechaIngreso: tod()
+    };
+    S.equipos.push(tradeItem);
+    await dbUpsert('equipos', tradeItem);
+  }
   // Registrar en ventas
   const snapV = JSON.parse(JSON.stringify(S.ventas));
+  const tradeLabel = tradeChk && tradeMod ? ` [Trade-in: ${tradeMod}]` : '';
   const venta = {
-    id: Date.now(), tipo:'equipo',
-    nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':'') + (clienteNombre?' → '+clienteNombre:''),
+    id: Date.now()+1, tipo:'equipo',
+    nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':'') + (clienteNombre?' → '+clienteNombre:'') + tradeLabel,
     cantidad: 1, precio, total: precio,
     costo: e.costo||0, metodo, fecha: tod(),
     comPct: 0, comision: 0,
-    tradeDesc: tradeDesc||'', tradeVal: tradeVal||0
+    tradeDesc: tradeMod||'', tradeVal: tradeVal||0
   };
   S.ventas.unshift(venta);
   await dbUpsert('ventas', venta);
   pushUndo('Venta equipo','ventas',snapV);
   btn.closest('[style*=fixed]').remove();
   rEquipos(); rGarantias();
-  showToast('Venta registrada ✓ — ' + esc(e.modelo));
+  const msg = tradeChk && tradeMod
+    ? `Venta registrada ✓ — ${esc(e.modelo)}\n📱 Trade-in "${tradeMod}" agregado al inventario`
+    : `Venta registrada ✓ — ${esc(e.modelo)}`;
+  showToast(msg);
 }
 
 function setEF(f,i){ eFilt=f; document.querySelectorAll('#etabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j)); rEquipos(); }
