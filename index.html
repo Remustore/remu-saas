@@ -15881,17 +15881,16 @@ function updateGarantiaVence(){
   }
 }
 
-function rGarantias(){
-  // Show in taller kanban - highlight equipment with active warranties
+function _getRepGarantiasActivas(){
+  // Helper: returns reparaciones con garantía vigente (usado por kanban taller)
   const hoy = tod();
-  const conGarantia = S.reparaciones.filter(r=>{
+  return S.reparaciones.filter(r=>{
     if(!r.garantiaDias || r.garantiaDias === 0) return false;
     if(r.estado !== 'entregado' || !r.fechaEntrega) return false;
     const vence = new Date(r.fechaEntrega);
     vence.setDate(vence.getDate() + r.garantiaDias);
     return vence.toISOString().slice(0,10) >= hoy;
   });
-  return conGarantia;
 }
 
 // ═══ COMISIONES AUTOMÁTICAS SALÓN ═══
