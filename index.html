@@ -6387,6 +6387,7 @@ async function loadAll(){
         .select('*')
         .eq('tenant_id', currentTenant.id)
         .not('estado','eq','bloqueado')
+        .not('estado','eq','cancelado')
         .order('fecha').order('hora');
       if(sbT && !sbE){
         _turnosCache = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
@@ -11427,6 +11428,7 @@ async function _reloadTurnosCache(){
       .select('*')
       .eq('tenant_id', currentTenant.id)
       .not('estado','eq','bloqueado')
+      .not('estado','eq','cancelado')
       .order('fecha').order('hora');
     if(error) throw error;
     if(data){
@@ -21826,6 +21828,10 @@ function _mostrarModalFinalizarConServicio(turno, servicios){
       if(metodoEl.options[i].value === turno.metodo){ metodoEl.selectedIndex = i; break; }
     }
   }
+
+  // Si el servicio del turno no coincide con ninguno de la lista, sincronizar el precio
+  // con el primer ítem visible en el dropdown para evitar que precio y servicio queden desfasados.
+  if(!currentSrv && hasSvcs) _mFCS_onSrvChange();
 }
 
 function _mFCS_getServicio(){
