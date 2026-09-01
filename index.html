@@ -1020,6 +1020,7 @@ $$;</pre>
   <div class="ni" onclick="go('pedidos')" id="nav-pedidos" style="display:none"><span class="nico"><i data-lucide="clipboard-list"></i></span>Pedidos<span id="pedidosBadge" class="nav-badge" style="display:none">0</span></div>
   <!-- INTERNOS (siempre ocultos en sidebar) -->
   <div class="ni" onclick="go('equipos')" id="nav-equipos" style="display:none"><span class="nico"><i data-lucide="smartphone"></i></span>Equipos</div>
+  <div class="ni" onclick="go('garantias')" id="nav-garantias" style="display:none"><span class="nico"><i data-lucide="shield-check"></i></span>Garantías<span id="garantiasBadge" class="nav-badge" style="display:none">0</span></div>
   <div class="ni" onclick="go('auditoria')" id="nav-auditoria" style="display:none"><span class="nico"><i data-lucide="clipboard-check"></i></span>Control Stock</div>
   <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec" style="display:none"><span class="nico"><i data-lucide="calendar-clock"></i></span>Turnos técnicos</div>
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas" style="display:none"><span class="nico"><i data-lucide="file-text"></i></span>Fichas</div>
@@ -1282,6 +1283,23 @@ $$;</pre>
           </div>
         </div>
         <div class="tw"><table><thead><tr><th>Modelo</th><th class="col-hide">IMEI</th><th>Estado</th><th>Precio reventa</th><th class="col-hide">Garantía</th><th class="col-hide">Proveedor</th><th></th></tr></thead><tbody id="tbE"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- GARANTÍAS -->
+    <div class="sec" id="sec-garantias">
+      <div class="pt">Garantías</div><div class="ps">Equipos vendidos con cobertura activa</div>
+      <div class="card">
+        <div class="ch">
+          <div class="tabs" id="gtabs">
+            <button class="tab active" onclick="setGF('todas',0)">Todas</button>
+            <button class="tab" onclick="setGF('vigente',1)">Vigentes</button>
+            <button class="tab" onclick="setGF('por_vencer',2)">Por vencer</button>
+            <button class="tab" onclick="setGF('vencida',3)">Vencidas</button>
+            <button class="tab" onclick="setGF('reclamo',4)">En reclamo</button>
+          </div>
+        </div>
+        <div class="tw"><table><thead><tr><th>Equipo</th><th>Cliente</th><th class="col-hide">IMEI</th><th>Garantía</th><th>Estado</th><th></th></tr></thead><tbody id="tbGar"></tbody></table></div>
       </div>
     </div>
 
@@ -6465,7 +6483,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', garantias:'Garantías', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes' };
 
 function go(id){
   // Bug 2: cerrar sidebar en móvil y ocultar overlay
@@ -6484,7 +6502,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -7493,15 +7511,41 @@ function abrirVentaEquipo(id){
   const overlay = document.createElement('div');
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
   overlay.onclick=ev=>{if(ev.target===overlay)overlay.remove();};
-  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:400px;padding:24px">
+  overlay.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:420px;padding:24px;max-height:90vh;overflow-y:auto">
     <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:4px">💸 Vender equipo</div>
     <div style="font-size:.82rem;color:var(--tx2);margin-bottom:16px">${esc(e.modelo)} ${esc(e.memoria||'')} ${e.tipo==='nuevo'?'· Nuevo':'· Usado'}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Nombre del cliente</label>
+        <input id="_veqCli" placeholder="Ej: Juan García" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;font-family:var(--fb)">
+      </div>
+      <div>
+        <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">WhatsApp cliente</label>
+        <input id="_veqTel" placeholder="Ej: 3412345678" type="tel" style="width:100%;padding:9px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;font-family:var(--fb)">
+      </div>
+    </div>
     <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Precio de venta ($)</label>
-    <input id="_veqPre" type="number" value="${e.precio||0}" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:12px">
+    <input id="_veqPre" type="number" value="${e.precio||0}" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.9rem;margin-bottom:10px">
     <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Método de pago</label>
-    <select id="_veqMet" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;margin-bottom:16px">
-      <option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta débito</option><option>Tarjeta crédito</option>
+    <select id="_veqMet" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;margin-bottom:12px">
+      <option>Efectivo</option><option>Transferencia</option><option>Mercado Pago</option><option>Tarjeta débito</option><option>Tarjeta crédito</option><option>Cuotas propias</option>
     </select>
+    <label style="font-size:.82rem;color:var(--tx2);display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:10px">
+      <input type="checkbox" id="_veqTradeChk" onchange="document.getElementById('_veqTradeBox').style.display=this.checked?'block':'none'">
+      Recibí un equipo en parte de pago (trade-in)
+    </label>
+    <div id="_veqTradeBox" style="display:none;background:var(--bg2);border:1px solid var(--bor2);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:4px">Equipo recibido</label>
+          <input id="_veqTradeDesc" placeholder="Ej: iPhone 11 128GB negro" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem;font-family:var(--fb)">
+        </div>
+        <div>
+          <label style="font-size:.65rem;color:var(--tx2);display:block;margin-bottom:4px">Valor asignado ($)</label>
+          <input id="_veqTradeVal" type="number" placeholder="0" style="width:100%;padding:8px 10px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:7px;font-size:.82rem">
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:8px">
       <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
       <button class="btn bg" style="flex:1" onclick="confirmarVentaEquipo(${id},this)">Confirmar venta</button>
@@ -7515,26 +7559,35 @@ async function confirmarVentaEquipo(id, btn){
   if(!e) return;
   const precio = parseFloat(document.getElementById('_veqPre')?.value)||e.precio||0;
   const metodo = document.getElementById('_veqMet')?.value||'Efectivo';
+  const clienteNombre = (document.getElementById('_veqCli')?.value||'').trim();
+  const clienteTel = (document.getElementById('_veqTel')?.value||'').trim().replace(/\D/g,'');
+  const tradeChk = document.getElementById('_veqTradeChk')?.checked;
+  const tradeDesc = tradeChk ? (document.getElementById('_veqTradeDesc')?.value||'').trim() : '';
+  const tradeVal = tradeChk ? (parseFloat(document.getElementById('_veqTradeVal')?.value)||0) : 0;
   btn.disabled=true; btn.textContent='Guardando...';
   // Marcar equipo como vendido
   const snapEq = JSON.parse(JSON.stringify(S.equipos));
   e.estado='vendido'; e.fechaVenta=tod(); e.precioVenta=precio;
+  if(clienteNombre) e.clienteNombre = clienteNombre;
+  if(clienteTel) e.clienteTel = clienteTel;
+  if(tradeChk && tradeDesc){ e.tradeDesc = tradeDesc; e.tradeVal = tradeVal; }
   await dbUpsert('equipos',e);
   pushUndo('Vender equipo','equipos',snapEq);
   // Registrar en ventas
   const snapV = JSON.parse(JSON.stringify(S.ventas));
   const venta = {
     id: Date.now(), tipo:'equipo',
-    nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':''),
+    nombre: e.modelo + (e.memoria?' '+e.memoria:'') + (e.imei?' ['+e.imei+']':'') + (clienteNombre?' → '+clienteNombre:''),
     cantidad: 1, precio, total: precio,
     costo: e.costo||0, metodo, fecha: tod(),
-    comPct: 0, comision: 0
+    comPct: 0, comision: 0,
+    tradeDesc: tradeDesc||'', tradeVal: tradeVal||0
   };
   S.ventas.unshift(venta);
   await dbUpsert('ventas', venta);
   pushUndo('Venta equipo','ventas',snapV);
   btn.closest('[style*=fixed]').remove();
-  rEquipos();
+  rEquipos(); rGarantias();
   showToast('Venta registrada ✓ — ' + esc(e.modelo));
 }
 
@@ -7579,6 +7632,143 @@ function rEquipos(){
       <button class="btn bd bsm" onclick="delEquipo(${e.id})">✕</button>
     </td></tr>`;
   }).join('');
+}
+
+// ═══ GARANTÍAS ═══
+let gFilt = 'todas';
+function setGF(f,i){ gFilt=f; document.querySelectorAll('#gtabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j)); rGarantias(); }
+
+function _estadoGarantia(e){
+  if(e.reclamoAbierto) return 'reclamo';
+  const dias = _diasGarantiaRestantes(e.garantiaVence);
+  if(dias===null) return null;
+  if(dias<0) return 'vencida';
+  if(dias<=30) return 'por_vencer';
+  return 'vigente';
+}
+
+function rGarantias(){
+  const tb = document.getElementById('tbGar');
+  if(!tb) return;
+  // Solo equipos vendidos con garantía configurada
+  let items = (S.equipos||[]).filter(e=>e.estado==='vendido'&&e.garantiaVence);
+  if(gFilt!=='todas') items=items.filter(e=>_estadoGarantia(e)===gFilt);
+  // Ordenar: reclamos primero, luego por días restantes ascendente
+  items.sort((a,b)=>{
+    const oa=a.reclamoAbierto?-1:(_diasGarantiaRestantes(a.garantiaVence)||9999);
+    const ob=b.reclamoAbierto?-1:(_diasGarantiaRestantes(b.garantiaVence)||9999);
+    return oa-ob;
+  });
+  // Actualizar badge
+  const badge=document.getElementById('garantiasBadge');
+  const reclamosAbiertos=(S.equipos||[]).filter(e=>e.reclamoAbierto).length;
+  const porVencer=(S.equipos||[]).filter(e=>e.estado==='vendido'&&_estadoGarantia(e)==='por_vencer').length;
+  const totalAlerta=reclamosAbiertos+porVencer;
+  if(badge){ badge.textContent=totalAlerta; badge.style.display=totalAlerta?'':'none'; }
+  if(!items.length){ tb.innerHTML=`<tr><td colspan="6">${emp('🛡️','Sin garantías registradas')}</td></tr>`; return; }
+  tb.innerHTML=items.map(e=>{
+    const dias=_diasGarantiaRestantes(e.garantiaVence);
+    const est=_estadoGarantia(e);
+    const estadoHtml=est==='reclamo'
+      ?'<span class="bx brd" style="font-size:.68rem">⚠ En reclamo</span>'+(e.reclamoDesc?`<br><span style="font-size:.65rem;color:var(--mut)">${esc(e.reclamoDesc)}</span>`:'')
+      :est==='vencida'
+      ?'<span class="bx" style="font-size:.68rem;background:rgba(120,120,120,.15);color:var(--mut)">Vencida</span>'
+      :est==='por_vencer'
+      ?`<span class="bx byw" style="font-size:.68rem">⏰ ${dias}d restantes</span>`
+      :`<span class="bx bbl" style="font-size:.68rem">✓ Vigente · ${dias}d</span>`;
+    const acciones=est==='reclamo'
+      ?`<button class="btn bg bsm" onclick="abrirResolucionGarantia(${e.id})">✓ Resolver</button>`
+      :est!=='vencida'
+      ?`<button class="btn brd bsm" onclick="abrirReclamoGarantia(${e.id})">⚠ Reclamo</button>`:'';
+    const waBtn=e.clienteTel?`<button class="btn bs bsm" onclick="_waGarantia(${e.id})" title="Avisar por WhatsApp">💬</button>`:'';
+    return `<tr>
+      <td><strong>${esc(e.modelo)}</strong><br><span style="font-size:.7rem;color:var(--mut)">${esc(e.memoria||'')}${e.color?' · '+esc(e.color):''}</span></td>
+      <td>${e.clienteNombre?esc(e.clienteNombre):'<span style="color:var(--mut)">—</span>'}${e.clienteTel?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(e.clienteTel)}</span>`:''}</td>
+      <td class="col-hide" style="font-size:.72rem;font-family:monospace;color:var(--mut)">${esc(e.imei||'—')}</td>
+      <td><span style="font-size:.78rem">${e.garantiaDias||0} días</span><br><span style="font-size:.68rem;color:var(--mut)">Vence: ${fD(e.garantiaVence)}</span></td>
+      <td>${estadoHtml}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">${acciones}${waBtn}</td>
+    </tr>`;
+  }).join('');
+}
+
+function abrirReclamoGarantia(id){
+  const e=S.equipos.find(eq=>eq.id===id); if(!e) return;
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick=ev=>{if(ev.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:400px;padding:24px">
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:4px">⚠ Reclamo de garantía</div>
+    <div style="font-size:.82rem;color:var(--tx2);margin-bottom:16px">${esc(e.modelo)} ${esc(e.memoria||'')} · IMEI: ${esc(e.imei||'—')}</div>
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Descripción del problema</label>
+    <textarea id="_reclDesc" rows="3" placeholder="¿Qué reporta el cliente?" style="width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);border-radius:8px;font-size:.88rem;resize:vertical;margin-bottom:16px;font-family:var(--fb)"></textarea>
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="btn brd" style="flex:1" onclick="confirmarReclamoGarantia(${id},this)">Registrar reclamo</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function confirmarReclamoGarantia(id,btn){
+  const e=S.equipos.find(eq=>eq.id===id); if(!e) return;
+  const desc=(document.getElementById('_reclDesc')?.value||'').trim();
+  if(!desc){ showToast('Describí el problema primero','err'); return; }
+  btn.disabled=true; btn.textContent='Guardando...';
+  const snap=JSON.parse(JSON.stringify(S.equipos));
+  e.reclamoAbierto=true; e.reclamoDesc=desc; e.reclamoFecha=tod();
+  await dbUpsert('equipos',e);
+  pushUndo('Reclamo garantía','equipos',snap);
+  btn.closest('[style*=fixed]').remove();
+  rGarantias(); showToast('Reclamo registrado ✓');
+}
+
+function abrirResolucionGarantia(id){
+  const e=S.equipos.find(eq=>eq.id===id); if(!e) return;
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:350;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.onclick=ev=>{if(ev.target===ov)ov.remove();};
+  ov.innerHTML=`<div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:400px;padding:24px">
+    <div style="font-family:var(--fh);font-size:1rem;font-weight:700;margin-bottom:4px">✓ Resolver reclamo</div>
+    <div style="font-size:.82rem;color:var(--tx2);margin-bottom:4px">${esc(e.modelo)} · ${esc(e.reclamoDesc||'')}</div>
+    <div style="font-size:.72rem;color:var(--mut);margin-bottom:14px">Reclamo: ${fD(e.reclamoFecha||tod())}</div>
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Resolución aplicada</label>
+    <select id="_reclRes" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor2);background:var(--bg);color:var(--tx);font-size:.88rem;margin-bottom:10px">
+      <option>Reparación sin costo</option>
+      <option>Cambio de equipo</option>
+      <option>Devolución de dinero</option>
+      <option>Sin cobertura (fuera de garantía)</option>
+    </select>
+    <label style="font-size:.68rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px">Costo para el negocio ($) — opcional</label>
+    <input type="number" id="_reclCosto" placeholder="0" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bor2);background:var(--bg);color:var(--tx);font-size:.9rem;margin-bottom:16px">
+    <div style="display:flex;gap:8px">
+      <button class="btn" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+      <button class="btn bg" style="flex:1" onclick="confirmarResolucionGarantia(${id},this)">Confirmar resolución</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+}
+
+async function confirmarResolucionGarantia(id,btn){
+  const e=S.equipos.find(eq=>eq.id===id); if(!e) return;
+  const resolucion=document.getElementById('_reclRes')?.value;
+  const costo=parseFloat(document.getElementById('_reclCosto')?.value)||0;
+  btn.disabled=true; btn.textContent='Guardando...';
+  const snap=JSON.parse(JSON.stringify(S.equipos));
+  e.reclamoAbierto=false; e.reclamoResolucion=resolucion;
+  e.reclamoResolucionFecha=tod(); e.reclamoCosto=costo;
+  await dbUpsert('equipos',e);
+  pushUndo('Resolver garantía','equipos',snap);
+  btn.closest('[style*=fixed]').remove();
+  rGarantias(); showToast('Reclamo resuelto ✓');
+}
+
+function _waGarantia(id){
+  const e=S.equipos.find(eq=>eq.id===id); if(!e||!e.clienteTel) return;
+  const biz=currentTenant?.nombre||'el local';
+  const msg=`¡Hola ${e.clienteNombre||''}! Te recordamos desde *${biz}* que la garantía de tu *${e.modelo}* vence el *${fD(e.garantiaVence)}*. Si notás algún inconveniente, contactanos antes de esa fecha. ¡Saludos! 🛡️`;
+  const tel=(e.clienteTel+'').replace(/\D/g,'');
+  window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 // ═══ VENTAS ═══
@@ -17049,7 +17239,7 @@ function updateDashParejaCard(){
   `;
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); rCubiertas(); rClientesGomeria(); }
+function renderAll(){ rDash(); rStock(); rEquipos(); rGarantias(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); rCubiertas(); rClientesGomeria(); }
 
 function getClientes(){
   const r = (currentTenant?.rubro||'').toLowerCase();
@@ -17464,7 +17654,7 @@ function aplicarModulosPorRubro(rubro){
   const mods = currentTenant?.modulos || {};
 
   // Ocultar todos los nav items opcionales antes de mostrar solo los del rubro activo
-  ['nav-taller','nav-equipos','nav-stock','nav-cubiertas','nav-clientesGomeria','nav-ventas','nav-pedidos',
+  ['nav-taller','nav-equipos','nav-garantias','nav-stock','nav-cubiertas','nav-clientesGomeria','nav-ventas','nav-pedidos',
    'nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-fichas',
    'nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config',
    'nav-auditoria','nav-turnosTec','nav-listaEspera','nav-objetivosCompra',
@@ -17478,7 +17668,7 @@ function aplicarModulosPorRubro(rubro){
 
   if(esTaller){
     // 🔧 TALLER DE CELULARES / SERVICIO TÉCNICO / ACCESORIOS
-    showNav('nav-taller','nav-equipos','nav-stock','nav-ventas','nav-pedidos','nav-turnosOnline','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-taller','nav-equipos','nav-garantias','nav-stock','nav-ventas','nav-pedidos','nav-gastos','nav-analisis','nav-precios');
   } else if(esGomeria){
     // 🔧 GOMERÍA / NEUMÁTICOS
     showNav('nav-cubiertas','nav-clientesGomeria','nav-turnos','nav-turnosOnline','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
