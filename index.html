@@ -7831,8 +7831,32 @@ async function confirmarResolucionGarantia(id,btn){
   e.reclamoResolucionFecha=tod(); e.reclamoCosto=costo;
   await dbUpsert('equipos',e);
   pushUndo('Resolver garantía','equipos',snap);
+  // Si hubo costo y no es "sin cobertura", registrar como gasto en Caja
+  const esSinCobertura = resolucion && resolucion.toLowerCase().includes('sin cobertura');
+  if(costo > 0 && !esSinCobertura){
+    const snapG=JSON.parse(JSON.stringify(S.gastos));
+    const imeiLabel = e.imei ? ` [${e.imei}]` : '';
+    const clienteLabel = e.clienteNombre ? ` — ${e.clienteNombre}` : '';
+    const gasto={
+      id: Date.now(),
+      concepto: `Garantía: ${resolucion} — ${e.modelo}${imeiLabel}${clienteLabel}`,
+      tipo: 'variable',
+      monto: costo,
+      fecha: tod(),
+      frecuencia: 'unico',
+      notas: `Reclamo: ${e.reclamoDesc||''}. Resolución: ${resolucion}.`
+    };
+    S.gastos.unshift(gasto);
+    await dbUpsert('gastos', gasto);
+    pushUndo('Gasto garantía','gastos',snapG);
+  }
   btn.closest('[style*=fixed]').remove();
-  rGarantias(); showToast('Reclamo resuelto ✓');
+  rGarantias();
+  if(costo > 0 && !esSinCobertura){
+    showToast(`Reclamo resuelto ✓ — Gasto de ${fmt(costo)} registrado en Caja`);
+  } else {
+    showToast('Reclamo resuelto ✓');
+  }
 }
 
 function _waGarantia(id){
