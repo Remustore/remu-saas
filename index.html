@@ -1021,6 +1021,7 @@ $$;</pre>
   <!-- INTERNOS (siempre ocultos en sidebar) -->
   <div class="ni" onclick="go('equipos')" id="nav-equipos" style="display:none"><span class="nico"><i data-lucide="smartphone"></i></span>Equipos</div>
   <div class="ni" onclick="go('garantias')" id="nav-garantias" style="display:none"><span class="nico"><i data-lucide="shield-check"></i></span>Garantías<span id="garantiasBadge" class="nav-badge" style="display:none">0</span></div>
+  <div class="ni" onclick="go('presupuestos')" id="nav-presupuestos" style="display:none"><span class="nico"><i data-lucide="file-text"></i></span>Presupuestos<span id="presBadge" class="nav-badge" style="display:none">0</span></div>
   <div class="ni" onclick="go('auditoria')" id="nav-auditoria" style="display:none"><span class="nico"><i data-lucide="clipboard-check"></i></span>Control Stock</div>
   <div class="ni" onclick="go('turnosTec')" id="nav-turnosTec" style="display:none"><span class="nico"><i data-lucide="calendar-clock"></i></span>Turnos técnicos</div>
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas" style="display:none"><span class="nico"><i data-lucide="file-text"></i></span>Fichas</div>
@@ -1300,6 +1301,24 @@ $$;</pre>
           </div>
         </div>
         <div class="tw"><table><thead><tr><th>Equipo</th><th>Cliente</th><th class="col-hide">IMEI</th><th>Garantía</th><th>Estado</th><th></th></tr></thead><tbody id="tbGar"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- PRESUPUESTOS DE EQUIPOS -->
+    <div class="sec" id="sec-presupuestos">
+      <div class="pt">Presupuestos</div><div class="ps">Cotizaciones de equipos enviadas a clientes</div>
+      <div class="card">
+        <div class="ch" style="flex-wrap:wrap;gap:8px">
+          <div class="tabs" id="prestabs">
+            <button class="tab active" onclick="setPF('todos',0)">Todos</button>
+            <button class="tab" onclick="setPF('borrador',1)">Borrador</button>
+            <button class="tab" onclick="setPF('enviado',2)">Enviados</button>
+            <button class="tab" onclick="setPF('aceptado',3)">Aceptados</button>
+            <button class="tab" onclick="setPF('rechazado',4)">Rechazados</button>
+          </div>
+          <button class="btn bgh" onclick="abrirNuevoPresupuesto()">+ Nuevo</button>
+        </div>
+        <div class="tw"><table><thead><tr><th>Equipo</th><th>Cliente</th><th class="col-hide">Fecha</th><th>Precio</th><th>Estado</th><th></th></tr></thead><tbody id="tbPres"></tbody></table></div>
       </div>
     </div>
 
@@ -3556,6 +3575,7 @@ async function borrarTodosMisDatos(){
       sb.from('inversores').delete().eq('tenant_id', tid),
       sb.from('movimientos_inv').delete().eq('tenant_id', tid),
       sb.from('turnos_solicitudes').delete().eq('tenant_id', tid),
+      sb.from('presupuestos').delete().eq('tenant_id', tid).catch(()=>{}),
     ]);
     // Limpiar localStorage del tenant
     const keysToRemove = [];
@@ -6326,12 +6346,13 @@ async function loadAll(){
   if(_isFirstLoad) document.getElementById('loadingScreen').style.display='flex';
   else setSyncing();
   try{
-    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas] = await Promise.all([
+    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas,presupuestos] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbLoad('mov_caja'),
-      dbLoadPedidos(), dbLoadCubiertas()
+      dbLoadPedidos(), dbLoadCubiertas(),
+      dbLoad('presupuestos').catch(()=>[])
     ]);
     S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
@@ -6384,6 +6405,7 @@ async function loadAll(){
     S.movCaja=movCaja||[];
     S.pedidos=pedidos||[];
     S.cubiertas=cubiertas||[];
+    S.presupuestos=presupuestos||[];
     S.clientesGomeria=[];
     S.historialGomeria=[];
     // Carga separada para no afectar el resto si falla
@@ -6483,7 +6505,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', garantias:'Garantías', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', garantias:'Garantías', presupuestos:'Presupuestos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes' };
 
 function go(id){
   // Bug 2: cerrar sidebar en móvil y ocultar overlay
@@ -6502,7 +6524,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, presupuestos:rPresupuestos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -7906,6 +7928,201 @@ function _waGarantia(id){
   const msg=`¡Hola ${e.clienteNombre||''}! Te recordamos desde *${biz}* que la garantía de tu *${e.modelo}* vence el *${fD(e.garantiaVence)}*. Si notás algún inconveniente, contactanos antes de esa fecha. ¡Saludos! 🛡️`;
   const tel=(e.clienteTel+'').replace(/\D/g,'');
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// ═══ PRESUPUESTOS DE EQUIPOS ═══
+if(!window.S) window.S={};
+let _presFilt = 'todos';
+
+function setPF(f,i){ _presFilt=f; document.querySelectorAll('#prestabs .tab').forEach((b,j)=>b.classList.toggle('active',i===j)); rPresupuestos(); }
+
+function _estadoPres(p){
+  const LABELS = { borrador:'📝 Borrador', enviado:'📤 Enviado', aceptado:'✅ Aceptado', rechazado:'❌ Rechazado', vencido:'⏰ Vencido' };
+  const COLORS = { borrador:'var(--tx2)', enviado:'var(--inf)', aceptado:'var(--ok)', rechazado:'var(--bad)', vencido:'var(--mut)' };
+  return { label: LABELS[p.estado]||p.estado, color: COLORS[p.estado]||'var(--tx2)' };
+}
+
+function rPresupuestos(){
+  if(!S.presupuestos) S.presupuestos=[];
+  const lista = _presFilt==='todos' ? S.presupuestos : S.presupuestos.filter(p=>p.estado===_presFilt);
+  const sorted = [...lista].sort((a,b)=>(b.id||0)-(a.id||0));
+
+  // Badge: enviados pendientes
+  const enviados = S.presupuestos.filter(p=>p.estado==='enviado').length;
+  const badge = document.getElementById('presBadge');
+  if(badge){ badge.textContent=enviados; badge.style.display=enviados>0?'':'none'; }
+
+  const tb = document.getElementById('tbPres');
+  if(!tb) return;
+  if(!sorted.length){ tb.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--mut)">Sin presupuestos${_presFilt!=='todos'?' en este estado':''}</td></tr>`; return; }
+  tb.innerHTML = sorted.map(p=>{
+    const eq = S.equipos.find(e=>e.id===p.equipo_id);
+    const st = _estadoPres(p);
+    return `<tr>
+      <td><strong>${esc(p.equipo_modelo||'—')}</strong>${p.notas?`<br><span style="font-size:.72rem;color:var(--tx2)">${esc(p.notas.slice(0,50))}</span>`:''}</td>
+      <td>${esc(p.cliente||'—')}${p.tel?`<br><span style="font-size:.72rem;color:var(--tx2)">${esc(p.tel)}</span>`:''}</td>
+      <td class="col-hide">${fD(p.fecha)||'—'}</td>
+      <td>
+        <strong style="color:var(--ok)">${fmt(p.precio_contado||0)}</strong>
+        ${p.notas_cuotas?`<br><span style="font-size:.7rem;color:var(--tx2)">${esc(p.notas_cuotas)}</span>`:''}
+      </td>
+      <td><span style="font-size:.78rem;font-weight:600;color:${st.color}">${st.label}</span></td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${p.tel?`<button class="btn bs bsm" onclick="enviarPresupuestoWA(${p.id})" title="Enviar por WhatsApp">📲</button>`:''}
+          ${eq&&eq.estado==='disponible'&&p.estado==='aceptado'?`<button class="btn bgh bsm" onclick="convertirPresupuestoVenta(${p.id})" title="Convertir a venta">💰</button>`:''}
+          <button class="btn be bsm" onclick="editarPresupuesto(${p.id})">✎</button>
+          <button class="btn bd bsm" onclick="eliminarPresupuesto(${p.id})">✕</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function abrirNuevoPresupuesto(){ _abrirModalPresupuesto(null); }
+function editarPresupuesto(id){ _abrirModalPresupuesto(id); }
+
+function _abrirModalPresupuesto(id){
+  const p = id ? (S.presupuestos||[]).find(x=>x.id===id) : null;
+  const eqDisp = (S.equipos||[]).filter(e=>e.estado==='disponible');
+  const eqOpts = eqDisp.map(e=>`<option value="${e.id}" data-precio="${e.precio}" data-costo="${e.costo}" ${p&&p.equipo_id===e.id?'selected':''}>${esc(e.modelo)} ${esc(e.memoria||'')} ${e.tipo==='usado'?'(Usado)':''} — ${fmt(e.precio)}</option>`).join('');
+
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:310;display:flex;align-items:center;justify-content:center;padding:16px" id="mPres" onclick="if(event.target.id==='mPres')closeMPres()">
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--bor);font-family:var(--fh);font-weight:700;font-size:1.05rem">${p?'✎ Editar':'📝 Nuevo'} presupuesto</div>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:11px">
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);font-weight:600">EQUIPO *</label>
+          <select id="_presEq" style="width:100%;margin-top:4px" onchange="_presAutoFill()" ${p?'disabled':''}>
+            <option value="">— Seleccioná un equipo —</option>
+            ${eqOpts}
+          </select>
+          ${p?`<div style="font-size:.7rem;color:var(--tx2);margin-top:3px">${esc(p.equipo_modelo||'')}</div>`:''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:.72rem;color:var(--tx2);font-weight:600">CLIENTE *</label>
+            <input id="_presCli" placeholder="Nombre" value="${esc(p?.cliente||'')}" style="width:100%;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--tx2);font-weight:600">WHATSAPP</label>
+            <input id="_presTel" placeholder="Sin 0 ni 15" value="${esc(p?.tel||'')}" style="width:100%;margin-top:4px">
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:.72rem;color:var(--tx2);font-weight:600">PRECIO CONTADO *</label>
+            <input id="_presCont" type="number" placeholder="0" value="${p?.precio_contado||''}" style="width:100%;margin-top:4px">
+          </div>
+          <div>
+            <label style="font-size:.72rem;color:var(--tx2);font-weight:600">ESTADO</label>
+            <select id="_presEst" style="width:100%;margin-top:4px">
+              ${['borrador','enviado','aceptado','rechazado','vencido'].map(s=>`<option value="${s}" ${(p?.estado||'borrador')===s?'selected':''}>${_estadoPres({estado:s}).label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);font-weight:600">CUOTAS (opcional)</label>
+          <input id="_presCuotas" placeholder="Ej: 3 cuotas de $75.000" value="${esc(p?.notas_cuotas||'')}" style="width:100%;margin-top:4px">
+        </div>
+        <div>
+          <label style="font-size:.72rem;color:var(--tx2);font-weight:600">NOTAS</label>
+          <textarea id="_presNotas" rows="2" placeholder="Observaciones, accesorios incluidos..." style="width:100%;margin-top:4px;resize:vertical">${esc(p?.notas||'')}</textarea>
+        </div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn" onclick="closeMPres()">Cancelar</button>
+        <button class="btn bgh" onclick="guardarPresupuesto(${id||'null'})">Guardar</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function _presAutoFill(){
+  const sel = document.getElementById('_presEq');
+  const opt = sel?.options[sel.selectedIndex];
+  if(opt && opt.dataset.precio){
+    const el = document.getElementById('_presCont');
+    if(el && !el.value) el.value = opt.dataset.precio;
+  }
+}
+
+function closeMPres(){ document.getElementById('mPres')?.remove(); }
+
+async function guardarPresupuesto(id){
+  const eqSel = document.getElementById('_presEq');
+  const equipo_id = eqSel?.value ? parseInt(eqSel.value) : (id ? (S.presupuestos.find(p=>p.id===id)?.equipo_id||null) : null);
+  const eq = equipo_id ? S.equipos.find(e=>e.id===equipo_id) : null;
+  const equipo_modelo = eq ? `${eq.modelo||''} ${eq.memoria||''}`.trim() : (id ? S.presupuestos.find(p=>p.id===id)?.equipo_modelo||'' : '');
+  const cliente = (document.getElementById('_presCli')?.value||'').trim();
+  const precio_contado = parseFloat(document.getElementById('_presCont')?.value)||0;
+  if(!equipo_modelo){ showToast('Seleccioná un equipo','err'); return; }
+  if(!cliente){ showToast('Ingresá el nombre del cliente','err'); return; }
+  if(!precio_contado){ showToast('Ingresá el precio contado','err'); return; }
+
+  if(!S.presupuestos) S.presupuestos=[];
+  const obj = {
+    id: id || Date.now(),
+    fecha: tod(),
+    equipo_id,
+    equipo_modelo,
+    cliente,
+    tel: (document.getElementById('_presTel')?.value||'').replace(/\D/g,''),
+    precio_contado,
+    notas_cuotas: (document.getElementById('_presCuotas')?.value||'').trim(),
+    notas: (document.getElementById('_presNotas')?.value||'').trim(),
+    estado: document.getElementById('_presEst')?.value||'borrador'
+  };
+  if(id){
+    const idx=S.presupuestos.findIndex(p=>p.id===id);
+    if(idx>-1) S.presupuestos[idx]=obj; else S.presupuestos.push(obj);
+  } else {
+    S.presupuestos.push(obj);
+  }
+  await dbUpsert('presupuestos', obj);
+  closeMPres();
+  rPresupuestos();
+  showToast('Presupuesto guardado ✓');
+}
+
+function enviarPresupuestoWA(id){
+  const p = (S.presupuestos||[]).find(x=>x.id===id);
+  if(!p || !p.tel) return;
+  const biz = currentTenant?.nombre || 'Nosotros';
+  const lines = [];
+  lines.push(`¡Hola${p.cliente?' '+p.cliente:''}! 👋 Te paso el presupuesto solicitado:\n`);
+  lines.push(`📱 *${p.equipo_modelo}*`);
+  lines.push(`💵 Contado: *${fmt(p.precio_contado)}*`);
+  if(p.notas_cuotas) lines.push(`💳 ${p.notas_cuotas}`);
+  if(p.notas) lines.push(`\n📝 ${p.notas}`);
+  lines.push(`\nEl precio tiene validez por 48 hs. ¡Cualquier consulta estoy a disposición!`);
+  lines.push(`— *${biz}*`);
+  const msg = lines.join('\n');
+  window.open(`https://wa.me/${p.tel}?text=${encodeURIComponent(msg)}`, '_blank');
+  // Marcar como enviado automáticamente
+  if(p.estado==='borrador'){ p.estado='enviado'; dbUpsert('presupuestos',p); rPresupuestos(); }
+}
+
+function convertirPresupuestoVenta(id){
+  const p = (S.presupuestos||[]).find(x=>x.id===id);
+  if(!p || !p.equipo_id) return;
+  const eq = S.equipos.find(e=>e.id===p.equipo_id);
+  if(!eq){ showToast('El equipo ya no está disponible','err'); return; }
+  // Pre-rellenar precio con el del presupuesto
+  eq._precioPresup = p.precio_contado;
+  eq._clientePresup = p.cliente;
+  eq._telPresup = p.tel;
+  abrirVentaEquipo(p.equipo_id);
+}
+
+async function eliminarPresupuesto(id){
+  _confirmarModal('¿Eliminar este presupuesto?', async ()=>{
+    S.presupuestos = (S.presupuestos||[]).filter(p=>p.id!==id);
+    await dbDelete('presupuestos', id);
+    rPresupuestos();
+    showToast('Presupuesto eliminado ✓');
+  });
 }
 
 // ═══ VENTAS ═══
@@ -10393,8 +10610,11 @@ function delMovCaja(id){
 function rMovCaja(){
   const mes = tod().slice(0,7);
   const movs = (S.movCaja||[]).filter(m=>!m.fecha||(m.fecha||'').slice(0,7)===mes).sort((a,b)=>(b.id||0)-(a.id||0));
-  const html = movs.length ? `<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;padding-top:8px;border-top:1px solid var(--bor)">Movimientos del mes</div>` +
-    movs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
+  const gastos = (S.gastos||[]).filter(g=>(g.fecha||'').slice(0,7)===mes).sort((a,b)=>(b.id||0)-(a.id||0));
+
+  const lbl = (txt)=>`<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;padding-top:10px;border-top:1px solid var(--bor)">${txt}</div>`;
+
+  const movHtml = movs.length ? lbl('Movimientos manuales') + movs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
       <div style="flex:1;min-width:0">
         <div style="font-size:.82rem;font-weight:600">${esc(m.concepto||'—')}</div>
         <div style="font-size:.7rem;color:var(--tx2)">${m.fecha||''} · ${esc(m.caja)} · ${m.tipo==='ingreso'?'⬆ Ingreso':'⬇ Egreso'}</div>
@@ -10405,6 +10625,17 @@ function rMovCaja(){
         <button class="btn bd bsm" onclick="delMovCaja(${m.id})">✕</button>
       </div>
     </div>`).join('') : '';
+
+  const gastosHtml = gastos.length ? lbl('Gastos del mes') + gastos.map(g=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600">${esc(g.concepto||'—')}</div>
+        <div style="font-size:.7rem;color:var(--tx2)">${g.fecha||''} · ${g.tipo||'variable'} · ⬇ Gasto</div>
+        ${g.notas?`<div style="font-size:.69rem;color:var(--mut);margin-top:2px">${esc(g.notas.slice(0,80))}</div>`:''}
+      </div>
+      <span style="font-weight:700;color:var(--bad);flex-shrink:0;margin-left:8px">-${fmt(g.monto)}</span>
+    </div>`).join('') : '';
+
+  const html = movHtml + gastosHtml || '';
   ['movCajaLista','movCajaLista-g'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.innerHTML = html;
@@ -17390,7 +17621,7 @@ function updateDashParejaCard(){
   `;
 }
 
-function renderAll(){ rDash(); rStock(); rEquipos(); rGarantias(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); rCubiertas(); rClientesGomeria(); }
+function renderAll(){ rDash(); rStock(); rEquipos(); rGarantias(); rPresupuestos(); rVentas(); rTaller(); rClientes(); rAuditoria(); rGastos(); rPrecios(); rInversores(); updateStockNotif(); rStockMov(); if(typeof rTurnos==='function') rTurnos(); if(typeof rCajas==='function') rCajas(); rCubiertas(); rClientesGomeria(); }
 
 function getClientes(){
   const r = (currentTenant?.rubro||'').toLowerCase();
@@ -17805,7 +18036,7 @@ function aplicarModulosPorRubro(rubro){
   const mods = currentTenant?.modulos || {};
 
   // Ocultar todos los nav items opcionales antes de mostrar solo los del rubro activo
-  ['nav-taller','nav-equipos','nav-garantias','nav-stock','nav-cubiertas','nav-clientesGomeria','nav-ventas','nav-pedidos',
+  ['nav-taller','nav-equipos','nav-garantias','nav-presupuestos','nav-stock','nav-cubiertas','nav-clientesGomeria','nav-ventas','nav-pedidos',
    'nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-fichas',
    'nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config',
    'nav-auditoria','nav-turnosTec','nav-listaEspera','nav-objetivosCompra',
@@ -17819,7 +18050,7 @@ function aplicarModulosPorRubro(rubro){
 
   if(esTaller){
     // 🔧 TALLER DE CELULARES / SERVICIO TÉCNICO / ACCESORIOS
-    showNav('nav-taller','nav-equipos','nav-garantias','nav-stock','nav-ventas','nav-pedidos','nav-gastos','nav-analisis','nav-precios');
+    showNav('nav-taller','nav-equipos','nav-garantias','nav-presupuestos','nav-stock','nav-ventas','nav-pedidos','nav-gastos','nav-analisis','nav-precios');
   } else if(esGomeria){
     // 🔧 GOMERÍA / NEUMÁTICOS
     showNav('nav-cubiertas','nav-clientesGomeria','nav-turnos','nav-turnosOnline','nav-ventas','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config');
@@ -19777,9 +20008,10 @@ function generarOrdenTrabajoPDF(id){
 </head>
 <body>
 
-<!-- Botón de imprimir (se oculta al imprimir) -->
-<div class="sin-imprimir" style="text-align:right;margin-bottom:16px">
-  <button onclick="window.print()" style="background:#111;color:#fff;border:none;padding:9px 22px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px">🖨️ Imprimir / Guardar PDF</button>
+<!-- Botones (se ocultan al imprimir) -->
+<div class="sin-imprimir" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;flex-wrap:wrap">
+  ${r.tel ? `<button onclick="window.open('https://wa.me/${(r.tel+'').replace(/\\D/g,'')}?text='+encodeURIComponent('Hola ${(r.cliente||'').replace(/'/g,'')}! 📋 Te enviamos la Orden de Servicio N°${nro} de tu ${r.equipo||'equipo'}. Ante cualquier consulta estamos disponibles. — ${neg}'),'_blank')" style="background:#25D366;color:#fff;border:none;padding:9px 18px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer">📲 Enviar por WhatsApp</button>` : '<div></div>'}
+  <button onclick="window.print()" style="background:#111;color:#fff;border:none;padding:9px 22px;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:.5px">🖨️ Imprimir / PDF</button>
 </div>
 
 <!-- Cabecera -->
@@ -19860,7 +20092,7 @@ ${r.garantiaDias > 0 ? `
 
 <!-- Footer -->
 <div class="footer">
-  <strong>Remu Store — Servicio Técnico</strong> · ${neg} · Orden generada el ${hoy}
+  <strong>${neg}</strong> · Orden generada el ${hoy}
 </div>
 
 </body>
