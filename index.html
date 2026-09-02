@@ -7896,7 +7896,7 @@ async function confirmarResolucionGarantia(id,btn){
   await dbUpsert('equipos',e);
   pushUndo('Resolver garantía','equipos',snap);
   // Si hubo costo y no es "sin cobertura", registrar como gasto en Caja
-  const esSinCobertura = resolucion && resolucion.toLowerCase().includes('sin cobertura');
+  const esSinCobertura = resolucion && (resolucion.toLowerCase().includes('sin cobertura') || resolucion.toLowerCase().includes('sin costo') || resolucion.toLowerCase().includes('gratis'));
   if(costo > 0 && !esSinCobertura){
     const snapG=JSON.parse(JSON.stringify(S.gastos));
     const imeiLabel = e.imei ? ` [${e.imei}]` : '';
@@ -9302,7 +9302,7 @@ function rGastos(){
   document.getElementById('gastosContainer').innerHTML =
     avisoHtml +
     _seccionFijos(fijos) +
-    _seccionG('Gastos Variables','📊','Comisiones, extras y otros del mes', variables) +
+    `<div id="secVarGastos">` + _seccionG('Gastos Variables','📊','Comisiones, extras y otros del mes', variables) + `</div>` +
     _seccionG('Stock / Compras','📦','Reposición de mercadería y materiales', stocks);
 }
 
@@ -10634,6 +10634,29 @@ function rCajas(){
       : [{k:'servicio',l:'🔧 Servicio técnico',obj:(S.objetivos?.repCant||7)*(S.objetivos?.repPre||40000)},{k:'accesorios',l:'📦 Accesorios',obj:(S.objetivos?.accCant||10)*(S.objetivos?.accPre||10000)},{k:'equipos',l:'📱 Equipos',obj:0},{k:'general',l:'💼 General',obj:0}];
   document.getElementById('cajasGrid').innerHTML=items.map(i=>`<div class="stat"><div class="sl">${i.l}</div><div class="sv" style="color:${(c[i.k]||0)>=0?'var(--ok)':'var(--bad)'}">${fmt(c[i.k]||0)}</div>${i.obj>0?`<div style="margin-top:6px"><div class="pb"><div class="pf" style="width:${Math.min(100,Math.round((c[i.k]||0)/i.obj*100))}%"></div></div><div style="font-size:.68rem;color:var(--mut);margin-top:3px">Meta día: ${fmt(i.obj)}</div></div>`:''}</div>`).join('');
 
+  // Chip de resultado neto del mes
+  const _mes = tod().slice(0,7);
+  const _ventasMes = (S.ventas||[]).filter(v=>(v.fecha||'').slice(0,7)===_mes).reduce((a,v)=>a+(v.total||0),0);
+  const _repsMes = (S.reparaciones||[]).filter(r=>r.estado==='entregado'&&(r.fechaEnt||r.fecha||'').slice(0,7)===_mes).reduce((a,r)=>a+(r.presupuesto||0),0);
+  const _ingresos = _ventasMes + _repsMes;
+  const _gastosFijos = (S.gastos||[]).filter(g=>g.tipo==='fijo').reduce((a,g)=>a+(g.monto||0),0);
+  const _gastosVar = (S.gastos||[]).filter(g=>g.tipo==='variable'&&(g.fecha||'').slice(0,7)===_mes).reduce((a,g)=>a+(g.monto||0),0);
+  const _gastosStock = (S.gastos||[]).filter(g=>g.tipo==='stock'&&(g.fecha||'').slice(0,7)===_mes).reduce((a,g)=>a+(g.monto||0),0);
+  const _gastosTot = _gastosFijos + _gastosVar + _gastosStock;
+  const _neto = _ingresos - _gastosTot;
+  const _netoEl = document.getElementById('cajaNetoMes') || (() => {
+    const el = document.createElement('div'); el.id='cajaNetoMes';
+    const grid = document.getElementById('cajasGrid');
+    if(grid) grid.parentNode.insertBefore(el, grid.nextSibling);
+    return el;
+  })();
+  _netoEl.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 4px;padding:10px 12px;background:var(--bg);border-radius:8px;border:1px solid var(--bor)">
+    <span style="font-size:.72rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.6px;font-weight:600">📅 Resultado del mes</span>
+    <span style="font-size:.8rem;color:var(--tx2)">Ingresos <strong style="color:var(--ok)">${fmt(_ingresos)}</strong></span>
+    <span style="font-size:.8rem;color:var(--tx2)">Gastos <strong style="color:var(--bad)">-${fmt(_gastosTot)}</strong></span>
+    <span style="font-size:.9rem;font-weight:700;color:${_neto>=0?'var(--ok)':'var(--bad)'}">= ${fmt(_neto)}</span>
+  </div>`;
+
   // Adaptar select de caja en modal de movimientos
   const mcCajaSel = document.getElementById('mcCaja');
   if(mcCajaSel){
@@ -10684,32 +10707,33 @@ function delMovCaja(id){
 function rMovCaja(){
   const mes = tod().slice(0,7);
   const movs = (S.movCaja||[]).filter(m=>!m.fecha||(m.fecha||'').slice(0,7)===mes).sort((a,b)=>(b.id||0)-(a.id||0));
-  const gastos = (S.gastos||[]).filter(g=>(g.fecha||'').slice(0,7)===mes).sort((a,b)=>(b.id||0)-(a.id||0));
+  const gastosVar = (S.gastos||[]).filter(g=>g.tipo==='variable'&&(g.fecha||'').slice(0,7)===mes);
+  const totalGastos = gastosVar.reduce((a,g)=>a+(g.monto||0),0);
 
-  const lbl = (txt)=>`<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;padding-top:10px;border-top:1px solid var(--bor)">${txt}</div>`;
+  const movHtml = movs.length
+    ? `<div style="font-size:.67rem;color:var(--mut);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;padding-top:10px;border-top:1px solid var(--bor)">Movimientos manuales</div>` +
+      movs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.82rem;font-weight:600">${esc(m.concepto||'—')}</div>
+          <div style="font-size:.7rem;color:var(--tx2)">${m.fecha||''} · ${esc(m.caja)} · ${m.tipo==='ingreso'?'⬆ Ingreso':'⬇ Egreso'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <span style="font-weight:700;color:${m.tipo==='ingreso'?'var(--ok)':'var(--bad)'}">${m.tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</span>
+          <button class="btn be bsm" onclick="editMovCaja(${m.id})">✎</button>
+          <button class="btn bd bsm" onclick="delMovCaja(${m.id})">✕</button>
+        </div>
+      </div>`).join('')
+    : '';
 
-  const movHtml = movs.length ? lbl('Movimientos manuales') + movs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.82rem;font-weight:600">${esc(m.concepto||'—')}</div>
-        <div style="font-size:.7rem;color:var(--tx2)">${m.fecha||''} · ${esc(m.caja)} · ${m.tipo==='ingreso'?'⬆ Ingreso':'⬇ Egreso'}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-        <span style="font-weight:700;color:${m.tipo==='ingreso'?'var(--ok)':'var(--bad)'}">${m.tipo==='ingreso'?'+':'-'}${fmt(m.monto)}</span>
-        <button class="btn be bsm" onclick="editMovCaja(${m.id})">✎</button>
-        <button class="btn bd bsm" onclick="delMovCaja(${m.id})">✕</button>
-      </div>
-    </div>`).join('') : '';
+  // Aviso compacto si hay gastos variables que afectan la caja
+  const gastosAviso = totalGastos > 0
+    ? `<div style="font-size:.75rem;color:var(--tx2);padding:9px 0;border-top:1px solid var(--bor);margin-top:${movs.length?'0':'8px'}">
+        💼 General afectada por <strong style="color:var(--bad)">-${fmt(totalGastos)}</strong> en gastos variables este mes
+        <a href="#" onclick="event.preventDefault();go('gastos');setTimeout(()=>document.getElementById('secVarGastos')?.scrollIntoView({behavior:'smooth'}),200)" style="color:var(--acc);margin-left:6px;text-decoration:none;font-size:.72rem">Ver detalle ↓</a>
+      </div>`
+    : '';
 
-  const gastosHtml = gastos.length ? lbl('Gastos del mes') + gastos.map(g=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bor)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:.82rem;font-weight:600">${esc(g.concepto||'—')}</div>
-        <div style="font-size:.7rem;color:var(--tx2)">${g.fecha||''} · ${g.tipo||'variable'} · ⬇ Gasto</div>
-        ${g.notas?`<div style="font-size:.69rem;color:var(--mut);margin-top:2px">${esc(g.notas.slice(0,80))}</div>`:''}
-      </div>
-      <span style="font-weight:700;color:var(--bad);flex-shrink:0;margin-left:8px">-${fmt(g.monto)}</span>
-    </div>`).join('') : '';
-
-  const html = movHtml + gastosHtml || '';
+  const html = movHtml + gastosAviso;
   ['movCajaLista','movCajaLista-g'].forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.innerHTML = html;
