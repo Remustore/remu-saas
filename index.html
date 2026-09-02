@@ -1326,6 +1326,7 @@ $$;</pre>
     <div class="sec" id="sec-taller">
       <div class="pt" id="tallerTitle">Reparaciones</div><div class="ps" id="tallerSub">Seguimiento de trabajos</div>
       <div id="estadoLinkBox" style="margin-bottom:14px"></div>
+      <div id="tallerBanner" style="display:none"></div>
       <div class="ch">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <div class="srch" style="max-width:220px"><span>⌕</span><input id="tallerIMEI" placeholder="Buscar IMEI o cliente..." oninput="buscarTaller(this.value)"></div>
@@ -2606,7 +2607,7 @@ $$;</pre>
   <ol style="margin:0;padding-left:18px" id="guiaPasos"></ol>
 </div>
 <div class="fr"><div><label>💵 Seña recibida ($)</label><input type="number" id="tSena" placeholder="0" oninput="calcGanTaller()"></div><div><label>Presupuesto cobrado ($)</label><input type="number" id="tPre" placeholder="0" oninput="calcGanTaller()"></div></div>
-<div class="fr"><div><label>Estado</label><select id="tEst" onchange="updateGarantiaVence()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option></select></div></div>
+<div class="fr"><div><label>Estado</label><select id="tEst" onchange="updateGarantiaVence()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo</option><option value="entregado">Entregado</option><option value="sin_reparacion">❌ Cancelado</option></select></div></div>
 <div id="tGanBox">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
     <span style="font-size:.72rem;color:var(--tx2)">Ganancia neta</span>
@@ -2876,7 +2877,7 @@ $$;</pre>
 <div class="mb" id="mAv"><div class="md"><div class="mh"><div class="mt2">Actualizar trabajo</div><button class="xbtn" onclick="closeM('mAv')">✕</button></div>
 <div class="mc">
 <div id="avInfo" style="font-size:.82rem;color:var(--tx2);margin-bottom:12px;padding:10px;background:var(--bg);border-radius:7px;"></div>
-<label>Nuevo estado</label><select id="avEst" onchange="chkWA();_toggleAvMetodo()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo para retirar ✓</option><option value="entregado">Entregado</option></select>
+<label>Nuevo estado</label><select id="avEst" onchange="chkWA();_toggleAvMetodo()"><option value="recibido">Recibido</option><option value="proceso">En proceso</option><option value="listo">Listo para retirar ✓</option><option value="entregado">Entregado</option><option value="sin_reparacion">❌ Cancelado / Sin reparar</option></select>
 <div id="avMetodoBox" style="display:none;margin-top:8px"><label>Método de pago</label><select id="avMetodo"><option value="Efectivo">Efectivo</option><option value="Transferencia">Transferencia</option><option value="Mercado Pago">Mercado Pago</option><option value="Tarjeta débito">Tarjeta débito</option><option value="Tarjeta crédito">Tarjeta crédito</option></select></div>
 <label>Nota</label><input id="avNot" placeholder="Ej: Esperando repuesto...">
 <div id="waH" style="display:none;background:rgba(76,175,125,.07);border:1px solid rgba(76,175,125,.2);border-radius:8px;padding:10px;margin-top:10px;font-size:.78rem;color:var(--tx2)">
@@ -8299,7 +8300,8 @@ function rVentas(){
 }
 
 // ═══ TALLER ═══
-const ESTS = [{k:'recibido',l:'Recibido',c:'bbl'},{k:'proceso',l:'En proceso',c:'byw'},{k:'listo',l:'✓ Listo',c:'bgr'},{k:'entregado',l:'Entregado',c:'bgx'}];
+const ESTS = [{k:'recibido',l:'Recibido',c:'bbl'},{k:'proceso',l:'En proceso',c:'byw'},{k:'listo',l:'✓ Listo',c:'bgr'},{k:'entregado',l:'Entregado',c:'bgx'},{k:'sin_reparacion',l:'❌ Cancelado',c:'bgx'}];
+let _tallerEntregadoExpanded = false;
 
 const GUIAS_REP = {
   bateria: { k:['bateria','batería','no carga','carga lenta','no enciende'], t:'🔋 Cambio de batería', p:['Quitar tornillos pentalobe','Calentar bordes 30 seg para abrir','Desconectar batería ANTES que todo','Quitar adhesivo con paciencia','Colocar nueva batería y conectar','Testear carga y porcentaje','Cerrar y verificar sellos'] },
@@ -8454,7 +8456,9 @@ function calcGanTaller(){
     if(ganPct) ganPct.textContent = pct+'%';
     if(ganPct) ganPct.style.color = pct>=50?'var(--ok)':pct>=30?'var(--wrn)':'var(--bad)';
     if(ganAlert){
-      ganAlert.textContent = pct>=50?'✓ Buen margen':pct>=30?'⚠ Margen regular':'✕ Margen bajo';
+      const minPrecio30 = cosRep + flete > 0 ? Math.ceil((cosRep+flete)/0.70) : 0;
+      const sugerencia = pct < 30 && minPrecio30 > pre ? ` — Para 30%: ${fmt(minPrecio30)}` : '';
+      ganAlert.textContent = (pct>=50?'✓ Buen margen':pct>=30?'⚠ Margen regular':'✕ Margen bajo') + sugerencia;
       ganAlert.style.background = pct>=50?'rgba(76,175,125,.15)':pct>=30?'rgba(201,148,76,.15)':'rgba(201,82,76,.15)';
       ganAlert.style.color = pct>=50?'var(--ok)':pct>=30?'var(--wrn)':'var(--bad)';
     }
@@ -8701,36 +8705,103 @@ function _garantiaChip(r){
   }
 }
 
+function _repParada(r){
+  const ACTIVOS = ['recibido','proceso','listo'];
+  if(!ACTIVOS.includes(r.estado)) return false;
+  const dias = r.fecha ? Math.floor((new Date()-new Date(r.fecha+'T00:00:00'))/86400000) : 0;
+  return dias >= 7;
+}
+
+function _recordarClienteWA(id){
+  const r = S.reparaciones.find(x=>x.id===id); if(!r||!r.tel) return;
+  const biz = currentTenant?.nombre || 'el negocio';
+  const dias = r.fecha ? Math.floor((new Date()-new Date(r.fecha+'T00:00:00'))/86400000) : 0;
+  const ESTL = {recibido:'esperando diagnóstico',proceso:'en proceso de reparación',listo:'listo para retirar ✅'};
+  const msg = `Hola ${r.cliente} 👋\n\nQueríamos avisarte desde *${biz}* que tu equipo (*${r.equipo||'trabajo'}*) lleva *${dias} días* en nuestro taller${r.falla?` por: ${r.falla}`:''} y está *${ESTL[r.estado]||r.estado}*.\n\n${r.presupuesto?`💰 Presupuesto: ${fmt(r.presupuesto)}\n\n`:''}¿Necesitás alguna info o podemos avanzar? Respondé este mensaje 🙏\n\n— *${biz}*`;
+  const tel = (r.tel+'').replace(/\D/g,'');
+  window.open(`https://wa.me/549${tel}?text=${encodeURIComponent(msg)}`, '_blank');
+  // Registrar el aviso en el registro
+  r.ultimoAviso = tod();
+  dbUpsert('reparaciones', r);
+}
+
+async function _recordarTodosWA(){
+  const paradas = S.reparaciones.filter(_repParada);
+  if(!paradas.length){ showToast('No hay trabajos parados','err'); return; }
+  const conTel = paradas.filter(r=>r.tel);
+  if(!conTel.length){ showToast('Ningún trabajo parado tiene teléfono cargado','err'); return; }
+  _confirmarModal(`Enviar recordatorio WA a ${conTel.length} cliente${conTel.length!==1?'s':''} con trabajos parados?`, ()=>{
+    conTel.forEach((r,i) => setTimeout(()=>_recordarClienteWA(r.id), i*400));
+    showToast(`Enviando ${conTel.length} recordatorios... ✓`);
+  });
+}
+
 function rTaller(){
   rEstadoLink();
+
+  // Banner de trabajos parados
+  const paradas = S.reparaciones.filter(_repParada);
+  const bannerEl = document.getElementById('tallerBanner');
+  if(bannerEl){
+    if(paradas.length){
+      const conTel = paradas.filter(r=>r.tel).length;
+      bannerEl.style.display='';
+      bannerEl.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.3);border-radius:9px;padding:10px 14px;margin-bottom:14px">
+        <span style="font-size:.83rem;color:var(--wrn);font-weight:600">⏰ ${paradas.length} trabajo${paradas.length!==1?'s':''} sin movimiento hace 7+ días</span>
+        ${conTel?`<button class="btn bsm" style="background:rgba(37,211,102,.15);color:#25D366;border-color:rgba(37,211,102,.4)" onclick="_recordarTodosWA()">📲 Avisar a todos (${conTel})</button>`:''}
+      </div>`;
+    } else {
+      bannerEl.style.display='none';
+      bannerEl.innerHTML='';
+    }
+  }
+
   document.getElementById('kan').innerHTML=ESTS.map(est=>{
-    const reps=S.reparaciones.filter(r=>r.estado===est.k);
-    return`<div class="kc"><div class="kct">${est.l} <span style="color:var(--mut)">(${reps.length})</span></div>
+    let reps = S.reparaciones.filter(r=>r.estado===est.k);
+    if(!reps.length && est.k==='sin_reparacion') return ''; // ocultar columna cancelado si está vacía
+
+    // Columna Entregado: mostrar solo últimas 10 si no está expandida
+    let hayMas = false;
+    let totalEntregado = reps.length;
+    if(est.k==='entregado' && !_tallerEntregadoExpanded && reps.length > 10){
+      reps = [...reps].sort((a,b)=>(b.id||0)-(a.id||0)).slice(0,10);
+      hayMas = true;
+    }
+
+    return`<div class="kc"><div class="kct">${est.l} <span style="color:var(--mut)">(${totalEntregado})</span></div>
     ${reps.length?reps.map(r=>{
       const diasEnTaller = r.fecha ? Math.floor((new Date()-new Date(r.fecha+'T00:00:00'))/86400000) : 0;
-      const diasColor = diasEnTaller>5?'var(--bad)':diasEnTaller>2?'var(--wrn)':'var(--mut)';
-      return`<div class="kk"><div class="kn">${r.cliente}</div>
+      const parada = _repParada(r);
+      const diasColor = parada?'var(--wrn)':diasEnTaller>5?'var(--bad)':diasEnTaller>2?'var(--wrn)':'var(--mut)';
+      const diasUltimoAviso = r.ultimoAviso ? Math.floor((new Date()-new Date(r.ultimoAviso+'T00:00:00'))/86400000) : null;
+      return`<div class="kk" style="${parada?'border-left:2px solid var(--wrn)':''}"><div class="kn">${r.cliente}</div>
       <div class="kd">${r.equipo||'—'}${r.imei?` <span style="font-size:.65rem;color:var(--mut)">· ${r.imei.slice(-6)}</span>`:''}</div>
       ${r.falla?`<div class="kd" style="margin-top:2px;font-style:italic">"${r.falla.slice(0,40)}"</div>`:''}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;flex-wrap:wrap;gap:3px">
         <span style="font-size:.68rem;color:${diasColor}">${fD(r.fecha)}${diasEnTaller>0?` · ${diasEnTaller}d`:''}</span>
         ${r.presupuesto?`<span style="font-size:.74rem;color:var(--gld);font-weight:600">${fmt(r.presupuesto)}</span>`:''}
       </div>
+      ${parada?`<div style="font-size:.68rem;margin-top:3px;padding:2px 7px;border-radius:4px;background:rgba(251,191,36,.1);color:var(--wrn);border:1px solid rgba(251,191,36,.25);display:flex;justify-content:space-between;align-items:center">
+        <span>⏰ ${diasEnTaller}d sin mover${diasUltimoAviso!==null?` · Aviso hace ${diasUltimoAviso}d`:''}</span>
+        ${r.tel?`<span style="cursor:pointer;text-decoration:underline" onclick="event.stopPropagation();_recordarClienteWA(${r.id})">📲 Recordar</span>`:''}
+      </div>`:''}
       ${r.ganancia!=null&&r.presupuesto?`<div style="font-size:.7rem;margin-top:3px;padding:3px 6px;border-radius:4px;background:${r.margen>=50?'rgba(74,222,128,.12)':r.margen>=30?'rgba(250,204,21,.12)':'rgba(248,113,113,.12)'};color:${r.margen>=50?'var(--ok)':r.margen>=30?'var(--wrn)':'var(--bad)'};font-weight:600">
         Gan: ${fmt(r.ganancia)} · ${r.margen}% ${r.margen>=50?'✓':r.margen>=30?'⚠':'✕'}${r.metodoPago?` <span style="font-weight:400;color:var(--tx2)">${r.metodoPago}</span>`:''}
       </div>`:''}
       ${_garantiaChip(r)}
       <div class="ka">
-        <button class="btn bgh bsm" onclick="openAv(${r.id})">Avanzar</button>
+        ${est.k!=='sin_reparacion'?`<button class="btn bgh bsm" onclick="openAv(${r.id})">Avanzar</button>`:''}
         <button class="btn be bsm" onclick="openM('mTaller',${r.id})">✎</button>
-        ${r.tel?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}
+        ${r.tel&&!parada?`<button class="btn bs bsm" onclick="showWA(S.reparaciones.find(x=>x.id===${r.id}))">📲</button>`:''}
         ${r.estado==='recibido'?`<button class="btn bgh bsm" onclick="generarPresupuestoPDF(${r.id})">📋</button>`:''}
         <button class="btn bgh bsm" onclick="generarOrdenTrabajoPDF(${r.id})" title="Orden de trabajo">📄</button>
         <button class="btn bgh bsm" onclick="generarEtiquetaTaller(${r.id})" title="Imprimir etiqueta">🏷️</button>
         <button class="btn bd bsm" onclick="delRep(${r.id})">✕</button>
       </div>
       </div>`;
-    }).join(''):`<div style="color:var(--mut);font-size:.74rem;padding:7px 0">Sin órdenes</div>`}</div>`;
+    }).join(''):`<div style="color:var(--mut);font-size:.74rem;padding:7px 0">Sin órdenes</div>`}
+    ${hayMas?`<div style="text-align:center;padding:8px 0"><button class="btn bsm" style="font-size:.75rem;color:var(--tx2)" onclick="_tallerEntregadoExpanded=true;rTaller()">Ver todos (${totalEntregado}) →</button></div>`:''}
+    ${est.k==='entregado'&&_tallerEntregadoExpanded&&totalEntregado>10?`<div style="text-align:center;padding:8px 0"><button class="btn bsm" style="font-size:.75rem;color:var(--tx2)" onclick="_tallerEntregadoExpanded=false;rTaller()">↑ Mostrar menos</button></div>`:''}</div>`;
   }).join('');
 }
 
