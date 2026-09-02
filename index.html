@@ -8676,7 +8676,10 @@ function rEstadoLink(){
 // Calcula y devuelve el chip HTML de garantía para una reparación
 function _garantiaChip(r){
   if(!r.garantiaDias || r.garantiaDias === 0) return '';
-  const fechaBase = r.fecha; // fecha de ingreso
+  // La garantía de una reparación empieza al momento de la entrega.
+  // No mostrar chip hasta que el trabajo esté entregado.
+  if(r.estado !== 'entregado') return '';
+  const fechaBase = r.fechaEnt || r.fecha;
   if(!fechaBase) return '';
   const vence = new Date(fechaBase + 'T00:00:00');
   vence.setDate(vence.getDate() + r.garantiaDias);
