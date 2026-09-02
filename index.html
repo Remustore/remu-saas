@@ -1316,9 +1316,12 @@ $$;</pre>
             <button class="tab" onclick="setPF('aceptado',3)">Aceptados</button>
             <button class="tab" onclick="setPF('rechazado',4)">Rechazados</button>
           </div>
-          <button class="btn bgh" onclick="abrirNuevoPresupuesto()">+ Nuevo</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn bgh" onclick="abrirNuevoPresupuesto('equipo')">📱 Equipo</button>
+            <button class="btn bgh" onclick="abrirNuevoPresupuesto('servicio')">🔧 Servicio</button>
+          </div>
         </div>
-        <div class="tw"><table><thead><tr><th>Equipo</th><th>Cliente</th><th class="col-hide">Fecha</th><th>Precio</th><th>Estado</th><th></th></tr></thead><tbody id="tbPres"></tbody></table></div>
+        <div class="tw"><table><thead><tr><th>Equipo / Servicio</th><th>Cliente</th><th class="col-hide">Fecha</th><th>Precio</th><th>Estado</th><th></th></tr></thead><tbody id="tbPres"></tbody></table></div>
       </div>
     </div>
 
@@ -7970,7 +7973,6 @@ function rPresupuestos(){
   const lista = _presFilt==='todos' ? S.presupuestos : S.presupuestos.filter(p=>p.estado===_presFilt);
   const sorted = [...lista].sort((a,b)=>(b.id||0)-(a.id||0));
 
-  // Badge: enviados pendientes
   const enviados = S.presupuestos.filter(p=>p.estado==='enviado').length;
   const badge = document.getElementById('presBadge');
   if(badge){ badge.textContent=enviados; badge.style.display=enviados>0?'':'none'; }
@@ -7979,10 +7981,19 @@ function rPresupuestos(){
   if(!tb) return;
   if(!sorted.length){ tb.innerHTML=`<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--mut)">Sin presupuestos${_presFilt!=='todos'?' en este estado':''}</td></tr>`; return; }
   tb.innerHTML = sorted.map(p=>{
-    const eq = S.equipos.find(e=>e.id===p.equipo_id);
+    const esServicio = p.tipo === 'servicio';
+    const eq = !esServicio ? S.equipos.find(e=>e.id===p.equipo_id) : null;
     const st = _estadoPres(p);
+    const tipoChip = esServicio
+      ? `<span style="font-size:.65rem;background:rgba(201,148,76,.15);color:var(--wrn);border-radius:4px;padding:1px 6px;font-weight:600">🔧 Servicio</span>`
+      : `<span style="font-size:.65rem;background:rgba(100,149,237,.12);color:var(--inf);border-radius:4px;padding:1px 6px;font-weight:600">📱 Equipo</span>`;
+    const descripcion = esServicio
+      ? `${esc(p.dispositivo||'—')} — ${esc(p.servicio||'—')}`
+      : esc(p.equipo_modelo||'—');
+    const puedeConvertirVenta = !esServicio && eq && eq.estado==='disponible' && p.estado==='aceptado';
+    const puedeConvertirRep = esServicio && p.estado==='aceptado';
     return `<tr>
-      <td><strong>${esc(p.equipo_modelo||'—')}</strong>${p.notas?`<br><span style="font-size:.72rem;color:var(--tx2)">${esc(p.notas.slice(0,50))}</span>`:''}</td>
+      <td>${tipoChip}<br><strong>${descripcion}</strong>${p.notas?`<br><span style="font-size:.72rem;color:var(--tx2)">${esc(p.notas.slice(0,40))}</span>`:''}</td>
       <td>${esc(p.cliente||'—')}${p.tel?`<br><span style="font-size:.72rem;color:var(--tx2)">${esc(p.tel)}</span>`:''}</td>
       <td class="col-hide">${fD(p.fecha)||'—'}</td>
       <td>
@@ -7993,7 +8004,8 @@ function rPresupuestos(){
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           ${p.tel?`<button class="btn bs bsm" onclick="enviarPresupuestoWA(${p.id})" title="Enviar por WhatsApp">📲</button>`:''}
-          ${eq&&eq.estado==='disponible'&&p.estado==='aceptado'?`<button class="btn bgh bsm" onclick="convertirPresupuestoVenta(${p.id})" title="Convertir a venta">💰</button>`:''}
+          ${puedeConvertirVenta?`<button class="btn bgh bsm" onclick="convertirPresupuestoVenta(${p.id})" title="Convertir a venta">💰</button>`:''}
+          ${puedeConvertirRep?`<button class="btn bgh bsm" onclick="convertirPresupuestoRep(${p.id})" title="Crear orden de reparación">🔧</button>`:''}
           <button class="btn be bsm" onclick="editarPresupuesto(${p.id})">✎</button>
           <button class="btn bd bsm" onclick="eliminarPresupuesto(${p.id})">✕</button>
         </div>
@@ -8002,26 +8014,90 @@ function rPresupuestos(){
   }).join('');
 }
 
-function abrirNuevoPresupuesto(){ _abrirModalPresupuesto(null); }
+function abrirNuevoPresupuesto(tipo){ _abrirModalPresupuesto(null, tipo||'equipo'); }
 function editarPresupuesto(id){ _abrirModalPresupuesto(id); }
 
-function _abrirModalPresupuesto(id){
+function _presToggleTipo(tipo){
+  const eqBlock = document.getElementById('_presEqBlock');
+  const srvBlock = document.getElementById('_presSrvBlock');
+  const cuotasBlock = document.getElementById('_presCuotasBlock');
+  document.querySelectorAll('#mPres .tipo-btn').forEach(b=>b.classList.toggle('bgh', b.dataset.tipo===tipo));
+  if(eqBlock) eqBlock.style.display = tipo==='equipo' ? '' : 'none';
+  if(srvBlock) srvBlock.style.display = tipo==='servicio' ? '' : 'none';
+  if(cuotasBlock) cuotasBlock.style.display = tipo==='equipo' ? '' : 'none';
+  const input = document.getElementById('_presTipo'); if(input) input.value = tipo;
+}
+
+function _abrirModalPresupuesto(id, tipoInicial){
   const p = id ? (S.presupuestos||[]).find(x=>x.id===id) : null;
+  const tipo = tipoInicial || p?.tipo || 'equipo';
   const eqDisp = (S.equipos||[]).filter(e=>e.estado==='disponible');
   const eqOpts = eqDisp.map(e=>`<option value="${e.id}" data-precio="${e.precio}" data-costo="${e.costo}" ${p&&p.equipo_id===e.id?'selected':''}>${esc(e.modelo)} ${esc(e.memoria||'')} ${e.tipo==='usado'?'(Usado)':''} — ${fmt(e.precio)}</option>`).join('');
+  const estOpts = ['borrador','enviado','aceptado','rechazado','vencido'].map(s=>`<option value="${s}" ${(p?.estado||'borrador')===s?'selected':''}>${_estadoPres({estado:s}).label}</option>`).join('');
 
   const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:310;display:flex;align-items:center;justify-content:center;padding:16px" id="mPres" onclick="if(event.target.id==='mPres')closeMPres()">
-    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto">
+    <div style="background:var(--sur);border:1px solid var(--bor2);border-radius:14px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto">
       <div style="padding:16px 20px;border-bottom:1px solid var(--bor);font-family:var(--fh);font-weight:700;font-size:1.05rem">${p?'✎ Editar':'📝 Nuevo'} presupuesto</div>
-      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:11px">
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);font-weight:600">EQUIPO *</label>
-          <select id="_presEq" style="width:100%;margin-top:4px" onchange="_presAutoFill()" ${p?'disabled':''}>
+      <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+        <input type="hidden" id="_presTipo" value="${tipo}">
+
+        <!-- Toggle tipo -->
+        <div style="display:flex;gap:6px;background:var(--bg);border-radius:9px;padding:4px">
+          <button type="button" class="btn bsm tipo-btn ${tipo==='equipo'?'bgh':''}" data-tipo="equipo" onclick="_presToggleTipo('equipo')" style="flex:1;justify-content:center">📱 Venta de equipo</button>
+          <button type="button" class="btn bsm tipo-btn ${tipo==='servicio'?'bgh':''}" data-tipo="servicio" onclick="_presToggleTipo('servicio')" style="flex:1;justify-content:center">🔧 Servicio técnico</button>
+        </div>
+
+        <!-- EQUIPO: selector de inventario -->
+        <div id="_presEqBlock" style="display:${tipo==='equipo'?'':'none'}">
+          <label style="font-size:.72rem;color:var(--tx2);font-weight:600">EQUIPO DEL INVENTARIO *</label>
+          <select id="_presEq" style="width:100%;margin-top:4px" onchange="_presAutoFill()" ${p&&p.tipo==='equipo'?'disabled':''}>
             <option value="">— Seleccioná un equipo —</option>
             ${eqOpts}
           </select>
-          ${p?`<div style="font-size:.7rem;color:var(--tx2);margin-top:3px">${esc(p.equipo_modelo||'')}</div>`:''}
+          ${p&&p.tipo==='equipo'?`<div style="font-size:.7rem;color:var(--tx2);margin-top:3px">${esc(p.equipo_modelo||'')}</div>`:''}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+            <div>
+              <label style="font-size:.72rem;color:var(--tx2);font-weight:600">PRECIO CONTADO *</label>
+              <input id="_presCont" type="number" placeholder="0" value="${p?.precio_contado||''}" style="width:100%;margin-top:4px">
+            </div>
+            <div id="_presCuotasBlock">
+              <label style="font-size:.72rem;color:var(--tx2);font-weight:600">CUOTAS (opcional)</label>
+              <input id="_presCuotas" placeholder="3x $75.000" value="${esc(p?.notas_cuotas||'')}" style="width:100%;margin-top:4px">
+            </div>
+          </div>
         </div>
+
+        <!-- SERVICIO: dispositivo + servicio + precio -->
+        <div id="_presSrvBlock" style="display:${tipo==='servicio'?'':'none'}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div>
+              <label style="font-size:.72rem;color:var(--tx2);font-weight:600">DISPOSITIVO *</label>
+              <input id="_presDisp" placeholder="Ej: iPhone 12, Samsung A30" value="${esc(p?.dispositivo||'')}" style="width:100%;margin-top:4px">
+            </div>
+            <div>
+              <label style="font-size:.72rem;color:var(--tx2);font-weight:600">SERVICIO *</label>
+              <input id="_presSrv" placeholder="Ej: Cambio de pantalla" value="${esc(p?.servicio||'')}" style="width:100%;margin-top:4px" list="_srvSugg">
+              <datalist id="_srvSugg">
+                <option>Cambio de pantalla</option><option>Cambio de batería</option><option>Conector de carga</option>
+                <option>Cámara frontal</option><option>Cámara trasera</option><option>Botones</option>
+                <option>Formateo / Software</option><option>Diagnóstico</option><option>Tapa trasera</option>
+              </datalist>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+            <div>
+              <label style="font-size:.72rem;color:var(--tx2);font-weight:600">PRECIO COBRADO *</label>
+              <input id="_presContSrv" type="number" placeholder="0" value="${p?.tipo==='servicio'?p.precio_contado||'':''}" style="width:100%;margin-top:4px" oninput="_presCalcMargenSrv()">
+            </div>
+            <div>
+              <label style="font-size:.72rem;color:var(--tx2);font-weight:600">COSTO REPUESTO</label>
+              <input id="_presCostoRep" type="number" placeholder="0" value="${esc(p?.costo_rep||'')}" style="width:100%;margin-top:4px" oninput="_presCalcMargenSrv()">
+            </div>
+          </div>
+          <div id="_presMargenSrv" style="font-size:.75rem;color:var(--tx2);margin-top:5px"></div>
+        </div>
+
+        <!-- Datos del cliente (comunes) -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
             <label style="font-size:.72rem;color:var(--tx2);font-weight:600">CLIENTE *</label>
@@ -8034,23 +8110,13 @@ function _abrirModalPresupuesto(id){
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
-            <label style="font-size:.72rem;color:var(--tx2);font-weight:600">PRECIO CONTADO *</label>
-            <input id="_presCont" type="number" placeholder="0" value="${p?.precio_contado||''}" style="width:100%;margin-top:4px">
-          </div>
-          <div>
             <label style="font-size:.72rem;color:var(--tx2);font-weight:600">ESTADO</label>
-            <select id="_presEst" style="width:100%;margin-top:4px">
-              ${['borrador','enviado','aceptado','rechazado','vencido'].map(s=>`<option value="${s}" ${(p?.estado||'borrador')===s?'selected':''}>${_estadoPres({estado:s}).label}</option>`).join('')}
-            </select>
+            <select id="_presEst" style="width:100%;margin-top:4px">${estOpts}</select>
           </div>
-        </div>
-        <div>
-          <label style="font-size:.72rem;color:var(--tx2);font-weight:600">CUOTAS (opcional)</label>
-          <input id="_presCuotas" placeholder="Ej: 3 cuotas de $75.000" value="${esc(p?.notas_cuotas||'')}" style="width:100%;margin-top:4px">
         </div>
         <div>
           <label style="font-size:.72rem;color:var(--tx2);font-weight:600">NOTAS</label>
-          <textarea id="_presNotas" rows="2" placeholder="Observaciones, accesorios incluidos..." style="width:100%;margin-top:4px;resize:vertical">${esc(p?.notas||'')}</textarea>
+          <textarea id="_presNotas" rows="2" placeholder="Observaciones..." style="width:100%;margin-top:4px;resize:vertical">${esc(p?.notas||'')}</textarea>
         </div>
       </div>
       <div style="padding:14px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px">
@@ -8060,6 +8126,17 @@ function _abrirModalPresupuesto(id){
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function _presCalcMargenSrv(){
+  const precio = parseFloat(document.getElementById('_presContSrv')?.value)||0;
+  const costo  = parseFloat(document.getElementById('_presCostoRep')?.value)||0;
+  const el = document.getElementById('_presMargenSrv');
+  if(!el) return;
+  if(!precio){ el.textContent=''; return; }
+  const gan = precio - costo;
+  const pct = Math.round(gan/precio*100);
+  el.innerHTML = `Ganancia: <strong style="color:${pct>=30?'var(--ok)':'var(--bad)'}">${fmt(gan)} (${pct}%)</strong>`;
 }
 
 function _presAutoFill(){
@@ -8074,38 +8151,50 @@ function _presAutoFill(){
 function closeMPres(){ document.getElementById('mPres')?.remove(); }
 
 async function guardarPresupuesto(id){
-  const eqSel = document.getElementById('_presEq');
-  const equipo_id = eqSel?.value ? parseInt(eqSel.value) : (id ? (S.presupuestos.find(p=>p.id===id)?.equipo_id||null) : null);
-  const eq = equipo_id ? S.equipos.find(e=>e.id===equipo_id) : null;
-  const equipo_modelo = eq ? `${eq.modelo||''} ${eq.memoria||''}`.trim() : (id ? S.presupuestos.find(p=>p.id===id)?.equipo_modelo||'' : '');
+  const tipo = document.getElementById('_presTipo')?.value || 'equipo';
   const cliente = (document.getElementById('_presCli')?.value||'').trim();
-  const precio_contado = parseFloat(document.getElementById('_presCont')?.value)||0;
-  if(!equipo_modelo){ showToast('Seleccioná un equipo','err'); return; }
   if(!cliente){ showToast('Ingresá el nombre del cliente','err'); return; }
-  if(!precio_contado){ showToast('Ingresá el precio contado','err'); return; }
 
   if(!S.presupuestos) S.presupuestos=[];
-  const obj = {
-    id: id || Date.now(),
-    fecha: tod(),
-    equipo_id,
-    equipo_modelo,
-    cliente,
-    tel: (document.getElementById('_presTel')?.value||'').replace(/\D/g,''),
-    precio_contado,
-    notas_cuotas: (document.getElementById('_presCuotas')?.value||'').trim(),
-    notas: (document.getElementById('_presNotas')?.value||'').trim(),
-    estado: document.getElementById('_presEst')?.value||'borrador'
-  };
-  if(id){
-    const idx=S.presupuestos.findIndex(p=>p.id===id);
-    if(idx>-1) S.presupuestos[idx]=obj; else S.presupuestos.push(obj);
+  let obj;
+
+  if(tipo === 'servicio'){
+    const dispositivo = (document.getElementById('_presDisp')?.value||'').trim();
+    const servicio    = (document.getElementById('_presSrv')?.value||'').trim();
+    const precio_contado = parseFloat(document.getElementById('_presContSrv')?.value)||0;
+    if(!dispositivo){ showToast('Ingresá el dispositivo','err'); return; }
+    if(!servicio){ showToast('Ingresá el servicio','err'); return; }
+    if(!precio_contado){ showToast('Ingresá el precio','err'); return; }
+    obj = {
+      id: id || Date.now(), tipo: 'servicio', fecha: tod(),
+      dispositivo, servicio, precio_contado,
+      costo_rep: parseFloat(document.getElementById('_presCostoRep')?.value)||0,
+      cliente, tel: (document.getElementById('_presTel')?.value||'').replace(/\D/g,''),
+      notas: (document.getElementById('_presNotas')?.value||'').trim(),
+      estado: document.getElementById('_presEst')?.value||'borrador'
+    };
   } else {
-    S.presupuestos.push(obj);
+    const eqSel = document.getElementById('_presEq');
+    const equipo_id = eqSel?.value ? parseInt(eqSel.value) : (id ? (S.presupuestos.find(p=>p.id===id)?.equipo_id||null) : null);
+    const eq = equipo_id ? S.equipos.find(e=>e.id===equipo_id) : null;
+    const equipo_modelo = eq ? `${eq.modelo||''} ${eq.memoria||''}`.trim() : (id ? S.presupuestos.find(p=>p.id===id)?.equipo_modelo||'' : '');
+    const precio_contado = parseFloat(document.getElementById('_presCont')?.value)||0;
+    if(!equipo_modelo){ showToast('Seleccioná un equipo','err'); return; }
+    if(!precio_contado){ showToast('Ingresá el precio contado','err'); return; }
+    obj = {
+      id: id || Date.now(), tipo: 'equipo', fecha: tod(),
+      equipo_id, equipo_modelo, precio_contado,
+      notas_cuotas: (document.getElementById('_presCuotas')?.value||'').trim(),
+      cliente, tel: (document.getElementById('_presTel')?.value||'').replace(/\D/g,''),
+      notas: (document.getElementById('_presNotas')?.value||'').trim(),
+      estado: document.getElementById('_presEst')?.value||'borrador'
+    };
   }
+
+  if(id){ const idx=S.presupuestos.findIndex(p=>p.id===id); if(idx>-1) S.presupuestos[idx]=obj; else S.presupuestos.push(obj); }
+  else S.presupuestos.push(obj);
   await dbUpsert('presupuestos', obj);
-  closeMPres();
-  rPresupuestos();
+  closeMPres(); rPresupuestos();
   showToast('Presupuesto guardado ✓');
 }
 
@@ -8113,17 +8202,20 @@ function enviarPresupuestoWA(id){
   const p = (S.presupuestos||[]).find(x=>x.id===id);
   if(!p || !p.tel) return;
   const biz = currentTenant?.nombre || 'Nosotros';
-  const lines = [];
-  lines.push(`¡Hola${p.cliente?' '+p.cliente:''}! 👋 Te paso el presupuesto solicitado:\n`);
-  lines.push(`📱 *${p.equipo_modelo}*`);
-  lines.push(`💵 Contado: *${fmt(p.precio_contado)}*`);
-  if(p.notas_cuotas) lines.push(`💳 ${p.notas_cuotas}`);
+  const lines = [`¡Hola${p.cliente?' '+p.cliente:''}! 👋 Te paso el presupuesto solicitado:\n`];
+  if(p.tipo === 'servicio'){
+    lines.push(`📱 Equipo: *${p.dispositivo}*`);
+    lines.push(`🔧 Servicio: *${p.servicio}*`);
+    lines.push(`💵 Precio: *${fmt(p.precio_contado)}*`);
+  } else {
+    lines.push(`📱 *${p.equipo_modelo}*`);
+    lines.push(`💵 Contado: *${fmt(p.precio_contado)}*`);
+    if(p.notas_cuotas) lines.push(`💳 ${p.notas_cuotas}`);
+  }
   if(p.notas) lines.push(`\n📝 ${p.notas}`);
-  lines.push(`\nEl precio tiene validez por 48 hs. ¡Cualquier consulta estoy a disposición!`);
+  lines.push(`\nPresupuesto válido por 48 hs. ¡Cualquier consulta estoy a disposición!`);
   lines.push(`— *${biz}*`);
-  const msg = lines.join('\n');
-  window.open(`https://wa.me/${p.tel}?text=${encodeURIComponent(msg)}`, '_blank');
-  // Marcar como enviado automáticamente
+  window.open(`https://wa.me/${p.tel}?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
   if(p.estado==='borrador'){ p.estado='enviado'; dbUpsert('presupuestos',p); rPresupuestos(); }
 }
 
@@ -8132,11 +8224,29 @@ function convertirPresupuestoVenta(id){
   if(!p || !p.equipo_id) return;
   const eq = S.equipos.find(e=>e.id===p.equipo_id);
   if(!eq){ showToast('El equipo ya no está disponible','err'); return; }
-  // Pre-rellenar precio con el del presupuesto
   eq._precioPresup = p.precio_contado;
   eq._clientePresup = p.cliente;
   eq._telPresup = p.tel;
   abrirVentaEquipo(p.equipo_id);
+}
+
+function convertirPresupuestoRep(id){
+  const p = (S.presupuestos||[]).find(x=>x.id===id);
+  if(!p) return;
+  // Pre-cargar el modal de nueva reparación con los datos del presupuesto
+  openM('mTaller', null);
+  setTimeout(()=>{
+    const set = (elId, val) => { const el=document.getElementById(elId); if(el) el.value=val; };
+    set('tCli', p.cliente||'');
+    set('tTel', p.tel||'');
+    set('tEq',  p.dispositivo||'');
+    set('tFal', p.servicio||'');
+    set('tPre', p.precio_contado||'');
+    set('tCosRep', p.costo_rep||'');
+    calcGanTaller();
+    const titulo = document.getElementById('mTallerTitle');
+    if(titulo) titulo.textContent = '🔧 Nueva reparación desde presupuesto';
+  }, 80);
 }
 
 async function eliminarPresupuesto(id){
