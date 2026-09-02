@@ -7742,28 +7742,50 @@ function rEquipos(){
   const tb = document.getElementById('tbE');
   if(!items.length){ tb.innerHTML=`<tr><td colspan="7">${emp('📱','Sin equipos')}</td></tr>`; return; }
   tb.innerHTML = items.map(e=>{
-    const diasRest = _diasGarantiaRestantes(e.garantiaVence);
-    const garHtml = diasRest === null
-      ? '<span style="color:var(--mut);font-size:.75rem">—</span>'
-      : diasRest < 0
-      ? '<span class="bx brd" style="font-size:.65rem">Vencida</span>'
-      : diasRest <= 7
-      ? `<span class="bx brd" style="font-size:.65rem">⚠ ${diasRest}d</span>`
-      : `<span style="font-size:.75rem;color:var(--ok)">${diasRest}d</span>`;
+    const vendido = e.estado === 'vendido';
+    const ganancia = (e.precio && e.costo) ? e.precio - e.costo : null;
+    const margen = (ganancia !== null && e.precio) ? Math.round(ganancia / e.precio * 100) : null;
+
+    // Columna Precio: disponible muestra costo + ganancia esperada; vendido solo precio + margen
+    let precioHtml;
+    if(vendido){
+      precioHtml = `<strong>${fmt(e.precio)}</strong>${margen!==null?`<br><span style="font-size:.68rem;color:var(--mut)">${margen}% margen</span>`:''}`;
+    } else {
+      precioHtml = `<strong style="color:var(--ok)">${fmt(e.precio)}</strong>`;
+      if(e.costo){
+        const ganColor = ganancia >= 0 ? 'var(--ok)' : 'var(--bad)';
+        precioHtml += `<br><span style="font-size:.7rem;color:var(--tx2)">Costo ${fmt(e.costo)}</span>`;
+        precioHtml += `<br><span style="font-size:.7rem;font-weight:600;color:${ganColor}">Gan: ${fmt(ganancia)} (${margen}%)</span>`;
+      }
+    }
+
+    // Columna Garantía: disponible → días que se darán al comprador; vendido → sin badge, solo fecha discreta
+    let garHtml;
+    if(vendido){
+      garHtml = e.garantiaVence
+        ? `<span style="font-size:.72rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`
+        : '<span style="color:var(--mut);font-size:.75rem">—</span>';
+    } else {
+      garHtml = e.garantiaDias > 0
+        ? `<span style="font-size:.75rem;color:var(--ok)">🛡 ${e.garantiaDias}d</span><br><span style="font-size:.65rem;color:var(--mut)">desde la venta</span>`
+        : '<span style="color:var(--mut);font-size:.75rem">Sin garantía</span>';
+    }
+
     const tipoChip = e.tipo==='nuevo'
       ? '<span class="bx bbl" style="font-size:.65rem">🆕 Nuevo</span>'
       : '<span class="bx byw" style="font-size:.65rem">📱 Usado</span>';
-    const vendidoChip = e.estado==='vendido' ? '<br><span class="bx bgx" style="font-size:.62rem">Vendido</span>' : '';
-    const margen = e.precio&&e.costo ? Math.round((e.precio-e.costo)/e.precio*100) : null;
+    const vendidoChip = vendido ? '<br><span class="bx bgx" style="font-size:.62rem">Vendido</span>' : '';
+    const notasTexto = e.notas ? esc(e.notas.length > 35 ? e.notas.slice(0,35)+'…' : e.notas) : '';
+
     return `<tr>
-    <td><strong>${esc(e.modelo)}</strong><br><span style="font-size:.7rem;color:var(--mut)">${esc(e.memoria||'')}${e.color?' · '+esc(e.color):''}</span>${e.notas?`<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.notas)}</span>`:''}${vendidoChip}</td>
+    <td><strong>${esc(e.modelo)}</strong><br><span style="font-size:.7rem;color:var(--mut)">${esc(e.memoria||'')}${e.color?' · '+esc(e.color):''}</span>${notasTexto?`<br><span style="font-size:.68rem;color:var(--mut)" title="${esc(e.notas||'')}">${notasTexto}</span>`:''}${vendidoChip}</td>
     <td class="col-hide" style="font-size:.72rem;font-family:monospace;color:var(--mut)">${esc(e.imei||'—')}</td>
     <td>${tipoChip}<br><span style="font-size:.68rem;color:var(--mut)">${esc(e.estadoFisico||'')}</span></td>
-    <td><strong>${fmt(e.precio)}</strong>${margen!==null?`<br><span style="font-size:.68rem;color:${margen>20?'var(--ok)':'var(--wrn)'}">${margen}%</span>`:''}</td>
-    <td class="col-hide">${garHtml}${e.garantiaVence?`<br><span style="font-size:.65rem;color:var(--mut)">${fD(e.garantiaVence)}</span>`:''}</td>
+    <td>${precioHtml}</td>
+    <td class="col-hide">${garHtml}</td>
     <td class="col-hide" style="font-size:.75rem">${e.provNombre?esc(e.provNombre):'<span style="color:var(--mut)">—</span>'}${e.provTel?`<br><span style="color:var(--mut);font-size:.68rem">${esc(e.provTel)}</span>`:''}</td>
     <td style="display:flex;gap:3px;flex-wrap:wrap">
-      ${e.estado!=='vendido'?`<button class="btn bs bsm" onclick="abrirVentaEquipo(${e.id})" title="Registrar venta">💸 Vender</button>`:''}
+      ${!vendido?`<button class="btn bs bsm" onclick="abrirVentaEquipo(${e.id})" title="Registrar venta">💸 Vender</button>`:''}
       <button class="btn be bsm" onclick="openM('mEquipo',${e.id})">✎</button>
       <button class="btn bd bsm" onclick="delEquipo(${e.id})">✕</button>
     </td></tr>`;
