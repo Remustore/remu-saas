@@ -12983,6 +12983,7 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
       rDash();
     } else {
       showToast('✓ Turno finalizado');
+      rCajas(); // refresh aunque sea precio=0
     }
     _showResenaWA(turnos[idx]);
     _mostrarNotaRapida(turnos[idx]);
@@ -13021,6 +13022,15 @@ function rFiadosPendientes(){
       </div>
     </div>`).join('')}
   </div>`;
+}
+
+function corregirPrecioTurno(id){
+  const turnos = typeof getTurnos==='function' ? getTurnos() : [];
+  const t = turnos.find(x=>String(x.id)===String(id));
+  if(!t) return;
+  const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[]};
+  window.__pendingFinalizarId = id;
+  _mostrarModalFinalizarConServicio(t, cfg.servicios||[]);
 }
 
 function cobrarFiado(id){
@@ -13319,7 +13329,10 @@ function rTurnos(){
       en_proceso:  `${_cobrarBtn}<button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button>`,
       terminado:   t.metodo==='Fiado'
         ? `<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.35);font-weight:700" onclick="cobrarFiado('${t.id}')">💰 Cobrar ${fmt(t.precio||0)}</button><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem" onclick="reagendarTurno('${t.id}')">🔄</button>`
-        : `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem;margin-left:4px" onclick="reagendarTurno('${t.id}')">🔄 Reagendar</button>`,
+        : (t.precio>0
+          ? `<span style="font-size:.72rem;color:var(--ok);font-weight:600">✓ Completado</span><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem;margin-left:4px" onclick="reagendarTurno('${t.id}')">🔄 Reagendar</button>`
+          : `<button class="btn bsm" style="background:rgba(201,148,76,.2);color:var(--wrn);border:1px solid rgba(201,148,76,.4);font-weight:600" onclick="corregirPrecioTurno('${t.id}')">💰 Registrar cobro</button><button class="btn bsm" style="background:rgba(76,142,201,.1);color:var(--inf);border:1px solid rgba(76,142,201,.25);font-size:.72rem;margin-left:4px" onclick="reagendarTurno('${t.id}')">🔄</button>`
+        ),
       no_vino:     `<span style="font-size:.72rem;color:var(--bad)">❌ No asistió</span>`,
     };
     return `<div class="card" style="${cardStyle}">
