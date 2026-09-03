@@ -10789,6 +10789,31 @@ function rCajas(){
     <span style="font-size:.9rem;font-weight:700;color:${_neto>=0?'var(--ok)':'var(--bad)'}">= ${fmt(_neto)}</span>
   </div>`;
 
+  // ── Banner: turnos terminados sin cobro registrado (solo para salones) ──
+  const _sinCobroEl = document.getElementById('cajaSinCobroAlert') || (() => {
+    const el = document.createElement('div'); el.id='cajaSinCobroAlert';
+    const grid = document.getElementById('cajasGrid');
+    if(grid) grid.parentNode.insertBefore(el, grid);
+    return el;
+  })();
+  if(esSalonCaja && typeof getTurnos==='function'){
+    const hoyAlerta = tod();
+    const sinCobro = getTurnos().filter(t=>t.fecha===hoyAlerta&&t.estado==='terminado'&&!(parseFloat(t.precio)>0));
+    if(sinCobro.length>0){
+      _sinCobroEl.innerHTML=`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(201,82,76,.08);border:1px solid rgba(201,82,76,.35);border-radius:9px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <span style="font-weight:700;color:var(--bad)">⚠ ${sinCobro.length} turno${sinCobro.length!==1?'s':''} sin monto registrado</span>
+          <span style="font-size:.78rem;color:var(--tx2);margin-left:8px">${sinCobro.map(t=>esc(t.cliente||'?')).join(', ')}</span>
+        </div>
+        <button class="btn bsm" style="background:rgba(201,82,76,.15);color:var(--bad);border:1px solid rgba(201,82,76,.3);white-space:nowrap" onclick="go('turnos')">Ver turnos →</button>
+      </div>`;
+    } else {
+      _sinCobroEl.innerHTML='';
+    }
+  } else {
+    _sinCobroEl.innerHTML='';
+  }
+
   // Adaptar select de caja en modal de movimientos
   const mcCajaSel = document.getElementById('mcCaja');
   if(mcCajaSel){
@@ -22688,6 +22713,17 @@ async function _mFCS_confirmar(){
 async function _mFCS_sinCobro(){
   var id = window.__pendingFinalizarId;
   if(id == null) return;
+  // Si el turno tiene precio conocido, pedir confirmación antes de registrar sin cobro
+  var turnos = typeof getTurnos==='function' ? getTurnos() : [];
+  var t = turnos.find(function(x){ return String(x.id)===String(id); });
+  var precioConocido = t ? (parseFloat(t.precio)||0) : 0;
+  var inputPrecio = parseFloat((document.getElementById('mFCS_precio')||{}).value||0)||0;
+  var precioFinal = inputPrecio || precioConocido;
+  if(precioFinal > 0){
+    if(!confirm('⚠ Este turno tiene un valor de '+fmt(precioFinal)+' asignado.\n¿Confirmar como "Sin cobro"?\n\nSi se realizó el servicio, usá "Registrar y finalizar" para que quede en la caja.')){
+      return; // cancelar — usuario vuelve al modal
+    }
+  }
   var srv = _mFCS_getServicio();
   _mFCS_cerrar();
   _mFCS_aplicarServicioAlTurno(id, srv, null, null);
