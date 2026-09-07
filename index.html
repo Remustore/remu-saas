@@ -15125,8 +15125,23 @@ function _rwS4(){
   return `<div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Tu cuenta</div>
     <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Con estos datos vas a acceder a tu panel de gestión.</div>
-    <div style="background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:12px 16px;margin-bottom:20px;font-size:.8rem;color:#c9a84c;line-height:1.5">
-      ⚡ <strong>Precio fundador $15.000/mes.</strong> Sin contratos. Cancelás cuando querés.
+    <div style="margin-bottom:20px">
+      <label style="${_OBL}">Elegí tu plan</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label id="rwPlanBasicoLbl" onclick="_rwSelectPlan('basico')" style="display:flex;flex-direction:column;gap:4px;background:rgba(201,168,76,.07);border:2px solid rgba(201,168,76,.35);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
+          <input type="radio" name="rwPlan" value="basico" style="display:none">
+          <span style="font-size:.7rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px">📦 Básico</span>
+          <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$25.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
+          <span style="font-size:.7rem;color:#a89880;line-height:1.4">Agenda · Caja · Fiados</span>
+        </label>
+        <label id="rwPlanCompletoLbl" onclick="_rwSelectPlan('completo')" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:2px solid var(--bor2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
+          <input type="radio" name="rwPlan" value="completo" style="display:none">
+          <span style="font-size:.7rem;font-weight:700;color:#4caf7d;text-transform:uppercase;letter-spacing:.5px">⭐ Completo</span>
+          <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$45.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
+          <span style="font-size:.7rem;color:#a89880;line-height:1.4">Todo incluido · Sin límites</span>
+        </label>
+      </div>
+      <div style="font-size:.7rem;color:#a89880;margin-top:6px">Sin contratos. Cancelás cuando querés.</div>
     </div>
     <label style="${_OBL}">Email</label>
     <input id="rwEmail" type="email" value="${esc(__rw.email)}" placeholder="tu@email.com" style="${_OB}margin-bottom:14px" autocomplete="email">
@@ -15151,6 +15166,13 @@ function _rwS4(){
     </div>
     <div style="text-align:center;margin-top:14px;font-size:.73rem;color:#a89880">¿Ya tenés cuenta? <a href="index.html" style="color:#c9a84c;text-decoration:none">Iniciar sesión →</a></div>
   </div>`;
+}
+function _rwSelectPlan(plan){
+  __rw.tier = plan;
+  const lblB = document.getElementById('rwPlanBasicoLbl');
+  const lblC = document.getElementById('rwPlanCompletoLbl');
+  if(lblB) lblB.style.borderColor = plan==='basico' ? 'rgba(201,168,76,.7)' : 'var(--bor2)';
+  if(lblC) lblC.style.borderColor = plan==='completo' ? '#4caf7d' : 'var(--bor2)';
 }
 function _rwS4Back(){
   __rw.email     = document.getElementById('rwEmail')?.value||'';
@@ -15180,7 +15202,7 @@ async function _rwFinish(btn){
     const trialHasta = new Date(Date.now()-1000).toISOString(); // vence de inmediato → pago desde día 1
     const {error:te} = await sb.from('tenants').insert({
       id: tenantId, nombre: __rw.nombre, rubro: __rw.rubro, email,
-      modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true, telefono:__rw.telefono||'', instagram:__rw.instagram||'', crm_estado:'nuevo', crm_notas:''},
+      modulos: {trial_hasta:trialHasta, pago_activo:false, auto_registro:true, telefono:__rw.telefono||'', instagram:__rw.instagram||'', crm_estado:'nuevo', crm_notas:'', tier:__rw.tier||'completo'},
       activo: true, created_at: new Date().toISOString()
     });
     if(te) throw new Error('Error al crear el negocio: '+(te.message||JSON.stringify(te)));
