@@ -3960,11 +3960,15 @@ async function loadTenants(){
     const autoReg = mods.auto_registro ? '<span style="font-size:.65rem;color:var(--inf);background:rgba(76,142,201,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,142,201,.2)">auto</span>' : '';
     const planBadge = mods.plan==='premium'
       ? '<span style="font-size:.65rem;color:#c9a84c;background:rgba(201,168,76,.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(201,168,76,.25);font-weight:700">🚀 PREMIUM</span>'
-      : mods.precio_mensual && mods.precio_mensual !== 15000
-        ? `<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">$${Number(mods.precio_mensual).toLocaleString('es-AR')}/mes</span>`
-        : mods.precio_mensual===15000
-          ? '<span style="font-size:.65rem;color:var(--mut);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">💎 Fundador</span>'
-          : '';
+      : mods.tier==='basico'
+        ? '<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor2);font-weight:600">📦 Básico</span>'
+        : mods.tier==='completo'
+          ? '<span style="font-size:.65rem;color:var(--ok);background:rgba(76,175,125,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,175,125,.25);font-weight:600">⭐ Completo</span>'
+          : mods.precio_mensual && mods.precio_mensual !== 15000
+            ? `<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">$${Number(mods.precio_mensual).toLocaleString('es-AR')}/mes</span>`
+            : mods.precio_mensual===15000
+              ? '<span style="font-size:.65rem;color:var(--mut);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">💎 Fundador</span>'
+              : '';
     const tel = mods.telefono || '';
     const telWa = tel.replace(/\D/g,'');
     const igRaw = mods.instagram || '';
@@ -4776,7 +4780,14 @@ async function editarTenant(id){
         </div>
 
         <div style="border-top:1px solid var(--bor);padding-top:14px;margin-top:4px">
-          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">⭐ Plan</div>
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">📋 Plan comercial</div>
+          <select id="etTier" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:6px">
+            <option value="completo" ${(mods.tier||'completo')==='completo'?'selected':''}>⭐ Completo — $45.000/mes · todos los módulos</option>
+            <option value="basico" ${mods.tier==='basico'?'selected':''}>📦 Básico — $25.000/mes · agenda + caja + fiados</option>
+          </select>
+          <div style="font-size:.71rem;color:var(--mut);margin-bottom:14px">Básico: sin historial de clientes, sin análisis, sin módulos extra. Completo: acceso a todo.</div>
+
+          <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">⭐ Plan Premium (heredado)</div>
           <div style="padding:8px 12px;background:${mods.plan==='premium'?'rgba(201,168,76,.1)':'var(--bg)'};border:1px solid ${mods.plan==='premium'?'rgba(201,168,76,.3)':'var(--bor2)'};border-radius:7px;margin-bottom:10px;font-size:.8rem">
             Plan actual: <strong style="color:${mods.plan==='premium'?'var(--gld)':'var(--tx)'}">${mods.plan==='premium'?'⭐ Premium':'📦 Esencial'}</strong>
             ${mods.plan==='premium'?`<button onclick="desactivarPremiumTenant('${id}')" style="margin-left:10px;padding:3px 8px;background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.3);border-radius:5px;font-size:.72rem;cursor:pointer">Desactivar</button>`:''}
@@ -4824,6 +4835,8 @@ async function guardarEdicionTenant(id){
   const premiumCode = document.getElementById('etPremiumCode')?.value.trim();
   if(premiumCode) mods.premium_code = premiumCode;
   else delete mods.premium_code;
+  const tier = document.getElementById('etTier')?.value || 'completo';
+  mods.tier = tier;
 
   const { error } = await sb.from('tenants').update({ nombre, rubro, modulos: mods }).eq('id', id);
   if(error){ alert('Error al guardar: ' + error.message); return; }
@@ -18355,6 +18368,20 @@ function aplicarModulosPorRubro(rubro){
   // Ocultar tab "Servicios" en Análisis para barberías/salones (no aplica reparaciones)
   const tabRep = document.getElementById('tabRep');
   if(tabRep) tabRep.style.display = (esBarberia || esSalon) ? 'none' : '';
+
+  // ── Control de plan (básico / completo) ──
+  // Sin tier asignado → se trata como completo para no romper clientes existentes
+  const tier = mods.tier || 'completo';
+  if(tier === 'basico'){
+    const lockNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
+    if(esBarberia || esSalon){
+      // Básico salón/barbería: queda agenda + caja + gastos. Sin historial, analisis, turnos fijos, lista de espera
+      lockNav('nav-clientes','nav-analisis','nav-turnosFijos','nav-listaEspera','nav-fichas');
+    } else if(esTaller){
+      // Básico taller: queda reparaciones + stock + ventas + gastos. Sin equipos, garantías, presupuestos, análisis
+      lockNav('nav-equipos','nav-garantias','nav-presupuestos','nav-analisis');
+    }
+  }
 }
 
 function applyBranding(){
