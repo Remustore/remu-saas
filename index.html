@@ -22609,7 +22609,8 @@ function _mostrarModalFinalizarConServicio(turno, servicios){
 
   var currentSrvId  = String(turno.servicioId || '');
   var currentSrv    = servicios.find(function(s){ return String(s.id) === currentSrvId; });
-  var currentPrecio = parseFloat(turno.precio) || (currentSrv ? parseFloat(currentSrv.precio) || 0 : 0);
+  // Prioridad: precio actual del servicio en config > precio guardado en el turno (puede estar desactualizado)
+  var currentPrecio = currentSrv ? (parseFloat(currentSrv.precio) || parseFloat(turno.precio) || 0) : (parseFloat(turno.precio) || 0);
   var hasSvcs       = servicios.length > 0;
 
   var iStyle = 'width:100%;background:#0a0a0a;border:1px solid #2e2e2e;color:#f5f0e8;padding:11px 14px;border-radius:8px;font-family:\'Outfit\',sans-serif;font-size:.88rem;outline:none;box-sizing:border-box';
