@@ -15253,10 +15253,21 @@ function _rwS6(){
         <button onclick="navigator.clipboard.writeText('${link}').then(()=>_rwToast('¡Link copiado!'))" style="flex-shrink:0;background:#c9a84c;color:#080808;border:none;border-radius:7px;padding:8px 12px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">Copiar</button>
       </div>
     </div>`;
+  const tierLabel = (__rw.tier||'completo')==='basico' ? 'Básico' : 'Completo';
+  const tierPrecio = (__rw.tier||'completo')==='basico' ? '25.000' : '45.000';
   return `<div style="text-align:center">
     <div style="font-size:3rem;margin-bottom:8px">🎉</div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${esc(__rw.nombre||'Tu negocio')} está listo</div>
-    <div style="font-size:.82rem;color:#a89880;margin-bottom:24px">Tu sistema está configurado y listo para recibir clientes</div>
+    <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Tu cuenta fue creada. Activá tu plan para acceder al sistema.</div>
+
+    <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.35);border-radius:14px;padding:20px;margin-bottom:22px;text-align:left">
+      <div style="font-size:.68rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">⚡ Activar suscripción</div>
+      <div style="font-size:.85rem;color:#f0ede6;margin-bottom:4px">Plan <strong>${tierLabel}</strong> · <strong>$${tierPrecio}/mes</strong></div>
+      <div style="font-size:.73rem;color:#a89880;margin-bottom:14px">Pago mensual automático · Sin contratos · Cancelás cuando querés</div>
+      <button id="rwPagarBtn" onclick="_rwActivarSuscripcion(this)" style="width:100%;background:#c9a84c;color:#080808;border:none;border-radius:9px;padding:13px;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Outfit',sans-serif;letter-spacing:.01em">
+        💳 Pagar con Mercado Pago →
+      </button>
+    </div>
 
     ${_card('🔗','Tu link de clientes — precios y turnos en uno', linkUnificado)}
 
@@ -15299,6 +15310,32 @@ function _rwS5(){
   </div>`;
 }
 
+async function _rwActivarSuscripcion(btn){
+  btn.disabled = true;
+  btn.textContent = 'Generando link de pago...';
+  try {
+    const res = await fetch('https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/create-mp-preference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId: __rw.tenantId,
+        tier:     __rw.tier || 'completo',
+        email:    __rw.email,
+        nombre:   __rw.nombre
+      })
+    });
+    const data = await res.json();
+    if(data.init_point){
+      window.location.href = data.init_point;
+    } else {
+      throw new Error(data.error || 'No se pudo generar el link de pago');
+    }
+  } catch(e){
+    btn.disabled = false;
+    btn.textContent = '💳 Pagar con Mercado Pago →';
+    _rwToast('Error: ' + (e.message || 'Intentá de nuevo'));
+  }
+}
 function _rwToast(msg){
   let t=document.getElementById('_rwToastEl');
   if(!t){t=document.createElement('div');t.id='_rwToastEl';t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e1e1e;border:1px solid #c9a84c;color:#f5f0e8;padding:10px 18px;border-radius:8px;font-size:.82rem;z-index:99999;font-family:Outfit,sans-serif;transition:opacity .3s';document.body.appendChild(t);}

@@ -36,11 +36,49 @@ serve(async (req) => {
     const tipo = url.searchParams.get('type') || '';
     const id   = url.searchParams.get('id')   || '';
 
-    // MP solo notifica suscripciones con type=subscription_preapproval
-    if (tipo !== 'subscription_preapproval' || !id) {
+    // Soportamos: autorización inicial (subscription_preapproval) y cobros mensuales (subscription_authorized_payment)
+    const esAutorizacion = tipo === 'subscription_preapproval';
+    const esRenovacion   = tipo === 'subscription_authorized_payment';
+    if ((!esAutorizacion && !esRenovacion) || !id) {
       return new Response('ignored', { status: 200, headers: cors });
     }
 
+    const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // ── Renovación mensual ─────────────────────────────────────────────────
+    if (esRenovacion) {
+      // Consultar pago autorizado para obtener el preapproval_id y el monto
+      const pagoRes = await fetch(`https://api.mercadopago.com/authorized_payments/${id}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      if (!pagoRes.ok) throw new Error(`MP API error pago: ${pagoRes.status}`);
+      const pago = await pagoRes.json();
+
+      // Buscar tenant por mp_sub_id (guardado en la activación inicial)
+      const subId = pago.preapproval_id;
+      if (!subId) return new Response('sin_preapproval_id', { status: 200, headers: cors });
+
+      const { data: tenantRen } = await sb
+        .from('tenants')
+        .select('id, nombre, modulos')
+        .filter('modulos->>mp_sub_id', 'eq', subId)
+        .maybeSingle();
+
+      if (!tenantRen) return new Response('tenant_no_encontrado_renovacion', { status: 200, headers: cors });
+
+      const nuevo = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000).toISOString(); // +32 días de margen
+      const modsRen = { ...(tenantRen.modulos || {}), pago_activo: true, trial_hasta: nuevo, ultimo_pago: new Date().toISOString() };
+      await sb.from('tenants').update({ modulos: modsRen }).eq('id', tenantRen.id);
+
+      const monto = pago.transaction_amount || 0;
+      await notificarPago(`[Renovación] ${tenantRen.nombre}`, monto, pago.payer?.email || '');
+      console.log(`[mp-webhook] Renovación procesada: ${tenantRen.id} | sub: ${subId}`);
+      return new Response(JSON.stringify({ ok: true, renovacion: tenantRen.id }), {
+        status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // ── Autorización inicial ────────────────────────────────────────────────
     // Consultar MP para verificar el estado real del pago
     const mpRes = await fetch(`https://api.mercadopago.com/preapproval/${id}`, {
       headers: { Authorization: `Bearer ${MP_TOKEN}` }
@@ -52,8 +90,6 @@ serve(async (req) => {
     if (mp.status !== 'authorized') {
       return new Response('not_authorized', { status: 200, headers: cors });
     }
-
-    const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
     // Identificar el tenant: primero por external_reference (si vino seteado),
     // si no por el email del pagador (columna tenants.email, o el email de su usuario en Auth)
