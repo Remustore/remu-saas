@@ -13346,7 +13346,10 @@ function rTurnos(){
       ? `margin-bottom:10px;border:2px solid var(--gld);border-radius:10px;background:rgba(201,168,76,.04)`
       : `margin-bottom:10px;border-left:3px solid ${borderColor}`;
     // Botones de acción según estado actual
-    const _cobrarBtn = `<button class="btn bsm" style="background:rgba(201,168,76,.2);color:var(--gld);border:1px solid rgba(201,168,76,.4);font-weight:600" onclick="cambiarEstadoTurno('${t.id}','terminado')">💰 Cobrar${t.precio>0?' '+fmt(t.precio):''}</button>`;
+    // Precio a mostrar: precio vigente del servicio en config (no el guardado al agendar, que puede estar desactualizado)
+    const _srvActual = (cfg.servicios||[]).find(s=>String(s.id)===String(t.servicioId));
+    const _precioMostrar = _srvActual ? (parseFloat(_srvActual.precio)||parseFloat(t.precio)||0) : (parseFloat(t.precio)||0);
+    const _cobrarBtn = `<button class="btn bsm" style="background:rgba(201,168,76,.2);color:var(--gld);border:1px solid rgba(201,168,76,.4);font-weight:600" onclick="cambiarEstadoTurno('${t.id}','terminado')">💰 Cobrar${_precioMostrar>0?' '+fmt(_precioMostrar):''}</button>`;
     const acciones = {
       pendiente:   `<button class="btn bsm" style="background:rgba(76,142,201,.15);color:var(--inf);border:1px solid rgba(76,142,201,.3)" onclick="cambiarEstadoTurno('${t.id}','confirmado')">✅ Confirmar</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
       confirmado:  `${_cobrarBtn}<button class="btn bsm" style="background:rgba(76,175,125,.15);color:var(--ok);border:1px solid rgba(76,175,125,.3)" onclick="cambiarEstadoTurno('${t.id}','llego')">🟢 Llegó</button><button class="btn bsm" style="background:rgba(201,82,76,.1);color:var(--bad);border:1px solid rgba(201,82,76,.25)" onclick="cambiarEstadoTurno('${t.id}','no_vino')">❌ No vino</button><button class="btn bd bsm" onclick="cancelarTurno('${t.id}')">✕</button>`,
