@@ -13084,17 +13084,25 @@ async function _confirmarCobrarFiado(id, metodo){
   const turnos = typeof getTurnos==='function' ? getTurnos() : [];
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
   if(idx===-1){ showToast('Turno no encontrado','err'); return; }
-  const turno = turnos[idx];
-  // Usar _sbId (UUID de Supabase) si está disponible; fallback al id local
-  const sbId = turno._sbId || id;
-  const { error } = await sb.from('turnos_solicitudes')
-    .update({ metodo })
-    .eq('id', sbId);
-  if(error){ showToast('Error al registrar el cobro: ' + (error.message||''), 'err'); return; }
-  // Actualizar caché local solo después de confirmar en Supabase
-  turnos[idx] = {...turno, metodo};
+
+  // Actualizar caché local PRIMERO para que cualquier upsert posterior use el valor correcto
+  turnos[idx] = {...turnos[idx], metodo};
   if(typeof saveTurnosLocal==='function') saveTurnosLocal(turnos);
+
+  // Persistir en Supabase — si tiene _sbId usamos update directo (columna metodo),
+  // si no, usamos upsert completo con el objeto ya actualizado
+  const sbId = turnos[idx]._sbId;
+  if(sbId && sb){
+    const {error} = await sb.from('turnos_solicitudes').update({ metodo }).eq('id', sbId);
+    if(error){ showToast('⚠ Error al guardar cobro: ' + (error.message||''), 'err'); return; }
+  } else if(typeof _upsertTurnoSb==='function'){
+    const res = await _upsertTurnoSb(turnos[idx]);
+    if(res && res.ok === false){ showToast('⚠ Error al guardar cobro','err'); return; }
+  }
+
   showToast('✓ Cobrado · ' + metodo);
+  if(typeof rFiadosPendientes==='function') rFiadosPendientes();
+  if(typeof rCajas==='function') rCajas();
   if(typeof rTurnos==='function') rTurnos();
   if(typeof rDash==='function') rDash();
 }
