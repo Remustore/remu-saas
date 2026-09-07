@@ -36,8 +36,9 @@ serve(async (req) => {
         transaction_amount: monto,
         currency_id:        'ARS',
       },
-      back_url: 'https://remugestion.ar?mp_ok=1',
-      status:   'pending',
+      back_url:         'https://remugestion.ar?mp_ok=1',
+      notification_url: 'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
+      status:           'pending',
     };
 
     const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
