@@ -18600,7 +18600,11 @@ async function silentRefresh(){
     const _vSinDup=[];const _tIds=new Set();
     for(const v of (ventas||[])){if(v.turnoId){if(!_tIds.has(v.turnoId)){_tIds.add(v.turnoId);_vSinDup.push(v);}}else{_vSinDup.push(v);}}
     S.ventas=_vSinDup;S.gastos=gastos;
-    S.reparaciones=reparaciones;S.precios=precios;S.meta=meta||0;
+    // Preservar reparaciones locales recientes que aún no aparecen en Supabase (race condition con dbUpsert)
+    const _repIds=new Set((reparaciones||[]).map(r=>r.id));
+    const _repLocales=(S.reparaciones||[]).filter(r=>!_repIds.has(r.id));
+    S.reparaciones=[...(reparaciones||[]),..._repLocales];
+    S.precios=precios;S.meta=meta||0;
     S.inversores=inversores;S.movimientos_inv=movimientos_inv;
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
