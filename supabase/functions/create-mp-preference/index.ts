@@ -1,6 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 
-const MP_TOKEN = Deno.env.get('MP_ACCESS_TOKEN') ?? '';
+const MP_TOKEN_PROD = Deno.env.get('MP_ACCESS_TOKEN')      ?? '';
+const MP_TOKEN_TEST = Deno.env.get('MP_ACCESS_TOKEN_TEST') ?? '';
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'content-type,authorization',
@@ -15,7 +17,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const { tenantId, tier, email, nombre } = await req.json();
+    const { tenantId, tier, email, nombre, test } = await req.json();
 
     if (!tenantId || !email) {
       return new Response(JSON.stringify({ error: 'Faltan parámetros' }), {
@@ -23,11 +25,15 @@ serve(async (req) => {
       });
     }
 
-    const monto      = PRECIOS[tier] ?? PRECIOS.completo;
+    const isTest     = test === true;
+    const token      = isTest ? MP_TOKEN_TEST : MP_TOKEN_PROD;
+    const monto      = isTest ? 100 : (PRECIOS[tier] ?? PRECIOS.completo); // $100 en prueba
     const planNombre = tier === 'basico' ? 'Plan Básico' : 'Plan Completo';
 
+    if (!token) throw new Error(isTest ? 'MP_ACCESS_TOKEN_TEST no configurado' : 'MP_ACCESS_TOKEN no configurado');
+
     const body = {
-      reason:             `remu gestión · ${planNombre} · ${nombre || tenantId}`,
+      reason:             `${isTest ? '[PRUEBA] ' : ''}remu gestión · ${planNombre} · ${nombre || tenantId}`,
       external_reference: tenantId,
       payer_email:        email,
       auto_recurring: {
@@ -43,7 +49,7 @@ serve(async (req) => {
 
     const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
       method:  'POST',
-      headers: { Authorization: `Bearer ${MP_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
     });
 
@@ -53,9 +59,9 @@ serve(async (req) => {
     }
 
     const mp = await mpRes.json();
-    console.log(`[create-mp-preference] Preferencia creada para ${tenantId} | tier: ${tier} | monto: ${monto}`);
+    console.log(`[create-mp-preference] ${isTest ? 'TEST ' : ''}Preferencia creada: ${tenantId} | tier: ${tier} | monto: $${monto}`);
 
-    return new Response(JSON.stringify({ init_point: mp.init_point, id: mp.id }), {
+    return new Response(JSON.stringify({ init_point: mp.init_point, id: mp.id, test: isTest }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
 

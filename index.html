@@ -4011,6 +4011,7 @@ async function loadTenants(){
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="editarTenant('${t.id}')">✎ Editar</button>
         <button class="sa-btn ${t.activo?'danger':'outline'}" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="toggleTenant('${t.id}',${t.activo})">${t.activo?'Desactivar':'Activar'}</button>
         <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:var(--gld);border-color:rgba(201,168,76,.4)" onclick="accederComoTenant('${t.id}')">→ Acceder</button>
+        <button class="sa-btn outline" style="margin:0;padding:3px 10px;font-size:.7rem;color:#9b59b6;border-color:rgba(155,89,182,.4)" onclick="testearPagoMp('${t.id}','${esc(t.email||'')}','${esc(mods.tier||'completo')}','${esc(t.nombre)}')">🧪 Probar pago</button>
         <button class="sa-btn danger" style="margin:0;padding:3px 10px;font-size:.7rem" onclick="eliminarTenantDefinitivo('${t.id}','${esc(t.nombre)}')">🗑 Eliminar</button>
       </div>
     </div>`;
@@ -4875,6 +4876,29 @@ async function eliminarTenantDefinitivo(id, nombre){
   } catch(e){
     alert('Error al eliminar: ' + (e?.message || e));
   }
+}
+
+async function testearPagoMp(tenantId, email, tier, nombre){
+  if(!email){ alert('Este tenant no tiene email registrado. Agregalo en Editar.'); return; }
+  const btn = event.target;
+  btn.disabled = true; btn.textContent = '⏳ Generando...';
+  try {
+    const res = await fetch('https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/create-mp-preference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tenantId, tier: tier||'completo', email, nombre, test: true })
+    });
+    const data = await res.json();
+    if(data.init_point){
+      window.open(data.init_point, '_blank');
+      showSaMsg('✓ Link de prueba generado ($100 ARS) — abrí la pestaña nueva', 'ok');
+    } else {
+      throw new Error(data.error || 'Sin init_point');
+    }
+  } catch(e){
+    showSaMsg('Error: ' + e.message, 'err');
+  }
+  btn.disabled = false; btn.textContent = '🧪 Probar pago';
 }
 
 async function accederComoTenant(id){
