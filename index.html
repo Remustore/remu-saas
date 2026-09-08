@@ -4607,47 +4607,51 @@ async function showTrialScreen(diasVencido){
   const waLink = document.getElementById('trialWaLink');
   if(waLink) waLink.href = `https://wa.me/${soporteTel}?text=${encodeURIComponent('Hola! Quiero activar mi suscripción de Remu Gestión — '+nombre)}`;
 
-  // Precio: tenant > localStorage > global config
+  // Precio según tier del tenant
+  const tier = currentTenant?.modulos?.tier || 'completo';
+  const precioTier = tier === 'basico' ? 25000 : 45000;
   const precioTenant = currentTenant?.modulos?.precio_mensual;
-  const precioLocal  = precioTenant || parseInt(localStorage.getItem('remu_mp_precio')) || 15000;
-  _actualizarPrecioTrial(precioLocal);
+  _actualizarPrecioTrial(precioTenant || precioTier, tier);
+  // Actualizar etiqueta del plan
+  const planLbl = document.querySelector('#trialScreen [style*="Plan completo"]');
+  if(planLbl) planLbl.textContent = tier === 'basico' ? 'Plan Básico' : 'Plan Completo';
   try {
     const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
     const cfg = data?.data;
-    const precioFinal = precioTenant || parseInt(cfg?.mp_precio) || 15000;
-    _actualizarPrecioTrial(precioFinal);
-    if(cfg?.mp_precio) localStorage.setItem('remu_mp_precio', String(cfg.mp_precio));
-    if(cfg?.mp_link)   localStorage.setItem('remu_mp_link', cfg.mp_link);
     if(cfg?.soporte_tel) localStorage.setItem('remu_soporte_tel', cfg.soporte_tel);
   } catch(e){}
 }
 
 // ── MERCADO PAGO ────────────────────────────────────────────────────
 async function iniciarPagoMP(){
-  // 1. Buscar link: modulos del tenant → localStorage → Supabase global
-  let mpLink = currentTenant?.modulos?.mp_link || localStorage.getItem('remu_mp_link') || '';
-  if(!mpLink){
-    try {
-      const { data } = await sb.from('precios').select('data').eq('id', MP_GLOBAL_ROW_ID).maybeSingle();
-      mpLink = data?.data?.mp_link || '';
-      if(mpLink) localStorage.setItem('remu_mp_link', mpLink); // cachear
-    } catch(e){}
+  const btn = document.getElementById('btnPagarMP');
+  if(btn){ btn.disabled=true; btn.textContent='Generando link de pago...'; }
+  try {
+    const res = await fetch('https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/create-mp-preference', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tenantId: currentTenant?.id,
+        tier:     currentTenant?.modulos?.tier || 'completo',
+        email:    currentTenant?.email || '',
+        nombre:   currentTenant?.nombre || ''
+      })
+    });
+    const data = await res.json();
+    if(data.init_point){
+      window.open(data.init_point, '_blank');
+      // Mostrar botón "Ya pagué" tras 8 segundos
+      setTimeout(() => {
+        const btnYa = document.getElementById('btnYaPague');
+        if(btnYa) btnYa.style.display = 'block';
+      }, 8000);
+    } else {
+      throw new Error(data.error || 'No se pudo generar el link');
+    }
+  } catch(e){
+    showToast('Error al generar el link: ' + e.message, 'err');
   }
-  if(!mpLink){
-    showToast('El link de pago no está configurado. Contactá soporte por WhatsApp.','err');
-    return;
-  }
-
-  // 2. Abrir checkout con ref del tenant y URL de retorno
-  const returnUrl = encodeURIComponent(window.location.origin + window.location.pathname + '?mp_ok=1');
-  const sep = mpLink.includes('?') ? '&' : '?';
-  window.open(mpLink + sep + 'ref=' + (currentTenant?.id||'') + '&back_url=' + returnUrl, '_blank');
-
-  // 3. Mostrar botón "Ya pagué" después de 5 segundos
-  setTimeout(() => {
-    const btn = document.getElementById('btnYaPague');
-    if(btn) btn.style.display = 'block';
-  }, 5000);
+  if(btn){ btn.disabled=false; btn.textContent='💳 Pagar con Mercado Pago →'; }
 }
 
 // Activa el tenant directo cuando el cliente confirma que pagó
