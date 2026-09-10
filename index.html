@@ -418,6 +418,10 @@ textarea{resize:vertical;min-height:70px;}
 .gsr-item .gsr-sub{font-size:.72rem;color:var(--tx2);}
 .gsr-empty{padding:16px;text-align:center;color:var(--mut);font-size:.8rem;}
 
+/* OFFLINE BANNER */
+#offlineBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:9990;background:#d97706;color:#fff;padding:9px 16px;text-align:center;font-size:.82rem;font-weight:500;letter-spacing:.01em;box-shadow:0 2px 8px rgba(0,0,0,.25);}
+#offlineBanner span{opacity:.8;font-size:.78rem;margin-left:8px;}
+
 /* TOAST */
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--car2);border:1px solid var(--gld);color:var(--tx);padding:10px 20px;border-radius:10px;font-size:.82rem;z-index:500;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
@@ -552,6 +556,12 @@ textarea{resize:vertical;min-height:70px;}
 
 <!-- TOAST -->
 <div id="toast"></div>
+
+<!-- OFFLINE BANNER -->
+<div id="offlineBanner">
+  ⚠️ Sin conexión al servidor — trabajando en modo local. Los cambios se guardarán cuando vuelva la conexión.
+  <span id="offlineBannerRetry"></span>
+</div>
 
 <!-- Botón flotante "Reportar problema" — visible solo dentro de la app -->
 <button id="btnReportarBug" onclick="reportarProblema()" title="Reportar un problema"
@@ -3138,6 +3148,45 @@ let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 function setSyncing(){ document.getElementById('syncDot').className='sync-dot syncing'; document.getElementById('syncTxt').textContent='Guardando...'; }
 function setSynced(msg){ document.getElementById('syncDot').className='sync-dot'; document.getElementById('syncTxt').textContent='Conectado'; if(msg) showToast(msg,'ok'); }
 function setSyncErr(detalle){ document.getElementById('syncDot').style.background='var(--bad)'; document.getElementById('syncTxt').textContent='Error'; showToast('Error al guardar' + (detalle ? ': ' + detalle : ''), 'err'); }
+
+// ── HEALTH CHECK — detecta si Supabase es alcanzable ──────────────────────────
+let _sbIsOffline = false;
+function _setSbOnlineState(online){
+  const banner = document.getElementById('offlineBanner');
+  if(!banner) return;
+  if(!online && !_sbIsOffline){
+    _sbIsOffline = true;
+    banner.style.display = 'block';
+    const dot = document.getElementById('syncDot');
+    const txt = document.getElementById('syncTxt');
+    if(dot) dot.style.background = 'var(--bad)';
+    if(txt) txt.textContent = 'Sin conexión';
+  } else if(online && _sbIsOffline){
+    _sbIsOffline = false;
+    banner.style.display = 'none';
+    const dot = document.getElementById('syncDot');
+    const txt = document.getElementById('syncTxt');
+    if(dot){ dot.style.background=''; dot.className='sync-dot'; }
+    if(txt) txt.textContent = 'Conectado';
+    showToast('✅ Conexión restaurada', 'ok');
+  }
+}
+async function _pingSupabase(){
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6000);
+    const res = await fetch(SURL + '/rest/v1/', {
+      headers: { apikey: SKEY },
+      signal: ctrl.signal
+    });
+    clearTimeout(t);
+    _setSbOnlineState(true);
+  } catch(e){ _setSbOnlineState(false); }
+}
+window.addEventListener('offline', () => _setSbOnlineState(false));
+window.addEventListener('online',  () => _pingSupabase());
+setTimeout(_pingSupabase, 3000);           // primer check a los 3s del load
+setInterval(_pingSupabase, 45000);         // luego cada 45s
 
 let toastTimer;
 function showToast(msg, type='ok'){
