@@ -23403,6 +23403,9 @@ async function _mFCS_fiado(){
           if(!finals[locales[li].estado] && locales[li].estado !== s.estado){
             locales[li].estado = s.estado; changed = true;
           }
+          if(s.origen==='admin' && locales[li].notas==='Turno solicitado online'){
+            locales[li].notas = ''; changed = true;
+          }
           return;
         }
         if(finals[s.estado]) return;
