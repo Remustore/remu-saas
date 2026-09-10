@@ -1047,6 +1047,7 @@ $$;</pre>
   <div class="ni" onclick="go('fichasClientes')" id="nav-fichas" style="display:none"><span class="nico"><i data-lucide="file-text"></i></span>Fichas</div>
   <div class="ni" onclick="go('turnosFijos')" id="nav-turnosFijos" style="display:none"><span class="nico"><i data-lucide="lock"></i></span>Turnos fijos</div>
   <div class="ni" onclick="go('listaEspera')" id="nav-listaEspera" style="display:none"><span class="nico"><i data-lucide="clock"></i></span>Lista de espera</div>
+  <div class="ni" onclick="go('ranking')" id="nav-ranking" style="display:none"><span class="nico"><i data-lucide="trophy"></i></span>Ranking</div>
   <div class="ni" onclick="go('objetivosCompra')" id="nav-objetivosCompra" style="display:none"><span class="nico"><i data-lucide="target"></i></span>Objetivos de compra</div>
   <div class="ns" id="nav-sep-config" style="display:none">Configuración</div>
   <div class="ni" onclick="go('turnosConfig')" id="nav-turnosConfig" style="display:none"><span class="nico"><i data-lucide="settings"></i></span>Configuración</div>
@@ -1456,8 +1457,8 @@ $$;</pre>
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:2px">
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <div>
-            <div class="pt">Turnos</div>
-            <div class="ps" style="margin-bottom:0">Agenda del salón</div>
+            <div class="pt" id="turnosPageTitle">Turnos</div>
+            <div class="ps" style="margin-bottom:0" id="turnosPageSub">Agenda del salón</div>
           </div>
           <div id="ocupacionBadge" style="display:none"></div>
         </div>
@@ -1744,6 +1745,21 @@ $$;</pre>
         </div>
       </div>
       <div id="listaEsperaList"></div>
+    </div>
+
+    <!-- RANKING CANCHAS -->
+    <div class="sec" id="sec-ranking">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div>
+          <div class="pt">🏆 Ranking del mes</div>
+          <div class="ps" style="margin-bottom:0">Top jugadores por horas jugadas este mes</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <select id="rankingMesSelect" onchange="rRanking()" style="background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:7px 10px;border-radius:7px;font-size:.82rem;outline:none"></select>
+          <button class="btn bg bsm" onclick="rRanking()">↺ Actualizar</button>
+        </div>
+      </div>
+      <div id="rankingContent"><div style="color:var(--mut);text-align:center;padding:40px">Cargando ranking...</div></div>
     </div>
 
     <!-- OBJETIVOS DE COMPRA -->
@@ -3146,6 +3162,13 @@ function esNegocioTurnos(rubro){
   const r = (rubro||'').toLowerCase();
   return /salon|salón|belleza|peluq|barber|manicur|uña|una|estetic|estétic|spa|maquilla|pestañ|nail/.test(r);
 }
+function esCancha(rubro){
+  const r = (rubro||'').toLowerCase();
+  return /cancha|padel|pádel|futbol|fútbol|deporti/.test(r);
+}
+// Labels adaptativos según rubro
+function _lblCancha(){ return esCancha(currentTenant?.rubro) ? 'cancha' : 'profesional'; }
+function _lblCanchas(){ return esCancha(currentTenant?.rubro) ? 'Canchas' : 'Profesionales'; }
 
 // ═══ ESTADO GLOBAL ═══
 let currentUser = null;    // usuario Supabase Auth
@@ -6642,7 +6665,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, presupuestos:rPresupuestos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, presupuestos:rPresupuestos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria, ranking:rRanking };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -13393,6 +13416,12 @@ function rTurnos(){
   if(!fechaEl.value) fechaEl.value = tod();
   const fecha = fechaEl.value;
   const cfg = getTurnosCfg();
+  // Adaptar labels para canchas
+  const _esCancha_ = esCancha(currentTenant?.rubro);
+  const tTitle = document.getElementById('turnosPageTitle');
+  const tSub   = document.getElementById('turnosPageSub');
+  if(tTitle) tTitle.textContent = _esCancha_ ? 'Reservas' : 'Turnos';
+  if(tSub)   tSub.textContent  = _esCancha_ ? 'Agenda de canchas' : 'Agenda del salón';
   let turnos = getTurnos().filter(t=>t.fecha===fecha && t.estado!=='cancelado');
   if(turnosFiltroEmpleado.startsWith('auto_')){
     const nombre = turnosFiltroEmpleado.replace('auto_','');
@@ -13402,9 +13431,10 @@ function rTurnos(){
   }
   turnos.sort((a,b)=>a.hora.localeCompare(b.hora));
 
-  // Update empleado tabs (con indicador 🚫 si tiene bloqueo ese día)
+  // Update empleado/cancha tabs
+  const _esCancha = esCancha(currentTenant?.rubro);
   const tabsEl = document.getElementById('empleadoTabs');
-  tabsEl.innerHTML = `<button class="tab ${turnosFiltroEmpleado==='todos'?'active':''}" onclick="setEmpleadoFiltro('todos',this)">Todos</button>` +
+  tabsEl.innerHTML = `<button class="tab ${turnosFiltroEmpleado==='todos'?'active':''}" onclick="setEmpleadoFiltro('todos',this)">${_esCancha?'Todas':'Todos'}</button>` +
     cfg.empleados.map(e=>{
       const blqDia = tieneBloqueoEnDia(e.bloqueos||[], fecha);
       return `<button class="tab ${turnosFiltroEmpleado==e.id?'active':''}" onclick="setEmpleadoFiltro('${e.id}',this)">${e.nombre}${blqDia?'&nbsp;🚫':''}</button>`;
@@ -17481,6 +17511,88 @@ function eliminarEspera(id){
   showToast('Eliminado de la lista ✓');
 }
 
+// ── RANKING CANCHAS ──────────────────────────────────────────────────────────
+async function rRanking(){
+  const el = document.getElementById('rankingContent');
+  const sel = document.getElementById('rankingMesSelect');
+  if(!el) return;
+
+  // Poblar select de meses (últimos 6)
+  if(sel && !sel.options.length){
+    const hoy = new Date();
+    for(let i=0;i<6;i++){
+      const d = new Date(hoy.getFullYear(), hoy.getMonth()-i, 1);
+      const val = d.toISOString().slice(0,7);
+      const lbl = d.toLocaleString('es-AR',{month:'long',year:'numeric'});
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+      sel.appendChild(opt);
+    }
+  }
+  const mes = sel ? sel.value : new Date().toISOString().slice(0,7);
+
+  el.innerHTML = '<div style="color:var(--mut);text-align:center;padding:30px">Cargando...</div>';
+  try {
+    const desde = mes+'-01';
+    const hasta = mes+'-31';
+    const { data, error } = await sb.from('turnos_solicitudes')
+      .select('nombre,duracion,estado')
+      .eq('tenant_id', currentTenant.id)
+      .in('estado',['terminado'])
+      .gte('fecha', desde)
+      .lte('fecha', hasta);
+
+    if(error) throw error;
+    if(!data||!data.length){
+      el.innerHTML='<div style="color:var(--mut);text-align:center;padding:40px">Sin datos para este mes</div>';
+      return;
+    }
+
+    // Agrupar por nombre
+    const map = {};
+    data.forEach(t=>{
+      const n = (t.nombre||'').trim();
+      if(!n) return;
+      if(!map[n]) map[n]={nombre:n, turnos:0, minutos:0};
+      map[n].turnos++;
+      map[n].minutos += parseInt(t.duracion)||60;
+    });
+
+    const lista = Object.values(map).sort((a,b)=>b.minutos-a.minutos);
+    const medallas = ['🥇','🥈','🥉'];
+    const mesLabel = sel ? sel.options[sel.selectedIndex]?.text : mes;
+
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:14px;border-left:3px solid var(--gld)">
+        <div style="font-size:.78rem;color:var(--tx2)">
+          🏆 Ranking basado en horas jugadas marcadas como terminadas en <strong>${mesLabel}</strong>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${lista.map((j,i)=>{
+          const hrs = Math.floor(j.minutos/60);
+          const mins = j.minutos%60;
+          const durLabel = hrs>0 ? (mins>0 ? `${hrs}h ${mins}min` : `${hrs}h`) : `${j.minutos}min`;
+          const medal = medallas[i] || `<span style="color:var(--tx2);font-size:.9rem">#${i+1}</span>`;
+          const isMedal = i<3;
+          return `<div style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid ${isMedal?'var(--gld)':'var(--bor)'};border-radius:10px;padding:12px 14px;${i===0?'box-shadow:0 0 0 1px var(--gld)33':''}">
+            <div style="font-size:${isMedal?'1.6rem':'1rem'};min-width:32px;text-align:center">${medal}</div>
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:.9rem;color:var(--tx)">${esc(j.nombre)}</div>
+              <div style="font-size:.75rem;color:var(--tx2);margin-top:2px">${j.turnos} reserva${j.turnos!==1?'s':''}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:1rem;font-weight:700;color:${i===0?'var(--gld)':'var(--tx)'}">${durLabel}</div>
+              <div style="font-size:.7rem;color:var(--mut)">jugadas</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+  } catch(e){
+    el.innerHTML=`<div style="color:var(--bad);text-align:center;padding:30px">Error al cargar ranking: ${e.message}</div>`;
+  }
+}
+
 function rListaEspera(){
   const el = document.getElementById('listaEsperaList');
   if(!el) return;
@@ -18492,7 +18604,7 @@ function aplicarModulosPorRubro(rubro){
    'nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-fichas',
    'nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config',
    'nav-auditoria','nav-turnosTec','nav-listaEspera','nav-objetivosCompra',
-   'nav-agendaTecnico','nav-inversores'
+   'nav-agendaTecnico','nav-inversores','nav-ranking'
   ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
 
   const showNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
@@ -18500,7 +18612,17 @@ function aplicarModulosPorRubro(rubro){
   // Todo oculto por defecto (ya están ocultos en el HTML con display:none)
   // Sólo mostramos lo que corresponde al rubro
 
-  if(esTaller){
+  const esCancha_ = esCancha(rubro);
+
+  if(esCancha_){
+    // 🏟 CANCHAS DE FÚTBOL / PÁDEL
+    showNav('nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config','nav-ranking');
+    // Renombrar label del nav de agenda
+    const navTurnos = document.getElementById('nav-turnos');
+    if(navTurnos){ const sp = navTurnos.querySelector('span:last-child'); if(sp && !sp.classList.contains('nico')) sp.textContent='Agenda de canchas'; }
+    const navFijos = document.getElementById('nav-turnosFijos');
+    if(navFijos){ const sp = navFijos.querySelector('span:last-child'); if(sp && !sp.classList.contains('nico')) sp.textContent='Reservas fijas'; }
+  } else if(esTaller){
     // 🔧 TALLER DE CELULARES / SERVICIO TÉCNICO / ACCESORIOS
     showNav('nav-taller','nav-equipos','nav-garantias','nav-presupuestos','nav-stock','nav-ventas','nav-pedidos','nav-gastos','nav-analisis','nav-precios');
   } else if(esGomeria){
@@ -18796,7 +18918,7 @@ async function silentRefresh(){
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
     S.movCaja=movCaja||[];
     const active=document.querySelector('.sec.active');
-    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores,cubiertas:rCubiertas,clientesGomeria:rClientesGomeria};if(renders[id])renders[id]();}
+    if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores,cubiertas:rCubiertas,clientesGomeria:rClientesGomeria,ranking:rRanking};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
     // Siempre actualizar badge de reservas pendientes (independiente de qué sección está activa)
     refreshBadgeSolicitudes();
