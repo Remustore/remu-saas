@@ -23457,7 +23457,7 @@ async function _mFCS_fiado(){
           }
           return;
         }
-        if(finals[s.estado]) return;
+        if(finals[s.estado] && s.fecha < hoy) return;
         var srv = (s.servicio_id && s.servicio_id!=='__aconfirmar__')
           ? (cfg.servicios||[]).find(function(x){ return String(x.id)===String(s.servicio_id); }) : null;
         var emp = s.empleado_id
