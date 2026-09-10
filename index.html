@@ -421,6 +421,10 @@ textarea{resize:vertical;min-height:70px;}
 /* OFFLINE BANNER */
 #offlineBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:9990;background:#d97706;color:#fff;padding:9px 16px;text-align:center;font-size:.82rem;font-weight:500;letter-spacing:.01em;box-shadow:0 2px 8px rgba(0,0,0,.25);}
 #offlineBanner span{opacity:.8;font-size:.78rem;margin-left:8px;}
+/* SAVE ERROR BANNER */
+#saveErrBanner{display:none;position:fixed;bottom:0;left:0;right:0;z-index:9985;background:#b91c1c;color:#fff;padding:12px 16px;align-items:center;justify-content:space-between;gap:12px;font-size:.83rem;font-weight:500;box-shadow:0 -3px 12px rgba(0,0,0,.3);}
+#saveErrBanner button{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:5px 13px;border-radius:6px;font-size:.78rem;cursor:pointer;white-space:nowrap;flex-shrink:0;}
+#saveErrBanner button:hover{background:rgba(255,255,255,.3);}
 
 /* TOAST */
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--car2);border:1px solid var(--gld);color:var(--tx);padding:10px 20px;border-radius:10px;font-size:.82rem;z-index:500;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;}
@@ -561,6 +565,12 @@ textarea{resize:vertical;min-height:70px;}
 <div id="offlineBanner">
   ⚠️ Sin conexión al servidor — trabajando en modo local. Los cambios se guardarán cuando vuelva la conexión.
   <span id="offlineBannerRetry"></span>
+</div>
+
+<!-- SAVE ERROR BANNER -->
+<div id="saveErrBanner">
+  <span id="saveErrMsg">❌ No se pudo guardar el turno.</span>
+  <button onclick="_ocultarErrorGuardado()">✕ Entendido</button>
 </div>
 
 <!-- Botón flotante "Reportar problema" — visible solo dentro de la app -->
@@ -3149,6 +3159,19 @@ function setSyncing(){ document.getElementById('syncDot').className='sync-dot sy
 function setSynced(msg){ document.getElementById('syncDot').className='sync-dot'; document.getElementById('syncTxt').textContent='Conectado'; if(msg) showToast(msg,'ok'); }
 function setSyncErr(detalle){ document.getElementById('syncDot').style.background='var(--bad)'; document.getElementById('syncTxt').textContent='Error'; showToast('Error al guardar' + (detalle ? ': ' + detalle : ''), 'err'); }
 
+// ── ERROR DE GUARDADO PERSISTENTE ─────────────────────────────────────────────
+function _mostrarErrorGuardado(msg){
+  const banner = document.getElementById('saveErrBanner');
+  const msgEl  = document.getElementById('saveErrMsg');
+  if(!banner){ showToast(msg,'err'); return; }
+  if(msgEl) msgEl.textContent = msg;
+  banner.style.display = 'flex';
+}
+function _ocultarErrorGuardado(){
+  const b = document.getElementById('saveErrBanner');
+  if(b) b.style.display = 'none';
+}
+
 // ── HEALTH CHECK — detecta si Supabase es alcanzable ──────────────────────────
 let _sbIsOffline = false;
 function _setSbOnlineState(online){
@@ -3168,6 +3191,7 @@ function _setSbOnlineState(online){
     const txt = document.getElementById('syncTxt');
     if(dot){ dot.style.background=''; dot.className='sync-dot'; }
     if(txt) txt.textContent = 'Conectado';
+    _ocultarErrorGuardado();
     showToast('✅ Conexión restaurada', 'ok');
   }
 }
@@ -12903,7 +12927,7 @@ async function saveTurno(_override){
   const sbResult = await _upsertTurnoSb(obj);
   if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=id?'Guardar cambios':'Agendar turno'; }
   if(!sbResult?.ok){
-    showToast('❌ No se pudo guardar: '+(sbResult?.error||'sin conexión')+'. Revisá tu internet e intentá de nuevo.','err');
+    _mostrarErrorGuardado('❌ No se pudo guardar el turno. Revisá tu internet e intentá de nuevo.');
     return;
   }
   // Solo actualiza el caché local DESPUÉS de confirmar Supabase
@@ -12976,7 +13000,7 @@ function cancelarTurno(id){
     if(turno){
       const sbResult = await _updateEstadoSb(turno,'cancelado');
       if(sbResult && sbResult.ok === false){
-        showToast('❌ No se pudo eliminar: sin conexión. Intentá de nuevo.','err');
+        _mostrarErrorGuardado('❌ No se pudo eliminar el turno. Revisá tu internet e intentá de nuevo.');
         return;
       }
     }
@@ -13061,7 +13085,7 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   // ── SUPABASE PRIMERO ────────────────────────────────────────────────────
   const sbResult = await _updateEstadoSb(turnoAntes, nuevoEstado, _precio, _metodo);
   if(sbResult && sbResult.ok === false){
-    showToast('❌ No se pudo actualizar: sin conexión. Intentá de nuevo.','err');
+    _mostrarErrorGuardado('❌ No se pudo actualizar el estado del turno. Revisá tu internet e intentá de nuevo.');
     return;
   }
   // Solo actualiza el caché local DESPUÉS de confirmar Supabase
