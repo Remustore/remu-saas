@@ -23418,7 +23418,7 @@ async function _mFCS_fiado(){
           servicioId:s.servicio_id||'',
           servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(srv?srv.nombre:(s.servicio_id||'Servicio')),
           sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30, precio:srv?(srv.precio||0):0,
-          notas:s.servicio_id==='__aconfirmar__'?'Definir servicio al llegar el cliente':'Turno solicitado online',
+          notas:s.servicio_id==='__aconfirmar__'?'Definir servicio al llegar el cliente':(s.origen==='admin'?'':'Turno solicitado online'),
           estado:s.estado, creadoEn:s.created_at||new Date().toISOString()
         });
         changed = true;
