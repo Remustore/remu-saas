@@ -9,6 +9,7 @@ const cors = {
 };
 
 const PRECIOS: Record<string, number> = {
+  fundador: 15000,
   basico:   25000,
   completo: 45000,
 };

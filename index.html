@@ -4056,15 +4056,17 @@ async function loadTenants(){
     const autoReg = mods.auto_registro ? '<span style="font-size:.65rem;color:var(--inf);background:rgba(76,142,201,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,142,201,.2)">auto</span>' : '';
     const planBadge = mods.plan==='premium'
       ? '<span style="font-size:.65rem;color:#c9a84c;background:rgba(201,168,76,.12);padding:1px 6px;border-radius:4px;border:1px solid rgba(201,168,76,.25);font-weight:700">🚀 PREMIUM</span>'
-      : mods.tier==='basico'
-        ? '<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor2);font-weight:600">📦 Básico</span>'
-        : mods.tier==='completo'
-          ? '<span style="font-size:.65rem;color:var(--ok);background:rgba(76,175,125,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,175,125,.25);font-weight:600">⭐ Completo</span>'
-          : mods.precio_mensual && mods.precio_mensual !== 15000
-            ? `<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">$${Number(mods.precio_mensual).toLocaleString('es-AR')}/mes</span>`
-            : mods.precio_mensual===15000
-              ? '<span style="font-size:.65rem;color:var(--mut);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">💎 Fundador</span>'
-              : '';
+      : mods.tier==='fundador'
+        ? '<span style="font-size:.65rem;color:#c9a84c;background:rgba(201,168,76,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(201,168,76,.3);font-weight:700">⚡ Fundador</span>'
+        : mods.tier==='basico'
+          ? '<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor2);font-weight:600">📦 Básico</span>'
+          : mods.tier==='completo'
+            ? '<span style="font-size:.65rem;color:var(--ok);background:rgba(76,175,125,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(76,175,125,.25);font-weight:600">⭐ Completo</span>'
+            : mods.precio_mensual && mods.precio_mensual !== 15000
+              ? `<span style="font-size:.65rem;color:var(--tx2);background:var(--bg);padding:1px 6px;border-radius:4px;border:1px solid var(--bor)">$${Number(mods.precio_mensual).toLocaleString('es-AR')}/mes</span>`
+              : mods.precio_mensual===15000
+                ? '<span style="font-size:.65rem;color:#c9a84c;background:rgba(201,168,76,.1);padding:1px 6px;border-radius:4px;border:1px solid rgba(201,168,76,.3);font-weight:700">⚡ Fundador</span>'
+                : '';
     const tel = mods.telefono || '';
     const telWa = tel.replace(/\D/g,'');
     const igRaw = mods.instagram || '';
@@ -4705,7 +4707,7 @@ async function showTrialScreen(diasVencido){
 
   // Precio según tier del tenant
   const tier = currentTenant?.modulos?.tier || 'completo';
-  const precioTier = tier === 'basico' ? 25000 : 45000;
+  const precioTier = tier === 'fundador' ? 15000 : tier === 'basico' ? 25000 : 45000;
   const precioTenant = currentTenant?.modulos?.precio_mensual;
   _actualizarPrecioTrial(precioTenant || precioTier, tier);
   // Actualizar etiqueta del plan
@@ -4885,8 +4887,9 @@ async function editarTenant(id){
           <select id="etTier" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:6px">
             <option value="completo" ${(mods.tier||'completo')==='completo'?'selected':''}>⭐ Completo — $45.000/mes · todos los módulos</option>
             <option value="basico" ${mods.tier==='basico'?'selected':''}>📦 Básico — $25.000/mes · agenda + caja + fiados</option>
+            <option value="fundador" ${mods.tier==='fundador'?'selected':''}>⚡ Fundador — $15.000/mes · primeros 10 clientes</option>
           </select>
-          <div style="font-size:.71rem;color:var(--mut);margin-bottom:14px">Básico: sin historial de clientes, sin análisis, sin módulos extra. Completo: acceso a todo.</div>
+          <div style="font-size:.71rem;color:var(--mut);margin-bottom:14px">Fundador: precio especial para los primeros 10 clientes. Mismo acceso que Básico.</div>
 
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">⭐ Plan Premium (heredado)</div>
           <div style="padding:8px 12px;background:${mods.plan==='premium'?'rgba(201,168,76,.1)':'var(--bg)'};border:1px solid ${mods.plan==='premium'?'rgba(201,168,76,.3)':'var(--bor2)'};border-radius:7px;margin-bottom:10px;font-size:.8rem">
@@ -15103,6 +15106,7 @@ function _rwR(){
   const pct = Math.min(s * 25, 100);
   const label = s <= 4 ? `Paso ${s} de 4` : '';
   const body = s===1?_rwS1():s===2?_rwS2():s===3?_rwS3():s===4?_rwS4():s===6?_rwS6():_rwS5();
+  if(s===4) setTimeout(_rwS4init, 50);
   const center = s===5||s===6;
   scr.innerHTML = `
     <div style="min-height:100vh;color:#f5f0e8;display:flex;flex-direction:column;font-family:'Outfit',sans-serif">
@@ -15251,26 +15255,63 @@ function _rwS3Next(){
   __rw.step=4; _rwR();
 }
 
+// Verifica cuántos cupos fundador quedan (máx 10)
+async function _checkCuposFundador(){
+  try {
+    const { count } = await sb.from('tenants')
+      .select('id', { count:'exact', head:true })
+      .filter('modulos->>tier','eq','fundador');
+    return Math.max(0, 20 - (count||0));
+  } catch(e){ return 0; }
+}
+
 // ── Paso 4: Email y contraseña del dueño ─────────────────────────────────
+async function _rwS4init(){
+  const cupos = await _checkCuposFundador();
+  __rw._cuposFundador = cupos;
+  const lbl = document.getElementById('rwPlanFundadorLbl');
+  const badge = document.getElementById('rwFundadorBadge');
+  if(lbl){
+    if(cupos > 0){
+      lbl.style.display = 'flex';
+      if(badge) badge.textContent = `⚡ Quedan ${cupos} cupos`;
+    } else {
+      lbl.style.display = 'none';
+      // Si tenía fundador seleccionado y ya no hay cupos, resetear
+      if(__rw.tier === 'fundador'){ __rw.tier = 'basico'; _rwSelectPlan('basico'); }
+    }
+  }
+}
 function _rwS4(){
   return `<div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Tu cuenta</div>
     <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Con estos datos vas a acceder a tu panel de gestión.</div>
     <div style="margin-bottom:20px">
       <label style="${_OBL}">Elegí tu plan</label>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <label id="rwPlanBasicoLbl" onclick="_rwSelectPlan('basico')" style="display:flex;flex-direction:column;gap:4px;background:rgba(201,168,76,.07);border:2px solid rgba(201,168,76,.35);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
-          <input type="radio" name="rwPlan" value="basico" style="display:none">
-          <span style="font-size:.7rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px">📦 Básico</span>
-          <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$25.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
-          <span style="font-size:.7rem;color:#a89880;line-height:1.4">Agenda · Caja · Fiados</span>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label id="rwPlanFundadorLbl" onclick="_rwSelectPlan('fundador')" style="display:none;flex-direction:column;gap:4px;background:rgba(201,168,76,.1);border:2px solid rgba(201,168,76,.5);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
+          <input type="radio" name="rwPlan" value="fundador" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:.7rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px">⚡ Precio Fundador</span>
+            <span id="rwFundadorBadge" style="font-size:.62rem;background:rgba(201,168,76,.2);color:#c9a84c;border:1px solid rgba(201,168,76,.4);padding:1px 7px;border-radius:10px;font-weight:700"></span>
+          </div>
+          <span style="font-size:1.15rem;font-weight:800;color:#f0ede6">$15.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
+          <span style="font-size:.7rem;color:#a89880;line-height:1.4">Precio especial · Agenda · Caja · Fiados</span>
         </label>
-        <label id="rwPlanCompletoLbl" onclick="_rwSelectPlan('completo')" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:2px solid var(--bor2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
-          <input type="radio" name="rwPlan" value="completo" style="display:none">
-          <span style="font-size:.7rem;font-weight:700;color:#4caf7d;text-transform:uppercase;letter-spacing:.5px">⭐ Completo</span>
-          <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$45.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
-          <span style="font-size:.7rem;color:#a89880;line-height:1.4">Todo incluido · Sin límites</span>
-        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label id="rwPlanBasicoLbl" onclick="_rwSelectPlan('basico')" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:2px solid var(--bor2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
+            <input type="radio" name="rwPlan" value="basico" style="display:none">
+            <span style="font-size:.7rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px">📦 Básico</span>
+            <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$25.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
+            <span style="font-size:.7rem;color:#a89880;line-height:1.4">Agenda · Caja · Fiados</span>
+          </label>
+          <label id="rwPlanCompletoLbl" onclick="_rwSelectPlan('completo')" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:2px solid var(--bor2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
+            <input type="radio" name="rwPlan" value="completo" style="display:none">
+            <span style="font-size:.7rem;font-weight:700;color:#4caf7d;text-transform:uppercase;letter-spacing:.5px">⭐ Completo</span>
+            <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$45.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
+            <span style="font-size:.7rem;color:#a89880;line-height:1.4">Todo incluido · Sin límites</span>
+          </label>
+        </div>
       </div>
       <div style="font-size:.7rem;color:#a89880;margin-top:6px">Sin contratos. Cancelás cuando querés.</div>
     </div>
@@ -15300,9 +15341,11 @@ function _rwS4(){
 }
 function _rwSelectPlan(plan){
   __rw.tier = plan;
+  const lblF = document.getElementById('rwPlanFundadorLbl');
   const lblB = document.getElementById('rwPlanBasicoLbl');
   const lblC = document.getElementById('rwPlanCompletoLbl');
-  if(lblB) lblB.style.borderColor = plan==='basico' ? 'rgba(201,168,76,.7)' : 'var(--bor2)';
+  if(lblF) lblF.style.borderColor = plan==='fundador' ? 'rgba(201,168,76,.9)' : 'rgba(201,168,76,.5)';
+  if(lblB) lblB.style.borderColor = plan==='basico'   ? 'rgba(201,168,76,.7)' : 'var(--bor2)';
   if(lblC) lblC.style.borderColor = plan==='completo' ? '#4caf7d' : 'var(--bor2)';
 }
 function _rwS4Back(){
@@ -19878,9 +19921,9 @@ function lpTab(n){
   <div class="lp-tag">Precio</div>
   <h2 class="lp-h2">Simple y sin sorpresas</h2>
   <div class="lp-precio-box">
-    <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:8px 16px;font-size:.72rem;font-weight:700;color:#c9a84c;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;display:inline-block">⚡ Precio fundador — primeros 10 lugares</div>
-    <div style="font-size:.8rem;color:#5a5040;text-decoration:line-through;margin-bottom:4px">$25.000 / mes</div>
-    <div style="font-family:'Playfair Display',serif;font-size:3.2rem;font-weight:800;color:#c9a84c;line-height:1">$15.000</div>
+    <div id="lpPrecioBadge" style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:8px 16px;font-size:.72rem;font-weight:700;color:#c9a84c;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;display:inline-block">⚡ Precio fundador — primeros 20 lugares</div>
+    <div id="lpPrecioTachado" style="font-size:.8rem;color:#5a5040;text-decoration:line-through;margin-bottom:4px">$25.000 / mes</div>
+    <div id="lpPrecioMain" style="font-family:'Playfair Display',serif;font-size:3.2rem;font-weight:800;color:#c9a84c;line-height:1">$15.000</div>
     <div style="font-size:.8rem;color:#a89880;margin-bottom:24px">por mes · facturado mensual</div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px;text-align:left">
       <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>Sin contratos, cancelás cuando querés</div>
@@ -19905,6 +19948,33 @@ function lpTab(n){
   <div style="font-size:.7rem;color:#3a3028;margin-bottom:16px">© 2026 Remu Gestión. Todos los derechos reservados.</div>
   <button onclick="document.getElementById('landingPage').style.display='none';document.getElementById('loginScreen').style.display='flex'" style="background:none;border:none;color:#a89880;font-family:'Outfit',sans-serif;font-size:.8rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Ingresar a mi cuenta</button>
 </footer>
+
+<script>
+// Actualizar precio en landing según cupos fundador disponibles
+(async function _lpActualizarPrecio(){
+  try {
+    const { count } = await sb.from('tenants')
+      .select('id', { count:'exact', head:true })
+      .filter('modulos->>tier','eq','fundador');
+    const cupos = Math.max(0, 20 - (count||0));
+    const badge   = document.getElementById('lpPrecioBadge');
+    const tachado = document.getElementById('lpPrecioTachado');
+    const main    = document.getElementById('lpPrecioMain');
+    if(!badge||!main) return;
+    if(cupos > 0){
+      badge.textContent   = `⚡ Precio fundador — quedan ${cupos} de 20 lugares`;
+      badge.style.display = 'inline-block';
+      if(tachado) tachado.style.display = '';
+      main.textContent    = '$15.000';
+    } else {
+      badge.textContent   = '📦 Plan Básico';
+      badge.style.display = 'inline-block';
+      if(tachado) tachado.style.display = 'none';
+      main.textContent    = '$25.000';
+    }
+  } catch(e){}
+})();
+</script>
 
 <!-- FLOATING WHATSAPP BUTTON -->
 <a href="https://wa.me/5493472628087?text=Hola!%20Quiero%20informaci%C3%B3n%20sobre%20Remu%20Gesti%C3%B3n%20para%20mi%20negocio"
