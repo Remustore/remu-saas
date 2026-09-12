@@ -15094,7 +15094,7 @@ function mostrarPaginaRegistro(){
   document.getElementById('loadingScreen').style.display = 'none';
   const scr = document.getElementById('onboardingScreen');
   if(!scr) return;
-  __rw = { step:1, nombre:'', rubro:'', svcs:[], hrs:{ apertura:'09:00', cierre:'19:00', dias:[1,2,3,4,5,6] }, email:'', pass:'' };
+  __rw = { step:1, nombre:'', rubro:'', svcs:[], hrs:{ apertura:'09:00', cierre:'19:00', dias:[1,2,3,4,5,6] }, email:'', pass:'', tier:'completo' };
   scr.style.display = 'block';
   _rwR();
 }
@@ -15275,12 +15275,15 @@ async function _rwS4init(){
     if(cupos > 0){
       lbl.style.display = 'flex';
       if(badge) badge.textContent = `⚡ Quedan ${cupos} cupos`;
+      // Auto-seleccionar Fundador si el usuario no eligió otro plan aún
+      if(__rw.tier === 'completo' || !__rw.tier) _rwSelectPlan('fundador');
     } else {
       lbl.style.display = 'none';
-      // Si tenía fundador seleccionado y ya no hay cupos, resetear
-      if(__rw.tier === 'fundador'){ __rw.tier = 'basico'; _rwSelectPlan('basico'); }
+      if(__rw.tier === 'fundador'){ __rw.tier = 'completo'; _rwSelectPlan('completo'); }
     }
   }
+  // Asegurar que el plan seleccionado esté visualmente marcado
+  if(__rw.tier) _rwSelectPlan(__rw.tier);
 }
 function _rwS4(){
   return `<div>
@@ -15369,6 +15372,7 @@ async function _rwFinish(btn){
   __rw.email=email; __rw.pass=pass;
   __rw.telefono  = (document.getElementById('rwTelefono')?.value||'').trim();
   __rw.instagram = (document.getElementById('rwInstagram')?.value||'').trim();
+  if(!__rw.tier) __rw.tier = 'completo'; // fallback defensivo
   btn.disabled=true; btn.textContent='Creando tu negocio...';
   try {
     // 1. Crear tenant en Supabase (ID generado en cliente — evita SELECT con RLS anon)
