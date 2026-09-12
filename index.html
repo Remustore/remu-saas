@@ -20071,9 +20071,17 @@ if ('serviceWorker' in navigator) {
             }
           });
         });
-        // Cuando el SW nuevo toma control → recargar para ver la versión nueva
+        // Cuando el SW nuevo toma control → avisar y recargar para ver la versión nueva
+        let _swReloading = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-          window.location.reload();
+          if (_swReloading) return;
+          _swReloading = true;
+          // Mostrar aviso visible antes de recargar
+          const d = document.createElement('div');
+          d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#4caf7d;color:#fff;padding:10px 18px;text-align:center;font-size:.84rem;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+          d.textContent = '✅ Nueva versión disponible — actualizando en un momento...';
+          document.body.appendChild(d);
+          setTimeout(() => window.location.reload(), 1800);
         });
       })
       .catch(e => console.warn('[SW] Registration failed:', e));
