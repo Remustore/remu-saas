@@ -12179,7 +12179,7 @@ const SERVICIOS_DEFAULT = [
 
 function getTurnosCfg(){
   const raw = localStorage.getItem(TURNOS_CFG_KEY + '_' + (currentTenant?.id||''));
-  if(raw){ try{ const p=JSON.parse(raw); if(p&&typeof p==='object') return p; }catch(e){} }
+  if(raw){ try{ const p=JSON.parse(raw); if(p&&typeof p==='object'){ if(!Array.isArray(p.servicios)) p.servicios=[]; if(!Array.isArray(p.empleados)) p.empleados=[]; return p; } }catch(e){} }
   // Solo usar servicios default para salones
   const rubro = (currentTenant?.rubro||'').toLowerCase();
   const esSalon = rubro.includes('salon')||rubro.includes('salón')||rubro.includes('belleza')||rubro.includes('peluq')||rubro.includes('manicur')||rubro.includes('estética')||rubro.includes('estetica');
