@@ -15460,10 +15460,8 @@ function _rwS6(){
       </div>
     </div>
 
-    <button onclick="window.location.href='index.html'" style="width:100%;padding:15px;background:linear-gradient(135deg,#c9a84c,#e8c96a);color:#080808;border:none;border-radius:10px;font-family:'Outfit',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;letter-spacing:.3px">
-      Ir al panel de gestión →
-    </button>
-    <div style="font-size:.7rem;color:#585044;margin-top:10px">Sin contratos · Cancelás cuando querés · Precio en pesos</div>
+    <div style="font-size:.7rem;color:#585044;margin-top:4px;margin-bottom:14px">Sin contratos · Cancelás cuando querés · Precio en pesos</div>
+    <div style="font-size:.75rem;color:#5a5040;text-align:center">¿Querés activar más tarde? <button onclick="window.location.href='index.html'" style="background:none;border:none;color:#a89880;text-decoration:underline;cursor:pointer;font-size:.75rem;font-family:'Outfit',sans-serif;padding:0">Ir al inicio →</button></div>
   </div>`;
 }
 
@@ -19331,17 +19329,47 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
       // ── Trial check (solo admin, no empleados ni superadmin) ──
       if(rolSesion === 'admin'){
         const mods = td.modulos || {};
-        // Auto-activar si regresa de pago exitoso de Mercado Pago
+        // Regreso desde MP: esperar al webhook en lugar de activar client-side
         const urlPago = new URLSearchParams(window.location.search);
-        if(urlPago.get('mp_ok') === '1' && !mods.pago_activo){
-          // Verificar que MP incluyó un ID de pago real (evita activación por URL manual)
-          const pagoId = urlPago.get('payment_id') || urlPago.get('preapproval_id') || urlPago.get('collection_id');
+        if(urlPago.get('mp_ok') === '1'){
           history.replaceState({}, '', window.location.pathname);
-          if(pagoId){
-            await activarSuscripcionTenant('mp_ok');
+          if(!mods.pago_activo){
+            // Mostrar pantalla de espera y hacer polling hasta que el webhook active la cuenta
+            document.getElementById('loadingScreen').style.display='none';
+            const ws = document.createElement('div');
+            ws.id = '_mpWaitScreen';
+            ws.style.cssText = 'position:fixed;inset:0;background:#080808;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;font-family:Outfit,sans-serif';
+            ws.innerHTML = `<div style="font-size:2.5rem">⏳</div>
+              <div style="font-size:1.1rem;font-weight:700;color:#f0ede6">Verificando tu pago...</div>
+              <div style="font-size:.8rem;color:#a89880;text-align:center;max-width:280px">Estamos confirmando tu suscripción con Mercado Pago. Tardará unos segundos.</div>
+              <div id="_mpWaitMsg" style="font-size:.75rem;color:#5a5040;margin-top:8px"></div>`;
+            document.body.appendChild(ws);
+            // Polling: hasta 30s esperando que el webhook setee pago_activo=true
+            let intentos = 0;
+            const _poll = async () => {
+              intentos++;
+              try {
+                const { data: td2 } = await sb.from('tenants').select('modulos').eq('id',currentTenant.id).single();
+                if(td2?.modulos?.pago_activo){
+                  ws.remove();
+                  currentTenant = {...currentTenant, modulos: td2.modulos};
+                  setupApp(); await loadAll();
+                  showToast('✅ ¡Suscripción activada! Bienvenido a Remu.', 'ok');
+                  return;
+                }
+              } catch(e){}
+              if(intentos < 10){
+                setTimeout(_poll, 3000);
+              } else {
+                // Webhook tardó demasiado — activar como fallback y avisar
+                ws.remove();
+                await activarSuscripcionTenant('mp_ok_fallback');
+              }
+            };
+            setTimeout(_poll, 2000);
             return;
           }
-          // Sin ID de MP → puede ser URL manipulada, cae al check de trial normal
+          // Ya estaba activo (webhook llegó antes que el usuario) → cargar normalmente
         }
         const trialHasta = mods.trial_hasta ? new Date(mods.trial_hasta) : new Date(new Date(td.created_at).getTime() + 30*24*60*60*1000);
         const diasRestantes = Math.ceil((trialHasta - new Date()) / 86400000);
