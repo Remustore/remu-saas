@@ -15427,8 +15427,9 @@ function _rwS6(){
         <button onclick="navigator.clipboard.writeText('${link}').then(()=>_rwToast('¡Link copiado!'))" style="flex-shrink:0;background:#c9a84c;color:#080808;border:none;border-radius:7px;padding:8px 12px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">Copiar</button>
       </div>
     </div>`;
-  const tierLabel = (__rw.tier||'completo')==='basico' ? 'Básico' : 'Completo';
-  const tierPrecio = (__rw.tier||'completo')==='basico' ? '25.000' : '45.000';
+  const _t = __rw.tier||'completo';
+  const tierLabel  = _t==='fundador' ? 'Fundador' : _t==='basico' ? 'Básico' : 'Completo';
+  const tierPrecio = _t==='fundador' ? '15.000'   : _t==='basico' ? '25.000' : '45.000';
   return `<div style="text-align:center">
     <div style="font-size:3rem;margin-bottom:8px">🎉</div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${esc(__rw.nombre||'Tu negocio')} está listo</div>
