@@ -29,7 +29,7 @@ serve(async (req) => {
     const isTest     = test === true;
     const token      = isTest ? MP_TOKEN_TEST : MP_TOKEN_PROD;
     const monto      = isTest ? 100 : (PRECIOS[tier] ?? PRECIOS.completo); // $100 en prueba
-    const planNombre = tier === 'basico' ? 'Plan Básico' : 'Plan Completo';
+    const planNombre = tier === 'fundador' ? 'Plan Fundador' : tier === 'basico' ? 'Plan Básico' : 'Plan Completo';
 
     if (!token) throw new Error(isTest ? 'MP_ACCESS_TOKEN_TEST no configurado' : 'MP_ACCESS_TOKEN no configurado');
 
