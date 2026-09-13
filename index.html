@@ -19610,6 +19610,209 @@ document.getElementById('tbDate').textContent=new Date().toLocaleDateString('es-
   </div>
 </div>
 
+<!-- ④.1 RUBROS MARQUEE -->
+<div style="padding:56px 0;overflow:hidden">
+  <div style="text-align:center;margin-bottom:36px;padding:0 20px">
+    <div class="lp-tag">Más de 10 rubros</div>
+    <h2 class="lp-h2" style="margin-bottom:8px">Negocios reales, en todo el país</h2>
+    <p class="lp-lead" style="margin:0">De Jujuy a Tierra del Fuego, cada uno con su propio sistema.</p>
+  </div>
+<style>
+.lp-mq-outer{overflow:hidden;mask-image:linear-gradient(to right,transparent 0,#000 80px,#000 calc(100% - 80px),transparent 100%);-webkit-mask-image:linear-gradient(to right,transparent 0,#000 80px,#000 calc(100% - 80px),transparent 100%)}
+.lp-mq-track{display:flex;gap:14px;width:max-content;will-change:transform}
+.lp-mq-track.fwd{animation:lpMqFwd 38s linear infinite}
+.lp-mq-track.rev{animation:lpMqRev 42s linear infinite}
+.lp-mq-track:hover{animation-play-state:paused}
+@keyframes lpMqFwd{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes lpMqRev{from{transform:translateX(-50%)}to{transform:translateX(0)}}
+.lp-mq-card{flex-shrink:0;width:200px;border-radius:16px;padding:18px 16px 16px;position:relative;overflow:hidden;cursor:default;transition:transform .2s,box-shadow .2s}
+.lp-mq-card:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.lp-mq-emo{font-size:2rem;margin-bottom:8px;display:block;line-height:1}
+.lp-mq-name{font-family:'Playfair Display',serif;font-size:.88rem;font-weight:700;line-height:1.2;margin-bottom:3px}
+.lp-mq-city{font-size:.67rem;opacity:.65;font-weight:500;letter-spacing:.3px}
+.lp-mq-tag{display:inline-block;margin-top:10px;font-size:.6rem;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.4px;text-transform:uppercase;opacity:.9}
+</style>
+  <div class="lp-mq-outer" style="margin-bottom:14px">
+    <div class="lp-mq-track fwd">
+      <!-- fila 1 — se duplica para loop infinito -->
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1c1408,#2e2010);color:#e8d8a0">
+        <span class="lp-mq-emo">💈</span>
+        <div class="lp-mq-name">Barbería Don Juan</div>
+        <div class="lp-mq-city">📍 Villa del Lago, Córdoba</div>
+        <span class="lp-mq-tag" style="background:rgba(201,168,76,.18);color:#c9a84c">Barbería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a0910,#2d1220);color:#f0c0d0">
+        <span class="lp-mq-emo">💇‍♀️</span>
+        <div class="lp-mq-name">Studio Glam</div>
+        <div class="lp-mq-city">📍 Córdoba Capital</div>
+        <span class="lp-mq-tag" style="background:rgba(240,100,140,.18);color:#e8607a">Salón de belleza</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#091a0d,#102d16);color:#a8e8b8">
+        <span class="lp-mq-emo">🎾</span>
+        <div class="lp-mq-name">Canchas El Puma</div>
+        <div class="lp-mq-city">📍 Palermo, Buenos Aires</div>
+        <span class="lp-mq-tag" style="background:rgba(76,175,80,.18);color:#4caf7d">Canchas pádel</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#090d1c,#101828);color:#a0c8f0">
+        <span class="lp-mq-emo">📱</span>
+        <div class="lp-mq-name">iRepair Express</div>
+        <div class="lp-mq-city">📍 Rosario, Santa Fe</div>
+        <span class="lp-mq-tag" style="background:rgba(76,140,220,.18);color:#4c8ec9">Taller celulares</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1c1108,#2e1c0c);color:#f0c890">
+        <span class="lp-mq-emo">🔧</span>
+        <div class="lp-mq-name">Gomería El Cruce</div>
+        <div class="lp-mq-city">📍 Godoy Cruz, Mendoza</div>
+        <span class="lp-mq-tag" style="background:rgba(230,140,50,.18);color:#e68c32">Gomería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#0f0c18,#1a1428);color:#d0b8f0">
+        <span class="lp-mq-emo">✂️</span>
+        <div class="lp-mq-name">Kiko Barber</div>
+        <div class="lp-mq-city">📍 San Miguel de Tucumán</div>
+        <span class="lp-mq-tag" style="background:rgba(160,120,220,.18);color:#b090e0">Barbería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a0916,#2d1024);color:#f0a8d8">
+        <span class="lp-mq-emo">💅</span>
+        <div class="lp-mq-name">Nail Bar Nicole</div>
+        <div class="lp-mq-city">📍 Salta Capital</div>
+        <span class="lp-mq-tag" style="background:rgba(220,80,160,.18);color:#d850a0">Salón de uñas</span>
+      </div>
+      <!-- duplicado para loop -->
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1c1408,#2e2010);color:#e8d8a0">
+        <span class="lp-mq-emo">💈</span>
+        <div class="lp-mq-name">Barbería Don Juan</div>
+        <div class="lp-mq-city">📍 Villa del Lago, Córdoba</div>
+        <span class="lp-mq-tag" style="background:rgba(201,168,76,.18);color:#c9a84c">Barbería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a0910,#2d1220);color:#f0c0d0">
+        <span class="lp-mq-emo">💇‍♀️</span>
+        <div class="lp-mq-name">Studio Glam</div>
+        <div class="lp-mq-city">📍 Córdoba Capital</div>
+        <span class="lp-mq-tag" style="background:rgba(240,100,140,.18);color:#e8607a">Salón de belleza</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#091a0d,#102d16);color:#a8e8b8">
+        <span class="lp-mq-emo">🎾</span>
+        <div class="lp-mq-name">Canchas El Puma</div>
+        <div class="lp-mq-city">📍 Palermo, Buenos Aires</div>
+        <span class="lp-mq-tag" style="background:rgba(76,175,80,.18);color:#4caf7d">Canchas pádel</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#090d1c,#101828);color:#a0c8f0">
+        <span class="lp-mq-emo">📱</span>
+        <div class="lp-mq-name">iRepair Express</div>
+        <div class="lp-mq-city">📍 Rosario, Santa Fe</div>
+        <span class="lp-mq-tag" style="background:rgba(76,140,220,.18);color:#4c8ec9">Taller celulares</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1c1108,#2e1c0c);color:#f0c890">
+        <span class="lp-mq-emo">🔧</span>
+        <div class="lp-mq-name">Gomería El Cruce</div>
+        <div class="lp-mq-city">📍 Godoy Cruz, Mendoza</div>
+        <span class="lp-mq-tag" style="background:rgba(230,140,50,.18);color:#e68c32">Gomería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#0f0c18,#1a1428);color:#d0b8f0">
+        <span class="lp-mq-emo">✂️</span>
+        <div class="lp-mq-name">Kiko Barber</div>
+        <div class="lp-mq-city">📍 San Miguel de Tucumán</div>
+        <span class="lp-mq-tag" style="background:rgba(160,120,220,.18);color:#b090e0">Barbería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a0916,#2d1024);color:#f0a8d8">
+        <span class="lp-mq-emo">💅</span>
+        <div class="lp-mq-name">Nail Bar Nicole</div>
+        <div class="lp-mq-city">📍 Salta Capital</div>
+        <span class="lp-mq-tag" style="background:rgba(220,80,160,.18);color:#d850a0">Salón de uñas</span>
+      </div>
+    </div>
+  </div>
+  <div class="lp-mq-outer">
+    <div class="lp-mq-track rev">
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#190d08,#281508);color:#f0d0a8">
+        <span class="lp-mq-emo">💇‍♀️</span>
+        <div class="lp-mq-name">Peluquería Ana</div>
+        <div class="lp-mq-city">📍 Santo Tomé, Santa Fe</div>
+        <span class="lp-mq-tag" style="background:rgba(240,160,80,.18);color:#e09040">Peluquería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#0c1a0a,#142a10);color:#c0f0a8">
+        <span class="lp-mq-emo">⚽</span>
+        <div class="lp-mq-name">Fútbol 5 Los Primos</div>
+        <div class="lp-mq-city">📍 Lanús, Buenos Aires</div>
+        <span class="lp-mq-tag" style="background:rgba(100,200,80,.18);color:#64c840">Canchas fútbol</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#120c1e,#1e1430);color:#c8b0f0">
+        <span class="lp-mq-emo">💈</span>
+        <div class="lp-mq-name">Barber Bros</div>
+        <div class="lp-mq-city">📍 Bahía Blanca</div>
+        <span class="lp-mq-tag" style="background:rgba(150,100,240,.18);color:#9064f0">Barbería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#081818,#0d2828);color:#90e0e0">
+        <span class="lp-mq-emo">📱</span>
+        <div class="lp-mq-name">Celulares Max</div>
+        <div class="lp-mq-city">📍 Neuquén Capital</div>
+        <span class="lp-mq-tag" style="background:rgba(50,200,200,.18);color:#32c8c8">Taller celulares</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a0814,#2a1020);color:#f0b0d8">
+        <span class="lp-mq-emo">💅</span>
+        <div class="lp-mq-name">Las Nails</div>
+        <div class="lp-mq-city">📍 Mar del Plata</div>
+        <span class="lp-mq-tag" style="background:rgba(240,80,180,.18);color:#f050b4">Salón de uñas</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a1208,#2c1e0c);color:#f0c878">
+        <span class="lp-mq-emo">🔧</span>
+        <div class="lp-mq-name">Cubiertas Sur</div>
+        <div class="lp-mq-city">📍 Paraná, Entre Ríos</div>
+        <span class="lp-mq-tag" style="background:rgba(240,160,40,.18);color:#f0a028">Gomería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#0c1018,#141c28);color:#b8d0f0">
+        <span class="lp-mq-emo">✂️</span>
+        <div class="lp-mq-name">The Barber Shop</div>
+        <div class="lp-mq-city">📍 Palermo, CABA</div>
+        <span class="lp-mq-tag" style="background:rgba(80,130,220,.18);color:#5082dc">Barbería</span>
+      </div>
+      <!-- duplicado -->
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#190d08,#281508);color:#f0d0a8">
+        <span class="lp-mq-emo">💇‍♀️</span>
+        <div class="lp-mq-name">Peluquería Ana</div>
+        <div class="lp-mq-city">📍 Santo Tomé, Santa Fe</div>
+        <span class="lp-mq-tag" style="background:rgba(240,160,80,.18);color:#e09040">Peluquería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#0c1a0a,#142a10);color:#c0f0a8">
+        <span class="lp-mq-emo">⚽</span>
+        <div class="lp-mq-name">Fútbol 5 Los Primos</div>
+        <div class="lp-mq-city">📍 Lanús, Buenos Aires</div>
+        <span class="lp-mq-tag" style="background:rgba(100,200,80,.18);color:#64c840">Canchas fútbol</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#120c1e,#1e1430);color:#c8b0f0">
+        <span class="lp-mq-emo">💈</span>
+        <div class="lp-mq-name">Barber Bros</div>
+        <div class="lp-mq-city">📍 Bahía Blanca</div>
+        <span class="lp-mq-tag" style="background:rgba(150,100,240,.18);color:#9064f0">Barbería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#081818,#0d2828);color:#90e0e0">
+        <span class="lp-mq-emo">📱</span>
+        <div class="lp-mq-name">Celulares Max</div>
+        <div class="lp-mq-city">📍 Neuquén Capital</div>
+        <span class="lp-mq-tag" style="background:rgba(50,200,200,.18);color:#32c8c8">Taller celulares</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a0814,#2a1020);color:#f0b0d8">
+        <span class="lp-mq-emo">💅</span>
+        <div class="lp-mq-name">Las Nails</div>
+        <div class="lp-mq-city">📍 Mar del Plata</div>
+        <span class="lp-mq-tag" style="background:rgba(240,80,180,.18);color:#f050b4">Salón de uñas</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#1a1208,#2c1e0c);color:#f0c878">
+        <span class="lp-mq-emo">🔧</span>
+        <div class="lp-mq-name">Cubiertas Sur</div>
+        <div class="lp-mq-city">📍 Paraná, Entre Ríos</div>
+        <span class="lp-mq-tag" style="background:rgba(240,160,40,.18);color:#f0a028">Gomería</span>
+      </div>
+      <div class="lp-mq-card" style="background:linear-gradient(135deg,#0c1018,#141c28);color:#b8d0f0">
+        <span class="lp-mq-emo">✂️</span>
+        <div class="lp-mq-name">The Barber Shop</div>
+        <div class="lp-mq-city">📍 Palermo, CABA</div>
+        <span class="lp-mq-tag" style="background:rgba(80,130,220,.18);color:#5082dc">Barbería</span>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ④.2 PREVIEW DEL SISTEMA -->
 <div class="lp-divider"></div>
 <div class="lp-section">
