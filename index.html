@@ -14907,12 +14907,17 @@ async function cargarSolicitudes(){
 
     const estadoBx = {pendiente:'byw', confirmado:'bgr', cancelado:'brd'};
     const estadoLabel = {pendiente:'⏳ pendiente', confirmado:'✅ confirmado', cancelado:'✕ cancelado'};
-    el.innerHTML = data.map(s=>`
+    const _solCfg = getTurnosCfg();
+    const _solEsC = esCancha(currentTenant?.rubro);
+    el.innerHTML = data.map(s=>{
+      const _srvNombre = (_solCfg.servicios||[]).find(x=>String(x.id)===String(s.servicio_id))?.nombre || s.servicio_nombre || s.servicio_id || '—';
+      const _empNombre = s.empleado_id ? ((_solCfg.empleados||[]).find(x=>String(x.id)===String(s.empleado_id))?.nombre || '') : '';
+      return `
       <div style="padding:12px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
         <div>
           <div style="font-weight:600;font-size:.88rem">${esc(s.nombre)} <span class="bx ${estadoBx[s.estado]||'bgx'}" style="margin-left:6px">${estadoLabel[s.estado]||s.estado}</span></div>
           <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">
-            📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${(s.hora||'—').substring(0,5)} &nbsp;·&nbsp; 🔧 ${esc(s.servicio_id||'—')}
+            📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${(s.hora||'—').substring(0,5)} &nbsp;·&nbsp; ${_solEsC?'🎾':'🔧'} ${esc(_srvNombre)}${_empNombre?' &nbsp;·&nbsp; '+(_solEsC?'🏟':'👤')+' '+esc(_empNombre):''}
           </div>
           ${s.tel?`<div style="font-size:.75rem;color:var(--tx2)">📱 ${esc(s.tel)}</div>`:''}
         </div>
@@ -14926,7 +14931,8 @@ async function cargarSolicitudes(){
           `:''}
           ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">📲 WA</button>`:''}
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch(e){
     if(el) el.innerHTML = '<div style="color:var(--bad);font-size:.82rem">Error al cargar reservas</div>';
   }
