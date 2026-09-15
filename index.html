@@ -3030,9 +3030,9 @@ $$;</pre>
 </div><div class="mf"><button class="btn" onclick="closeM('mCompra')">Cancelar</button><button class="btn bg" onclick="saveCompra()">Registrar compra</button></div></div></div>
 
 <!-- Precio -->
-<div class="mb" id="mPrecio"><div class="md"><div class="mh"><div class="mt2">Agregar Servicio</div><button class="xbtn" onclick="closeM('mPrecio')">✕</button></div>
+<div class="mb" id="mPrecio"><div class="md"><div class="mh"><div class="mt2" id="prModalTitle">Agregar Servicio</div><button class="xbtn" onclick="closeM('mPrecio')">✕</button></div>
 <div class="mc"><input type="hidden" id="prId">
-<div class="fr full"><div><label>Nombre del servicio</label><input id="prNom" placeholder="Ej: Cambio de pantalla, corte..."></div></div>
+<div class="fr full"><div><label id="prNomLabel">Nombre del servicio</label><input id="prNom" placeholder="Ej: Cambio de pantalla, corte..."></div></div>
 <div class="fr"><div><label id="prModLabel">Sector / Descripción</label><input id="prMod" placeholder="Ej: Peluquería, iPhone 14, todo tipo..."></div><div><label>Precio ($)</label><input type="number" id="prPre" placeholder="0"></div></div>
 <div class="fr"><div><label>Categoría (para filtros)</label><select id="prCat"><option value="">— Sin categoría</option></select></div><div><label>Disponibilidad</label><select id="prDisp"><option value="disponible">Disponible</option><option value="consultar">Consultar</option><option value="no disponible">No disponible</option></select></div></div>
 <div class="fr full"><div><label>Notas / aclaraciones</label><input id="prNot" placeholder="Opcional..."></div></div>
@@ -9600,18 +9600,50 @@ function initPrCatSelect(valorActual){
   const sel = document.getElementById('prCat');
   if(!sel) return;
   const rub = (currentTenant?.rubro||'').toLowerCase();
-  const esBarber = /barber/i.test(rub);
-  const esSalon = esBarber || /salon|belleza|peluq|manicur/i.test(rub);
-  const esGomC = /gomer|neumat|cubiert/i.test(rub);
+  const esBarber  = /barber/i.test(rub);
+  const esSalon   = esBarber || /salon|belleza|peluq|manicur/i.test(rub);
+  const esGomC    = /gomer|neumat|cubiert/i.test(rub);
+  const esCanchaM = /cancha|padel|p[aá]del|futbol|f[uú]tbol|deporti/i.test(rub);
   let opts;
-  if(esGomC) opts = [{v:'',l:'— Sin categoría'},{v:'cubierta',l:'🛞 Cubierta'},{v:'servicio',l:'🔧 Servicio'},{v:'otro',l:'📦 Otros'}];
+  if(esCanchaM) opts = [{v:'',l:'— Sin categoría'},{v:'padel',l:'🎾 Pádel'},{v:'futbol',l:'⚽ Fútbol 5'},{v:'futbol11',l:'⚽ Fútbol 11'},{v:'squash',l:'🏸 Squash'},{v:'tenis',l:'🎾 Tenis'},{v:'techada',l:'🏗 Techada'},{v:'otro',l:'🔧 Otro'}];
+  else if(esGomC) opts = [{v:'',l:'— Sin categoría'},{v:'cubierta',l:'🛞 Cubierta'},{v:'servicio',l:'🔧 Servicio'},{v:'otro',l:'📦 Otros'}];
   else if(esBarber) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'barba',l:'🪒 Barba'},{v:'coloracion',l:'🎨 Coloración'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'otro',l:'🔧 Otros'}];
   else if(esSalon) opts = [{v:'',l:'— Sin categoría'},{v:'corte',l:'✂ Corte'},{v:'tintura',l:'🎨 Tintura'},{v:'tratamiento',l:'✨ Tratamientos'},{v:'manicuria',l:'💅 Manicuria'},{v:'pedicuria',l:'🦶 Pedicuria'},{v:'maquillaje',l:'💄 Maquillaje'},{v:'lifting',l:'👁 Lifting'},{v:'depilacion',l:'✨ Depilación'},{v:'otro',l:'🔧 Otros'}];
   else opts = [{v:'',l:'— Sin categoría'},{v:'pantalla',l:'📱 Pantallas'},{v:'tapa',l:'🔲 Tapas'},{v:'bateria',l:'🔋 Baterías'},{v:'conector',l:'🔌 Conectores'},{v:'camara',l:'📸 Cámaras'},{v:'otro',l:'🔧 Otros'}];
   sel.innerHTML = opts.map(o=>`<option value="${o.v}"${o.v===valorActual?' selected':''}>${o.l}</option>`).join('');
-  // Adapt label
-  const lbl = document.getElementById('prModLabel');
-  if(lbl) lbl.textContent = (esBarber||esSalon) ? 'Sector' : 'Modelo / Tipo compatible';
+
+  // Adaptar todos los labels del modal según rubro
+  const isEditing = !!document.getElementById('prId')?.value;
+  const lblTitle = document.getElementById('prModalTitle');
+  const lblNom   = document.getElementById('prNomLabel');
+  const lblMod   = document.getElementById('prModLabel');
+  const inpNom   = document.getElementById('prNom');
+  const inpMod   = document.getElementById('prMod');
+  if(esCanchaM){
+    if(lblTitle) lblTitle.textContent = isEditing ? 'Editar Cancha' : 'Agregar Cancha';
+    if(lblNom)   lblNom.textContent   = 'Nombre de la cancha';
+    if(lblMod)   lblMod.textContent   = 'Superficie / Tipo';
+    if(inpNom)   inpNom.placeholder   = 'Ej: Cancha 1, Cancha Norte...';
+    if(inpMod)   inpMod.placeholder   = 'Ej: Sintética, Cemento, Techada...';
+  } else if(esBarber||esSalon){
+    if(lblTitle) lblTitle.textContent = isEditing ? 'Editar Servicio' : 'Agregar Servicio';
+    if(lblNom)   lblNom.textContent   = 'Nombre del servicio';
+    if(lblMod)   lblMod.textContent   = 'Sector';
+    if(inpNom)   inpNom.placeholder   = 'Ej: Corte clásico, Tintura...';
+    if(inpMod)   inpMod.placeholder   = 'Ej: Damas, Caballeros, Todo público...';
+  } else if(esGomC){
+    if(lblTitle) lblTitle.textContent = isEditing ? 'Editar Servicio' : 'Agregar Servicio';
+    if(lblNom)   lblNom.textContent   = 'Nombre del servicio';
+    if(lblMod)   lblMod.textContent   = 'Tipo / Compatibilidad';
+    if(inpNom)   inpNom.placeholder   = 'Ej: Cambio de cubiertas, Balanceo...';
+    if(inpMod)   inpMod.placeholder   = 'Ej: Todo tipo, Utilitarios, Motos...';
+  } else {
+    if(lblTitle) lblTitle.textContent = isEditing ? 'Editar Servicio' : 'Agregar Servicio';
+    if(lblNom)   lblNom.textContent   = 'Nombre del servicio';
+    if(lblMod)   lblMod.textContent   = 'Modelo / Tipo compatible';
+    if(inpNom)   inpNom.placeholder   = 'Ej: Cambio de pantalla, Carga rápida...';
+    if(inpMod)   inpMod.placeholder   = 'Ej: iPhone 14, Samsung S21, todo tipo...';
+  }
 }
 
 async function savePrecio(){
@@ -9833,11 +9865,12 @@ function rPrecios(){
   if(currentTenant && !document.getElementById('sec-precios').dataset.rubroIconInit){
     document.getElementById('sec-precios').dataset.rubroIconInit = '1';
     const rubI = (currentTenant.rubro||'').toLowerCase();
-    const rubroIconI = /barber/i.test(rubI) ? '💈' : /salon|belleza|peluq|manicur/i.test(rubI) ? '💇' : /gomer|neumat|cubiert/i.test(rubI) ? '🛞' : '📱';
+    const esC_ = /cancha|padel|p[aá]del|futbol|f[uú]tbol|deporti/i.test(rubI);
+    const rubroIconI = esC_ ? '🎾' : /barber/i.test(rubI) ? '💈' : /salon|belleza|peluq|manicur/i.test(rubI) ? '💇' : /gomer|neumat|cubiert/i.test(rubI) ? '🛞' : '📱';
     const ptEl = document.querySelector('#sec-precios .pt');
     const psEl = document.querySelector('#sec-precios .ps');
-    if(ptEl) ptEl.textContent = rubroIconI + ' Lista de Precios';
-    if(psEl) psEl.textContent = 'Catálogo interno — no se muestra a tus clientes';
+    if(ptEl) ptEl.textContent = rubroIconI + (esC_ ? ' Canchas' : ' Lista de Precios');
+    if(psEl) psEl.textContent = esC_ ? 'Canchas disponibles para reservar' : 'Catálogo interno — no se muestra a tus clientes';
   }
   // Adapt tabs to rubro
   const prTabs = document.getElementById('prTabs');
@@ -9846,6 +9879,7 @@ function rPrecios(){
     const esBarberP = /barber/i.test(rub);
     const esSalonP  = /salon|belleza|peluq|manicur/i.test(rub);
     const esGomP    = /gomer|neumat|cubiert/i.test(rub);
+    const esCanchaP = /cancha|padel|p[aá]del|futbol|f[uú]tbol|deporti/i.test(rub);
     // Auto-asignar categoria gomería
     if(esGomP && S.precios.some(p=>!p.categoria)){
       S.precios.forEach(p=>{
@@ -9879,10 +9913,17 @@ function rPrecios(){
         }
       });
     }
-    if(esBarberP || esSalonP || esGomP){
+    if(esBarberP || esSalonP || esGomP || esCanchaP){
       prTabs.dataset.rubroInit = '1';
       prFilt = '';
-      prTabs.innerHTML = esGomP
+      prTabs.innerHTML = esCanchaP
+        ? `<button class="tab active" onclick="setPrFilt('',this)">Todas</button>
+           <button class="tab" onclick="setPrFilt('padel',this)">🎾 Pádel</button>
+           <button class="tab" onclick="setPrFilt('futbol',this)">⚽ Fútbol 5</button>
+           <button class="tab" onclick="setPrFilt('futbol11',this)">⚽ Fútbol 11</button>
+           <button class="tab" onclick="setPrFilt('squash',this)">🏸 Squash</button>
+           <button class="tab" onclick="setPrFilt('otro',this)">🔧 Otro</button>`
+        : esGomP
         ? `<button class="tab active" onclick="setPrFilt('',this)">Todos</button>
            <button class="tab" onclick="setPrFilt('cubierta',this)">🛞 Cubiertas</button>
            <button class="tab" onclick="setPrFilt('servicio',this)">🔧 Servicios</button>
