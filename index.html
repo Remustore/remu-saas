@@ -17581,7 +17581,8 @@ async function rRanking(){
   el.innerHTML = '<div style="color:var(--mut);text-align:center;padding:30px">Cargando...</div>';
   try {
     const desde = mes+'-01';
-    const hasta = mes+'-31';
+    const [_y,_m] = mes.split('-').map(Number);
+    const hasta = new Date(_y, _m, 0).toISOString().slice(0,10); // último día real del mes
     const { data, error } = await sb.from('turnos_solicitudes')
       .select('nombre,duracion,estado')
       .eq('tenant_id', currentTenant.id)
