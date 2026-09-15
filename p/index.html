@@ -405,16 +405,19 @@ function renderPage(){
   const nombre = G.tenant?.nombre || G.tenantNombre || 'Negocio';
   const rubro  = G.tenant?.rubro  || G.tenantRubro  || '';
   const rubroLC = rubro.toLowerCase();
-  const esBarber = /barber/i.test(rubroLC);
-  const esSalon  = /salon|belleza|peluq|manicur/i.test(rubroLC);
+  const esBarber  = /barber/i.test(rubroLC);
+  const esSalon   = /salon|belleza|peluq|manicur/i.test(rubroLC);
   const esGomeria = /gomel|gomer|neumat|cubiert/i.test(rubroLC);
-  const rubroIcon = esBarber ? '💈' : esSalon ? '💇' : esGomeria ? '🛞' : '📱';
+  const esCanchas = /cancha|padel|p[aá]del|futbol|f[uú]tbol|deporti/i.test(rubroLC);
+  const rubroIcon = esCanchas ? '🎾' : esBarber ? '💈' : esSalon ? '💇' : esGomeria ? '🛞' : '📱';
 
   document.title = nombre + ' — ' + T('titulo');
   document.getElementById('bkPanTitle').textContent = T('reservarTurno');
 
   // Tabs por rubro
-  const cats = esBarber
+  const cats = esCanchas
+    ? [{k:'',l:T('todos')},{k:'padel',l:'🎾 Pádel'},{k:'futbol',l:'⚽ Fútbol 5'},{k:'futbol11',l:'⚽ Fútbol 11'},{k:'squash',l:'🏸 Squash'},{k:'tenis',l:'🎾 Tenis'},{k:'otro',l:T('catOtros')}]
+    : esBarber
     ? [{k:'',l:T('todos')},{k:'corte',l:T('catCorte')},{k:'barba',l:T('catBarba')},{k:'coloracion',l:T('catColoracion')},{k:'tratamiento',l:T('catTratamiento')},{k:'otro',l:T('catOtros')}]
     : esSalon
     ? [{k:'',l:T('todos')},{k:'corte',l:T('catCorte')},{k:'tintura',l:T('catTintura')},{k:'manicuria',l:T('catManicuria')},{k:'maquillaje',l:T('catMaquillaje')},{k:'lifting',l:T('catLifting')},{k:'depilacion',l:T('catDepilacion')}]
@@ -424,7 +427,8 @@ function renderPage(){
 
   // Nota de precios
   const textoNota = oc.notaPrecios || (
-    esGomeria ? 'Precios de referencia. Consultanos por tu medida específica y stock disponible. 🛞 Instalación y balanceo incluidos salvo indicación contraria.' :
+    esCanchas  ? 'Reservá tu cancha por el tiempo indicado. La reserva se confirma al instante. 🎾' :
+    esGomeria  ? 'Precios de referencia. Consultanos por tu medida específica y stock disponible. 🛞 Instalación y balanceo incluidos salvo indicación contraria.' :
     (esBarber||esSalon) ? T('notaSalon') : T('notaTelefonia')
   );
 
@@ -606,9 +610,14 @@ function abrirReserva(srvId){
 
   const minFecha = tod();
   const hayEmpleados = cfg.empleados && cfg.empleados.length > 1;
+  const _rub = (G.tenant?.rubro||G.tenantRubro||'').toLowerCase();
+  const _esC = /cancha|padel|p[aá]del|futbol|f[uú]tbol|deporti/i.test(_rub);
+  const lblEmp = _esC ? 'Cancha' : T('lblProfesional');
+  const lblSinPref = _esC ? 'Cualquier cancha disponible' : T('sinPreferencia');
+  const lblSrv = _esC ? 'Tipo de reserva' : T('lblServicio');
 
   document.getElementById('bkBody').innerHTML = `
-    <label>${T('lblServicio')}</label>
+    <label>${lblSrv}</label>
     <select id="bkSrv" onchange="onBkSrvChange()">
       ${cfg.servicios.map(s=>`<option value="${esc(String(s.id))}" data-dur="${s.duracion||30}">
         ${esc(s.categoria?s.categoria+': ':'')}${esc(s.nombre)} (${s.duracion||30} ${T('minutos')})${s.precio>0?' — '+fmt(s.precio):''}
@@ -622,9 +631,9 @@ function abrirReserva(srvId){
     <input id="bkTel" type="tel" inputmode="numeric" placeholder="11 2345 6789" autocomplete="tel">
 
     ${hayEmpleados ? `
-    <label>${T('lblProfesional')}</label>
+    <label>${lblEmp}</label>
     <select id="bkEmp" onchange="onBkFechaChange()">
-      <option value="">${T('sinPreferencia')}</option>
+      <option value="">${lblSinPref}</option>
       ${cfg.empleados.map(e=>`<option value="${esc(String(e.id))}">${esc(e.nombre)}</option>`).join('')}
     </select>` : '<input type="hidden" id="bkEmp" value="">'}
 
@@ -712,31 +721,63 @@ async function cargarSlotsPanel(){
   wrap.className='msg-info';
   wrap.innerHTML=T('cargandoHorarios');
 
+  // Leer selección de cancha/empleado ANTES de la query para poder filtrar
+  const empId = document.getElementById('bkEmp')?.value||'';
+  const hasMultiEmp = cfg.empleados && cfg.empleados.length > 1;
+
   const {data:rows} = await sb.from('turnos_solicitudes')
-    .select('hora,estado,nombre,servicio_id')
+    .select('hora,estado,nombre,servicio_id,empleado_id')
     .eq('tenant_id',G.tenantId)
     .eq('fecha',fecha)
     .in('estado',['confirmado','pendiente','bloqueado']);
 
-  // Construir set de minutos ocupados a partir de las reservas reales + duración del servicio
-  const ocupadosMin = new Set(); // minutos absolutos bloqueados
-  const fijosMin    = new Set(); // minutos de turnos fijos (no disponibles)
-  for(const r of (rows||[])){
-    const h = (r.hora||'').substring(0,5);
-    const hMin = hhToMin(h);
-    if(r.estado==='bloqueado'){
-      if((r.nombre||'').startsWith('__fijo__')){
-        fijosMin.add(hMin);
-      } else {
-        // __extra__ u otro bloqueado: marcar el slot (compatibilidad con reservas anteriores)
-        ocupadosMin.add(hMin);
+  const fijosMin    = new Set();
+  let   ocupadosMin;
+
+  if(hasMultiEmp && !empId){
+    // Multi-recurso sin selección: slot ocupado solo si TODAS las canchas están ocupadas
+    const empOcupMap = {};
+    cfg.empleados.forEach(e=>{ empOcupMap[String(e.id)] = new Set(); });
+    for(const r of (rows||[])){
+      const h = (r.hora||'').substring(0,5);
+      const hMin = hhToMin(h);
+      if(r.estado==='bloqueado'&&(r.nombre||'').startsWith('__fijo__')){
+        fijosMin.add(hMin); continue;
       }
-    } else {
-      // confirmado o pendiente: bloquear todos los slots que ocupa este turno
-      ocupadosMin.add(hMin);
-      const srvR = (cfg.servicios||[]).find(s=>String(s.id)===String(r.servicio_id));
-      const durR = srvR ? (srvR.duracion||30) : 30;
-      for(let k=30; k<durR; k+=30) ocupadosMin.add(hMin+k);
+      const rEmpId = r.empleado_id ? String(r.empleado_id) : null;
+      if(rEmpId && empOcupMap[rEmpId]){
+        empOcupMap[rEmpId].add(hMin);
+        const srvR=(cfg.servicios||[]).find(s=>String(s.id)===String(r.servicio_id));
+        const durR=srvR?(srvR.duracion||30):30;
+        for(let k=30;k<durR;k+=30) empOcupMap[rEmpId].add(hMin+k);
+      } else if(!rEmpId){
+        // Sin emp asignado (legacy): bloquear globalmente
+        fijosMin.add(hMin);
+      }
+    }
+    // Intersección: solo marcar ocupado si TODAS las canchas coinciden
+    const empIds = Object.keys(empOcupMap);
+    const allMin = new Set();
+    empIds.forEach(id=>empOcupMap[id].forEach(m=>allMin.add(m)));
+    ocupadosMin = new Set([...allMin].filter(m=>empIds.every(id=>empOcupMap[id].has(m))));
+  } else {
+    // Un empleado/cancha específico (o sin empleados): filtrar por empId
+    ocupadosMin = new Set();
+    for(const r of (rows||[])){
+      const h = (r.hora||'').substring(0,5);
+      const hMin = hhToMin(h);
+      if(r.estado==='bloqueado'){
+        if((r.nombre||'').startsWith('__fijo__')){ fijosMin.add(hMin); }
+        else {
+          if(!empId || String(r.empleado_id)===String(empId)) ocupadosMin.add(hMin);
+        }
+      } else {
+        if(empId && String(r.empleado_id)!==String(empId)) continue;
+        ocupadosMin.add(hMin);
+        const srvR=(cfg.servicios||[]).find(s=>String(s.id)===String(r.servicio_id));
+        const durR=srvR?(srvR.duracion||30):30;
+        for(let k=30;k<durR;k+=30) ocupadosMin.add(hMin+k);
+      }
     }
   }
 
@@ -744,8 +785,6 @@ async function cargarSlotsPanel(){
   const srvVal = String(document.getElementById('bkSrv')?.value||'');
   const srv    = (cfg.servicios||[]).find(s=>String(s.id)===srvVal);
   const durNuevo = srv ? (srv.duracion||30) : 30;
-
-  const empId = document.getElementById('bkEmp')?.value||'';
   const blqEmpMin = new Set();
   if(cfg.empleados&&cfg.empleados.length){
     const emps = empId
@@ -852,9 +891,30 @@ async function enviarReserva(){
     const pasos = Math.ceil(dur/30);
     const horasReq = Array.from({length:pasos},(_,k)=>minToHH(hhToMin(hora)+k*30));
 
-    const {data:previo} = await sb.from('turnos_solicitudes')
+    // Multi-cancha: si no se eligió una, auto-asignar la primera cancha libre
+    const _hasMultiEmp = G.cfg.empleados && G.cfg.empleados.length > 1;
+    let finalEmpId = empId;
+    if(!finalEmpId && _hasMultiEmp){
+      const {data:empOcu} = await sb.from('turnos_solicitudes')
+        .select('empleado_id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
+        .in('hora',horasReq).in('estado',['confirmado','bloqueado'])
+        .not('empleado_id','is',null);
+      const busyIds = new Set((empOcu||[]).map(r=>String(r.empleado_id)));
+      const freeEmp = G.cfg.empleados.find(e=>!busyIds.has(String(e.id)));
+      if(!freeEmp){
+        showErr(T('errOcupado'));
+        btn.disabled=false; btn.textContent=T('confirmarReserva');
+        cargarSlotsPanel(); return;
+      }
+      finalEmpId = String(freeEmp.id);
+    }
+
+    // Chequeo previo filtrado por empleado/cancha específica
+    let previoQ = sb.from('turnos_solicitudes')
       .select('id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
-      .in('hora',horasReq).in('estado',['confirmado','bloqueado']).limit(1);
+      .in('hora',horasReq).in('estado',['confirmado','bloqueado']);
+    if(finalEmpId) previoQ = previoQ.eq('empleado_id', parseInt(finalEmpId));
+    const {data:previo} = await previoQ.limit(1);
     if(previo&&previo.length){
       showErr(T('errOcupado'));
       btn.disabled=false; btn.textContent=T('confirmarReserva');
@@ -865,7 +925,7 @@ async function enviarReserva(){
     const {data:ins,error:insErr} = await sb.from('turnos_solicitudes').insert({
       tenant_id:G.tenantId, nombre, tel,
       servicio_id:srvId||null,
-      empleado_id:empId?(parseInt(empId)||null):null,
+      empleado_id:finalEmpId?(parseInt(finalEmpId)||null):null,
       fecha, hora, estado:'confirmado', created_at:ts
     }).select('id').single();
     if(insErr) throw new Error(insErr.message||T('errReserva'));
@@ -874,17 +934,24 @@ async function enviarReserva(){
       const extras=[];
       for(let k=1;k<pasos;k++){
         extras.push({tenant_id:G.tenantId,nombre:'__extra__:'+(ins?.id||''),tel,
-          servicio_id:srvId||null,empleado_id:empId?(parseInt(empId)||null):null,
+          servicio_id:srvId||null,empleado_id:finalEmpId?(parseInt(finalEmpId)||null):null,
           fecha,hora:minToHH(hhToMin(hora)+k*30),estado:'bloqueado',created_at:ts});
       }
       if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
     }
 
     const {data:todos} = await sb.from('turnos_solicitudes')
-      .select('id,created_at,estado')
+      .select('id,created_at,estado,empleado_id')
       .eq('tenant_id',G.tenantId).eq('fecha',fecha).eq('hora',hora)
       .in('estado',['confirmado','bloqueado','pendiente']);
-    const conflicto=(todos||[]).some(t=>t.id!==ins.id&&t.created_at<=ts&&(t.estado==='confirmado'||t.estado==='bloqueado'));
+    const conflicto=(todos||[]).some(t=>{
+      if(t.id===ins.id) return false;
+      if(t.created_at>ts) return false;
+      if(t.estado!=='confirmado'&&t.estado!=='bloqueado') return false;
+      // Solo conflicto si es el mismo empleado/cancha (o sin empleado asignado)
+      if(finalEmpId && t.empleado_id && String(t.empleado_id)!==String(finalEmpId)) return false;
+      return true;
+    });
     if(conflicto){
       await sb.from('turnos_solicitudes').delete().eq('id',ins.id);
       showErr(T('errOcupado'));
@@ -895,7 +962,9 @@ async function enviarReserva(){
     const srvNombre=(G.cfg.servicios||[]).find(s=>String(s.id)===String(srvId))?.nombre||'el servicio';
     const loc = _lang==='pt'?'pt-BR':_lang==='en'?'en-US':'es-AR';
     const fechaFmt=new Date(fecha+'T12:00:00').toLocaleDateString(loc,{weekday:'long',day:'numeric',month:'long'});
-    const profNombre=empId?((G.cfg.empleados||[]).find(e=>String(e.id)===String(empId))?.nombre||''):'';
+    const profNombre=finalEmpId?((G.cfg.empleados||[]).find(e=>String(e.id)===String(finalEmpId))?.nombre||''):'';
+    const _esCC = /cancha|padel|p[aá]del|futbol|f[uú]tbol|deporti/i.test((G.tenant?.rubro||G.tenantRubro||'').toLowerCase());
+    const lblConfProf = _esCC ? 'Cancha' : T('confProfesional');
 
     cerrarReserva();
 
@@ -921,7 +990,7 @@ async function enviarReserva(){
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">🕐 ${esc(hora)}</span>
           </div>
           ${profNombre?`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0">
-            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">${T('confProfesional')}</span>
+            <span style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:.5px">${lblConfProf}</span>
             <span style="font-size:.85rem;color:#f5f0e8;font-weight:600">${esc(profNombre)}</span>
           </div>`:''}
         </div>
