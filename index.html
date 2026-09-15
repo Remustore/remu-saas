@@ -13570,7 +13570,7 @@ function rTurnos(){
             ${t.metodo==='Fiado'?`<span style="font-size:.72rem;font-weight:700;color:var(--bad);background:rgba(201,82,76,.12);padding:2px 8px;border-radius:10px;border:1px solid rgba(201,82,76,.3)">🔴 Fiado</span>`:''}
           </div>
           <div style="font-size:.78rem;color:var(--tx2);margin-top:3px">
-            🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ✂ ${esc(t.servicioNombre||'')} &nbsp;·&nbsp; 👤 ${esc(t.empleadoNombre||'')}
+            🕐 ${t.hora} – ${finStr} &nbsp;·&nbsp; ${_esCancha_?'🎾':'✂'} ${esc(t.servicioNombre||'')} &nbsp;·&nbsp; ${_esCancha_?'🏟':'👤'} ${esc(t.empleadoNombre||'')}
           </div>
           ${t.notas?`<div style="font-size:.75rem;color:var(--mut);margin-top:3px">📝 ${esc(t.notas)}</div>`:''}
         </div>

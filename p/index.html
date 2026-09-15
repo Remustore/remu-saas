@@ -900,7 +900,11 @@ async function enviarReserva(){
         .in('hora',horasReq).in('estado',['confirmado','bloqueado'])
         .not('empleado_id','is',null);
       const busyIds = new Set((empOcu||[]).map(r=>String(r.empleado_id)));
-      const freeEmp = G.cfg.empleados.find(e=>!busyIds.has(String(e.id)));
+      // También verificar bloqueos de config (no sólo los del DB)
+      const freeEmp = G.cfg.empleados.find(e=>{
+        if(busyIds.has(String(e.id))) return false;
+        return horasReq.every(h=>!esBloqueado(e.bloqueos||[], fecha, h));
+      });
       if(!freeEmp){
         showErr(T('errOcupado'));
         btn.disabled=false; btn.textContent=T('confirmarReserva');
