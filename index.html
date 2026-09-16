@@ -3261,7 +3261,7 @@ async function _pingSupabase(){
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 6000);
     const res = await fetch(SURL + '/rest/v1/', {
-      headers: { apikey: SKEY },
+      headers: { apikey: SKEY, Authorization: 'Bearer ' + SKEY },
       signal: ctrl.signal
     });
     clearTimeout(t);
@@ -21458,7 +21458,9 @@ function _iniciarRealtimeReservas(tenantId){
 
 function _detenerRealtimeReservas(){
   if(_realtimeCh){
-    try { sb.removeChannel(_realtimeCh); } catch(e){}
+    if(typeof _realtimeCh.unsubscribe === 'function'){
+      try { sb.removeChannel(_realtimeCh); } catch(e){}
+    }
     _realtimeCh = null;
   }
 }
@@ -22172,7 +22174,9 @@ async function _syncFijosSupabase(){
   _detenerRealtimeReservas = function(){
     _stopPolling();
     if(typeof _realtimeCh !== 'undefined' && _realtimeCh){
-      try { if(sb && sb.removeChannel) sb.removeChannel(_realtimeCh); } catch(e){}
+      if(sb && sb.removeChannel && typeof _realtimeCh.unsubscribe === 'function'){
+        try { sb.removeChannel(_realtimeCh); } catch(e){}
+      }
       _realtimeCh = null;
     }
     console.log('[Polling] Detenido');
@@ -23562,6 +23566,6 @@ async function _mFCS_fiado(){
 
 })();
 </script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" onload="lucide.createIcons()"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" onload="lucide.createIcons()"></script>
 </body>
 </html>
