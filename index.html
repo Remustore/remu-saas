@@ -1023,6 +1023,9 @@ $$;</pre>
   </div>
   <div class="ns">Principal</div>
   <div class="ni" onclick="go('dashboard')"><span class="nico"><i data-lucide="layout-dashboard"></i></span>Inicio</div>
+  <!-- REPARTO / ENTREGAS -->
+  <div class="ni" onclick="go('pedidosReparto')" id="nav-pedidosReparto" style="display:none"><span class="nico"><i data-lucide="truck"></i></span>Pedidos del día</div>
+  <div class="ni" onclick="go('resumenReparto')" id="nav-resumenReparto" style="display:none"><span class="nico"><i data-lucide="bar-chart-2"></i></span>Resumen</div>
   <!-- TALLER DE CELULARES -->
   <div class="ni" onclick="go('taller')" id="nav-taller" style="display:none"><span class="nico"><i data-lucide="wrench"></i></span>Reparaciones</div>
   <div class="ni" onclick="go('ventas')" id="nav-ventas" style="display:none"><span class="nico"><i data-lucide="receipt"></i></span>Ventas</div>
@@ -1324,6 +1327,10 @@ $$;</pre>
         <div class="tw"><table><thead><tr><th>Equipo</th><th>Cliente</th><th class="col-hide">IMEI</th><th>Garantía</th><th>Estado</th><th></th></tr></thead><tbody id="tbGar"></tbody></table></div>
       </div>
     </div>
+
+    <!-- REPARTO — PEDIDOS DE ENTREGA -->
+    <div class="sec" id="sec-pedidosReparto"></div>
+    <div class="sec" id="sec-resumenReparto"></div>
 
     <!-- PRESUPUESTOS DE EQUIPOS -->
     <div class="sec" id="sec-presupuestos">
@@ -3026,6 +3033,37 @@ $$;</pre>
   </div>
 </div>
 
+<!-- Pedido de reparto -->
+<div class="mb" id="mPedidoRep"><div class="md" style="max-width:520px"><div class="mh"><div class="mt2" id="_repMTitle">Nuevo pedido</div><button class="xbtn" onclick="closeM('mPedidoRep')">✕</button></div>
+<div class="mc">
+  <input type="hidden" id="_repId">
+  <div class="fr full">
+    <div><label>Cliente *</label><input id="_repCli" placeholder="Nombre del cliente"></div>
+  </div>
+  <div class="fr">
+    <div><label>Teléfono</label><input id="_repTel" type="tel" placeholder="11 1234-5678"></div>
+    <div><label>Hora estimada</label><input id="_repHora" type="time"></div>
+  </div>
+  <div class="fr full">
+    <div><label>Dirección *</label><input id="_repDir" placeholder="Av. Corrientes 1234, CABA"></div>
+  </div>
+  <div class="fr full">
+    <div><label>Notas</label><textarea id="_repNotas" rows="2" placeholder="Timbre 3B, dejar con portero..."></textarea></div>
+  </div>
+  <div style="margin-top:10px">
+    <label style="font-size:.82rem;font-weight:600;color:var(--tx2)">Productos / Ítems</label>
+    <div id="_repItems" style="margin-top:6px"></div>
+    <button class="btn bg2 bsm" style="margin-top:6px;font-size:.8rem" onclick="_repAgregarItem()">+ Agregar ítem</button>
+  </div>
+  <div style="text-align:right;font-weight:600;font-size:.92rem;margin-top:10px">
+    Total: <span id="_repTotal">$ 0</span>
+  </div>
+  <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn bg2" onclick="closeM('mPedidoRep')">Cancelar</button>
+    <button class="btn bg" onclick="guardarPedidoReparto()">Guardar pedido</button>
+  </div>
+</div></div></div>
+
 <!-- Gasto -->
 <div class="mb" id="mGasto"><div class="md"><div class="mh"><div class="mt2" id="mGastoTitulo">Registrar Gasto</div><button class="xbtn" onclick="closeM('mGasto')">✕</button></div>
 <div class="mc"><input type="hidden" id="gId">
@@ -3146,6 +3184,7 @@ $$;</pre>
 
 <script src="js/taller.js"></script>
 <script src="js/gomeria.js"></script>
+<script src="js/reparto.js"></script>
 <script>
 // ── Error handler global: captura la ubicación exacta de errores de runtime ─
 window.onerror = function(msg, src, line, col, err){
@@ -3213,7 +3252,7 @@ function _lblCanchas(){ return esCancha(currentTenant?.rubro) ? 'Canchas' : 'Pro
 let currentUser = null;    // usuario Supabase Auth
 let currentTenant = null;  // objeto tenant { id, nombre, rubro, modulos }
 let currentRole = null;    // 'admin' | 'superadmin'
-let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[] };
+let S = { stock:[], equipos:[], ventas:[], gastos:[], reparaciones:[], precios:[], meta:0, inversores:[], movimientos_inv:[], objetivos:null, movCaja:[], pedidos:[], cubiertas:[], clientesGomeria:[], historialGomeria:[], pedidosReparto:[] };
 let sFilt='todos', eFilt='todos', avId=null, undoStack=[], undoTimer=null;
 
 // ═══ SYNC UI ═══
@@ -5234,13 +5273,14 @@ async function loadAll(){
   if(_isFirstLoad) document.getElementById('loadingScreen').style.display='flex';
   else setSyncing();
   try{
-    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas,presupuestos] = await Promise.all([
+    let [stock,equipos,ventas,gastos,reparaciones,precios,meta,inversores,movimientos_inv,objetivos,movCaja,pedidos,cubiertas,presupuestos,pedidosReparto] = await Promise.all([
       dbLoad('stock'), dbLoad('equipos'), dbLoad('ventas'), dbLoad('gastos'),
       dbLoad('reparaciones'), dbLoad('precios'), dbGetConfig('meta'),
       dbLoad('inversores'), dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'), dbLoad('mov_caja'),
       dbLoadPedidos(), dbLoadCubiertas(),
-      dbLoad('presupuestos').catch(()=>[])
+      dbLoad('presupuestos').catch(()=>[]),
+      dbLoad('pedidos_reparto').catch(()=>[])
     ]);
     S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
@@ -5294,6 +5334,7 @@ async function loadAll(){
     S.pedidos=pedidos||[];
     S.cubiertas=cubiertas||[];
     S.presupuestos=presupuestos||[];
+    S.pedidosReparto=pedidosReparto||[];
     S.clientesGomeria=[];
     S.historialGomeria=[];
     // Carga separada para no afectar el resto si falla
@@ -5393,7 +5434,7 @@ async function doUndo(){
 }
 
 // ═══ NAV ═══
-const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', garantias:'Garantías', presupuestos:'Presupuestos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes' };
+const SN = { dashboard:'Inicio', ventas:'Ventas', stock:'Productos', equipos:'Equipos', garantias:'Garantías', presupuestos:'Presupuestos', taller:'Reparaciones', clientes:'Clientes', auditoria:'Control de Stock', agendaTecnico:'Agenda técnica', turnos:'Agenda del día', turnosConfig:'Configuración', fichasClientes:'Fichas de clientes', turnosOnline:'Reservas online', turnosTec:'Turnos técnicos', turnosFijos:'Turnos fijos', listaEspera:'Lista de espera', objetivosCompra:'Objetivos de compra', gastos:'Caja y Gastos', analisis:'Análisis', precios:'Mis precios', inversores:'Inversores', pedidos:'Pedidos', cuotas:'Cuotas', metasPareja:'Metas', cubiertas:'Cubiertas', clientesGomeria:'Clientes', pedidosReparto:'Pedidos del día', resumenReparto:'Resumen de entregas' };
 
 function go(id){
   // Bug 2: cerrar sidebar en móvil y ocultar overlay
@@ -5412,7 +5453,7 @@ function go(id){
   if(sec) sec.classList.add('active');
   document.querySelectorAll('.ni').forEach(n=>{ if(n.getAttribute('onclick')===`go('${id}')`) n.classList.add('active'); });
   document.getElementById('tbTitle').textContent = SN[id]||id;
-  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, presupuestos:rPresupuestos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria, ranking:rRanking };
+  const renders = { dashboard:rDash, stock:rStock, equipos:rEquipos, garantias:rGarantias, presupuestos:rPresupuestos, ventas:rVentas, taller:rTaller, clientes:rClientes, auditoria:rAuditoria, agendaTecnico:rAgendaTecnico, turnos:rTurnos, turnosConfig:rTurnosConfig, fichasClientes:rFichasClientesMain, turnosOnline:rTurnosOnline, turnosTec:rTurnosTec, turnosFijos:rTurnosFijos, listaEspera:rListaEspera, objetivosCompra:rObjetivosCompra, gastos:rGastos, analisis:rAnalisis, precios:rPrecios, inversores:rInversores, pedidos:rPedidos, cubiertas:_iniciarCubiertas, clientesGomeria:_iniciarClientesGomeria, ranking:rRanking, pedidosReparto:rPedidosReparto, resumenReparto:rResumenReparto };
   if(renders[id]) renders[id]();
   if(window.innerWidth<769) document.getElementById('sb').classList.remove('open');
 }
@@ -15772,6 +15813,7 @@ function aplicarModulosPorRubro(rubro){
   const esBarberia = r.includes('barberia')||r.includes('barbería');
   const esSalon    = r.includes('salon')||r.includes('salón')||r.includes('belleza')||r.includes('peluq')||r.includes('manicur')||r.includes('uña')||r.includes('pestañ');
   const esGomeria  = r.includes('gomeria')||r.includes('gomería')||r.includes('neumat')||r.includes('cubiert');
+  const esReparto  = r.includes('reparto')||r.includes('entrega')||r.includes('distribuc');
   const mods = currentTenant?.modulos || {};
 
   // Ocultar todos los nav items opcionales antes de mostrar solo los del rubro activo
@@ -15779,7 +15821,8 @@ function aplicarModulosPorRubro(rubro){
    'nav-turnos','nav-turnosFijos','nav-turnosOnline','nav-clientes','nav-fichas',
    'nav-gastos','nav-analisis','nav-precios','nav-turnosConfig','nav-sep-config',
    'nav-auditoria','nav-turnosTec','nav-listaEspera','nav-objetivosCompra',
-   'nav-agendaTecnico','nav-inversores','nav-ranking'
+   'nav-agendaTecnico','nav-inversores','nav-ranking',
+   'nav-pedidosReparto','nav-resumenReparto'
   ].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
 
   const showNav = (...ids) => ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=''; });
@@ -15797,6 +15840,9 @@ function aplicarModulosPorRubro(rubro){
     if(navTurnos){ const sp = navTurnos.querySelector('span:last-child'); if(sp && !sp.classList.contains('nico')) sp.textContent='Agenda de canchas'; }
     const navFijos = document.getElementById('nav-turnosFijos');
     if(navFijos){ const sp = navFijos.querySelector('span:last-child'); if(sp && !sp.classList.contains('nico')) sp.textContent='Reservas fijas'; }
+  } else if(esReparto){
+    // 🚚 REPARTO / DISTRIBUCIÓN / ENTREGAS
+    showNav('nav-pedidosReparto','nav-resumenReparto','nav-gastos','nav-analisis','nav-precios');
   } else if(esTaller){
     // 🔧 TALLER DE CELULARES / SERVICIO TÉCNICO / ACCESORIOS
     showNav('nav-taller','nav-equipos','nav-garantias','nav-presupuestos','nav-stock','nav-ventas','nav-pedidos','nav-gastos','nav-analisis','nav-precios');
