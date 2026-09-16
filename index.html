@@ -1485,6 +1485,7 @@ $$;</pre>
           <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
             <button class="tab active" id="vistaListaBtn" onclick="setVistaTurnos('lista')">📋 Lista</button>
             <button class="tab" id="vistaHorarioBtn" onclick="setVistaTurnos('horario')">🕐 Horario</button>
+            <button class="tab" id="vistaGrillaBtn" onclick="setVistaTurnos('grilla')" style="display:none">🏟 Grilla</button>
             <button class="tab" id="vistaSemanaBt" onclick="setVistaTurnos('semana')">📅 Semana</button>
             <button class="tab" id="vistaCalendarioBtn" onclick="setVistaTurnos('calendario')">🗓 Mes</button>
           </div>
@@ -1585,6 +1586,42 @@ $$;</pre>
             <label class="mod-check"><input type="checkbox" class="diasSalon" value="5" checked onchange="saveTurnosConfig()"> Vie</label>
             <label class="mod-check"><input type="checkbox" class="diasSalon" value="6" checked onchange="saveTurnosConfig()"> Sáb</label>
             <label class="mod-check"><input type="checkbox" class="diasSalon" value="0" onchange="saveTurnosConfig()"> Dom</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tarifas pico / valle — solo canchas -->
+      <div class="card" id="cardTarifaPico" style="display:none;margin-bottom:14px">
+        <div class="ch"><h3>⚡ Tarifas pico / valle</h3></div>
+        <div style="font-size:.75rem;color:var(--tx2);margin-bottom:12px;line-height:1.5">
+          Los horarios pico muestran un precio diferente en la página de reservas.
+        </div>
+        <label class="mod-check" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="picoActivo" onchange="saveTarifaPico()"> Activar tarifas diferenciadas
+        </label>
+        <div id="picoFields" style="display:none">
+          <div class="fr">
+            <div><label>Horario pico desde</label><input type="time" id="picoDesde" value="20:00" onchange="saveTarifaPico()"></div>
+            <div><label>Horario pico hasta</label><input type="time" id="picoHasta" value="23:00" onchange="saveTarifaPico()"></div>
+          </div>
+          <div style="margin-top:10px">
+            <label>Días pico</label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="1" onchange="saveTarifaPico()"> Lun</label>
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="2" onchange="saveTarifaPico()"> Mar</label>
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="3" onchange="saveTarifaPico()"> Mié</label>
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="4" onchange="saveTarifaPico()"> Jue</label>
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="5" checked onchange="saveTarifaPico()"> Vie</label>
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="6" checked onchange="saveTarifaPico()"> Sáb</label>
+              <label class="mod-check"><input type="checkbox" class="diasPico" value="0" checked onchange="saveTarifaPico()"> Dom</label>
+            </div>
+          </div>
+          <div style="margin-top:10px">
+            <label>Multiplicador precio pico</label>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:5px">
+              <input type="number" id="picoMulti" value="1.5" step="0.1" min="1.0" max="5" style="width:90px" onchange="saveTarifaPico()">
+              <span style="font-size:.75rem;color:var(--tx2)">Ej: precio $<span id="picoEjBase">1000</span> × <span id="picoEjMulti">1.5</span> = $<span id="picoEjResult">1500</span> en pico</span>
+            </div>
           </div>
         </div>
       </div>
@@ -12721,10 +12758,134 @@ function setVistaTurnos(v){
   document.getElementById('vistaHorarioBtn').classList.toggle('active', v==='horario');
   document.getElementById('vistaSemanaBt')?.classList.toggle('active', v==='semana');
   document.getElementById('vistaCalendarioBtn')?.classList.toggle('active', v==='calendario');
-  document.getElementById('turnosLista').style.display = (v==='lista'||v==='horario') ? '' : 'none';
+  document.getElementById('vistaGrillaBtn')?.classList.toggle('active', v==='grilla');
+  document.getElementById('turnosLista').style.display = (v==='lista'||v==='horario'||v==='grilla') ? '' : 'none';
   document.getElementById('turnosSemana').style.display = v==='semana' ? '' : 'none';
   document.getElementById('turnosCalendario').style.display = v==='calendario' ? '' : 'none';
   rTurnos();
+}
+
+// ── Grilla canchas × hora ────────────────────────────────────────────────────
+function rTurnosGrilla(){
+  const cfg = getTurnosCfg();
+  const fecha = document.getElementById('turnosFecha')?.value || tod();
+  const canchas = cfg.empleados || [];
+  const el = document.getElementById('turnosLista');
+  if(!canchas.length){
+    el.innerHTML = '<div style="color:var(--mut);padding:16px 0;font-size:.82rem">Configurá las canchas primero en ⚙ Configuración.</div>';
+    return;
+  }
+  const turnos = getTurnos().filter(t => t.fecha === fecha && t.estado !== 'cancelado');
+  // Map: canchaId → { hora: turno }
+  const ocupMap = {};
+  canchas.forEach(c => { ocupMap[String(c.id)] = {}; });
+  turnos.forEach(t => {
+    const cId = String(t.empleadoId||'');
+    if(ocupMap[cId]) ocupMap[cId][(t.hora||'').substring(0,5)] = t;
+  });
+  // Time slots
+  const ap = cfg.apertura||'08:00', ci = cfg.cierre||'23:00';
+  const [ah,am] = ap.split(':').map(Number);
+  const [ch,cm] = ci.split(':').map(Number);
+  const slots = [];
+  for(let m = ah*60+am; m <= ch*60+cm; m += 60){
+    slots.push(String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'));
+  }
+  const thStyle = 'padding:8px 10px;text-align:center;border-bottom:2px solid var(--bor);font-weight:600;font-size:.8rem;white-space:nowrap';
+  const tdStyle = 'padding:5px 6px;border-bottom:1px solid var(--bor);border-right:1px solid var(--bor);vertical-align:top;min-width:110px';
+  let html = `<div style="overflow-x:auto;margin-top:4px"><table style="width:100%;border-collapse:collapse;font-size:.78rem">
+    <thead><tr>
+      <th style="${thStyle};text-align:left;width:52px;color:var(--tx2)">Hora</th>
+      ${canchas.map(c=>`<th style="${thStyle}">${esc(c.nombre)}</th>`).join('')}
+    </tr></thead><tbody>`;
+  slots.forEach(hora => {
+    html += `<tr><td style="padding:7px 10px;border-bottom:1px solid var(--bor);color:var(--tx2);font-size:.75rem;font-weight:600;white-space:nowrap">${hora}</td>`;
+    canchas.forEach(c => {
+      const t = ocupMap[String(c.id)]?.[hora];
+      if(t){
+        const isPend = t.estado === 'pendiente';
+        const bg = isPend ? 'rgba(255,193,7,.12)' : 'rgba(201,168,76,.15)';
+        const bor = isPend ? 'rgba(255,193,7,.4)' : 'rgba(201,168,76,.4)';
+        html += `<td style="${tdStyle}"><div style="background:${bg};border:1px solid ${bor};border-radius:7px;padding:6px 8px;cursor:pointer" onclick="openM('mTurno','${t.id}')">
+          <div style="font-weight:700;color:var(--tx);font-size:.75rem">${esc((t.cliente||'').split(' ')[0])}</div>
+          <div style="color:var(--tx2);font-size:.68rem;margin-top:1px">${esc(t.servicioNombre||'')}</div>
+          ${isPend?`<div style="font-size:.62rem;color:#f5a623;margin-top:2px">⏳ pendiente</div>`:''}
+        </div></td>`;
+      } else {
+        html += `<td style="${tdStyle}"><div style="border:1px dashed rgba(76,175,125,.2);border-radius:7px;padding:5px 8px;color:rgba(76,175,125,.4);font-size:.7rem;text-align:center">Libre</div></td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ── Tarifas pico / valle ─────────────────────────────────────────────────────
+function getPrecioConPico(precio, fecha, hora){
+  if(!precio) return precio;
+  const cfg = getTurnosCfg();
+  const p = cfg.tarifaPico;
+  if(!p||!p.activo) return precio;
+  const diaSemana = new Date(fecha+'T12:00:00').getDay();
+  if(!p.dias||!p.dias.includes(diaSemana)) return precio;
+  const [hh,mm] = (hora||'00:00').split(':').map(Number);
+  const [dh,dm] = (p.desde||'20:00').split(':').map(Number);
+  const [fh,fm] = (p.hasta||'23:00').split(':').map(Number);
+  const slotMin  = hh*60+(mm||0);
+  const desdeMin = dh*60+(dm||0);
+  const hastaMin = fh*60+(fm||0);
+  if(slotMin >= desdeMin && slotMin < hastaMin) return Math.round(precio*(p.multiplicador||1.5));
+  return precio;
+}
+
+function rTarifaPicoUI(){
+  const esC = esCancha(currentTenant?.rubro);
+  const card = document.getElementById('cardTarifaPico');
+  if(card) card.style.display = esC ? '' : 'none';
+  if(!esC) return;
+  const cfg = getTurnosCfg();
+  const p = cfg.tarifaPico || {};
+  const actEl = document.getElementById('picoActivo');
+  if(actEl) actEl.checked = !!p.activo;
+  const fields = document.getElementById('picoFields');
+  if(fields) fields.style.display = p.activo ? '' : 'none';
+  const d = document.getElementById('picoDesde'); if(d) d.value = p.desde||'20:00';
+  const h = document.getElementById('picoHasta'); if(h) h.value = p.hasta||'23:00';
+  const m = document.getElementById('picoMulti'); if(m) m.value = p.multiplicador||1.5;
+  const dias = p.dias||[5,6,0];
+  document.querySelectorAll('.diasPico').forEach(cb=>{ cb.checked = dias.includes(parseInt(cb.value)); });
+  _actualizarEjemploPico();
+  // Mostrar botón grilla solo para canchas
+  const btn = document.getElementById('vistaGrillaBtn');
+  if(btn) btn.style.display = esC ? '' : 'none';
+}
+
+function _actualizarEjemploPico(){
+  const cfg = getTurnosCfg();
+  const precio = (cfg.servicios||[])[0]?.precio || 1000;
+  const multi = parseFloat(document.getElementById('picoMulti')?.value)||1.5;
+  const ejBase = document.getElementById('picoEjBase'); if(ejBase) ejBase.textContent = precio.toLocaleString('es-AR');
+  const ejMul  = document.getElementById('picoEjMulti'); if(ejMul) ejMul.textContent = multi;
+  const ejRes  = document.getElementById('picoEjResult'); if(ejRes) ejRes.textContent = Math.round(precio*multi).toLocaleString('es-AR');
+}
+
+async function saveTarifaPico(){
+  const activo = document.getElementById('picoActivo')?.checked||false;
+  const fields = document.getElementById('picoFields');
+  if(fields) fields.style.display = activo ? '' : 'none';
+  _actualizarEjemploPico();
+  const cfg = getTurnosCfg();
+  cfg.tarifaPico = {
+    activo,
+    desde: document.getElementById('picoDesde')?.value||'20:00',
+    hasta: document.getElementById('picoHasta')?.value||'23:00',
+    dias: [...document.querySelectorAll('.diasPico:checked')].map(c=>parseInt(c.value)),
+    multiplicador: parseFloat(document.getElementById('picoMulti')?.value)||1.5
+  };
+  localStorage.setItem(TURNOS_CFG_KEY+'_'+(currentTenant?.id||''), JSON.stringify(cfg));
+  try{ await persistCfgToSupabase(); }catch(e){}
+  showToast('Tarifas pico guardadas ✓');
 }
 
 function setEmpleadoFiltro(id, btn){
@@ -13472,6 +13633,9 @@ function rTurnos(){
   const tSub   = document.getElementById('turnosPageSub');
   if(tTitle) tTitle.textContent = _esCancha_ ? 'Reservas' : 'Turnos';
   if(tSub)   tSub.textContent  = _esCancha_ ? 'Agenda de canchas' : 'Agenda del salón';
+  // Mostrar botón grilla solo para canchas
+  const _grillaBtn = document.getElementById('vistaGrillaBtn');
+  if(_grillaBtn) _grillaBtn.style.display = _esCancha_ ? '' : 'none';
   let turnos = getTurnos().filter(t=>t.fecha===fecha && t.estado!=='cancelado');
   if(turnosFiltroEmpleado.startsWith('auto_')){
     const nombre = turnosFiltroEmpleado.replace('auto_','');
@@ -13595,6 +13759,7 @@ function rTurnos(){
 
   // Render other views — SIEMPRE, aunque el día no tenga turnos
   if(turnosVista==='horario') rTurnosHorario();
+  if(turnosVista==='grilla') rTurnosGrilla();
   if(turnosVista==='semana') rTurnosSemana();
   if(turnosVista==='calendario') rTurnosCalendario();
   rOcupacionDia();
@@ -13832,6 +13997,7 @@ async function rTurnosConfig(){
   const _esGomCfg = _rubCfg.includes('gomeria')||_rubCfg.includes('gomería')||_rubCfg.includes('neumat')||_rubCfg.includes('cubiert');
   const _horLabel = document.querySelector('#cardHorarioSalon h3');
   if(_horLabel) _horLabel.textContent = _esGomCfg ? '🕐 Horario de atención' : '🕐 Horario del salón';
+  rTarifaPicoUI();
 
   // Si no hay servicios en localStorage, intentar restaurar desde Supabase
   let cfg = getTurnosCfg();
@@ -14935,7 +15101,7 @@ async function cargarSolicitudes(){
           ${s.estado==='confirmado'?`
             <button class="btn bd bsm" onclick="cancelarReservaOnline('${s.id}','${esc(s.nombre)}','${s.tel||''}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">✕ Cancelar</button>
           `:''}
-          ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">📲 WA</button>`:''}
+          ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}','${esc(_srvNombre)}','${esc(_empNombre)}')">📲 WA</button>`:''}
         </div>
       </div>`;
     }).join('');
@@ -15075,17 +15241,17 @@ async function cancelarReservaOnline(id, nombre, tel, fecha, hora){
   });
 }
 
-function waRespuestaSolicitud(nombre, tel, estado, fecha, hora){
+function waRespuestaSolicitud(nombre, tel, estado, fecha, hora, srvNombre, empNombre){
   const neg = currentTenant?.nombre||'el negocio';
   const _dir = getOnlineCfg().direccion||'';
+  const _esC = esCancha(currentTenant?.rubro);
+  const _tipo = _esC ? 'reserva' : 'turno';
+  const detalle = (srvNombre && srvNombre!=='—')
+    ? `\n${_esC?'🎾':'🔧'} ${srvNombre}${(empNombre&&empNombre!=='—')?' · '+(_esC?'🏟':'👤')+' '+empNombre:''}`
+    : '';
   let msg = estado==='confirmado'
-    ? `Hola ${nombre} 👋
-
-Tu turno en *${neg}* fue *confirmado* ✅
-📅 ${fecha} a las ${hora}${_dir?`\n📍 ${_dir}`:''}
-
-¡Te esperamos!`
-    : `Hola ${nombre}, te recordamos tu solicitud de turno en *${neg}*. ¿Confirmamos para el ${fecha} a las ${hora}?`;
+    ? `Hola ${nombre} 👋\n\nTu ${_tipo} en *${neg}* fue *confirmado* ✅\n📅 ${fecha} a las ${hora}${detalle}${_dir?`\n📍 ${_dir}`:''}\n\n¡Te esperamos!`
+    : `Hola ${nombre}, te recordamos tu solicitud de ${_tipo} en *${neg}*. ¿Confirmamos para el ${fecha} a las ${hora}?`;
   window.open('https://wa.me/549'+tel.replace(/\D/g,'')+'?text='+encodeURIComponent(msg),'_blank');
 }
 
@@ -23151,14 +23317,18 @@ async function _syncFijosSupabase(){
 
       const estadoBx   = {pendiente:'byw', confirmado:'bgr', cancelado:'brd'};
       const estadoLabel = {pendiente:'⏳ pendiente', confirmado:'✅ confirmado', cancelado:'✕ cancelado'};
+      const _sol2Cfg = getTurnosCfg();
+      const _sol2EsC = esCancha(currentTenant?.rubro);
       el.innerHTML = data.map(s=>{
         const displayNombre = (s.nombre||'').startsWith('__fijo__') ? '🔒 Turno fijo' : (s.nombre||'—');
+        const _srv2 = (_sol2Cfg.servicios||[]).find(x=>String(x.id)===String(s.servicio_id))?.nombre || s.servicio_nombre || s.servicio_id || '—';
+        const _emp2 = s.empleado_id ? ((_sol2Cfg.empleados||[]).find(x=>String(x.id)===String(s.empleado_id))?.nombre || '') : '';
         return `
         <div style="padding:12px;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
           <div>
             <div style="font-weight:600;font-size:.88rem">${esc(displayNombre)} <span class="bx ${estadoBx[s.estado]||'bgx'}" style="margin-left:6px">${estadoLabel[s.estado]||s.estado}</span></div>
             <div style="font-size:.75rem;color:var(--tx2);margin-top:3px">
-              📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${(s.hora||'—').substring(0,5)} &nbsp;·&nbsp; 🔧 ${esc(s.servicio_id||'—')}
+              📅 ${s.fecha||'—'} &nbsp;·&nbsp; 🕐 ${(s.hora||'—').substring(0,5)} &nbsp;·&nbsp; ${_sol2EsC?'🎾':'🔧'} ${esc(_srv2)}${_emp2?' &nbsp;·&nbsp; '+(_sol2EsC?'🏟':'👤')+' '+esc(_emp2):''}
             </div>
             ${s.tel?`<div style="font-size:.75rem;color:var(--tx2)">📱 ${esc(s.tel)}</div>`:''}
           </div>
@@ -23170,7 +23340,7 @@ async function _syncFijosSupabase(){
             ${s.estado==='confirmado'?`
               <button class="btn bd bsm" onclick="cancelarReservaOnline('${s.id}','${esc(s.nombre)}','${s.tel||''}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">✕ Cancelar</button>
             `:''}
-            ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}')">📲 WA</button>`:''}
+            ${s.tel?`<button class="btn bs bsm" onclick="waRespuestaSolicitud('${esc(s.nombre)}','${s.tel}','${s.estado}','${s.fecha||''}','${(s.hora||'').substring(0,5)}','${esc(_srv2)}','${esc(_emp2)}')">📲 WA</button>`:''}
           </div>
         </div>`;}).join('');
     } catch(e){

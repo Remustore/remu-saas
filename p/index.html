@@ -841,8 +841,28 @@ async function cargarSlotsPanel(){
       d.innerHTML=`<span style="color:#585044;text-decoration:line-through">${s.hora}</span>`;
     } else {
       d.className='slot';
-      d.textContent=s.hora;
       d.dataset.hora=s.hora;
+      // Precio pico
+      const _p = G.cfg?.tarifaPico;
+      const _srvPrecio = (G.cfg?.servicios||[]).find(sv=>String(sv.id)===String(document.getElementById('bkSrv')?.value||''))?.precio||0;
+      let _precioLabel = '';
+      if(_p&&_p.activo&&_srvPrecio){
+        const _diaSel = new Date(fecha+'T12:00:00').getDay();
+        const _diasP = _p.dias||[];
+        if(_diasP.includes(_diaSel)){
+          const [_dh,_dm]=(_p.desde||'20:00').split(':').map(Number);
+          const [_fh,_fm]=(_p.hasta||'23:00').split(':').map(Number);
+          const [_sh,_sm]=s.hora.split(':').map(Number);
+          const _sMin=_sh*60+_sm, _dMin=_dh*60+_dm, _fMin=_fh*60+_fm;
+          if(_sMin>=_dMin&&_sMin<_fMin){
+            const _pp=Math.round(_srvPrecio*(_p.multiplicador||1.5));
+            _precioLabel=`<span style="display:block;font-size:.62rem;color:#c9a84c;font-weight:700;margin-top:1px">⚡ $${_pp.toLocaleString('es-AR')}</span>`;
+          } else if(_srvPrecio){
+            _precioLabel=`<span style="display:block;font-size:.62rem;color:#a89880;margin-top:1px">$${_srvPrecio.toLocaleString('es-AR')}</span>`;
+          }
+        }
+      }
+      d.innerHTML=`<span>${s.hora}</span>${_precioLabel}`;
       d.onclick=function(){
         document.querySelectorAll('#bkSlots .slot.sel').forEach(el=>el.classList.remove('sel'));
         this.classList.add('sel');
