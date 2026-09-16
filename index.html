@@ -7210,8 +7210,10 @@ function rDash(){
   const rubD=(currentTenant?.rubro||'').toLowerCase();
   const esBarberiaD=esNegocioTurnos(rubD);
   const esGomeriaD=rubD.includes('gomeria')||rubD.includes('gomería')||rubD.includes('neumat')||rubD.includes('cubiert');
+  const esRepartoD=rubD.includes('reparto')||rubD.includes('entrega')||rubD.includes('distribuc');
   const _cajaDia=document.getElementById('cajaDiaGom'); if(_cajaDia) _cajaDia.style.display='none';
   if(esGomeriaD){ rDashGomeria(); return; }
+  if(esRepartoD){ rDashReparto(); return; }
   // Para barberías/salones: ingresos de servicio desde getTurnos() (localStorage, sin duplicados).
   // S.ventas puede tener duplicados históricos → no usar para servicios en barberías.
   const tVProducto = esBarberiaD ? vm.filter(v=>v.tipo!=='servicio').reduce((a,v)=>a+v.total,0) : 0;
@@ -7725,6 +7727,84 @@ function rAnalisisGomeria(){
   const mets={}; vFilt.forEach(v=>{mets[v.metodo]=(mets[v.metodo]||0)+v.total;});
   const totP=Object.values(mets).reduce((a,b)=>a+b,0);
   document.getElementById('pagos').innerHTML=totP?Object.entries(mets).sort((a,b)=>b[1]-a[1]).map(([met,tot])=>{const p=Math.round(tot/totP*100);return`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:.79rem"><span>${met}</span><span style="color:var(--gld);font-weight:600">${fmt(tot)} (${p}%)</span></div><div class="pb"><div class="pf" style="width:${p}%"></div></div></div>`;}).join(''):emp('💳','Sin ventas de cubiertas');
+}
+
+function rDashReparto(){
+  // — Acciones rápidas —
+  const qbtns = document.getElementById('dashQuickBtns');
+  if(qbtns) qbtns.innerHTML = `
+    <div style="font-size:.65rem;color:var(--tx2);text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px">Acciones rápidas</div>
+    <div style="display:grid;gap:10px">
+      <button class="btn bg"  style="padding:13px;font-size:.88rem;justify-content:center" onclick="openNuevoPedidoRep();go('pedidosReparto')"><span style="font-size:1rem">📦</span> Nuevo pedido</button>
+      <button class="btn bgh" style="padding:13px;font-size:.88rem;justify-content:center" onclick="go('pedidosReparto')"><span style="font-size:1rem">🚗</span> Ver pedidos del día</button>
+      <button class="btn"     style="padding:13px;font-size:.88rem;justify-content:center" onclick="go('resumenReparto')"><span style="font-size:1rem">📊</span> Resumen de entregas</button>
+    </div>`;
+
+  const hoy    = tod();
+  const peds   = S.pedidosReparto || [];
+  const pedsFilt = filtrarDash(peds, 'fecha');
+
+  const cobrado  = pedsFilt.filter(p=>p.estado==='entregado').reduce((s,p)=>s+(p.total||0),0);
+  const tG       = filtrarDash(S.gastos,'fecha').reduce((a,g)=>a+g.monto,0);
+  const ganReal  = cobrado - tG;
+
+  const hoyPeds      = peds.filter(p=>p.fecha===hoy);
+  const cPendiente   = hoyPeds.filter(p=>p.estado==='pendiente').length;
+  const cEnCamino    = hoyPeds.filter(p=>p.estado==='en_camino').length;
+  const cEntregado   = hoyPeds.filter(p=>p.estado==='entregado').length;
+
+  // — Stats —
+  const filtLabel = getDFiltLabel();
+  document.getElementById('dStats').innerHTML=`
+    <div class="stat"><div class="sl">${filtLabel}</div><div class="sv" style="color:var(--ok)">${fmt(cobrado)}</div><div class="ss">${pedsFilt.filter(p=>p.estado==='entregado').length} entrega${pedsFilt.filter(p=>p.estado==='entregado').length!==1?'s':''}</div></div>
+    <div class="stat"><div class="sl">Gastos del período</div><div class="sv" style="color:var(--bad)">${fmt(tG)}</div></div>
+    <div class="stat"><div class="sl">Ganancia neta</div><div class="sv" style="color:${ganReal>=0?'var(--gld)':'var(--bad)'}">${fmt(ganReal)}</div></div>
+    <div class="stat"><div class="sl">📦 Hoy</div><div class="sv" style="color:var(--wrn)">${cEntregado} entregado${cEntregado!==1?'s':''}</div><div class="ss">🕐 ${cPendiente} pendiente${cPendiente!==1?'s':''}  🚗 ${cEnCamino} en camino</div></div>`;
+
+  // — Meta —
+  const meta=S.meta||0, pct=meta>0?Math.min(100,Math.round(cobrado/meta*100)):0;
+  document.getElementById('metaArc').style.strokeDashoffset=157-(157*pct/100);
+  document.getElementById('mPct').textContent=pct+'%';
+  document.getElementById('mVal').textContent=fmt(meta);
+  document.getElementById('mVen').textContent=fmt(cobrado);
+
+  // — Flujo —
+  const mg=cobrado>0?Math.round(ganReal/cobrado*100):0;
+  document.getElementById('flujo').innerHTML=`
+    <div class="fi2"><span>Ingresos</span><span style="color:var(--ok);font-weight:600">${fmt(cobrado)}</span></div>
+    <div class="fi2"><span>Gastos operativos</span><span style="color:var(--bad);font-weight:600">- ${fmt(tG)}</span></div>
+    <div class="gl"></div>
+    <div class="fi2"><span style="font-weight:600">Resultado neto</span><span style="color:${ganReal>=0?'var(--gld)':'var(--bad)'};font-family:var(--fh);font-size:1.05rem;font-weight:700">${fmt(ganReal)}</span></div>
+    <div style="margin-top:7px;font-size:.71rem;color:var(--mut)">Margen: <strong style="color:${mg>30?'var(--ok)':mg>15?'var(--wrn)':'var(--bad)'}">${mg}%</strong></div>`;
+
+  // — Top clientes —
+  const topSCard=document.getElementById('topSCard'); if(topSCard) topSCard.style.display='';
+  const cliMap={}; pedsFilt.filter(p=>p.estado==='entregado').forEach(p=>{const k=p.cliente||'Sin nombre';cliMap[k]=(cliMap[k]||0)+(p.total||0);});
+  const topCli=Object.entries(cliMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  document.getElementById('topS').innerHTML=topCli.length
+    ?topCli.map(([n,t],i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)"><div style="font-family:var(--fh);font-size:.9rem;font-weight:700;color:${i===0?'var(--gld)':'var(--mut)'};width:16px">${i+1}</div><div style="flex:1;font-size:.8rem">${esc(n)}</div><div style="font-weight:600;color:var(--gld);font-size:.8rem">${fmt(t)}</div></div>`).join('')
+    :emp('🚚','Sin entregas en este período');
+
+  // — Alertas —
+  const als=[];
+  if(cPendiente>0) als.push({t:'w',m:`${cPendiente} pedido${cPendiente!==1?'s':''} pendiente${cPendiente!==1?'s':''} para hoy`});
+  if(cEnCamino>0)  als.push({t:'o',m:`${cEnCamino} pedido${cEnCamino!==1?'s':''} en camino ahora`});
+  if(ganReal<0)    als.push({t:'b',m:`Los gastos superan los ingresos en <strong>${fmt(Math.abs(ganReal))}</strong>`});
+  if(meta>0&&pct>=100) als.push({t:'o',m:`¡Meta de ${fmt(meta)} alcanzada! 🎉`});
+  document.getElementById('alerts').innerHTML=als.length
+    ?als.map(a=>`<div class="al ${a.t==='w'?'aw':a.t==='o'?'ao':'ab'}"><span>${a.t==='w'?'⚠':a.t==='o'?'✓':'✕'}</span><span>${a.m}</span></div>`).join('')
+    :`<div class="al ai"><span>✓</span><span>Sin alertas. Todo en orden.</span></div>`;
+
+  // — Consejos —
+  const cns=[];
+  if(cPendiente>3) cns.push({i:'⚡',t:'Muchos pedidos pendientes',d:`Tenés ${cPendiente} pedidos sin salir. Asigná repartidor y mandá el WhatsApp de "en camino" para mantener a los clientes informados.`});
+  if(mg<20&&cobrado>0) cns.push({i:'📊',t:'Revisá tus márgenes',d:'El margen está por debajo del 20%. Revisá si el precio de entrega cubre los costos operativos.'});
+  if(!cns.length) cns.push({i:'🚚',t:'Registrá tus entregas',d:'Con al menos una semana de datos verás tus métricas de entrega, clientes más frecuentes y resultado del negocio.'});
+  document.getElementById('cons').innerHTML=cns.slice(0,4).map(c=>`<div class="co"><span class="coi">${c.i}</span><div class="cot"><strong>${c.t}</strong>${c.d}</div></div>`).join('');
+
+  // Ocultar objetivos de taller (no aplica a reparto)
+  const objCard=document.getElementById('objHoy');
+  if(objCard&&objCard.parentElement) objCard.parentElement.style.display='none';
 }
 
 function rAnalisisBarber(){
