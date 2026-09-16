@@ -3259,10 +3259,12 @@ function _setSbOnlineState(online){
 }
 async function _pingSupabase(){
   try {
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return; // sin sesión activa no hay nada que pingar
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 6000);
     const res = await fetch(SURL + '/rest/v1/', {
-      headers: { apikey: SKEY, Authorization: 'Bearer ' + SKEY },
+      headers: { apikey: SKEY, Authorization: 'Bearer ' + session.access_token },
       signal: ctrl.signal
     });
     clearTimeout(t);
