@@ -5282,7 +5282,12 @@ async function loadAll(){
       dbLoad('presupuestos').catch(()=>[]),
       dbLoad('pedidos_reparto').catch(()=>[])
     ]);
-    S.stock=(stock||[]).filter(Boolean); S.equipos=equipos;
+    const stockFiltrado = (stock||[]).filter(Boolean);
+    // Proteger contra carga vacía inesperada (sesión expirada, error RLS): si Supabase
+    // devuelve [] pero ya teníamos productos cargados, conservar los existentes.
+    if(stockFiltrado.length > 0 || S.stock.length === 0) S.stock = stockFiltrado;
+    else console.warn('[stock] Supabase devolvió [] pero S.stock tenía', S.stock.length, 'items — conservando caché');
+    S.equipos=equipos;
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
     // Deduplicar ventas por turnoId: si hay múltiples ventas del mismo turno (bug anterior),
     // conservar solo la primera. Ventas sin turnoId (ventas manuales) se conservan todas.
@@ -6389,7 +6394,7 @@ function rStock(){
   const q = (document.getElementById('sQ').value||'').toLowerCase();
   const items = S.stock.filter(s=>(sFilt==='todos'||s.categoria===sFilt)&&(!q||s.nombre.toLowerCase().includes(q)));
   const tb = document.getElementById('tbS');
-  if(!items.length){ tb.innerHTML=`<tr><td colspan="8">${emp('📦','Sin productos')}</td></tr>`; return; }
+  if(!items.length){ const msg = (sFilt!=='todos'||q) ? 'Sin productos en esta categoría' : 'Sin productos'; tb.innerHTML=`<tr><td colspan="8">${emp('📦',msg)}</td></tr>`; return; }
   tb.innerHTML = items.map(s=>{
     const mg = s.precio&&s.costo ? Math.round((s.precio-s.costo)/s.precio*100) : null;
     return `<tr><td><strong>${esc(s.nombre)}</strong>${s.notas?`<br><span style="font-size:.7rem;color:var(--mut)">${esc(s.notas)}</span>`:''}</td>
@@ -12870,6 +12875,7 @@ function getCategorias(){
 }
 
 function setupCategoriasStock(){
+  sFilt = 'todos';
   var cats = getCategorias();
   var stabs = document.getElementById("stabs");
   if(stabs){
