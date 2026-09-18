@@ -725,11 +725,10 @@ async function cargarSlotsPanel(){
   const empId = document.getElementById('bkEmp')?.value||'';
   const hasMultiEmp = cfg.empleados && cfg.empleados.length > 1;
 
-  const {data:rows} = await sb.from('turnos_solicitudes')
-    .select('hora,estado,nombre,servicio_id,empleado_id')
-    .eq('tenant_id',G.tenantId)
-    .eq('fecha',fecha)
-    .in('estado',['confirmado','pendiente','bloqueado']);
+  const {data:rows} = await sb.rpc('get_disponibilidad', {
+    p_tenant_id: G.tenantId,
+    p_fecha: fecha
+  });
 
   const fijosMin    = new Set();
   let   ocupadosMin;
@@ -914,11 +913,20 @@ async function enviarReserva(){
     // Multi-cancha: si no se eligió una, auto-asignar la primera cancha libre
     const _hasMultiEmp = G.cfg.empleados && G.cfg.empleados.length > 1;
     let finalEmpId = empId;
+
+    // Fetch único de disponibilidad vía RPC (no expone nombre/tel del cliente)
+    const {data:_slotsHoy} = await sb.rpc('get_disponibilidad', {
+      p_tenant_id: G.tenantId,
+      p_fecha: fecha
+    });
+    const _sf = _slotsHoy || [];
+
     if(!finalEmpId && _hasMultiEmp){
-      const {data:empOcu} = await sb.from('turnos_solicitudes')
-        .select('empleado_id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
-        .in('hora',horasReq).in('estado',['confirmado','bloqueado'])
-        .not('empleado_id','is',null);
+      const empOcu = _sf.filter(r =>
+        horasReq.includes(r.hora) &&
+        ['confirmado','bloqueado'].includes(r.estado) &&
+        r.empleado_id != null
+      );
       const busyIds = new Set((empOcu||[]).map(r=>String(r.empleado_id)));
       // También verificar bloqueos de config (no sólo los del DB)
       const freeEmp = G.cfg.empleados.find(e=>{
@@ -933,12 +941,15 @@ async function enviarReserva(){
       finalEmpId = String(freeEmp.id);
     }
 
-    // Chequeo previo filtrado por empleado/cancha específica
-    let previoQ = sb.from('turnos_solicitudes')
-      .select('id').eq('tenant_id',G.tenantId).eq('fecha',fecha)
-      .in('hora',horasReq).in('estado',['confirmado','bloqueado']);
-    if(finalEmpId) previoQ = previoQ.eq('empleado_id', parseInt(finalEmpId));
-    const {data:previo} = await previoQ.limit(1);
+    // Chequeo previo filtrado por empleado/cancha específica (usando datos ya cargados)
+    let _previo = _sf.filter(r =>
+      horasReq.includes(r.hora) &&
+      ['confirmado','bloqueado'].includes(r.estado)
+    );
+    if(finalEmpId) _previo = _previo.filter(r =>
+      r.empleado_id != null && String(r.empleado_id) === String(parseInt(finalEmpId))
+    );
+    const previo = _previo;
     if(previo&&previo.length){
       showErr(T('errOcupado'));
       btn.disabled=false; btn.textContent=T('confirmarReserva');
@@ -971,10 +982,15 @@ async function enviarReserva(){
       if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
     }
 
-    const {data:todos} = await sb.from('turnos_solicitudes')
-      .select('id,created_at,estado,empleado_id')
-      .eq('tenant_id',G.tenantId).eq('fecha',fecha).eq('hora',hora)
-      .in('estado',['confirmado','bloqueado','pendiente']);
+    // Re-fetch post-insert para detectar colisión de carrera (datos frescos)
+    const {data:_todosPost} = await sb.rpc('get_disponibilidad', {
+      p_tenant_id: G.tenantId,
+      p_fecha: fecha
+    });
+    const todos = (_todosPost||[]).filter(t =>
+      t.hora === hora &&
+      ['confirmado','bloqueado','pendiente'].includes(t.estado)
+    );
     const conflicto=(todos||[]).some(t=>{
       if(t.id===ins.id) return false;
       if(t.created_at>ts) return false;
