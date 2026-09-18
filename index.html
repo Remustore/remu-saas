@@ -3138,11 +3138,11 @@ $$;</pre>
 <div id="cdHistorial" style="margin-bottom:8px"></div>
 <div id="cdExtra"></div>
 <div style="background:rgba(201,82,76,.08);border:1px solid rgba(201,82,76,.2);border-radius:8px;padding:10px 12px;font-size:.78rem;color:var(--bad);margin-top:10px">
-  ⚠️ El <strong>reset</strong> es solo visual — no elimina datos. Los totales se reinician para el próximo turno del día.
+  ⚠️ <strong>Reiniciar caja</strong> elimina los movimientos manuales de hoy (ingresos/egresos extra). Las ventas y gastos se conservan.
 </div>
 </div><div class="mf">
 <button class="btn" onclick="guardarCierreDiario(false)">💾 Solo guardar</button>
-<button class="btn bg" onclick="guardarCierreDiario(true)">💾 Guardar y reiniciar caja</button>
+<button class="btn bg" onclick="_confirmarReiniciarCaja()">🔄 Guardar y reiniciar caja</button>
 </div></div></div>
 
 <!-- Mov Caja -->
@@ -8116,7 +8116,9 @@ function delMovCaja(id){
 
 function rMovCaja(){
   const mes = tod().slice(0,7);
-  const movs = (S.movCaja||[]).filter(m=>!m.fecha||(m.fecha||'').slice(0,7)===mes).sort((a,b)=>(b.id||0)-(a.id||0));
+  // Mostrar último mes completo (30 días) para que no desaparezcan registros al cambiar de mes
+  const desde = new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+  const movs = (S.movCaja||[]).filter(m=>!m.fecha||(m.fecha||'')>=desde).sort((a,b)=>(b.id||0)-(a.id||0));
   const gastosVar = (S.gastos||[]).filter(g=>g.tipo==='variable'&&(g.fecha||'').slice(0,7)===mes);
   const totalGastos = gastosVar.reduce((a,g)=>a+(g.monto||0),0);
 
@@ -8282,6 +8284,10 @@ function cierreDiario(){
   }
 }
 
+function _confirmarReiniciarCaja(){
+  _confirmarModal('¿Reiniciar la caja del día?\n\nEsto elimina los movimientos manuales de hoy (ingresos/egresos extra registrados). Las ventas y gastos quedan intactos.', ()=>guardarCierreDiario(true));
+}
+
 async function guardarCierreDiario(resetear){
   const data = window.__cierreDiarioData;
   if(!data) return;
@@ -8302,9 +8308,10 @@ async function guardarCierreDiario(resetear){
     // Guardar timestamp del cierre
     localStorage.setItem('caja_reset_'+(currentTenant?.id||'')+'_'+data.fecha, Date.now());
     // Limpiar movCaja del día para que la caja arranque en cero
+    // IMPORTANTE: solo borrar registros CON fecha == hoy, nunca los sin fecha (podrían ser históricos)
     const hoy = tod();
-    const _hoyMovs = (S.movCaja||[]).filter(m => !m.fecha || m.fecha === hoy);
-    S.movCaja = (S.movCaja||[]).filter(m => m.fecha && m.fecha !== hoy);
+    const _hoyMovs = (S.movCaja||[]).filter(m => m.fecha === hoy);
+    S.movCaja = (S.movCaja||[]).filter(m => m.fecha !== hoy);
     try { await Promise.all(_hoyMovs.map(m => dbDelete('mov_caja', m.id))); } catch(e){}
     // Resetear también ventas del día en memoria (solo en pantalla, no borra Supabase)
     // La caja visual queda en $0 porque movCaja está limpio y ventas quedan en Supabase
