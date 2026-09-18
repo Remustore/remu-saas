@@ -946,11 +946,16 @@ async function enviarReserva(){
     }
 
     const ts=new Date().toISOString();
+    const finalEmpNombre = (G.cfg.empleados||[]).find(e=>String(e.id)===String(finalEmpId))?.nombre || '';
     const {data:ins,error:insErr} = await sb.from('turnos_solicitudes').insert({
       tenant_id:G.tenantId, nombre, tel,
       servicio_id:srvId||null,
+      servicio_nombre: srv?.nombre || '',
       empleado_id:finalEmpId?(parseInt(finalEmpId)||null):null,
-      fecha, hora, estado:'confirmado', created_at:ts
+      empleado_nombre: finalEmpNombre,
+      precio: srv?.precio || 0,
+      duracion: dur,
+      fecha, hora, estado:'confirmado', origen:'online', created_at:ts
     }).select('id').single();
     if(insErr) throw new Error(insErr.message||T('errReserva'));
 
@@ -958,7 +963,9 @@ async function enviarReserva(){
       const extras=[];
       for(let k=1;k<pasos;k++){
         extras.push({tenant_id:G.tenantId,nombre:'__extra__:'+(ins?.id||''),tel,
-          servicio_id:srvId||null,empleado_id:finalEmpId?(parseInt(finalEmpId)||null):null,
+          servicio_id:srvId||null, servicio_nombre:srv?.nombre||'',
+          empleado_id:finalEmpId?(parseInt(finalEmpId)||null):null, empleado_nombre:finalEmpNombre,
+          precio:0, duracion:30, origen:'online',
           fecha,hora:minToHH(hhToMin(hora)+k*30),estado:'bloqueado',created_at:ts});
       }
       if(extras.length) await sb.from('turnos_solicitudes').insert(extras);
