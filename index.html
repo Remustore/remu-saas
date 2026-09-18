@@ -9437,14 +9437,23 @@ async function _upsertTurnoSb(obj){
       if(error) throw error;
       return {ok:true, sbId:obj._sbId};
     } else {
-      const {data, error} = await sb.from('turnos_solicitudes')
-        .upsert({...payload}, {onConflict:'tenant_id,ref_id'}).select('id').single();
-      if(error) throw error;
-      if(data?.id){
-        obj._sbId = data.id;
-        _addAdminSbId(data.id);
+      // Buscar primero por (tenant_id, ref_id) para evitar duplicados independientemente
+      // del índice DB — el partial unique index no funciona con ON CONFLICT de PostgREST
+      const {data:existe} = await sb.from('turnos_solicitudes')
+        .select('id').eq('tenant_id', tid).eq('ref_id', String(obj.id)).maybeSingle();
+      if(existe?.id){
+        const {error} = await sb.from('turnos_solicitudes').update(payload).eq('id', existe.id);
+        if(error) throw error;
+        obj._sbId = existe.id;
+        _addAdminSbId(existe.id);
+        return {ok:true, sbId:existe.id};
+      } else {
+        const {data, error} = await sb.from('turnos_solicitudes')
+          .insert(payload).select('id').single();
+        if(error) throw error;
+        if(data?.id){ obj._sbId = data.id; _addAdminSbId(data.id); }
+        return {ok:true, sbId:data?.id};
       }
-      return {ok:true, sbId:data?.id};
     }
   } catch(e){
     console.warn('[_upsertTurnoSb]', e.message);
