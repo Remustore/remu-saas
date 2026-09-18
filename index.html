@@ -5193,18 +5193,33 @@ async function loadSaStats(){
 }
 
 // ═══ SUPABASE CRUD (con tenant_id) ═══
+
+// Cache localStorage para datos críticos — fallback cuando Supabase falla
+function _lsSave(key, data){ try{ if(currentTenant?.id) localStorage.setItem('_rc_'+key+'_'+currentTenant.id, JSON.stringify(data)); }catch(e){} }
+function _lsLoad(key){ try{ const d=localStorage.getItem('_rc_'+key+'_'+(currentTenant?.id||'')); return d?JSON.parse(d):null; }catch(e){ return null; } }
+
+// Asignación defensiva: solo pisa S.X si hay datos nuevos; si no, conserva el actual o intenta LS
+function _safeSet(newArr, current, lsKey, fallbackFn){
+  const d=(newArr||[]).filter(Boolean);
+  if(d.length>0){ if(lsKey) _lsSave(lsKey,d); return d; }         // Supabase devolvió datos
+  if(current&&current.length>0){ return current; }                  // Supabase vacío pero teníamos — conservar
+  const ls=lsKey?_lsLoad(lsKey):null;                               // Último recurso: localStorage
+  if(ls&&ls.length>0) return ls;
+  return fallbackFn ? fallbackFn() : [];                            // Nuevo tenant o todo vacío
+}
+
 async function dbLoad(table){
   try{
     let query = sb.from(table).select('*');
     if(currentTenant) query = query.eq('tenant_id', currentTenant.id);
     const { data, error } = await query;
-    if(error){ console.error('[dbLoad] error en', table, error); throw error; }
+    if(error){ console.error('[dbLoad] error en', table, error); return null; } // null = error (≠ legítimamente vacío)
     console.log('[dbLoad]', table, '→', (data||[]).length, 'filas');
     return (data||[]).map(r => {
       if(typeof r.data === 'string'){ try{ return JSON.parse(r.data); }catch(e){ return r.data; } }
       return r.data;
     }).filter(Boolean);
-  }catch(e){ console.error('Load error', table, e); return []; }
+  }catch(e){ console.error('Load error', table, e); return null; }
 }
 
 async function dbUpsert(table, item){
@@ -5282,15 +5297,12 @@ async function loadAll(){
       dbLoad('presupuestos').catch(()=>[]),
       dbLoad('pedidos_reparto').catch(()=>[])
     ]);
-    const stockFiltrado = (stock||[]).filter(Boolean);
-    // Proteger contra carga vacía inesperada (sesión expirada, error RLS): si Supabase
-    // devuelve [] pero ya teníamos productos cargados, conservar los existentes.
-    if(stockFiltrado.length > 0 || S.stock.length === 0) S.stock = stockFiltrado;
-    else console.warn('[stock] Supabase devolvió [] pero S.stock tenía', S.stock.length, 'items — conservando caché');
-    S.equipos=equipos;
+    // Stock — _safeSet conserva si Supabase devuelve null/vacío inesperado
+    S.stock = _safeSet(stock, S.stock, 'stock');
+    S.equipos = equipos||S.equipos||[];
     console.log('[stock] cargados:', S.stock.length, '— tenant:', currentTenant?.id);
-    // Deduplicar ventas por turnoId: si hay múltiples ventas del mismo turno (bug anterior),
-    // conservar solo la primera. Ventas sin turnoId (ventas manuales) se conservan todas.
+
+    // Ventas — deduplicar por turnoId y asignar de forma defensiva
     const ventasSinDuplicar = [];
     const turnoIdsVistos = new Set();
     for(const v of (ventas||[])){
@@ -5301,9 +5313,10 @@ async function loadAll(){
         ventasSinDuplicar.push(v);
       }
     }
-    if(ventasSinDuplicar.length !== (ventas||[]).length) console.warn('[loadAll] Se eliminaron', (ventas||[]).length - ventasSinDuplicar.length, 'ventas duplicadas de S.ventas');
-    S.ventas = ventasSinDuplicar;
-    S.gastos=gastos.length ? gastos : getGastosFijos();
+    S.ventas = _safeSet(ventasSinDuplicar, S.ventas, 'ventas');
+
+    // Gastos — fallback a getGastosFijos() solo para tenants sin gastos creados
+    S.gastos = _safeSet(gastos, S.gastos, 'gastos', ()=>getGastosFijos());
     // Restaurar turnosCfg y onlineCfg desde Supabase si no están en localStorage
     const tid = currentTenant?.id||'';
     if(precios){
@@ -5332,10 +5345,10 @@ async function loadAll(){
       // Filtrar filas de configuración para que no entren en S.precios
       precios = precios.filter(p=>!p.__turnosCfg && !p.__tipo);
     }
-    S.reparaciones=reparaciones; S.precios=precios; S.meta=meta||0;
-    S.inversores=inversores; S.movimientos_inv=movimientos_inv;
+    S.reparaciones=reparaciones||S.reparaciones||[]; S.precios=precios||S.precios||[]; S.meta=meta||0;
+    S.inversores=inversores||S.inversores||[]; S.movimientos_inv=movimientos_inv||S.movimientos_inv||[];
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
-    S.movCaja=movCaja||[];
+    S.movCaja = _safeSet(movCaja, S.movCaja, 'movCaja');
     S.pedidos=pedidos||[];
     S.cubiertas=cubiertas||[];
     S.presupuestos=presupuestos||[];
@@ -16258,19 +16271,21 @@ async function silentRefresh(){
       dbLoad('inversores'),dbLoad('movimientos_inv'),
       dbGetConfig('objetivos'),dbLoad('mov_caja')
     ]);
-    S.stock=stock;S.equipos=equipos;
+    S.stock = _safeSet(stock, S.stock, 'stock');
+    S.equipos=equipos||S.equipos||[];
     // Deduplicar por turnoId igual que en loadAll()
     const _vSinDup=[];const _tIds=new Set();
     for(const v of (ventas||[])){if(v.turnoId){if(!_tIds.has(v.turnoId)){_tIds.add(v.turnoId);_vSinDup.push(v);}}else{_vSinDup.push(v);}}
-    S.ventas=_vSinDup;S.gastos=gastos;
+    S.ventas = _safeSet(_vSinDup, S.ventas, 'ventas');
+    S.gastos = _safeSet(gastos, S.gastos, 'gastos', ()=>getGastosFijos());
     // Preservar reparaciones locales recientes que aún no aparecen en Supabase (race condition con dbUpsert)
     const _repIds=new Set((reparaciones||[]).map(r=>r.id));
     const _repLocales=(S.reparaciones||[]).filter(r=>!_repIds.has(r.id));
     S.reparaciones=[...(reparaciones||[]),..._repLocales];
-    S.precios=precios;S.meta=meta||0;
-    S.inversores=inversores;S.movimientos_inv=movimientos_inv;
+    S.precios=precios||S.precios||[];S.meta=meta||0;
+    S.inversores=inversores||S.inversores||[];S.movimientos_inv=movimientos_inv||S.movimientos_inv||[];
     S.objetivos=objetivos||{repCant:7,repPre:40000,accCant:10,accPre:10000,eqCant:1,eqPre:0};
-    S.movCaja=movCaja||[];
+    S.movCaja = _safeSet(movCaja, S.movCaja, 'movCaja');
     const active=document.querySelector('.sec.active');
     if(active){const id=active.id.replace('sec-','');const renders={dashboard:rDash,stock:rStock,equipos:rEquipos,ventas:rVentas,taller:rTaller,clientes:rClientes,auditoria:rAuditoria,agendaTecnico:rAgendaTecnico,turnos:rTurnos,turnosConfig:rTurnosConfig,fichasClientes:rFichasClientesMain,turnosOnline:rTurnosOnline,turnosTec:rTurnosTec,turnosFijos:rTurnosFijos,listaEspera:rListaEspera,objetivosCompra:rObjetivosCompra,gastos:rGastos,analisis:rAnalisis,precios:rPrecios,inversores:rInversores,cubiertas:rCubiertas,clientesGomeria:rClientesGomeria,ranking:rRanking};if(renders[id])renders[id]();}
     const dot=document.getElementById('syncDot');dot.style.background='var(--gld)';setTimeout(()=>dot.style.background='',600);
