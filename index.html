@@ -5218,7 +5218,7 @@ async function dbLoad(table){
     return (data||[]).map(r => {
       if(typeof r.data === 'string'){ try{ return JSON.parse(r.data); }catch(e){ return r.data; } }
       return r.data;
-    }).filter(Boolean);
+    }).filter(d => d && !d._deleted);
   }catch(e){ console.error('Load error', table, e); return null; }
 }
 
@@ -5257,6 +5257,13 @@ async function dbDelete(table, id){
     if(error) throw error;
     setSynced(); return true;
   }catch(e){ console.error('Delete error', e); setSyncErr(); return false; }
+}
+
+// Soft delete: marca _deleted:true en el JSONB en vez de borrar la fila
+// La fila queda en Supabase y se puede recuperar; dbLoad la filtra automáticamente
+async function dbSoftDelete(table, item){
+  if(!item?.id) return false;
+  return dbUpsert(table, {...item, _deleted:true, _deletedAt:new Date().toISOString()});
 }
 
 async function dbSetConfig(key, value){
@@ -6332,7 +6339,11 @@ async function confirmarVentaRapida(){
 }
 
 async function delStock(id){
-  if(!confirm('¿Eliminar producto?')) return;
+  const prod = S.stock.find(s=>s.id===id);
+  const msg = prod
+    ? `¿Eliminar "${prod.nombre}"?\nStock actual: ${prod.cantidad} unidad${prod.cantidad===1?'':'es'}`
+    : '¿Eliminar producto?';
+  if(!confirm(msg)) return;
   const snap = JSON.parse(JSON.stringify(S.stock));
   S.stock = S.stock.filter(s=>s.id!==id);
   await dbDelete('stock',id); pushUndo('Eliminar producto','stock',snap); rStock();
@@ -6488,9 +6499,15 @@ async function saveGasto(){
 }
 
 async function delGasto(id){
-  _confirmarModal('¿Eliminar este gasto?', async()=>{
+  const item = S.gastos.find(g=>g.id===id);
+  const label = item
+    ? `¿Eliminar gasto "${item.concepto||item.nombre||'sin nombre'}" por $${(item.monto||0).toLocaleString('es-AR')}?`
+    : '¿Eliminar este gasto?';
+  _confirmarModal(label, async()=>{
     const snap=JSON.parse(JSON.stringify(S.gastos));
-    S.gastos=S.gastos.filter(g=>g.id!==id);await dbDelete('gastos',id);pushUndo('Eliminar gasto','gastos',snap);rGastos();
+    S.gastos=S.gastos.filter(g=>g.id!==id);
+    if(item) await dbSoftDelete('gastos', item);
+    pushUndo('Eliminar gasto','gastos',snap); rGastos();
   });
 }
 
@@ -7942,9 +7959,10 @@ function getCajas(){
   const rubC=(currentTenant?.rubro||'').toLowerCase();
   const esSalonC=/barber|barbería|salon|belleza/i.test(rubC);
   const esGomC=rubC.includes('gomeria')||rubC.includes('gomería')||rubC.includes('neumat')||rubC.includes('cubiert');
-  // Timestamp del último reset del día (si existe): excluir movCaja anteriores a ese punto
-  const _resetTs = parseInt(localStorage.getItem('caja_reset_'+(currentTenant?.id||'')+'_'+hoy)||'0');
-  const _movHoy = (S.movCaja||[]).filter(m=>(!m.fecha||m.fecha===hoy)&&(!_resetTs||m.id>_resetTs));
+  // Timestamp del último reset del día: primero busca en Supabase (mov_caja tipo:'reset'), fallback localStorage
+  const _resetSb = (S.movCaja||[]).filter(m=>m.fecha===hoy&&m.tipo==='reset').sort((a,b)=>(b.id||0)-(a.id||0))[0];
+  const _resetTs = _resetSb ? (_resetSb.id||0) : parseInt(localStorage.getItem('caja_reset_'+(currentTenant?.id||'')+'_'+hoy)||'0');
+  const _movHoy = (S.movCaja||[]).filter(m=>m.tipo!=='reset'&&(!m.fecha||m.fecha===hoy)&&(!_resetTs||m.id>_resetTs));
 
   if(esGomC){
     const cajas={cubiertas:0,servicios:0,general:0};
@@ -8142,9 +8160,13 @@ function editMovCaja(id){
 }
 
 function delMovCaja(id){
-  _confirmarModal('¿Eliminar este movimiento?', async ()=>{
+  const item = (S.movCaja||[]).find(x=>x.id===id);
+  const label = item
+    ? `¿Eliminar ${item.tipo==='ingreso'?'ingreso':'egreso'} "${item.concepto||'sin detalle'}" por $${(item.monto||0).toLocaleString('es-AR')}?`
+    : '¿Eliminar este movimiento?';
+  _confirmarModal(label, async ()=>{
     S.movCaja = (S.movCaja||[]).filter(x=>x.id!==id);
-    await dbDelete('mov_caja', id);
+    if(item) await dbSoftDelete('mov_caja', item);
     rCajas(); rMovCaja(); rDash();
     showToast('Movimiento eliminado ✓');
   });
@@ -8154,7 +8176,7 @@ function rMovCaja(){
   const mes = tod().slice(0,7);
   // Mostrar último mes completo (30 días) para que no desaparezcan registros al cambiar de mes
   const desde = new Date(Date.now()-30*864e5).toISOString().slice(0,10);
-  const movs = (S.movCaja||[]).filter(m=>!m.fecha||(m.fecha||'')>=desde).sort((a,b)=>(b.id||0)-(a.id||0));
+  const movs = (S.movCaja||[]).filter(m=>m.tipo!=='reset'&&(!m.fecha||(m.fecha||'')>=desde)).sort((a,b)=>(b.id||0)-(a.id||0));
   const gastosVar = (S.gastos||[]).filter(g=>g.tipo==='variable'&&(g.fecha||'').slice(0,7)===mes);
   const totalGastos = gastosVar.reduce((a,g)=>a+(g.monto||0),0);
 
@@ -8341,11 +8363,14 @@ async function guardarCierreDiario(resetear){
   }
   closeM('mCierreDiario');
   if(resetear){
-    // Guardar timestamp del cierre — los movCaja anteriores a este momento quedan
-    // excluidos de la caja activa pero NO se borran de Supabase (datos históricos intactos)
+    // Guardar reset: persiste en Supabase (mov_caja tipo:'reset') Y en localStorage como backup
+    // getCajas() ignora movCaja con id <= resetId, así la caja visual queda en $0
     const hoy = tod();
-    localStorage.setItem('caja_reset_'+(currentTenant?.id||'')+'_'+hoy, Date.now());
-    // La caja visual queda en $0 porque getCajas() excluye movCaja previos al reset
+    const resetId = Date.now();
+    const resetRow = {id: resetId, fecha: hoy, tipo:'reset', concepto:'Cierre de caja', monto:0};
+    S.movCaja = [...(S.movCaja||[]), resetRow];
+    await dbUpsert('mov_caja', resetRow);
+    localStorage.setItem('caja_reset_'+(currentTenant?.id||'')+'_'+hoy, resetId);
     rCajas();
     rDash();
     showToast('💾 Cierre guardado · Caja reiniciada en $0');
