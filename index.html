@@ -5369,7 +5369,17 @@ async function loadAll(){
         .lte('fecha', _sbHasta)
         .order('fecha').order('hora');
       if(sbT && !sbE){
-        _turnosCache = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+        const _rawT = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+        // Deduplicar por ref_id y por slot (fecha+hora+nombre+empleado)
+        const _sRefId=new Map(), _sSlot=new Map(); const _dedupT=[];
+        for(const t of _rawT){
+          const rk=t.id?String(t.id):null;
+          const sk=`${t.fecha}|${t.hora}|${(t.cliente||'').toLowerCase()}|${(t.empleadoNombre||'').toLowerCase()}`;
+          if(rk&&_sRefId.has(rk)) continue;
+          if(_sSlot.has(sk)) continue;
+          if(rk) _sRefId.set(rk,t); _sSlot.set(sk,t); _dedupT.push(t);
+        }
+        _turnosCache = _dedupT;
         _saveTurnosLS(_turnosCache);
       }
     } catch(e){ console.warn('[loadAll] carga turnos sb:', e.message); }
@@ -9546,7 +9556,21 @@ async function _reloadTurnosCache(){
         console.warn('[_reloadTurnosCache] Supabase devolvió [] pero caché local tiene datos — conservando caché');
         return;
       }
-      const remoto = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+      // Deduplicar filas de Supabase por ref_id (duplicados creados por bug de upsert)
+      // y como fallback por (fecha+hora+nombre+empleado) para filas sin ref_id
+      const _seenRefId = new Map(); // ref_id → turno (el primero gana)
+      const _seenSlot  = new Map(); // 'fecha|hora|nombre|empleado' → turno
+      const _remotoRaw = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+      const remoto = [];
+      for(const t of _remotoRaw){
+        const refKey = t.id ? String(t.id) : null;
+        const slotKey = `${t.fecha}|${t.hora}|${(t.cliente||'').toLowerCase()}|${(t.empleadoNombre||'').toLowerCase()}`;
+        if(refKey && _seenRefId.has(refKey)) continue; // duplicado por ref_id
+        if(_seenSlot.has(slotKey)) continue; // duplicado por slot
+        if(refKey) _seenRefId.set(refKey, t);
+        _seenSlot.set(slotKey, t);
+        remoto.push(t);
+      }
       const refIdsRemotos = new Set(remoto.map(t=>String(t.id)));
       // Conservar turnos guardados localmente que aún no terminaron de sincronizarse a Supabase
       // (sin _sbId y sin aparecer todavía en el remoto): un evento realtime disparado por OTRO
