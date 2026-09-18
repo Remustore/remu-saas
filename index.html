@@ -5352,11 +5352,16 @@ async function loadAll(){
     // ── Cargar turnos desde Supabase (fuente única, cross-device) ────────────
     _turnosCache = null;
     try {
+      // Rango: 60 días atrás (historial del mes) + 6 meses adelante (turnos fijos futuros)
+      const _sbDesde = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+      const _sbHasta = new Date(Date.now()+183*864e5).toISOString().slice(0,10);
       const {data:sbT, error:sbE} = await sb.from('turnos_solicitudes')
         .select('*')
         .eq('tenant_id', currentTenant.id)
         .not('estado','eq','bloqueado')
         .not('estado','eq','cancelado')
+        .gte('fecha', _sbDesde)
+        .lte('fecha', _sbHasta)
         .order('fecha').order('hora');
       if(sbT && !sbE){
         _turnosCache = sbT.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
@@ -9509,11 +9514,15 @@ async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
 async function _reloadTurnosCache(){
   if(!sb||!currentTenant?.id) return;
   try {
+    const _rdDesde = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
+    const _rdHasta = new Date(Date.now()+183*864e5).toISOString().slice(0,10);
     const {data, error} = await sb.from('turnos_solicitudes')
       .select('*')
       .eq('tenant_id', currentTenant.id)
       .not('estado','eq','bloqueado')
       .not('estado','eq','cancelado')
+      .gte('fecha', _rdDesde)
+      .lte('fecha', _rdHasta)
       .order('fecha').order('hora');
     if(error) throw error;
     if(data){
