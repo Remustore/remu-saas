@@ -1273,6 +1273,7 @@ $$;</pre>
             <div class="srch"><span>⌕</span><input placeholder="Buscar..." oninput="rStock()" id="sQ"></div>
             <button class="btn bgh" onclick="openRegistrarCompra(null)">📦 Registrar compra</button>
             <button class="btn bg" onclick="openNuevoStock()">+ Agregar producto</button>
+            <button class="btn bsm" onclick="abrirListaCompras()" id="btnListaCompras" style="display:none">🛒 Lista de compras</button>
           </div>
         </div>
         <div class="tw"><table><thead><tr><th>Producto</th><th class="col-hide">Categoría</th><th>Stock</th><th>Precio venta</th><th class="col-hide">Margen</th><th>Estado</th><th></th></tr></thead><tbody id="tbS"></tbody></table></div>
@@ -3112,6 +3113,18 @@ $$;</pre>
 </div><div class="mf"><button class="btn" onclick="closeM('mGasto')">Cancelar</button><button class="btn bg" onclick="saveGasto()">Guardar</button></div></div></div>
 
 <!-- Compra de Stock -->
+<!-- Modal Lista de Compras -->
+<div class="mb" id="mListaCompras"><div class="md"><div class="mh"><div class="mt2">🛒 Lista de compras</div><button class="xbtn" onclick="closeM('mListaCompras')">✕</button></div>
+<div class="mc">
+  <div id="listaComprasContent"></div>
+</div>
+<div class="mf" style="gap:8px">
+  <button class="btn" onclick="closeM('mListaCompras')">Cerrar</button>
+  <button class="btn bg" onclick="_copiarListaCompras()">📋 Copiar lista</button>
+  <button class="btn bgh" onclick="_waListaCompras()">📲 Enviar por WA</button>
+</div>
+</div></div>
+
 <div class="mb" id="mCompra"><div class="md"><div class="mh"><div class="mt2">📦 Registrar Compra</div><button class="xbtn" onclick="closeM('mCompra')">✕</button></div>
 <div class="mc">
 <div class="fr full"><div><label>Producto</label><select id="compProd" onchange="autoFillCostoCompra()"></select></div></div>
@@ -6418,6 +6431,7 @@ async function saveCompra(){
 }
 
 function updateStockNotif(){
+  updateStockListaBtn();
   const bajos = [...new Map(S.stock.filter(s=>s.cantidad<=s.minimo).map(s=>[s.nombre,s])).values()];
   const badge = document.getElementById('stockBadge');
   const banner = document.getElementById('stockAlertBanner');
@@ -6455,6 +6469,62 @@ function rStock(){
     <td>${s.cantidad<=s.minimo?`<span class="bx brd">Bajo</span>`:`<span class="bx bgr">OK</span>`}</td>
     <td style="display:flex;gap:4px">${s.cantidad>0?`<button class="btn bs bsm" onclick="abrirVentaDesdeProd(${s.id})" title="Registrar venta">💸</button>`:''}<button class="btn bgh bsm" onclick="openRegistrarCompra(${s.id})" title="Registrar compra">📦</button><button class="btn be bsm" onclick="openM('mStock',${s.id})">✎</button><button class="btn bd bsm" onclick="delStock(${s.id})">✕</button></td></tr>`;
   }).join('');
+}
+
+// ═══ LISTA DE COMPRAS ═══
+function _stockBajo(){
+  return (S.stock||[]).filter(s => s.cantidad <= s.minimo);
+}
+
+function updateStockListaBtn(){
+  const btn = document.getElementById('btnListaCompras');
+  if(btn) btn.style.display = _stockBajo().length > 0 ? '' : 'none';
+}
+
+function abrirListaCompras(){
+  const bajos = _stockBajo().sort((a,b)=>a.cantidad-b.cantidad);
+  if(!bajos.length){ showToast('No hay productos bajo el mínimo'); return; }
+
+  const rows = bajos.map(s=>{
+    const pedir = Math.max((s.minimo*2) - s.cantidad, s.minimo);
+    const estadoColor = s.cantidad === 0 ? 'var(--bad)' : 'var(--wrn)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--bor)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500;font-size:.88rem">${esc(s.nombre)}</div>
+        <div style="font-size:.75rem;color:var(--mut)">${esc(s.categoria)}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:.75rem;color:${estadoColor};font-weight:600">tiene ${s.cantidad} · mín ${s.minimo}</div>
+        <div style="font-size:.82rem;color:var(--gld);font-weight:600">pedir ${pedir} uds</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('listaComprasContent').innerHTML =
+    `<div style="font-size:.78rem;color:var(--mut);margin-bottom:12px">${bajos.length} producto${bajos.length!==1?'s':''} para reponer</div>${rows}`;
+
+  openM('mListaCompras');
+}
+
+function _textoListaCompras(){
+  const bajos = _stockBajo().sort((a,b)=>a.cantidad-b.cantidad);
+  const negocio = currentTenant?.nombre || 'el negocio';
+  const lineas = bajos.map(s=>{
+    const pedir = Math.max((s.minimo*2)-s.cantidad, s.minimo);
+    return `• ${s.nombre} (${s.categoria}) → ${pedir} uds (tiene ${s.cantidad})`;
+  }).join('\n');
+  return `Lista de compras — ${negocio}\n📦 ${bajos.length} producto${bajos.length!==1?'s':''} para reponer:\n\n${lineas}`;
+}
+
+function _copiarListaCompras(){
+  navigator.clipboard.writeText(_textoListaCompras())
+    .then(()=>showToast('Lista copiada ✓'))
+    .catch(()=>showToast('No se pudo copiar','err'));
+}
+
+function _waListaCompras(){
+  const texto = encodeURIComponent(_textoListaCompras());
+  window.open('https://wa.me/?text='+texto, '_blank');
 }
 
 // ═══ GASTOS ═══
