@@ -1495,6 +1495,22 @@ $$;</pre>
             <button class="tab" id="vistaGrillaBtn" onclick="setVistaTurnos('grilla')" style="display:none">🏟 Grilla</button>
             <button class="tab" id="vistaSemanaBt" onclick="setVistaTurnos('semana')">📅 Semana</button>
             <button class="tab" id="vistaCalendarioBtn" onclick="setVistaTurnos('calendario')">🗓 Mes</button>
+            <button class="tab" id="historialBtn" onclick="toggleHistorial()" style="opacity:.7">📂 Historial</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel historial (oculto por defecto) -->
+      <div id="historialPanel" style="display:none;margin-bottom:14px">
+        <div class="card" style="background:var(--bg2)">
+          <div style="font-size:.78rem;color:var(--mut);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:.6px">Búsqueda histórica</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:.82rem;color:var(--mut)">Desde</label>
+            <input type="date" id="histDesde" style="padding:6px 10px;font-size:.85rem;flex:1;max-width:150px">
+            <label style="font-size:.82rem;color:var(--mut)">hasta</label>
+            <input type="date" id="histHasta" style="padding:6px 10px;font-size:.85rem;flex:1;max-width:150px">
+            <button class="btn bgh bsm" onclick="buscarHistorial()">Buscar</button>
+            <button class="btn bsm" onclick="cerrarHistorial()" style="margin-left:auto">✕ Cerrar</button>
           </div>
         </div>
       </div>
@@ -10881,6 +10897,109 @@ function rTurnos(){
   if(turnosVista==='semana') rTurnosSemana();
   if(turnosVista==='calendario') rTurnosCalendario();
   rOcupacionDia();
+}
+
+// ── Historial de turnos (búsqueda más allá del filtro de 60 días) ────────────
+let _historialActivo = false;
+
+function toggleHistorial(){
+  _historialActivo = !_historialActivo;
+  const panel = document.getElementById('historialPanel');
+  const btn   = document.getElementById('historialBtn');
+  if(_historialActivo){
+    panel.style.display = '';
+    btn.classList.add('active');
+    btn.style.opacity = '1';
+    const hoy = tod();
+    const hace90 = new Date(Date.now()-90*864e5).toISOString().slice(0,10);
+    const histDesde = document.getElementById('histDesde');
+    const histHasta = document.getElementById('histHasta');
+    if(histDesde && !histDesde.value) histDesde.value = hace90;
+    if(histHasta && !histHasta.value) histHasta.value = hoy;
+  } else {
+    cerrarHistorial();
+  }
+}
+
+function cerrarHistorial(){
+  _historialActivo = false;
+  const panel = document.getElementById('historialPanel');
+  const btn   = document.getElementById('historialBtn');
+  if(panel) panel.style.display = 'none';
+  if(btn){ btn.classList.remove('active'); btn.style.opacity = '.7'; }
+  rTurnos();
+}
+
+async function buscarHistorial(){
+  const desde = document.getElementById('histDesde')?.value;
+  const hasta  = document.getElementById('histHasta')?.value;
+  const lista  = document.getElementById('turnosLista');
+  if(!desde || !hasta){ showToast('Seleccioná el rango de fechas'); return; }
+  if(desde > hasta){ showToast('La fecha inicial debe ser menor o igual a la final'); return; }
+
+  lista.innerHTML = '<div style="text-align:center;padding:24px;color:var(--mut)">Buscando...</div>';
+
+  const {data, error} = await sb.from('turnos_solicitudes')
+    .select('*').eq('tenant_id', currentTenant.id)
+    .not('estado','eq','cancelado').not('estado','eq','bloqueado')
+    .gte('fecha', desde).lte('fecha', hasta)
+    .order('fecha').order('hora').limit(1000);
+
+  if(error){
+    lista.innerHTML = '<div style="text-align:center;padding:24px;color:var(--err)">Error al cargar datos</div>';
+    return;
+  }
+
+  const turnos = data || [];
+  if(!turnos.length){
+    lista.innerHTML = '<div style="text-align:center;padding:24px;color:var(--mut)">Sin turnos en ese período</div>';
+    return;
+  }
+
+  // Agrupar por fecha
+  const porFecha = {};
+  turnos.forEach(t => { const f=t.fecha||''; if(!porFecha[f]) porFecha[f]=[]; porFecha[f].push(t); });
+
+  const totalFacturado = turnos.filter(t=>t.estado==='terminado'&&t.metodo!=='Fiado').reduce((s,t)=>s+(parseFloat(t.precio)||0),0);
+
+  const html = Object.keys(porFecha).sort().reverse().map(fecha => {
+    const ts = porFecha[fecha];
+    const terminados = ts.filter(t=>t.estado==='terminado').length;
+    const facturado  = ts.filter(t=>t.estado==='terminado'&&t.metodo!=='Fiado').reduce((s,t)=>s+(parseFloat(t.precio)||0),0);
+    return `<div style="margin-bottom:14px">
+      <div style="font-weight:600;font-size:.88rem;padding:6px 0;border-bottom:1px solid var(--bor);display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span>${fD(fecha)}</span>
+        <span style="font-size:.75rem;color:var(--mut)">${ts.length} turnos · ${terminados}✓ · ${facturado>0?fmt(facturado):'$0'}</span>
+      </div>
+      ${ts.map(t => {
+        const sc = t.estado==='terminado'?'var(--ok)':t.estado==='pendiente'?'var(--war)':'var(--mut)';
+        const cliente  = esc(t.nombre||t.cliente||'Sin nombre');
+        const empleado = esc(t.empleadoNombre||t.empleado_nombre||'');
+        const servicio = esc(t.servicioNombre||t.servicio_nombre||'');
+        const precio   = t.precio ? fmt(parseFloat(t.precio)) : '';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor)">
+          <div style="width:44px;font-size:.82rem;font-weight:600;color:var(--mut);flex-shrink:0">${t.hora||''}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:500;font-size:.88rem">${cliente}</div>
+            <div style="font-size:.75rem;color:var(--mut)">${[servicio,empleado].filter(Boolean).join(' · ')}</div>
+          </div>
+          ${precio?`<div style="font-size:.82rem;color:var(--gld);flex-shrink:0">${precio}</div>`:''}
+          <div style="font-size:.72rem;padding:2px 8px;border-radius:10px;background:${sc}22;color:${sc};flex-shrink:0">${t.estado}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  lista.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:10px">
+    <div>
+      <div style="font-size:.78rem;color:var(--mut)">Período: ${fD(desde)} → ${fD(hasta)}</div>
+      <div style="font-size:.9rem;font-weight:600">${turnos.length} turnos · ${turnos.filter(t=>t.estado==='terminado').length} finalizados</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-size:.78rem;color:var(--mut)">Facturado</div>
+      <div style="font-size:.9rem;font-weight:600;color:var(--gld)">${fmt(totalFacturado)}</div>
+    </div>
+  </div>${html}`;
 }
 
 function rTurnosHorario(){
