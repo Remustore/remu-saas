@@ -20546,6 +20546,7 @@ function eliminarTurnoAdmin(id){
       var turno = todos.find(function(t){ return String(t.id) === String(id); });
       var restantes = todos.filter(function(t){ return String(t.id) !== String(id); });
       if(typeof saveTurnosLocal === 'function') saveTurnosLocal(restantes);
+      if(typeof _removeFromPendingQueue === 'function') _removeFromPendingQueue(id);
       if(typeof rTurnos === 'function') rTurnos();
       if(typeof showToast === 'function') showToast('Turno eliminado ✓');
       // Borrar de Supabase
