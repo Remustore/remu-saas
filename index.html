@@ -5220,7 +5220,10 @@ async function dbDeleteCubierta(id){
 }
 
 function _getCuotasCfg(){
-  try{ return JSON.parse(dbGetConfig('gomCuotas')||'{}'); }catch(e){ return {}; }
+  const v = dbGetConfig('gomCuotas');
+  if(!v) return {};
+  if(typeof v === 'string'){ try{ return JSON.parse(v)||{}; }catch(e){ return {}; } }
+  return (typeof v === 'object') ? v : {};
 }
 function _cubCoefs(){ const c=_getCuotasCfg(); return { c3: c.c3||1.15, c6: c.c6||1.30, c12: c.c12||1.60 }; }
 function _calcCuotas(contado){ const {c3,c6,c12}=_cubCoefs(); return { p3: Math.round(contado*c3), p6: Math.round(contado*c6), p12: Math.round(contado*c12) }; }
@@ -5242,7 +5245,7 @@ async function _guardarCuotasCfg(){
   const c12 = parseFloat(document.getElementById('cubC12')?.value)||1.60;
   const prev = _getCuotasCfg();
   const cambiaron = prev.c3!==c3 || prev.c6!==c6 || prev.c12!==c12;
-  dbSetConfig('gomCuotas', JSON.stringify({c3,c6,c12}));
+  dbSetConfig('gomCuotas', {c3,c6,c12});
   // actualizar ejemplo
   const e = 100000;
   const el3=document.getElementById('cubEjC3'), el6=document.getElementById('cubEjC6'), el12=document.getElementById('cubEjC12');
@@ -5394,10 +5397,20 @@ async function rGomDashboard(){
 const _GOM_MARCAS_DEF = ['Fate','Pirelli','Bridgestone','Michelin','Goodyear','Continental','Yokohama','Toyo','Dunlop','Hankook'];
 const _GOM_SERV_DEF   = ['Cambio de cubiertas','Rotación de cubiertas','Reparación de pinchadura','Alineación y balanceo','Cambio de aceite','Cambio de filtros','Reparación tren delantero','Cambio de amortiguadores'];
 
-function _getGomMarcas(){ try{ return JSON.parse(dbGetConfig('gomMarcas')||'null')||_GOM_MARCAS_DEF; }catch(e){ return _GOM_MARCAS_DEF; } }
-function _getGomServicios(){ try{ return JSON.parse(dbGetConfig('gomServicios')||'null')||_GOM_SERV_DEF; }catch(e){ return _GOM_SERV_DEF; } }
-function _saveGomMarcas(l){ dbSetConfig('gomMarcas', JSON.stringify(l)); }
-function _saveGomServicios(l){ dbSetConfig('gomServicios', JSON.stringify(l)); }
+function _getGomMarcas(){
+  const v = dbGetConfig('gomMarcas');
+  if(!v) return _GOM_MARCAS_DEF;
+  if(typeof v === 'string'){ try{ return JSON.parse(v)||_GOM_MARCAS_DEF; }catch(e){ return _GOM_MARCAS_DEF; } }
+  return Array.isArray(v) ? v : _GOM_MARCAS_DEF;
+}
+function _getGomServicios(){
+  const v = dbGetConfig('gomServicios');
+  if(!v) return _GOM_SERV_DEF;
+  if(typeof v === 'string'){ try{ return JSON.parse(v)||_GOM_SERV_DEF; }catch(e){ return _GOM_SERV_DEF; } }
+  return Array.isArray(v) ? v : _GOM_SERV_DEF;
+}
+function _saveGomMarcas(l){ dbSetConfig('gomMarcas', l); }
+function _saveGomServicios(l){ dbSetConfig('gomServicios', l); }
 
 function abrirGomListas(){
   rGomListas();
@@ -24628,8 +24641,8 @@ async function _mFCS_fiado(){
         console.log('[Realtime] TOKEN_REFRESHED — recreando canal');
         _clearBackoff(); _bIdx = 0; _iniciarRealtimeReservas(tid);
       });
-      _authUnsub = (_sub && typeof _sub.unsubscribe === 'function') ? _sub.unsubscribe
-        : (_sub && _sub.data && _sub.data.subscription ? _sub.data.subscription.unsubscribe : null);
+      _authUnsub = (_sub && typeof _sub.unsubscribe === 'function') ? _sub.unsubscribe.bind(_sub)
+        : (_sub && _sub.data && _sub.data.subscription ? _sub.data.subscription.unsubscribe.bind(_sub.data.subscription) : null);
     }
     if(typeof sb !== 'undefined' && sb && sb.auth){ _setupAuthListener(); }
     else {
