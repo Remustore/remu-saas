@@ -18132,6 +18132,7 @@ async function _swNotif(title, body, section, tag){
 
 // ── Recordatorio: turno en 1 hora ────────────────────────────────────
 function checkTurnosEnUnaHora(){
+  if (!currentTenant?.id) return; // no correr sin tenant definido (evita clave vacía en localStorage)
   if (!_isNotifEnabled('recordatorio') || !('Notification' in window) || Notification.permission !== 'granted') return;
   const turnos = typeof getTurnos === 'function' ? getTurnos() : [];
   if (!turnos.length) return;
@@ -18316,7 +18317,7 @@ async function desactivarPremiumTenant(tenantId){
 })();
 
 // ── Arrancar el checker de recordatorios cada minuto ─────────────────
-setInterval(checkTurnosEnUnaHora, 60000);
+setInterval(checkTurnosEnUnaHora, 5*60000); // cada 5 min — la ventana es de 10 min, alcanza sobrado
 // Primera ejecución tras carga de datos (15s = tiempo estimado de carga)
 setTimeout(checkTurnosEnUnaHora, 15000);
 </script>
