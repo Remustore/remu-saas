@@ -10816,6 +10816,7 @@ async function saveTurnosConfig(){
 
 // ── Cache Supabase-first ──────────────────────────────────────────────────
 let _turnosCache = null;
+let _turnosRealtimeCh = null;
 
 function _mapSbTurno(r){
   return {
@@ -10906,9 +10907,22 @@ async function _syncPendingTurnos(){
   if(!sb||!currentTenant?.id) return;
   const pending = _getPendingQueue();
   if(!pending.length) return;
-  console.log('[_syncPendingTurnos] Reintentando sync de', pending.length, 'turno(s) pendiente(s)...');
+
+  // Limpiar de la cola los turnos que ya no existen en el caché local —
+  // si fueron borrados sin pasar por _removeFromPendingQueue (bug anterior),
+  // esto evita que se re-inserten en Supabase.
+  const localIds = new Set((getTurnos()||[]).map(t=>String(t.id)));
+  const huerfanos = pending.filter(t=>!localIds.has(String(t.id)));
+  if(huerfanos.length){
+    huerfanos.forEach(t=>_removeFromPendingQueue(t.id));
+    console.log('[_syncPendingTurnos] Descartados', huerfanos.length, 'turno(s) huérfanos de la cola');
+  }
+  const validos = pending.filter(t=>localIds.has(String(t.id)));
+  if(!validos.length) return;
+
+  console.log('[_syncPendingTurnos] Reintentando sync de', validos.length, 'turno(s) pendiente(s)...');
   let synced = 0;
-  for(const t of pending){
+  for(const t of validos){
     try {
       const payload = {
         tenant_id: currentTenant.id,
@@ -11048,7 +11062,9 @@ async function migrarTurnosManual(btn){
 
 function _initTurnosRealtime(tenantId){
   if(!sb||!tenantId) return;
-  sb.channel('remu-turnos-'+tenantId)
+  // Evitar suscripciones duplicadas si loadAll corre más de una vez
+  if(_turnosRealtimeCh){ try{ sb.removeChannel(_turnosRealtimeCh); }catch(e){} _turnosRealtimeCh = null; }
+  _turnosRealtimeCh = sb.channel('remu-turnos-'+tenantId)
     .on('postgres_changes',{event:'*',schema:'public',table:'turnos_solicitudes',filter:'tenant_id=eq.'+tenantId},
       ()=>{ _reloadTurnosCache().then(()=>{ if(typeof rTurnos==='function') rTurnos(); }); })
     .subscribe();
