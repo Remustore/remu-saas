@@ -5480,9 +5480,7 @@ async function rGomDashboard(){
   }
 }
 
-// ── Listas personalizables por tenant ────────────────────────────────────────
-const _GOM_MARCAS_DEF = ['Fate','Pirelli','Bridgestone','Michelin','Goodyear','Continental','Yokohama','Toyo','Dunlop','Hankook'];
-const _GOM_SERV_DEF   = ['Cambio de cubiertas','Rotación de cubiertas','Reparación de pinchadura','Alineación y balanceo','Cambio de aceite','Cambio de filtros','Reparación tren delantero','Cambio de amortiguadores'];
+// ── Listas personalizables por tenant (declaradas en js/gomeria.js) ───────────
 
 function _getGomMarcas(){
   const v = dbGetConfig('gomMarcas');
@@ -5685,8 +5683,7 @@ async function dbDeleteServicioGomeria(id){
 }
 
 // ─── Pedidos (Proveedor / Cliente) → Supabase ────────────────────────────────
-let _pedGomTab  = 'prov';
-let _pedGomCart = [];  // items temporales antes de crear el pedido
+// _pedGomTab, _pedGomCart declarados en js/gomeria.js
 
 function pedSetTab(t){
   _pedGomTab  = t;
@@ -5959,7 +5956,7 @@ async function _iniciarClientesGomeria(){
   rClientesGomeria();
 }
 
-let _cliGomTab = 'lista';
+// _cliGomTab declarado en js/gomeria.js
 
 function setCliGomTab(tab){
   _cliGomTab = tab;
@@ -6173,7 +6170,7 @@ async function eliminarClienteGomeria(id){
 }
 
 // ─── Historial de cliente ─────────────────────────────────────────────────────
-let _histGomClienteActivo = null;
+// _histGomClienteActivo declarado en js/gomeria.js
 
 // ─── Ficha completa del vehículo ──────────────────────────────────────────────
 async function verFichaVehiculo(clienteId){
@@ -6393,7 +6390,7 @@ function _waClienteGom(){
   window.open(`https://wa.me/549${tel}?text=${encodeURIComponent('Hola'+(c.nombre?' '+c.nombre:'')+' 👋 Te contactamos de '+negocio+'.')}`, '_blank');
 }
 
-const _tipoIcoGom={'Cambio de cubiertas':'🛞','Rotación de cubiertas':'🔄','Alineación':'⚙️','Balanceo':'⚙️','Alineación y balanceo':'⚙️','Reparación de pinchadura':'🩹','Cambio de válvula':'🔧','Control de presión':'💨'};
+// _tipoIcoGom declarado en js/gomeria.js
 
 function _renderHistorialGomeria(lista){
   const el=document.getElementById('mHistGomLista');
