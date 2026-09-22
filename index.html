@@ -6735,6 +6735,20 @@ async function loadAll(){
           if(_sSlot.has(sk)) continue;
           if(rk) _sRefId.set(rk,t); _sSlot.set(sk,t); _dedupT.push(t);
         }
+        // Antes de sobreescribir localStorage, verificar si hay turnos locales
+        // sin _sbId que no están en Supabase — migrarlos primero para no perderlos.
+        const _lsRaw = localStorage.getItem(TURNOS_KEY+'_'+(currentTenant?.id||''));
+        if(_lsRaw){
+          try {
+            const _lsTurnos = JSON.parse(_lsRaw)||[];
+            const _sbRefIds = new Set(_dedupT.map(t=>String(t.id)));
+            const _huerfanos = _lsTurnos.filter(t=>!t._sbId && t.fecha && t.hora && !_sbRefIds.has(String(t.id)));
+            if(_huerfanos.length){
+              console.log('[loadAll] Migrando', _huerfanos.length, 'turno(s) local(es) a Supabase antes de sobrescribir localStorage...');
+              for(const t of _huerfanos){ try{ await _upsertTurnoSb(t); }catch(e){} }
+            }
+          } catch(e){}
+        }
         _turnosCache = _dedupT;
         _saveTurnosLS(_turnosCache);
       }
