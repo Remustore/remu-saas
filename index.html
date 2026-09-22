@@ -10980,18 +10980,12 @@ async function _syncPendingTurnos(){
 // Retorna {ok:true} en éxito o {ok:false, error} en fallo
 async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
   if(!sb||!currentTenant?.id||!obj?.id) return {ok:false, error:'sin conexión'};
-  const upd = {estado: nuevoEstado};
-  if(nuevoEstado==='terminado'&&precio>0){upd.precio=precio; upd.metodo=metodo||'Efectivo';}
-  try {
-    if(obj._sbId){
-      const {error} = await sb.from('turnos_solicitudes').update(upd).eq('id', obj._sbId);
-      if(error) throw error;
-      return {ok:true};
-    } else {
-      const result = await _upsertTurnoSb({...obj, estado:nuevoEstado, precio:precio||obj.precio, metodo:metodo||obj.metodo});
-      return result;
-    }
-  } catch(e){ console.warn('[_updateEstadoSb]', e.message); return {ok:false, error:e.message}; }
+  // Siempre hacer upsert completo para que todos los campos (servicio, precio, metodo) queden en Supabase
+  const result = await _upsertTurnoSb({...obj, estado:nuevoEstado,
+    precio: precio != null ? precio : (obj.precio||0),
+    metodo: metodo || obj.metodo || 'Efectivo'
+  });
+  return result;
 }
 
 async function _reloadTurnosCache(){
@@ -11974,20 +11968,18 @@ async function _confirmarCobrarFiado(id, metodo){
   const idx = turnos.findIndex(x=>String(x.id)===String(id));
   if(idx===-1){ showToast('Turno no encontrado','err'); return; }
 
-  // Actualizar caché local PRIMERO para que cualquier upsert posterior use el valor correcto
-  turnos[idx] = {...turnos[idx], metodo};
-  if(typeof saveTurnosLocal==='function') saveTurnosLocal(turnos);
-
-  // Persistir en Supabase — si tiene _sbId usamos update directo (columna metodo),
-  // si no, usamos upsert completo con el objeto ya actualizado
+  // ── SUPABASE PRIMERO ────────────────────────────────────────────────────
   const sbId = turnos[idx]._sbId;
   if(sbId && sb){
     const {error} = await sb.from('turnos_solicitudes').update({ metodo }).eq('id', sbId);
     if(error){ showToast('⚠ Error al guardar cobro: ' + (error.message||''), 'err'); return; }
   } else if(typeof _upsertTurnoSb==='function'){
-    const res = await _upsertTurnoSb(turnos[idx]);
+    const res = await _upsertTurnoSb({...turnos[idx], metodo});
     if(res && res.ok === false){ showToast('⚠ Error al guardar cobro','err'); return; }
   }
+  // Solo actualiza caché local DESPUÉS de confirmar Supabase
+  turnos[idx] = {...turnos[idx], metodo};
+  if(typeof saveTurnosLocal==='function') saveTurnosLocal(turnos);
 
   showToast('✓ Cobrado · ' + metodo);
   if(typeof rFiadosPendientes==='function') rFiadosPendientes();
@@ -12960,16 +12952,22 @@ async function guardarBloqueo(){
     const _mh=m=>Math.floor(m/60).toString().padStart(2,'0')+':'+(m%60).toString().padStart(2,'0');
     const _ini=bloqueo.horaInicio?_hm(bloqueo.horaInicio):_ah*60+_am;
     const _fin=bloqueo.horaFin?_hm(bloqueo.horaFin):_ch*60+_cm;
-    const _all=getTurnos(); let _chg=false;
+    const _all=getTurnos(); const _cancelados=[];
     for(let _m=_ah*60+_am;_m<_ch*60+_cm;_m+=30){
       if(_m>=_ini&&_m<_fin){
         const _h=_mh(_m);
         const _i=_all.findIndex(t=>t.fecha===bloqueo.fecha&&String(t.empleadoId)===String(empId)&&t.hora===_h&&t.estado!=='cancelado'&&t.estado!=='no_vino');
-        if(_i>=0){_all[_i].estado='cancelado';_chg=true;}
+        if(_i>=0){_all[_i].estado='cancelado';_cancelados.push(_all[_i]);}
         sincronizarBloqueoManual({fecha:bloqueo.fecha,hora:_h,empleadoId:empId,cliente:'🚫 '+(motivo||emp.nombre)},'crear');
       }
     }
-    if(_chg) saveTurnosLocal(_all);
+    if(_cancelados.length){
+      // Supabase primero: sincronizar cancelaciones antes de guardar en localStorage
+      for(const _t of _cancelados){
+        try{ await _updateEstadoSb(_t,'cancelado',null,null); }catch(e){ console.warn('[bloqueo] sync cancel error',e.message); }
+      }
+      saveTurnosLocal(_all);
+    }
     _toastMsg = _chg ? 'Bloqueo agregado — se cancelaron los turnos en ese horario ✓' : 'Bloqueo agregado ✓';
   }
   document.getElementById('bloqueoFecha').value='';
@@ -13810,8 +13808,18 @@ async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
     showToast(`⚠ Hay un turno solapado a las ${conflicto.hora} (${conflicto.cliente})`, 'warn');
   }
 
+  // ── SUPABASE PRIMERO ────────────────────────────────────────────────────
+  const { error: updErr } = await sb.from('turnos_solicitudes')
+    .update({ estado: 'confirmado' })
+    .eq('id', id)
+    .eq('tenant_id', currentTenant.id);
+  if(updErr){
+    showToast('❌ No se pudo confirmar el turno. Revisá tu internet e intentá de nuevo.', 'err');
+    return;
+  }
   const turno = {
-    id: Date.now().toString(),
+    id: id,
+    _sbId: id,
     cliente: nombre, tel, fecha, hora,
     empleadoId: emp?.id||'', empleadoNombre: emp?.nombre||'',
     servicioId: srv?.id||0, servicioNombre: srv?.nombre||servicio,
@@ -13822,13 +13830,6 @@ async function confirmarSolicitud(id, nombre, tel, servicio, fecha, hora){
   };
   turnos.push(turno);
   saveTurnosLocal(turnos);
-
-  // Update solicitud status in Supabase (non-blocking: turno ya guardado en localStorage)
-  const { error: updErr } = await sb.from('turnos_solicitudes')
-    .update({ estado: 'confirmado' })
-    .eq('id', id)
-    .eq('tenant_id', currentTenant.id);
-  if(updErr) console.error('[confirmarSolicitud] update error:', updErr.message);
   showToast('Turno confirmado ✓');
   cargarSolicitudes();
   rTurnos();
@@ -22350,8 +22351,8 @@ function _mFCS_aplicarServicioAlTurno(id, srv, precio, metodo){
   }
   if(precio != null) upd.precio = precio;
   if(metodo)         upd.metodo = metodo;
+  // Solo actualiza en memoria — _doEstadoTurno (Supabase-first) guardará todo
   turnos[idx] = Object.assign({}, turnos[idx], upd);
-  if(typeof saveTurnosLocal === 'function') saveTurnosLocal(turnos);
 }
 
 async function _mFCS_confirmar(){
@@ -22501,8 +22502,10 @@ async function _mFCS_fiado(){
       var _cfg = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[], empleados:[]};
       var _emp = _cfg.empleados && _cfg.empleados[0];
       var _ts  = typeof getTurnos === 'function' ? getTurnos() : [];
+      // Usar el id de Supabase como id local para evitar duplicados en loadAll
       _ts.push({
-        id: Date.now().toString(),
+        id: String(id),
+        _sbId: String(id),
         cliente: nombre, tel: tel, fecha: fecha, hora: hora,
         empleadoId: _emp ? _emp.id : '', empleadoNombre: _emp ? _emp.nombre : '',
         servicioId: '__aconfirmar__', servicioNombre: '📋 A confirmar',
