@@ -17101,7 +17101,7 @@ function getClientes(){
     if(servicio) mapa[k].servicios.push(servicio);
   };
   if(esSalonRubro && typeof getTurnos==='function'){
-    getTurnos().filter(t=>t.estado==='terminado').forEach(t=>agregar(t.cliente,t.tel,t.fecha,t.precio||0,t.servicioNombre));
+    getTurnos().filter(t=>t.estado==='terminado'||t.estado==='confirmado').forEach(t=>agregar(t.cliente,t.tel,t.fecha,t.precio||0,t.servicioNombre));
   } else {
     S.reparaciones.forEach(r=>agregar(r.cliente,r.tel,r.fecha,r.presupuesto||0,r.equipo));
   }
