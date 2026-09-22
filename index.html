@@ -5257,7 +5257,12 @@ async function dbUpsert(table, item){
     const { error } = await sb.from(table).upsert({ id: item.id, data: item, tenant_id: currentTenant.id }, { onConflict: 'id' });
     if(error) throw error;
     setSynced(); return true;
-  }catch(e){ console.error('Upsert error', e); setSyncErr(e?.message||''); return false; }
+  }catch(e){
+    console.error('Upsert error', e); setSyncErr(e?.message||'');
+    // Fallback offline: encolar para sync automático cuando vuelva la conexión
+    if(typeof _addToPendingDbOp === 'function') _addToPendingDbOp(table, item);
+    return false;
+  }
 }
 
 async function dbLoadPedidos(){
@@ -6760,6 +6765,14 @@ async function loadAll(){
     setTimeout(_migrateTurnosToSb, 5000);
     setTimeout(_syncPendingTurnos, 8000);
     setInterval(_syncPendingTurnos, 5 * 60 * 1000);
+    setTimeout(_syncPendingDbOps, 12000);
+    setInterval(_syncPendingDbOps, 5 * 60 * 1000);
+    // Sync inmediato cuando vuelve la conexión a internet
+    window.addEventListener('online', ()=>{
+      console.log('[offline-queue] Conexión restaurada — sincronizando...');
+      setTimeout(_syncPendingTurnos, 1000);
+      setTimeout(_syncPendingDbOps, 2000);
+    });
     _initTurnosRealtime(currentTenant.id);
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -10749,6 +10762,38 @@ function _removeFromPendingQueue(turnoId){
   _savePendingQueue(_getPendingQueue().filter(t=>String(t.id)!==String(turnoId)));
 }
 
+// ── Cola offline para dbUpsert (gastos, movCaja, etc.) ───────────────────────
+const PENDING_DB_OPS_KEY = 'remu_pending_dbops_';
+function _pendingDbOpsKey(){ return PENDING_DB_OPS_KEY+(currentTenant?.id||''); }
+function _getPendingDbOps(){ try{ return JSON.parse(localStorage.getItem(_pendingDbOpsKey())||'[]'); }catch(e){ return []; } }
+function _savePendingDbOps(q){ try{ localStorage.setItem(_pendingDbOpsKey(), JSON.stringify(q)); }catch(e){} }
+function _addToPendingDbOp(table, item){
+  const q = _getPendingDbOps();
+  const idx = q.findIndex(op=>op.table===table && String(op.item?.id)===String(item?.id));
+  const op = {table, item};
+  if(idx!==-1) q[idx]=op; else q.push(op);
+  _savePendingDbOps(q);
+}
+async function _syncPendingDbOps(){
+  if(!sb||!currentTenant?.id) return;
+  const ops = _getPendingDbOps();
+  if(!ops.length) return;
+  let synced=0; const remaining=[];
+  for(const op of ops){
+    try{
+      const {error} = await sb.from(op.table).upsert(
+        {id:op.item.id, data:op.item, tenant_id:currentTenant.id}, {onConflict:'id'}
+      );
+      if(!error){ synced++; } else { remaining.push(op); }
+    }catch(e){ remaining.push(op); }
+  }
+  _savePendingDbOps(remaining);
+  if(synced>0){
+    showToast('☁ '+synced+' dato'+(synced>1?'s':'')+' sincronizado'+(synced>1?'s':'')+' con Supabase ✓');
+    console.log('[_syncPendingDbOps]', synced, 'operación(es) sincronizada(s)');
+  }
+}
+
 // Servicios predeterminados
 const SERVICIOS_DEFAULT = [
   {id:1, nombre:'Corte de pelo', sector:'Peluquería', duracion:45, precio:0},
@@ -11696,10 +11741,11 @@ async function saveTurno(_override){
   const sbResult = await _upsertTurnoSb(obj);
   if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=id?'Guardar cambios':'Agendar turno'; }
   if(!sbResult?.ok){
-    _mostrarErrorGuardado('❌ No se pudo guardar el turno. Revisá tu internet e intentá de nuevo.');
-    return;
+    // Offline: guardar localmente y encolar para sync automático
+    _addToPendingQueue(obj);
+    showToast('📶 Sin conexión — turno guardado localmente, se sincronizará automáticamente','warn');
   }
-  // Solo actualiza el caché local DESPUÉS de confirmar Supabase
+  // Siempre guardar en localStorage (online o offline)
   if(id){
     const idx = turnos.findIndex(t=>String(t.id)===String(id));
     if(idx>-1){ turnos[idx]=obj; } else { showToast('Error: turno no encontrado','err'); return; }
@@ -11854,10 +11900,11 @@ async function _doEstadoTurno(id, nuevoEstado, precioExtra, metodoExtra){
   // ── SUPABASE PRIMERO ────────────────────────────────────────────────────
   const sbResult = await _updateEstadoSb(turnoAntes, nuevoEstado, _precio, _metodo);
   if(sbResult && sbResult.ok === false){
-    _mostrarErrorGuardado('❌ No se pudo actualizar el estado del turno. Revisá tu internet e intentá de nuevo.');
-    return;
+    // Offline: encolar para sync automático
+    _addToPendingQueue({...turnoAntes, ..._upd});
+    showToast('📶 Sin conexión — cambio guardado localmente, se sincronizará automáticamente','warn');
   }
-  // Solo actualiza el caché local DESPUÉS de confirmar Supabase
+  // Siempre guardar en localStorage (online o offline)
   turnos[idx] = {...turnos[idx], ..._upd};
   saveTurnosLocal(turnos);
   if(nuevoEstado === 'terminado'){
