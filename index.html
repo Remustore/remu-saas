@@ -13124,15 +13124,18 @@ function rCajaEmpleadas(){
   if(!fechaEl.value) fechaEl.value = tod();
   const cfg = getTurnosCfg();
 
-  let turnos;
+  let todosTerminados;
   if(modo === 'mes'){
     if(!mesEl.value) mesEl.value = tod().substring(0,7);
     const mes = mesEl.value;
-    turnos = getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes)&&t.estado==='terminado'&&t.precio>0);
+    todosTerminados = getTurnos().filter(t=>t.fecha&&t.fecha.startsWith(mes)&&t.estado==='terminado');
   } else {
     const fecha = fechaEl.value;
-    turnos = getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado'&&t.precio>0);
+    todosTerminados = getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado');
   }
+
+  // Solo los que tienen precio y empleada — los que entran en la caja
+  const turnos = todosTerminados.filter(t=>t.precio>0);
 
   let empleados = cfg.empleados;
   // Si está logueado como empleada, mostrar solo su propia caja
@@ -13145,7 +13148,12 @@ function rCajaEmpleadas(){
     return;
   }
 
-  el.innerHTML = empleados.map(e=>{
+  const empIds = new Set(empleados.map(e=>String(e.id)));
+
+  // Servicios terminados que no entran en ninguna caja (sin precio o sin empleada asignada)
+  const sinCaja = todosTerminados.filter(t=>!t.precio||!t.empleadoId||!empIds.has(String(t.empleadoId)));
+
+  let html = empleados.map(e=>{
     const tEmp = turnos.filter(t=>t.empleadoId==e.id);
     const total = tEmp.reduce((a,t)=>a+t.precio,0);
     const comision = Math.round(total*(e.comision||0)/100);
@@ -13168,6 +13176,27 @@ function rCajaEmpleadas(){
       </div>`:''}
     </div>`;
   }).join('');
+
+  // Bloque de advertencia si hay servicios terminados fuera de la caja
+  if(sinCaja.length && currentRole !== 'empleado'){
+    html += `<div style="margin-top:8px;padding:12px;background:rgba(255,180,0,.08);border:1px solid var(--wrn);border-radius:8px">
+      <div style="font-size:.8rem;font-weight:600;color:var(--wrn);margin-bottom:6px">
+        ⚠ ${sinCaja.length} servicio${sinCaja.length>1?'s':''} terminado${sinCaja.length>1?'s':''} sin precio o sin empleada asignada (no entran en la caja)
+      </div>
+      <div style="font-size:.72rem;color:var(--tx2)">
+        ${sinCaja.map(t=>{
+          const motivo = !t.precio ? 'sin precio' : 'sin empleada';
+          return `<div style="display:flex;justify-content:space-between;padding:2px 0">
+            <span>${modo==='mes'?t.fecha+' '+t.hora:t.hora} — ${esc(t.cliente||'?')} (${esc(t.servicioNombre||'?')})</span>
+            <span style="color:var(--wrn);margin-left:8px">${motivo}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:6px;font-size:.7rem;color:var(--mut)">Editá esos turnos para asignarles precio y empleada → quedarán en la caja.</div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 function verCajaEmpleada(id){
