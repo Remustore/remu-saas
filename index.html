@@ -13188,22 +13188,50 @@ function rCajaEmpleadas(){
     </div>`;
   }).join('');
 
-  // Bloque de advertencia si hay servicios terminados fuera de la caja
+  // Bloque de advertencia colapsable si hay servicios terminados fuera de la caja
   if(sinCaja.length && currentRole !== 'empleado'){
+    const scId = 'cajaSinCaja_'+Date.now();
+
+    // Sugerir empleada por cliente: buscar en turnos ya asignados
+    const clientEmpMap = {};
+    getTurnos().filter(t=>t.empleadoNombre&&t.cliente).forEach(t=>{
+      clientEmpMap[t.cliente.trim().toLowerCase()] = t.empleadoNombre;
+    });
+    const conSugerencia = sinCaja.filter(t=>clientEmpMap[t.cliente?.trim().toLowerCase()]);
+    const sinSugerencia = sinCaja.filter(t=>!clientEmpMap[t.cliente?.trim().toLowerCase()]);
+
+    const filas = sinCaja.slice(0,8).map(t=>{
+      const sug = clientEmpMap[t.cliente?.trim().toLowerCase()];
+      const motivo = !t.precio ? 'sin precio' : (sug?`→ ${sug}`:'sin empleada');
+      const col = !t.precio ? 'var(--bad)' : (sug?'var(--ok)':'var(--wrn)');
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:.72rem;color:var(--tx2)">
+        <span>${t.fecha} — ${esc(t.cliente||'?')}</span>
+        <span style="color:${col};margin-left:8px;flex-shrink:0">${motivo}</span>
+      </div>`;
+    }).join('');
+
     html += `<div style="margin-top:8px;padding:12px;background:rgba(255,180,0,.08);border:1px solid var(--wrn);border-radius:8px">
-      <div style="font-size:.8rem;font-weight:600;color:var(--wrn);margin-bottom:6px">
-        ⚠ ${sinCaja.length} servicio${sinCaja.length>1?'s':''} terminado${sinCaja.length>1?'s':''} sin precio o sin empleada asignada (no entran en la caja)
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div style="font-size:.8rem;font-weight:600;color:var(--wrn)">
+          ⚠ ${sinCaja.length} servicios terminados sin empleada o sin precio
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${conSugerencia.length?`<button class="btn bg" style="font-size:.72rem;padding:4px 10px" onclick="_cajAutoAsignar()">
+            ✨ Auto-asignar ${conSugerencia.length} reconocidos
+          </button>`:''}
+          <button class="btn" style="font-size:.72rem;padding:4px 10px" onclick="document.getElementById('${scId}').style.display=document.getElementById('${scId}').style.display==='none'?'':'none'">
+            Ver lista
+          </button>
+        </div>
       </div>
-      <div style="font-size:.72rem;color:var(--tx2)">
-        ${sinCaja.map(t=>{
-          const motivo = !t.precio ? 'sin precio' : 'sin empleada';
-          return `<div style="display:flex;justify-content:space-between;padding:2px 0">
-            <span>${modo==='mes'?t.fecha+' '+t.hora:t.hora} — ${esc(t.cliente||'?')} (${esc(t.servicioNombre||'?')})</span>
-            <span style="color:var(--wrn);margin-left:8px">${motivo}</span>
-          </div>`;
-        }).join('')}
+      ${conSugerencia.length?`<div style="font-size:.72rem;color:var(--tx2);margin-top:6px">
+        ${conSugerencia.length} clientes reconocidos por historial — se pueden asignar automáticamente.
+        ${sinSugerencia.length?`${sinSugerencia.length} sin historial → editarlos manualmente.`:''}
+      </div>`:''}
+      <div id="${scId}" style="display:none;margin-top:8px;border-top:1px solid var(--bor);padding-top:8px">
+        ${filas}
+        ${sinCaja.length>8?`<div style="font-size:.7rem;color:var(--mut);margin-top:4px">… y ${sinCaja.length-8} más. Usá "Auto-asignar" o editá cada turno desde la grilla.</div>`:''}
       </div>
-      <div style="margin-top:6px;font-size:.7rem;color:var(--mut)">Editá esos turnos para asignarles precio y empleada → quedarán en la caja.</div>
     </div>`;
   }
 
@@ -13215,6 +13243,58 @@ function verCajaEmpleada(id){
   if(cajEl) cajEl.value = tod();
   rCajaEmpleadas();
   document.getElementById('cajaEmpleadasGrid')?.scrollIntoView({behavior:'smooth'});
+}
+
+async function _cajAutoAsignar(){
+  const cfg = getTurnosCfg();
+  const todos = getTurnos();
+
+  // Mapa cliente → empleada basado en turnos que YA tienen empleada asignada
+  const clientEmpMap = {};
+  todos.filter(t=>t.empleadoNombre&&t.cliente).forEach(t=>{
+    clientEmpMap[t.cliente.trim().toLowerCase()] = t.empleadoNombre;
+  });
+
+  // Turnos terminados sin empleada que tienen sugerencia por historial
+  const aTratar = todos.filter(t=>
+    t.estado==='terminado' &&
+    !t.empleadoId &&
+    !t.empleadoNombre &&
+    t.cliente &&
+    clientEmpMap[t.cliente.trim().toLowerCase()]
+  );
+
+  if(!aTratar.length){ showToast('No hay turnos para auto-asignar'); return; }
+
+  const btn = document.querySelector('button[onclick="_cajAutoAsignar()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Asignando…'; }
+
+  let ok=0, err=0;
+  for(const t of aTratar){
+    const empNombre = clientEmpMap[t.cliente.trim().toLowerCase()];
+    const emp = cfg.empleados.find(e=>e.nombre.toLowerCase()===empNombre.toLowerCase());
+    if(!emp) continue;
+
+    const idx = todos.findIndex(x=>String(x.id)===String(t.id));
+    if(idx===-1) continue;
+    todos[idx].empleadoId   = String(emp.id);
+    todos[idx].empleadoNombre = emp.nombre;
+
+    if(t._sbId && sb && currentTenant?.id){
+      try{
+        await sb.from('turnos_solicitudes').update({
+          empleado_id:     parseInt(emp.id)||null,
+          empleado_nombre: emp.nombre
+        }).eq('id', t._sbId).eq('tenant_id', currentTenant.id);
+        ok++;
+      }catch(e){ err++; }
+    } else { ok++; }
+  }
+
+  saveTurnosLocal(todos);
+  _turnosCache = todos;
+  showToast(`✓ ${ok} turno${ok!==1?'s':''} asignados automáticamente${err?` (${err} errores)`:''}`, err?'warn':'ok');
+  rCajaEmpleadas();
 }
 
 // ═══ FICHAS DE CLIENTES ═══
