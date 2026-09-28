@@ -13149,12 +13149,23 @@ function rCajaEmpleadas(){
   }
 
   const empIds = new Set(empleados.map(e=>String(e.id)));
+  const empNombres = new Set(empleados.map(e=>e.nombre.toLowerCase()));
+
+  // Turno pertenece a una empleada si coincide ID o nombre (fallback para IDs viejos)
+  function _perteneceA(t, e){
+    if(String(t.empleadoId) === String(e.id)) return true;
+    if(t.empleadoNombre && t.empleadoNombre.toLowerCase() === e.nombre.toLowerCase()) return true;
+    return false;
+  }
+  function _tieneEmpleada(t){
+    return empleados.some(e => _perteneceA(t, e));
+  }
 
   // Servicios terminados que no entran en ninguna caja (sin precio o sin empleada asignada)
-  const sinCaja = todosTerminados.filter(t=>!t.precio||!t.empleadoId||!empIds.has(String(t.empleadoId)));
+  const sinCaja = todosTerminados.filter(t=>!t.precio||!_tieneEmpleada(t));
 
   let html = empleados.map(e=>{
-    const tEmp = turnos.filter(t=>t.empleadoId==e.id);
+    const tEmp = turnos.filter(t=>_perteneceA(t,e));
     const total = tEmp.reduce((a,t)=>a+t.precio,0);
     const comision = Math.round(total*(e.comision||0)/100);
     return `<div style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px">
