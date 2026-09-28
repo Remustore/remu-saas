@@ -19840,30 +19840,36 @@ async function verificarEmailsVencimiento(tenants){
 // ── Wrappers (no modifican las funciones originales) ─────────────────────
 (function(){
   // Wrap loadSaStats → también carga métricas extendidas
-  var _saStatsOrig = loadSaStats;
-  loadSaStats = async function(){
-    var r = await _saStatsOrig.apply(this, arguments);
-    loadSaMetricas();
-    return r;
-  };
+  if(typeof loadSaStats === 'function'){
+    var _saStatsOrig = loadSaStats;
+    loadSaStats = async function(){
+      var r = await _saStatsOrig.apply(this, arguments);
+      loadSaMetricas();
+      return r;
+    };
+  }
 
   // Wrap loadTenants → también verifica emails de vencimiento
-  var _loadTenantsOrig = loadTenants;
-  loadTenants = async function(){
-    await _loadTenantsOrig.apply(this, arguments);
-    // Obtener tenants para chequeo de vencimiento
-    try {
-      var { data } = await sb.from('tenants').select('*').neq('id', MP_SYSTEM_TENANT_ID);
-      if(data) verificarEmailsVencimiento(data);
-    } catch(e){}
-  };
+  if(typeof loadTenants === 'function'){
+    var _loadTenantsOrig = loadTenants;
+    loadTenants = async function(){
+      await _loadTenantsOrig.apply(this, arguments);
+      // Obtener tenants para chequeo de vencimiento
+      try {
+        var { data } = await sb.from('tenants').select('*').neq('id', MP_SYSTEM_TENANT_ID);
+        if(data) verificarEmailsVencimiento(data);
+      } catch(e){}
+    };
+  }
 
   // Wrap precargarServiciosTenant → dispara email de bienvenida tras registro exitoso
-  var _precargarOrig = precargarServiciosTenant;
-  precargarServiciosTenant = async function(tenantId, rubro, nombre){
-    enviarEmailBienvenida(__rw?.email||'', nombre||__rw?.nombre||'', tenantId);
-    return _precargarOrig.apply(this, arguments);
-  };
+  if(typeof precargarServiciosTenant === 'function'){
+    var _precargarOrig = precargarServiciosTenant;
+    precargarServiciosTenant = async function(tenantId, rubro, nombre){
+      enviarEmailBienvenida(__rw?.email||'', nombre||__rw?.nombre||'', tenantId);
+      return _precargarOrig.apply(this, arguments);
+    };
+  }
 })();
 </script>
 
@@ -21164,7 +21170,7 @@ function _filtrarSlotsPasados(){
 
 
 // Calendario interno (admin): advertencia si el horario elegido ya pasó
-(function(){
+if(typeof verificarConflicto === 'function')(function(){
   var _orig = verificarConflicto;
   verificarConflicto = async function(){
     await _orig.apply(this, arguments);
