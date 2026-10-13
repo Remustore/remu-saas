@@ -801,13 +801,8 @@ textarea{resize:vertical;min-height:70px;}
             </div>
           </div>
           <label>Plan</label>
-          <select id="saPlan" onchange="saActualizarPrecioPlan()" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:6px">
-            <option value="profesional">⭐ Profesional — $14.900/mes</option>
-            <option value="premium">🚀 Premium — $20.000/mes (incluye WA automático)</option>
-          </select>
           <label>Precio mensual (ARS)</label>
-          <input id="saPrecioMensual" type="number" value="14900" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;">
-          <div style="font-size:.7rem;color:var(--tx2);margin-top:4px;margin-bottom:10px">💡 Podés editarlo para precio fundador u ofertas especiales</div>
+          <input id="saPrecioMensual" type="number" value="15000" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:10px">
 
           <label>Rol del usuario</label>
           <select id="saRol" onchange="toggleRolFields(this.value)" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:9px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;">
@@ -851,7 +846,7 @@ textarea{resize:vertical;min-height:70px;}
         <input id="saInputMpLink" type="url" placeholder="https://mpago.la/tu-link-de-cobro">
 
         <label>Precio de suscripción (ARS)</label>
-        <input id="saInputMpPrecio" type="number" placeholder="8000" value="8000">
+        <input id="saInputMpPrecio" type="number" placeholder="15000" value="15000">
 
         <div style="margin-top:6px;padding:10px;background:rgba(76,142,201,.08);border:1px solid rgba(76,142,201,.2);border-radius:7px;font-size:.75rem;color:var(--tx2);line-height:1.5">
           💡 <strong>URL de retorno</strong> que tenés que configurar en MP:<br>
@@ -4748,11 +4743,8 @@ async function _cargarSoporteTel(){
 }
 
 function saActualizarPrecioPlan(){
-  const plan = document.getElementById('saPlan')?.value;
-  const inp  = document.getElementById('saPrecioMensual');
-  if(!inp) return;
-  if(plan==='premium') inp.value = 20000;
-  else inp.value = 14900;
+  const inp = document.getElementById('saPrecioMensual');
+  if(inp && !inp.value) inp.value = 15000;
 }
 
 function _actualizarPrecioTrial(precio){
@@ -4816,7 +4808,7 @@ async function showTrialScreen(diasVencido){
 
   // Precio según tier del tenant
   const tier = currentTenant?.modulos?.tier || 'completo';
-  const precioTier = tier === 'fundador' ? 15000 : tier === 'basico' ? 25000 : 45000;
+  const precioTier = 15000;
   const precioTenant = currentTenant?.modulos?.precio_mensual;
   _actualizarPrecioTrial(precioTenant || precioTier, tier);
   // Actualizar etiqueta del plan
@@ -14465,8 +14457,8 @@ function _rwS6(){
       </div>
     </div>`;
   const _t = __rw.tier||'completo';
-  const tierLabel  = _t==='fundador' ? 'Fundador' : _t==='basico' ? 'Básico' : 'Completo';
-  const tierPrecio = _t==='fundador' ? '15.000'   : _t==='basico' ? '25.000' : '45.000';
+  const tierLabel  = 'Profesional';
+  const tierPrecio = '15.000';
   return `<div style="text-align:center">
     <div style="font-size:3rem;margin-bottom:8px">🎉</div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${esc(__rw.nombre||'Tu negocio')} está listo</div>
