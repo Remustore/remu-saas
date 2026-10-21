@@ -2800,6 +2800,8 @@ $$;</pre>
   <input type="hidden" id="turnoId">
   <div class="fr"><div><label>Cliente</label><div style="position:relative"><input id="turnoCli" placeholder="Nombre del cliente" oninput="autocompleteCliTurno(this.value)" autocomplete="off"><div id="turnoCliSugg" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--car2);border:1px solid var(--bor2);border-radius:0 0 7px 7px;z-index:500;max-height:200px;overflow-y:auto"></div></div><div id="turnoFichaLink" style="display:none;margin-top:4px"></div></div><div><label>Teléfono / WA</label><input id="turnoTel" placeholder="11 2345 6789"></div></div>
   <div class="fr"><div><label>Empleado</label><select id="turnoEmpleado" onchange="filtrarServiciosPorEmpleado()"></select></div><div><label>Sector / Servicio</label><select id="turnoServicio" onchange="updateDuracionTurno()"></select></div></div>
+  <div id="turnoSrvsExtra" style="margin-top:4px;display:flex;flex-direction:column;gap:4px"></div>
+  <div style="margin-top:5px"><button type="button" class="btn bsm" onclick="agregarSrvTurno()" style="font-size:.75rem;padding:4px 12px">➕ Otro servicio</button></div>
   <div class="fr"><div><label>Fecha</label><input type="date" id="turnoFecha" onchange="updateDuracionTurno()"></div><div><label>Hora</label><input type="time" id="turnoHora" step="1800" onchange="updateDuracionTurno()"></div></div>
   <div id="turnoDurBox" style="background:var(--bg);border-radius:8px;padding:10px;margin-top:8px;font-size:.8rem;color:var(--tx2)">
     Duración estimada: <strong id="turnoDurLabel" style="color:var(--gld)">—</strong>
@@ -10889,6 +10891,7 @@ function _mapSbTurno(r){
     metodo:         r.metodo || '',
     esFijo:         r.es_fijo || false,
     fijoId:         r.fijo_id || null,
+    servicios:      r.servicios || null,
     creadoEn:       r.created_at || new Date().toISOString()
   };
 }
@@ -10921,6 +10924,7 @@ async function _upsertTurnoSb(obj){
     metodo:          obj.metodo||'',
     es_fijo:         obj.esFijo||false,
     fijo_id:         obj.fijoId||null,
+    servicios:       obj.servicios||null,
     origen:          'admin',
     ref_id:          String(obj.id)
   };
@@ -11486,6 +11490,7 @@ function openNuevoTurno(){
   document.getElementById('turnoHora').value = '';
   document.getElementById('turnoNotas').value = '';
   if(document.getElementById('turnoPrecio')) document.getElementById('turnoPrecio').value = '';
+  if(typeof _limpiarSrvsExtra==='function') _limpiarSrvsExtra();
   document.getElementById('turnoConflicto').style.display = 'none';
   document.getElementById('mTurnoTitle').textContent = 'Nuevo turno';
   // Mostrar opción recurrente solo al crear (no al editar)
@@ -11684,8 +11689,20 @@ async function saveTurno(_override){
   const empleado = cfg.empleados.find(e=>String(e.id)===String(empleadoId));
   const turnos   = getTurnos();
 
+  // Recoger servicios extra (multi-servicio)
+  const _extraSels = [...document.querySelectorAll('#turnoSrvsExtra .srv-extra-sel')].filter(s=>s.value);
+  const _extraSrvs = _extraSels.map(sel=>{
+    const s2=cfg.servicios.find(s=>String(s.id)===sel.value); if(s2) return s2;
+    const p2=(S.precios||[]).find(p=>String(p.id)===sel.value);
+    return p2?{id:p2.id,nombre:p2.nombre,sector:p2.categoria||'',duracion:p2.duracion||30,precio:parseFloat(p2.precio)||0}:null;
+  }).filter(Boolean);
+  const _todosServs = [srv,..._extraSrvs].filter(Boolean);
+  const _srvNombreCombo = _todosServs.map(s=>s.nombre).join(' + ')||srv?.nombre||'';
+  const _srvDurTotal = _todosServs.reduce((a,s)=>a+(s.duracion||30),0)||srv?.duracion||60;
+  const _serviciosArr = _todosServs.map(s=>({id:s.id,nombre:s.nombre,precio:s.precio||0,duracion:s.duracion||30}));
+
   if(!_override){
-    const durN = srv?.duracion||60;
+    const durN = _srvDurTotal;
     const [h,m] = hora.split(':').map(Number);
     const inicioN = h*60+m;
     const finN    = inicioN+durN;
@@ -11716,10 +11733,11 @@ async function saveTurno(_override){
     id: id||Date.now().toString(),
     cliente: cli, tel, fecha, hora,
     empleadoId, empleadoNombre: empleado?.nombre||'',
-    servicioId: srv?.id||servicioVal, servicioNombre: srv?.nombre||'',
+    servicioId: srv?.id||servicioVal, servicioNombre: _srvNombreCombo,
     sector:   srv?.sector||'',
-    duracion: srv?.duracion||60,
+    duracion: _srvDurTotal,
     precio: precioCobrado,
+    servicios: _serviciosArr.length>1 ? _serviciosArr : undefined,
     notas, estado,
     esFijo:   turnoOriginal?.esFijo||false,
     fijoId:   turnoOriginal?.fijoId||null,
@@ -11756,7 +11774,7 @@ async function saveTurno(_override){
       if(!S.ventas.some(v=>v.turnoId===turnoIdStr)){
         const venta = {
           id: Date.now(), turnoId: turnoIdStr,
-          tipo:'servicio', nombre: srv?.nombre||obj.servicioNombre||'Servicio',
+          tipo:'servicio', nombre: obj.servicioNombre||'Servicio',
           cantidad:1, precio:precioCobrado, total:precioCobrado,
           costo:0, metodo: obj.metodo||'Efectivo', fecha,
           comPct:0, comision:0
@@ -12095,6 +12113,13 @@ function editarTurno(id){
         if(fidelBtn){fidelBtn.dataset.nombre=t.cliente;fidelBtn.dataset.visitas=totalVisitas;}
       }else{fidelAlert.style.display='none';}
     }else{if(fidelAlert)fidelAlert.style.display='none';}
+  }
+  // Limpiar y re-poblar servicios extra
+  if(typeof _limpiarSrvsExtra==='function') _limpiarSrvsExtra();
+  if(t.servicios && Array.isArray(t.servicios) && t.servicios.length>1){
+    const _cfgE=getTurnosCfg();
+    const _svcsE=_cfgE.servicios.length>0?_cfgE.servicios:(S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible').map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}));
+    t.servicios.slice(1).forEach(s=>{ if(typeof _agregarSrvExtraRow==='function') _agregarSrvExtraRow(_svcsE, String(s.id)); });
   }
   updateDuracionTurno();
   document.getElementById('mTurno').classList.add('open');
@@ -23686,5 +23711,126 @@ async function _mFCS_fiado(){
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js" onload="lucide.createIcons()"></script>
+<script>
+/* ══ MULTI-SERVICIOS POR TURNO ══════════════════════════════════════════════
+   Permite seleccionar 2+ servicios al crear/editar un turno.
+   El precio se auto-suma, la duración se acumula, y el nombre es combinado.
+   Se guarda en Supabase como columna 'servicios' (jsonb).
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function(){
+  'use strict';
+
+  /* ── Estado del precio auto-calculado (para no pisar precio editado manualmente) ── */
+  window._autoTotalPrecioTurno = 0;
+
+  /* ── Limpiar filas de servicios extra (llamado al abrir/cerrar modal) ── */
+  window._limpiarSrvsExtra = function(){
+    var box = document.getElementById('turnoSrvsExtra');
+    if(box) box.innerHTML = '';
+    window._autoTotalPrecioTurno = 0;
+  };
+
+  /* ── Obtener lista de servicios disponibles ── */
+  function _getSrvsList(){
+    var cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[]};
+    if(cfg.servicios && cfg.servicios.length>0) return cfg.servicios;
+    return (typeof S!=='undefined' && Array.isArray(S.precios) ? S.precios : [])
+      .filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
+      .map(function(p){ return {id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}; });
+  }
+
+  /* ── Crear una fila de servicio extra ── */
+  function _crearFilaSrvExtra(svcs, valorInicial){
+    var row = document.createElement('div');
+    row.className = 'tsrv-extra-row';
+    row.style.cssText = 'display:flex;gap:6px;align-items:center';
+
+    var sel = document.createElement('select');
+    sel.className = 'srv-extra-sel';
+    sel.style.cssText = 'flex:1;padding:6px 8px;border:1px solid var(--bor2);border-radius:6px;background:var(--sur);color:var(--tx);font-size:.82rem';
+    sel.innerHTML = '<option value="">— Elegir servicio —</option>' +
+      svcs.map(function(s){
+        var isSel = valorInicial && String(s.id)===String(valorInicial) ? ' selected' : '';
+        return '<option value="'+s.id+'" data-dur="'+(s.duracion||30)+'" data-precio="'+(s.precio||0)+'"'+isSel+'>'+
+          (s.sector?s.sector+': ':'')+s.nombre+' ('+(s.duracion||30)+' min)'+
+          (s.precio>0?' · $'+Number(s.precio).toLocaleString('es-AR'):'')+
+          '</option>';
+      }).join('');
+    sel.addEventListener('change', function(){
+      if(typeof updateDuracionTurno==='function') updateDuracionTurno();
+    });
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn bsm bd';
+    btn.textContent = '✕';
+    btn.style.cssText = 'flex-shrink:0;padding:4px 8px';
+    btn.addEventListener('click', function(){
+      row.remove();
+      if(typeof updateDuracionTurno==='function') updateDuracionTurno();
+    });
+
+    row.appendChild(sel);
+    row.appendChild(btn);
+    return row;
+  }
+
+  /* ── Exposed: agregar fila desde botón ── */
+  window.agregarSrvTurno = function(){
+    var box = document.getElementById('turnoSrvsExtra');
+    if(!box) return;
+    box.appendChild(_crearFilaSrvExtra(_getSrvsList(), null));
+  };
+
+  /* ── Exposed: agregar fila con valor pre-seleccionado (usado en editarTurno) ── */
+  window._agregarSrvExtraRow = function(svcs, valorInicial){
+    var box = document.getElementById('turnoSrvsExtra');
+    if(!box) return;
+    box.appendChild(_crearFilaSrvExtra(svcs||_getSrvsList(), valorInicial));
+  };
+
+  /* ── Patch updateDuracionTurno: sumar duración y precio de todos los servicios ── */
+  if(typeof updateDuracionTurno==='function'){
+    var _updOrig = updateDuracionTurno;
+    updateDuracionTurno = function(){
+      var srv = document.getElementById('turnoServicio');
+      var opt = srv ? srv.options[srv.selectedIndex] : null;
+      var dur1     = parseInt(opt&&opt.getAttribute('data-dur')||'0')||0;
+      var precio1  = parseFloat(opt&&opt.getAttribute('data-precio')||'0')||0;
+      var durExtra = 0, precioExtra = 0;
+      document.querySelectorAll('#turnoSrvsExtra .srv-extra-sel').forEach(function(s){
+        if(!s.value) return;
+        var o = s.options[s.selectedIndex];
+        durExtra    += parseInt(o&&o.getAttribute('data-dur')||'0')||0;
+        precioExtra += parseFloat(o&&o.getAttribute('data-precio')||'0')||0;
+      });
+      var durTotal    = dur1 + durExtra;
+      var totalPrecio = precio1 + precioExtra;
+      var hora = (document.getElementById('turnoHora')||{}).value||'';
+      var durLbl = document.getElementById('turnoDurLabel');
+      var finLbl = document.getElementById('turnoFinLabel');
+      if(durLbl) durLbl.textContent = durTotal ? durTotal+' min' : '—';
+      if(hora && durTotal){
+        var hm = hora.split(':').map(Number);
+        var fin = new Date(2000,0,1,hm[0],hm[1]+durTotal);
+        if(finLbl) finLbl.textContent = fin.getHours().toString().padStart(2,'0')+':'+fin.getMinutes().toString().padStart(2,'0');
+      } else {
+        if(finLbl) finLbl.textContent = '—';
+      }
+      var precioEl = document.getElementById('turnoPrecio');
+      if(precioEl && totalPrecio>0){
+        var cur = parseFloat(precioEl.value)||0;
+        // Solo actualizar si está en 0 o si coincide con el último total auto-calculado
+        if(cur===0 || cur===window._autoTotalPrecioTurno){
+          precioEl.value = totalPrecio;
+          window._autoTotalPrecioTurno = totalPrecio;
+        }
+      }
+      if(typeof verificarConflicto==='function') verificarConflicto();
+    };
+  }
+
+})();
+</script>
 </body>
 </html>
