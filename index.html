@@ -22813,7 +22813,7 @@ async function _mFCS_fiado(){
       try {
         var res = await sb.from('precios')
           .update({ data: updated, tenant_id: currentTenant.id })
-          .eq('id', Number(id)).eq('tenant_id', currentTenant.id);
+          .eq('id', id).eq('tenant_id', currentTenant.id);
         if(res.error) throw res.error;
         if(typeof setSynced==='function') setSynced();
       } catch(e){ console.error('[savePrecio] update:', e); if(typeof setSyncErr==='function') setSyncErr(e?.message||''); }
