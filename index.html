@@ -12121,6 +12121,9 @@ function editarTurno(id){
     const _svcsE=_cfgE.servicios.length>0?_cfgE.servicios:(S.precios||[]).filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible').map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',duracion:p.duracion||30,precio:parseFloat(p.precio)||0}));
     t.servicios.slice(1).forEach(s=>{ if(typeof _agregarSrvExtraRow==='function') _agregarSrvExtraRow(_svcsE, String(s.id)); });
   }
+  // Sincronizar el "precio auto" con el precio actual del turno para que
+  // al agregar un servicio extra el precio se actualice correctamente.
+  if(typeof window._autoTotalPrecioTurno!=='undefined') window._autoTotalPrecioTurno = parseFloat(t.precio||0);
   updateDuracionTurno();
   document.getElementById('mTurno').classList.add('open');
 }
