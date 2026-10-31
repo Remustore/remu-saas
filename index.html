@@ -4717,7 +4717,7 @@ async function loadMpConfig(){
   } catch(e){}
 
   const link  = cfg?.mp_link  || localStorage.getItem('remu_mp_link')  || '';
-  const precio = cfg?.mp_precio || parseInt(localStorage.getItem('remu_mp_precio')) || 8000;
+  const precio = cfg?.mp_precio || parseInt(localStorage.getItem('remu_mp_precio')) || 10000;
   const video = cfg?.video_tutorial || localStorage.getItem('remu_video_tutorial') || '';
   const soporteTel = cfg?.soporte_tel || localStorage.getItem('remu_soporte_tel') || '';
 
@@ -4746,7 +4746,7 @@ async function _cargarSoporteTel(){
 
 function saActualizarPrecioPlan(){
   const inp = document.getElementById('saPrecioMensual');
-  if(inp && !inp.value) inp.value = 15000;
+  if(inp && !inp.value) inp.value = 10000;
 }
 
 function _actualizarPrecioTrial(precio){
@@ -4810,7 +4810,7 @@ async function showTrialScreen(diasVencido){
 
   // Precio según tier del tenant
   const tier = currentTenant?.modulos?.tier || 'completo';
-  const precioTier = 15000;
+  const precioTier = 10000;
   const precioTenant = currentTenant?.modulos?.precio_mensual;
   _actualizarPrecioTrial(precioTenant || precioTier, tier);
   // Actualizar etiqueta del plan
@@ -4827,13 +4827,29 @@ async function showTrialScreen(diasVencido){
 async function iniciarPagoMP(){
   const btn = document.getElementById('btnPagarMP');
   if(btn){ btn.disabled=true; btn.textContent='Generando link de pago...'; }
+
+  // Fallback: si la función falla, mostrar botón WA directamente
+  const _mostrarFallbackWA = () => {
+    const soporteTel = localStorage.getItem('remu_soporte_tel') || '5493472628087';
+    const nombre = currentTenant?.nombre || 'mi negocio';
+    const wa = document.getElementById('trialWaLink');
+    if(wa){
+      wa.href = `https://wa.me/${soporteTel}?text=${encodeURIComponent('Hola! Quiero activar mi suscripción de Remu Gestión — '+nombre)}`;
+      wa.style.background = 'rgba(37,211,102,.12)';
+      wa.style.borderColor = 'rgba(37,211,102,.3)';
+      wa.style.color = '#25d366';
+      wa.textContent = '💬 Activar por WhatsApp (alternativa)';
+    }
+    const btnYa = document.getElementById('btnYaPague');
+    if(btnYa) btnYa.style.display = 'block';
+  };
+
   try {
     const res = await fetch('https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/create-mp-preference', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         tenantId: currentTenant?.id,
-        tier:     currentTenant?.modulos?.tier || 'completo',
         email:    currentTenant?.email || '',
         nombre:   currentTenant?.nombre || ''
       })
@@ -4841,16 +4857,27 @@ async function iniciarPagoMP(){
     const data = await res.json();
     if(data.init_point){
       window.open(data.init_point, '_blank');
-      // Mostrar botón "Ya pagué" tras 8 segundos
+      // Mostrar botón "Ya pagué" y aviso tras 5 segundos
       setTimeout(() => {
         const btnYa = document.getElementById('btnYaPague');
         if(btnYa) btnYa.style.display = 'block';
-      }, 8000);
+        // Pequeño texto de ayuda
+        const sub = document.getElementById('trialScreenSub');
+        if(sub && !sub.querySelector('._mpHint')){
+          const hint = document.createElement('div');
+          hint.className = '_mpHint';
+          hint.style.cssText = 'margin-top:10px;font-size:.75rem;color:#585044';
+          hint.textContent = 'Se abrió Mercado Pago en otra pestaña. Una vez que completés el pago, tocá "Ya pagué" acá.';
+          sub.appendChild(hint);
+        }
+      }, 5000);
     } else {
-      throw new Error(data.error || 'No se pudo generar el link');
+      throw new Error(data.error || 'No se pudo generar el link de pago');
     }
   } catch(e){
-    showToast('Error al generar el link: ' + e.message, 'err');
+    console.error('[iniciarPagoMP]', e);
+    showToast('No se pudo conectar con Mercado Pago. Podés activar por WhatsApp.', 'err');
+    _mostrarFallbackWA();
   }
   if(btn){ btn.disabled=false; btn.textContent='💳 Pagar con Mercado Pago →'; }
 }

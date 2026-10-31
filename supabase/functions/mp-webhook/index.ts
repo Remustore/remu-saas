@@ -112,7 +112,7 @@ serve(async (req) => {
         // Tenants creados antes de guardar el email: buscar el usuario en Auth y su tenant_id
         const { data: usersPage } = await sb.auth.admin.listUsers({ perPage: 1000 });
         const u = (usersPage?.users || []).find(x => (x.email || '').toLowerCase() === payerEmail);
-        const tid = u?.user_metadata?.tenant_id;
+        const tid = u?.app_metadata?.tenant_id || u?.user_metadata?.tenant_id;
         if (tid) {
           const { data } = await sb.from('tenants').select('id, nombre, modulos').eq('id', tid).maybeSingle();
           if (data) {
