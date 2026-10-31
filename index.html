@@ -5015,11 +5015,9 @@ async function editarTenant(id){
         <div style="border-top:1px solid var(--bor);padding-top:14px;margin-top:4px">
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">📋 Plan comercial</div>
           <select id="etTier" style="width:100%;background:var(--bg);border:1px solid var(--bor2);color:var(--tx);padding:8px 12px;border-radius:7px;font-family:var(--fb);font-size:.85rem;outline:none;margin-bottom:6px">
-            <option value="completo" ${(mods.tier||'completo')==='completo'?'selected':''}>⭐ Completo — $45.000/mes · todos los módulos</option>
-            <option value="basico" ${mods.tier==='basico'?'selected':''}>📦 Básico — $25.000/mes · agenda + caja + fiados</option>
-            <option value="fundador" ${mods.tier==='fundador'?'selected':''}>⚡ Fundador — $15.000/mes · primeros 10 clientes</option>
+            <option value="completo" selected>⭐ Completo — $10.000/mes · todos los módulos</option>
           </select>
-          <div style="font-size:.71rem;color:var(--mut);margin-bottom:14px">Fundador: precio especial para los primeros 10 clientes. Mismo acceso que Básico.</div>
+          <div style="font-size:.71rem;color:var(--mut);margin-bottom:14px">Plan único — $10.000 ARS/mes · todo incluido.</div>
 
           <div style="font-size:.68rem;color:var(--gld);text-transform:uppercase;letter-spacing:.7px;font-weight:600;margin-bottom:8px">⭐ Plan Premium (heredado)</div>
           <div style="padding:8px 12px;background:${mods.plan==='premium'?'rgba(201,168,76,.1)':'var(--bg)'};border:1px solid ${mods.plan==='premium'?'rgba(201,168,76,.3)':'var(--bor2)'};border-radius:7px;margin-bottom:10px;font-size:.8rem">
@@ -14347,56 +14345,30 @@ async function _checkCuposFundador(){
 
 // ── Paso 4: Email y contraseña del dueño ─────────────────────────────────
 async function _rwS4init(){
-  const cupos = await _checkCuposFundador();
-  __rw._cuposFundador = cupos;
-  const lbl = document.getElementById('rwPlanFundadorLbl');
-  const badge = document.getElementById('rwFundadorBadge');
-  if(lbl){
-    if(cupos > 0){
-      lbl.style.display = 'flex';
-      if(badge) badge.textContent = `⚡ Quedan ${cupos} cupos`;
-      // Auto-seleccionar Fundador si el usuario no eligió otro plan aún
-      if(__rw.tier === 'completo' || !__rw.tier) _rwSelectPlan('fundador');
-    } else {
-      lbl.style.display = 'none';
-      if(__rw.tier === 'fundador'){ __rw.tier = 'completo'; _rwSelectPlan('completo'); }
-    }
-  }
-  // Asegurar que el plan seleccionado esté visualmente marcado
-  if(__rw.tier) _rwSelectPlan(__rw.tier);
+  // Plan único: siempre completo
+  __rw.tier = 'completo';
 }
 function _rwS4(){
   return `<div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px">Tu cuenta</div>
     <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Con estos datos vas a acceder a tu panel de gestión.</div>
     <div style="margin-bottom:20px">
-      <label style="${_OBL}">Elegí tu plan</label>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <label id="rwPlanFundadorLbl" onclick="_rwSelectPlan('fundador')" style="display:none;flex-direction:column;gap:4px;background:rgba(201,168,76,.1);border:2px solid rgba(201,168,76,.5);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
-          <input type="radio" name="rwPlan" value="fundador" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:.7rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px">⚡ Precio Fundador</span>
-            <span id="rwFundadorBadge" style="font-size:.62rem;background:rgba(201,168,76,.2);color:#c9a84c;border:1px solid rgba(201,168,76,.4);padding:1px 7px;border-radius:10px;font-weight:700"></span>
+      <div style="background:rgba(201,168,76,.07);border:1.5px solid rgba(201,168,76,.35);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div>
+          <div style="font-size:.65rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Plan Completo · Todo incluido</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            <span style="font-size:.7rem;color:#a89880;display:flex;align-items:center;gap:4px"><span style="color:#4caf7d">✓</span> Turnos online</span>
+            <span style="font-size:.7rem;color:#a89880;display:flex;align-items:center;gap:4px"><span style="color:#4caf7d">✓</span> Caja y stock</span>
+            <span style="font-size:.7rem;color:#a89880;display:flex;align-items:center;gap:4px"><span style="color:#4caf7d">✓</span> Empleados</span>
+            <span style="font-size:.7rem;color:#a89880;display:flex;align-items:center;gap:4px"><span style="color:#4caf7d">✓</span> Soporte incluido</span>
           </div>
-          <span style="font-size:1.15rem;font-weight:800;color:#f0ede6">$15.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
-          <span style="font-size:.7rem;color:#a89880;line-height:1.4">Precio especial · Agenda · Caja · Fiados</span>
-        </label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <label id="rwPlanBasicoLbl" onclick="_rwSelectPlan('basico')" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:2px solid var(--bor2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
-            <input type="radio" name="rwPlan" value="basico" style="display:none">
-            <span style="font-size:.7rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.5px">📦 Básico</span>
-            <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$25.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
-            <span style="font-size:.7rem;color:#a89880;line-height:1.4">Agenda · Caja · Fiados</span>
-          </label>
-          <label id="rwPlanCompletoLbl" onclick="_rwSelectPlan('completo')" style="display:flex;flex-direction:column;gap:4px;background:var(--bg);border:2px solid var(--bor2);border-radius:10px;padding:12px 14px;cursor:pointer;transition:border-color .15s">
-            <input type="radio" name="rwPlan" value="completo" style="display:none">
-            <span style="font-size:.7rem;font-weight:700;color:#4caf7d;text-transform:uppercase;letter-spacing:.5px">⭐ Completo</span>
-            <span style="font-size:1.05rem;font-weight:800;color:#f0ede6">$45.000<span style="font-size:.7rem;font-weight:400;color:#a89880">/mes</span></span>
-            <span style="font-size:.7rem;color:#a89880;line-height:1.4">Todo incluido · Sin límites</span>
-          </label>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'Playfair Display',serif;font-size:1.4rem;font-weight:800;color:#f0ede6;line-height:1">$10.000</div>
+          <div style="font-size:.65rem;color:#a89880;margin-top:2px">ARS / mes</div>
         </div>
       </div>
-      <div style="font-size:.7rem;color:#a89880;margin-top:6px">Sin contratos. Cancelás cuando querés.</div>
+      <div style="font-size:.7rem;color:#585044;margin-top:6px">Sin contratos · Cancelás cuando querés · Precio en pesos</div>
     </div>
     <label style="${_OBL}">Email</label>
     <input id="rwEmail" type="email" value="${esc(__rw.email)}" placeholder="tu@email.com" style="${_OB}margin-bottom:14px" autocomplete="email">
@@ -14423,13 +14395,7 @@ function _rwS4(){
   </div>`;
 }
 function _rwSelectPlan(plan){
-  __rw.tier = plan;
-  const lblF = document.getElementById('rwPlanFundadorLbl');
-  const lblB = document.getElementById('rwPlanBasicoLbl');
-  const lblC = document.getElementById('rwPlanCompletoLbl');
-  if(lblF) lblF.style.borderColor = plan==='fundador' ? 'rgba(201,168,76,.9)' : 'rgba(201,168,76,.5)';
-  if(lblB) lblB.style.borderColor = plan==='basico'   ? 'rgba(201,168,76,.7)' : 'var(--bor2)';
-  if(lblC) lblC.style.borderColor = plan==='completo' ? '#4caf7d' : 'var(--bor2)';
+  __rw.tier = 'completo';
 }
 function _rwS4Back(){
   __rw.email     = document.getElementById('rwEmail')?.value||'';
@@ -14511,9 +14477,8 @@ function _rwS6(){
         <button onclick="navigator.clipboard.writeText('${link}').then(()=>_rwToast('¡Link copiado!'))" style="flex-shrink:0;background:#c9a84c;color:#080808;border:none;border-radius:7px;padding:8px 12px;font-size:.75rem;font-weight:700;cursor:pointer;font-family:'Outfit',sans-serif">Copiar</button>
       </div>
     </div>`;
-  const _t = __rw.tier||'completo';
-  const tierLabel  = 'Profesional';
-  const tierPrecio = '15.000';
+  const tierLabel  = 'Completo';
+  const tierPrecio = '10.000';
   return `<div style="text-align:center">
     <div style="font-size:3rem;margin-bottom:8px">🎉</div>
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${esc(__rw.nombre||'Tu negocio')} está listo</div>
@@ -19275,10 +19240,10 @@ function lpTab(n){
   <div class="lp-tag">Precio</div>
   <h2 class="lp-h2">Simple y sin sorpresas</h2>
   <div class="lp-precio-box">
-    <div id="lpPrecioBadge" style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.2);border-radius:10px;padding:8px 16px;font-size:.72rem;font-weight:700;color:#c9a84c;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;display:inline-block">⚡ Precio fundador — primeros 20 lugares</div>
-    <div id="lpPrecioTachado" style="font-size:.8rem;color:#5a5040;text-decoration:line-through;margin-bottom:4px">$25.000 / mes</div>
-    <div id="lpPrecioMain" style="font-family:'Playfair Display',serif;font-size:3.2rem;font-weight:800;color:#c9a84c;line-height:1">$15.000</div>
-    <div style="font-size:.8rem;color:#a89880;margin-bottom:24px">por mes · facturado mensual</div>
+    <div id="lpPrecioBadge" style="background:rgba(76,175,125,.1);border:1px solid rgba(76,175,125,.25);border-radius:10px;padding:8px 16px;font-size:.72rem;font-weight:700;color:#4caf7d;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:20px;display:inline-block">Plan Completo · Todo incluido</div>
+    <div id="lpPrecioTachado" style="display:none"></div>
+    <div id="lpPrecioMain" style="font-family:'Playfair Display',serif;font-size:3.2rem;font-weight:800;color:#c9a84c;line-height:1">$10.000</div>
+    <div style="font-size:.8rem;color:#a89880;margin-bottom:24px">pesos argentinos por mes</div>
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px;text-align:left">
       <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>Sin contratos, cancelás cuando querés</div>
       <div style="display:flex;align-items:center;gap:10px;font-size:.85rem;color:#a89880"><span style="color:#c9a84c;font-size:1rem">✓</span>Todos los módulos incluidos</div>
@@ -19293,39 +19258,28 @@ function lpTab(n){
 <!-- COMPARATIVA DE PLANES -->
 <div class="lp-divider"></div>
 <div class="lp-section">
-  <div class="lp-tag" style="text-align:center">Planes</div>
-  <h2 class="lp-h2" style="text-align:center">¿Cuál plan te conviene?</h2>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:560px;margin:0 auto">
-
-    <!-- BÁSICO -->
-    <div style="background:#0f0d0a;border:1px solid #2a2218;border-radius:14px;padding:20px 18px">
-      <div style="font-size:.68rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">📦 Básico</div>
-      <div style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:800;color:#f0ede6;margin-bottom:4px">$25.000<span style="font-size:.75rem;font-weight:400;color:#a89880">/mes</span></div>
-      <div style="font-size:.75rem;color:#a89880;margin-bottom:14px;line-height:1.5">Agenda · Caja · Recordatorios · Reservas online</div>
-      <div style="font-size:.8rem;color:#c9a84c;font-weight:600;margin-bottom:6px">Ideal si…</div>
-      <ul style="margin:0;padding-left:14px;font-size:.78rem;color:#a89880;line-height:1.8">
-        <li>Recién arrancás y querés probar</li>
-        <li>Solo necesitás ordenar los turnos y la caja</li>
-        <li>Trabajás solo o con 1 empleado</li>
-      </ul>
+  <div class="lp-tag" style="text-align:center">Plan</div>
+  <h2 class="lp-h2" style="text-align:center">Un plan. Todo incluido.</h2>
+  <div style="max-width:440px;margin:0 auto">
+    <div style="background:#0f0d0a;border:1.5px solid rgba(201,168,76,.4);border-radius:16px;padding:24px 22px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-size:.68rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:1.2px">Plan Completo</div>
+        <div style="background:#4caf7d;color:#fff;font-size:.6rem;font-weight:700;padding:2px 10px;border-radius:10px;letter-spacing:.8px">TODO INCLUIDO</div>
+      </div>
+      <div style="font-family:'Playfair Display',serif;font-size:2rem;font-weight:800;color:#f0ede6;margin-bottom:4px">$10.000<span style="font-size:.8rem;font-weight:400;color:#a89880"> ARS/mes</span></div>
+      <div style="font-size:.75rem;color:#a89880;margin-bottom:20px">Sin contratos · Cancelás cuando querés</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Turnos online 24/7</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Caja y gastos</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Historial de clientes</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Stock e inventario</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Múltiples empleados</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Análisis del negocio</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Soporte por WhatsApp</div>
+        <div style="display:flex;align-items:center;gap:7px;font-size:.78rem;color:#a89880"><span style="color:#4caf7d;font-size:.9rem">✓</span> Actualizaciones gratis</div>
+      </div>
     </div>
-
-    <!-- COMPLETO -->
-    <div style="background:#0f0d0a;border:1.5px solid rgba(76,175,125,.35);border-radius:14px;padding:20px 18px;position:relative">
-      <div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#4caf7d;color:#fff;font-size:.6rem;font-weight:700;padding:2px 10px;border-radius:10px;letter-spacing:.8px;white-space:nowrap">MÁS ELEGIDO</div>
-      <div style="font-size:.68rem;font-weight:700;color:#4caf7d;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px">⭐ Completo</div>
-      <div style="font-family:'Playfair Display',serif;font-size:1.5rem;font-weight:800;color:#f0ede6;margin-bottom:4px">$45.000<span style="font-size:.75rem;font-weight:400;color:#a89880">/mes</span></div>
-      <div style="font-size:.75rem;color:#a89880;margin-bottom:14px;line-height:1.5">Todo el Básico + historial de clientes, análisis, turnos fijos y más</div>
-      <div style="font-size:.8rem;color:#4caf7d;font-weight:600;margin-bottom:6px">Ideal si…</div>
-      <ul style="margin:0;padding-left:14px;font-size:.78rem;color:#a89880;line-height:1.8">
-        <li>Tenés 2 o más empleados</li>
-        <li>Querés ver cuánto facturás y qué servicios venden más</li>
-        <li>Tus clientes vienen seguido y querés fidelizarlos</li>
-      </ul>
-    </div>
-
   </div>
-  <p style="text-align:center;font-size:.72rem;color:#5a5040;margin-top:18px">Podés cambiar de plan en cualquier momento desde tu panel.</p>
 </div>
 
 <!-- FAQ -->
@@ -19407,30 +19361,7 @@ function lpFaq(i){
 </footer>
 
 <script>
-// Actualizar precio en landing según cupos fundador disponibles
-(async function _lpActualizarPrecio(){
-  try {
-    const { count } = await sb.from('tenants')
-      .select('id', { count:'exact', head:true })
-      .filter('modulos->>tier','eq','fundador');
-    const cupos = Math.max(0, 20 - (count||0));
-    const badge   = document.getElementById('lpPrecioBadge');
-    const tachado = document.getElementById('lpPrecioTachado');
-    const main    = document.getElementById('lpPrecioMain');
-    if(!badge||!main) return;
-    if(cupos > 0){
-      badge.textContent   = `⚡ Precio fundador — quedan ${cupos} de 20 lugares`;
-      badge.style.display = 'inline-block';
-      if(tachado) tachado.style.display = '';
-      main.textContent    = '$15.000';
-    } else {
-      badge.textContent   = '📦 Plan Básico';
-      badge.style.display = 'inline-block';
-      if(tachado) tachado.style.display = 'none';
-      main.textContent    = '$25.000';
-    }
-  } catch(e){}
-})();
+// Plan único — no hay cupos ni tiers
 </script>
 
 <!-- FLOATING WHATSAPP BUTTON -->
