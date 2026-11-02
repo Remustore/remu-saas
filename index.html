@@ -4770,14 +4770,10 @@ function saActualizarPrecioPlan(){
 function _actualizarPrecioTrial(precio){
   const el = document.getElementById('trialPrecioDisplay');
   if(!el) return;
-  const anual = precio * 10;
+  const p = 10000; // precio único — ignorar valor guardado
   el.innerHTML = `
     <div style="font-size:2rem;font-weight:800;color:#c9a84c;font-family:'Playfair Display',serif">
-      $${precio.toLocaleString('es-AR')} <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span>
-    </div>
-    <div style="margin-top:8px;padding:8px 12px;background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);border-radius:8px;font-size:.78rem;color:#c9a84c">
-      🎁 Plan anual: $${anual.toLocaleString('es-AR')} — pagás 10 meses, usás 12
-      <span style="color:#a89880;margin-left:4px">(ahorrás $${(precio*2).toLocaleString('es-AR')})</span>
+      $${p.toLocaleString('es-AR')} <span style="font-size:1rem;color:#a89880;font-family:'Outfit',sans-serif">ARS / mes</span>
     </div>`;
 }
 
