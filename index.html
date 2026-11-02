@@ -625,6 +625,24 @@ textarea{resize:vertical;min-height:70px;}
        style="display:block;padding:11px;background:transparent;color:#a89880;border-radius:10px;font-size:.82rem;text-decoration:none;margin-bottom:8px;border:1px solid #242424">
       💬 Activar por WhatsApp
     </a>
+    <!-- Activación con código -->
+    <div style="margin-bottom:12px">
+      <button onclick="document.getElementById('trialCodigoBox').style.display=document.getElementById('trialCodigoBox').style.display==='none'?'block':'none'" style="background:none;border:none;color:#585044;font-size:.78rem;cursor:pointer;font-family:'Outfit',sans-serif;text-decoration:underline">
+        Tengo un código de activación
+      </button>
+      <div id="trialCodigoBox" style="display:none;margin-top:10px;background:#0a0a0a;border:1px solid #2a2218;border-radius:10px;padding:14px">
+        <div style="font-size:.72rem;color:#a89880;margin-bottom:8px">Ingresá el código que te enviaron</div>
+        <div style="display:flex;gap:8px">
+          <input id="trialCodigoInput" type="text" placeholder="Código" maxlength="20"
+            style="flex:1;background:#141414;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 12px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.9rem;outline:none;text-align:center;letter-spacing:2px;text-transform:uppercase"
+            onkeydown="if(event.key==='Enter')activarConCodigo()">
+          <button onclick="activarConCodigo()" style="padding:10px 16px;background:#c9a84c;color:#080808;border:none;border-radius:8px;font-weight:700;font-size:.85rem;cursor:pointer;font-family:'Outfit',sans-serif">
+            Activar
+          </button>
+        </div>
+        <div id="trialCodigoErr" style="display:none;font-size:.75rem;color:#e07878;margin-top:6px"></div>
+      </div>
+    </div>
     <button onclick="doLogout()" style="background:none;border:none;color:#585044;font-size:.78rem;cursor:pointer;font-family:'Outfit',sans-serif">Cerrar sesión</button>
   </div>
 </div>
@@ -4821,6 +4839,35 @@ async function showTrialScreen(diasVencido){
     const cfg = data?.data;
     if(cfg?.soporte_tel) localStorage.setItem('remu_soporte_tel', cfg.soporte_tel);
   } catch(e){}
+}
+
+// ── ACTIVACIÓN CON CÓDIGO MANUAL ────────────────────────────────────
+async function activarConCodigo(){
+  const inp = document.getElementById('trialCodigoInput');
+  const errEl = document.getElementById('trialCodigoErr');
+  const codigo = (inp?.value||'').trim().toUpperCase();
+  const CODIGOS_VALIDOS = ['3232'];
+  if(errEl) errEl.style.display = 'none';
+  if(!codigo){ if(errEl){ errEl.textContent='Ingresá el código.'; errEl.style.display='block'; } return; }
+  if(!CODIGOS_VALIDOS.includes(codigo)){
+    if(errEl){ errEl.textContent='Código incorrecto. Verificá con el soporte.'; errEl.style.display='block'; }
+    return;
+  }
+  const btn = document.querySelector('#trialCodigoBox button');
+  if(btn){ btn.disabled=true; btn.textContent='Activando...'; }
+  try {
+    const nuevaFecha = new Date(Date.now() + 30*24*60*60*1000).toISOString();
+    const mods = {...(currentTenant?.modulos||{}), pago_activo:true, trial_hasta:nuevaFecha, ultimo_pago:new Date().toISOString(), origen_pago:'codigo_manual'};
+    const {error} = await sb.from('tenants').update({modulos:mods, activo:true}).eq('id', currentTenant.id);
+    if(error) throw new Error(error.message);
+    if(inp) inp.value='';
+    document.getElementById('trialScreen').style.display='none';
+    document.getElementById('loadingScreen').style.display='flex';
+    setTimeout(()=>location.reload(), 800);
+  } catch(e){
+    if(errEl){ errEl.textContent='Error al activar: '+(e.message||'intentá de nuevo'); errEl.style.display='block'; }
+    if(btn){ btn.disabled=false; btn.textContent='Activar'; }
+  }
 }
 
 // ── MERCADO PAGO ────────────────────────────────────────────────────
@@ -12019,8 +12066,17 @@ function corregirPrecioTurno(id){
   const t = turnos.find(x=>String(x.id)===String(id));
   if(!t) return;
   const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[]};
+  let svcs = (cfg.servicios||[]).map(s=>{
+    const vivo = (typeof S!=='undefined'&&Array.isArray(S.precios)?S.precios:[])
+                   .find(p=>String(p.id)===String(s.id)||p.nombre===s.nombre);
+    return vivo ? {...s, precio:parseFloat(vivo.precio)||s.precio} : s;
+  });
+  if(!svcs.length && typeof S!=='undefined'&&Array.isArray(S.precios)){
+    svcs = S.precios.filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible')
+                    .map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',precio:parseFloat(p.precio)||0,duracion:p.duracion||30}));
+  }
   window.__pendingFinalizarId = id;
-  _mostrarModalFinalizarConServicio(t, cfg.servicios||[]);
+  _mostrarModalFinalizarConServicio(t, svcs);
 }
 
 function cobrarFiado(id){
@@ -22560,8 +22616,19 @@ async function _mFCS_fiado(){
     if(idx === -1) return _origCET.apply(this, arguments); // fallback
     var t         = turnos[idx];
     var cfg       = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
+    // Sincronizar precios de S.precios (fuente de verdad) en la lista de servicios
+    var svcs = (cfg.servicios || []).map(function(s){
+      var vivo = (typeof S!=='undefined' && Array.isArray(S.precios) ? S.precios : [])
+                   .find(function(p){ return String(p.id)===String(s.id) || p.nombre===s.nombre; });
+      return vivo ? Object.assign({}, s, { precio: parseFloat(vivo.precio)||s.precio }) : s;
+    });
+    // Si cfg no tiene servicios pero S.precios sí, usarlos directamente
+    if(!svcs.length && typeof S!=='undefined' && Array.isArray(S.precios)){
+      svcs = S.precios.filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
+                      .map(function(p){ return { id:p.id, nombre:p.nombre, sector:p.categoria||'', precio:parseFloat(p.precio)||0, duracion:p.duracion||30 }; });
+    }
     window.__pendingFinalizarId = id;
-    _mostrarModalFinalizarConServicio(t, cfg.servicios || []);
+    _mostrarModalFinalizarConServicio(t, svcs);
   };
 })();
 </script>
