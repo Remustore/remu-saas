@@ -22480,8 +22480,11 @@ function _mostrarModalFinalizarConServicio(turno, servicios){
   _mFCS_cerrar();
 
   var currentSrvId  = String(turno.servicioId || '');
-  var currentSrv    = servicios.find(function(s){ return String(s.id) === currentSrvId; });
-  // Prioridad: precio actual del servicio en config > precio guardado en el turno (puede estar desactualizado)
+  var _normStr = function(s){ return (s||'').toLowerCase().trim(); };
+  // Buscar por ID exacto, si no por nombre (evita fallo cuando IDs difieren entre cfg y S.precios)
+  var currentSrv    = servicios.find(function(s){ return String(s.id) === currentSrvId; })
+                   || servicios.find(function(s){ return _normStr(s.nombre) === _normStr(turno.servicioNombre); });
+  // Precio: siempre usar el del servicio actual (Mis Precios) como valor por defecto
   var currentPrecio = currentSrv ? (parseFloat(currentSrv.precio) || parseFloat(turno.precio) || 0) : (parseFloat(turno.precio) || 0);
   var hasSvcs       = servicios.length > 0;
 
