@@ -8181,6 +8181,19 @@ async function savePrecio(){
   }else{
     const item={id:Date.now(),...obj};S.precios.push(item);await dbUpsert('precios',item);pushUndo('Nuevo precio','precios',snap);
   }
+  // Propagar precio actualizado a cfg.servicios en localStorage para que "Cobrar" lo refleje
+  try {
+    const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : null;
+    if(cfg && Array.isArray(cfg.servicios) && cfg.servicios.length){
+      const _n = s=>(s||'').toLowerCase().trim();
+      cfg.servicios = cfg.servicios.map(s=>{
+        const match = S.precios.find(p=>String(p.id)===String(s.id)||_n(p.nombre)===_n(s.nombre));
+        return match ? {...s, precio:parseFloat(match.precio)||s.precio} : s;
+      });
+      if(typeof TURNOS_CFG_KEY!=='undefined' && currentTenant?.id)
+        localStorage.setItem(TURNOS_CFG_KEY+'_'+currentTenant.id, JSON.stringify(cfg));
+    }
+  } catch(e){}
   closeM('mPrecio');rPrecios();showToast('Precio guardado ✓');
 }
 
@@ -12062,14 +12075,15 @@ function corregirPrecioTurno(id){
   const t = turnos.find(x=>String(x.id)===String(id));
   if(!t) return;
   const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[]};
+  const _sp2 = (typeof S!=='undefined'&&Array.isArray(S.precios))?S.precios:[];
+  const _n2 = s=>(s||'').toLowerCase().trim();
   let svcs = (cfg.servicios||[]).map(s=>{
-    const vivo = (typeof S!=='undefined'&&Array.isArray(S.precios)?S.precios:[])
-                   .find(p=>String(p.id)===String(s.id)||p.nombre===s.nombre);
+    const vivo = _sp2.find(p=>String(p.id)===String(s.id)) || _sp2.find(p=>_n2(p.nombre)===_n2(s.nombre));
     return vivo ? {...s, precio:parseFloat(vivo.precio)||s.precio} : s;
   });
-  if(!svcs.length && typeof S!=='undefined'&&Array.isArray(S.precios)){
-    svcs = S.precios.filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible')
-                    .map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',precio:parseFloat(p.precio)||0,duracion:p.duracion||30}));
+  if(!svcs.length && _sp2.length){
+    svcs = _sp2.filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible')
+               .map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',precio:parseFloat(p.precio)||0,duracion:p.duracion||30}));
   }
   window.__pendingFinalizarId = id;
   _mostrarModalFinalizarConServicio(t, svcs);
@@ -22612,15 +22626,18 @@ async function _mFCS_fiado(){
     if(idx === -1) return _origCET.apply(this, arguments); // fallback
     var t         = turnos[idx];
     var cfg       = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
-    // Sincronizar precios de S.precios (fuente de verdad) en la lista de servicios
+    // Usar S.precios como fuente de verdad de precios (siempre tiene el valor más reciente)
+    var _sPrecios = (typeof S!=='undefined' && Array.isArray(S.precios)) ? S.precios : [];
+    var _norm = function(s){ return (s||'').toLowerCase().trim(); };
+    var _vivoById = function(sid){ return _sPrecios.find(function(p){ return String(p.id)===String(sid); }); };
+    var _vivoByName = function(nom){ return _sPrecios.find(function(p){ return _norm(p.nombre)===_norm(nom); }); };
     var svcs = (cfg.servicios || []).map(function(s){
-      var vivo = (typeof S!=='undefined' && Array.isArray(S.precios) ? S.precios : [])
-                   .find(function(p){ return String(p.id)===String(s.id) || p.nombre===s.nombre; });
+      var vivo = _vivoById(s.id) || _vivoByName(s.nombre);
       return vivo ? Object.assign({}, s, { precio: parseFloat(vivo.precio)||s.precio }) : s;
     });
-    // Si cfg no tiene servicios pero S.precios sí, usarlos directamente
-    if(!svcs.length && typeof S!=='undefined' && Array.isArray(S.precios)){
-      svcs = S.precios.filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
+    // Si cfg no tiene servicios, usar S.precios directamente
+    if(!svcs.length && _sPrecios.length){
+      svcs = _sPrecios.filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
                       .map(function(p){ return { id:p.id, nombre:p.nombre, sector:p.categoria||'', precio:parseFloat(p.precio)||0, duracion:p.duracion||30 }; });
     }
     window.__pendingFinalizarId = id;
