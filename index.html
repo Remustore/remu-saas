@@ -12075,15 +12075,13 @@ function corregirPrecioTurno(id){
   const t = turnos.find(x=>String(x.id)===String(id));
   if(!t) return;
   const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[]};
-  const _sp2 = (typeof S!=='undefined'&&Array.isArray(S.precios))?S.precios:[];
-  const _n2 = s=>(s||'').toLowerCase().trim();
-  let svcs = (cfg.servicios||[]).map(s=>{
-    const vivo = _sp2.find(p=>String(p.id)===String(s.id)) || _sp2.find(p=>_n2(p.nombre)===_n2(s.nombre));
-    return vivo ? {...s, precio:parseFloat(vivo.precio)||s.precio} : s;
-  });
-  if(!svcs.length && _sp2.length){
+  const _sp2 = (typeof S!=='undefined'&&Array.isArray(S.precios)&&S.precios.length)?S.precios:[];
+  let svcs;
+  if(_sp2.length){
     svcs = _sp2.filter(p=>p.nombre&&(p.disponibilidad||'disponible')!=='no_disponible')
                .map(p=>({id:p.id,nombre:p.nombre,sector:p.categoria||'',precio:parseFloat(p.precio)||0,duracion:p.duracion||30}));
+  } else {
+    svcs = cfg.servicios||[];
   }
   window.__pendingFinalizarId = id;
   _mostrarModalFinalizarConServicio(t, svcs);
@@ -22629,19 +22627,15 @@ async function _mFCS_fiado(){
     if(idx === -1) return _origCET.apply(this, arguments); // fallback
     var t         = turnos[idx];
     var cfg       = typeof getTurnosCfg === 'function' ? getTurnosCfg() : {servicios:[]};
-    // Usar S.precios como fuente de verdad de precios (siempre tiene el valor más reciente)
-    var _sPrecios = (typeof S!=='undefined' && Array.isArray(S.precios)) ? S.precios : [];
-    var _norm = function(s){ return (s||'').toLowerCase().trim(); };
-    var _vivoById = function(sid){ return _sPrecios.find(function(p){ return String(p.id)===String(sid); }); };
-    var _vivoByName = function(nom){ return _sPrecios.find(function(p){ return _norm(p.nombre)===_norm(nom); }); };
-    var svcs = (cfg.servicios || []).map(function(s){
-      var vivo = _vivoById(s.id) || _vivoByName(s.nombre);
-      return vivo ? Object.assign({}, s, { precio: parseFloat(vivo.precio)||s.precio }) : s;
-    });
-    // Si cfg no tiene servicios, usar S.precios directamente
-    if(!svcs.length && _sPrecios.length){
-      svcs = _sPrecios.filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
-                      .map(function(p){ return { id:p.id, nombre:p.nombre, sector:p.categoria||'', precio:parseFloat(p.precio)||0, duracion:p.duracion||30 }; });
+    var _sPrecios = (typeof S!=='undefined' && Array.isArray(S.precios) && S.precios.length) ? S.precios : [];
+    var svcs;
+    if(_sPrecios.length){
+      // S.precios es la fuente de verdad — siempre tiene los precios actuales
+      svcs = _sPrecios
+        .filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
+        .map(function(p){ return { id:p.id, nombre:p.nombre, sector:p.categoria||'', precio:parseFloat(p.precio)||0, duracion:p.duracion||30 }; });
+    } else {
+      svcs = cfg.servicios || [];
     }
     window.__pendingFinalizarId = id;
     _mostrarModalFinalizarConServicio(t, svcs);
