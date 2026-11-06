@@ -10166,13 +10166,16 @@ function exportarExcel(){
     : [];
   const wb = XLSX.utils.book_new();
 
-  // Comisiones recalculadas en vivo según el % vigente por empleado
-  // (igual que cierreDiario/rGananciaHoy/rDash/exportarPDF): t.comision
-  // queda grabado al cerrar el turno y puede no reflejar el % actual.
+  // Comisiones: usar t.comision (guardado al cerrar el turno) como valor histórico exacto.
+  // Fallback al % actual solo si el turno no tiene comision guardada.
   const cfgXl = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
   const empMap = {}, empPctMapXl = {};
   (cfgXl.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; empPctMapXl[String(e.id)]=e.comision||0; });
-  const comTurnoXl = t=>{ const p=empPctMapXl[String(t.empleadoId)]||0; return p>0?Math.round((t.precio||0)*p/100):0; };
+  const comTurnoXl = t=>{
+    if(t.comision != null && t.comision > 0) return t.comision; // valor histórico guardado
+    const p=empPctMapXl[String(t.empleadoId)]||0;
+    return p>0?Math.round((t.precio||0)*p/100):0;
+  };
 
   // Hoja Turnos (solo salon)
   if(tFilt.length){
@@ -10375,7 +10378,10 @@ function exportarPDF(){
   const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {empleados:[]};
   const empMap = {}, empPctMap = {};
   (cfg.empleados||[]).forEach(e=>{ empMap[String(e.id)]=e.nombre; empPctMap[String(e.id)]=e.comision||0; });
-  const comTurno = t=>{ const p=empPctMap[String(t.empleadoId)]||0; return p>0?Math.round((t.precio||0)*p/100):0; };
+  const comTurno = t=>{
+    if(t.comision != null && t.comision > 0) return t.comision;
+    const p=empPctMap[String(t.empleadoId)]||0; return p>0?Math.round((t.precio||0)*p/100):0;
+  };
   const totCom = tFilt.reduce((a,t)=>a+comTurno(t),0);
   const totalIng = tT + tV + tR;
   const neto = totalIng - tC - tG - totCom - totalCostosRep;
