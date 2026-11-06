@@ -10278,6 +10278,21 @@ function exportarExcel(){
   const totalCostosRep = repFilt.reduce((a,r)=>a+(r.costoRep||0)+(r.flete||0),0);
   const totalIng = tT + tVv + tR;
   const neto = totalIng - tC - tG - tComR - totalCostosRep;
+  // Desglose por método de pago
+  const metodos = ['Efectivo','Transferencia','Mercado Pago','Débito','Crédito'];
+  const pagoMap = {};
+  metodos.forEach(m=>{ pagoMap[m]=0; });
+  const _addPago = (metodo, monto)=>{
+    if(!metodo||!monto) return;
+    const key = metodos.find(m=>m.toLowerCase()===metodo.toLowerCase()) || 'Otros';
+    pagoMap[key] = (pagoMap[key]||0) + monto;
+  };
+  tFilt.forEach(t=>_addPago(t.metodo, t.precio||0));
+  vShow.forEach(v=>_addPago(v.metodo, v.total||0));
+  repFilt.forEach(r=>_addPago(r.metodoPago, r.presupuesto||0));
+  const pagoRows = Object.entries(pagoMap).filter(([,v])=>v>0).map(([k,v])=>['  '+k, v]);
+  const totalPagos = Object.values(pagoMap).reduce((a,b)=>a+b,0);
+
   const resData = [
     ['RESUMEN FINANCIERO — ' + label], [''],
     ['Concepto', 'Monto'],
@@ -10295,6 +10310,10 @@ function exportarExcel(){
        : (!esSalon && tR>0 ? [['Trabajos entregados', repFilt.length]]
        : [['Cantidad de ventas', vFilt.length]])),
     ['Cantidad de gastos', gFilt.length],
+    [''],
+    ['INGRESOS POR MÉTODO DE PAGO', ''],
+    ...pagoRows,
+    ['  TOTAL cobrado', totalPagos],
   ];
   const ws4 = XLSX.utils.aoa_to_sheet(resData);
   ws4['!cols'] = [{wch:32},{wch:18}];
