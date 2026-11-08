@@ -15,7 +15,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const { tenantId, email, mpEmail, nombre, test } = await req.json();
+    const { tenantId, email, nombre, test } = await req.json();
 
     if (!tenantId || !email) {
       return new Response(JSON.stringify({ error: 'Faltan parámetros: tenantId y email son requeridos' }), {
@@ -26,8 +26,6 @@ serve(async (req) => {
     const isTest = test === true;
     const token  = isTest ? MP_TOKEN_TEST : MP_TOKEN_PROD;
     const monto  = isTest ? 100 : PRECIO_PLAN;
-    // Usar email de MP si fue ingresado explícitamente, si no usar el email de la cuenta
-    const payerEmail = (mpEmail || email).toLowerCase().trim();
 
     if (!token) {
       throw new Error(isTest
@@ -36,22 +34,22 @@ serve(async (req) => {
       );
     }
 
+    // Checkout Pro — sin restricción de email, cualquier cuenta de MP puede pagar
     const body = {
-      reason:             `${isTest ? '[PRUEBA] ' : ''}Remu Gestión · Plan Completo · ${nombre || tenantId}`,
+      items: [{
+        title:       `${isTest ? '[PRUEBA] ' : ''}Remu Gestión · Plan Completo`,
+        description: `Suscripción mensual — ${nombre || tenantId}`,
+        quantity:    1,
+        unit_price:  monto,
+        currency_id: 'ARS',
+      }],
       external_reference: tenantId,
-      payer_email:        payerEmail,
-      auto_recurring: {
-        frequency:          1,
-        frequency_type:     'months',
-        transaction_amount: monto,
-        currency_id:        'ARS',
-      },
-      back_url:         'https://remugestion.ar?mp_ok=1',
-      notification_url: 'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
-      status:           'pending',
+      back_url:           'https://remugestion.ar?mp_ok=1',
+      notification_url:   'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
+      auto_return:        'approved',
     };
 
-    const mpRes = await fetch('https://api.mercadopago.com/preapproval', {
+    const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method:  'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body:    JSON.stringify(body),
@@ -63,7 +61,7 @@ serve(async (req) => {
     }
 
     const mp = await mpRes.json();
-    console.log(`[create-mp-preference] ${isTest ? 'TEST ' : ''}OK: ${tenantId} | $${monto} | sub: ${mp.id}`);
+    console.log(`[create-mp-preference] ${isTest ? 'TEST ' : ''}OK: ${tenantId} | $${monto} | pref: ${mp.id}`);
 
     return new Response(JSON.stringify({ init_point: mp.init_point, id: mp.id, monto, test: isTest }), {
       headers: { ...cors, 'Content-Type': 'application/json' },

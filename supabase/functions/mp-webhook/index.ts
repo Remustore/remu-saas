@@ -36,14 +36,56 @@ serve(async (req) => {
     const tipo = url.searchParams.get('type') || '';
     const id   = url.searchParams.get('id')   || '';
 
-    // Soportamos: autorización inicial (subscription_preapproval) y cobros mensuales (subscription_authorized_payment)
+    // Soportamos: Checkout Pro (payment), suscripciones legacy (subscription_preapproval / subscription_authorized_payment)
+    const esPago         = tipo === 'payment';
     const esAutorizacion = tipo === 'subscription_preapproval';
     const esRenovacion   = tipo === 'subscription_authorized_payment';
-    if ((!esAutorizacion && !esRenovacion) || !id) {
+    if ((!esPago && !esAutorizacion && !esRenovacion) || !id) {
       return new Response('ignored', { status: 200, headers: cors });
     }
 
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+    // ── Checkout Pro — pago único ──────────────────────────────────────────
+    if (esPago) {
+      const pagoRes = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
+        headers: { Authorization: `Bearer ${MP_TOKEN}` }
+      });
+      if (!pagoRes.ok) throw new Error(`MP API error payment: ${pagoRes.status}`);
+      const pago = await pagoRes.json();
+
+      if (pago.status !== 'approved') {
+        return new Response('not_approved', { status: 200, headers: cors });
+      }
+
+      const ref = pago.external_reference;
+      if (!ref) return new Response('sin_external_reference', { status: 200, headers: cors });
+
+      const { data: tenantPago } = await sb
+        .from('tenants')
+        .select('id, nombre, modulos')
+        .eq('id', ref)
+        .maybeSingle();
+
+      if (!tenantPago) return new Response('tenant_no_encontrado', { status: 200, headers: cors });
+
+      const nuevo = new Date(Date.now() + 32 * 24 * 60 * 60 * 1000).toISOString();
+      const modsPago = {
+        ...(tenantPago.modulos || {}),
+        pago_activo:  true,
+        trial_hasta:  nuevo,
+        ultimo_pago:  new Date().toISOString(),
+        origen_pago:  'checkout_pro',
+      };
+      await sb.from('tenants').update({ modulos: modsPago, activo: true }).eq('id', ref);
+
+      const monto = pago.transaction_amount || 0;
+      await notificarPago(tenantPago.nombre || ref, monto, pago.payer?.email || '');
+      console.log(`[mp-webhook] Checkout Pro activado: ${ref} | pago: ${id}`);
+      return new Response(JSON.stringify({ ok: true, tenant: ref }), {
+        status: 200, headers: { ...cors, 'Content-Type': 'application/json' }
+      });
+    }
 
     // ── Renovación mensual ─────────────────────────────────────────────────
     if (esRenovacion) {
