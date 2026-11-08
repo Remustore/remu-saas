@@ -15,7 +15,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const { tenantId, email, nombre, test } = await req.json();
+    const { tenantId, email, mpEmail, nombre, test } = await req.json();
 
     if (!tenantId || !email) {
       return new Response(JSON.stringify({ error: 'Faltan parámetros: tenantId y email son requeridos' }), {
@@ -26,6 +26,8 @@ serve(async (req) => {
     const isTest = test === true;
     const token  = isTest ? MP_TOKEN_TEST : MP_TOKEN_PROD;
     const monto  = isTest ? 100 : PRECIO_PLAN;
+    // Usar email de MP si fue ingresado explícitamente, si no usar el email de la cuenta
+    const payerEmail = (mpEmail || email).toLowerCase().trim();
 
     if (!token) {
       throw new Error(isTest
@@ -37,7 +39,7 @@ serve(async (req) => {
     const body = {
       reason:             `${isTest ? '[PRUEBA] ' : ''}Remu Gestión · Plan Completo · ${nombre || tenantId}`,
       external_reference: tenantId,
-      payer_email:        email,
+      payer_email:        payerEmail,
       auto_recurring: {
         frequency:          1,
         frequency_type:     'months',

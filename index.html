@@ -613,6 +613,12 @@ textarea{resize:vertical;min-height:70px;}
         <div style="display:flex;align-items:center;gap:8px;font-size:.83rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones y soporte incluidos</div>
       </div>
     </div>
+    <div style="margin-bottom:10px">
+      <div style="font-size:.72rem;color:#a89880;margin-bottom:5px">Email de tu cuenta de Mercado Pago</div>
+      <input id="mpEmailInput" type="email" placeholder="tucuenta@gmail.com"
+        style="width:100%;box-sizing:border-box;background:#141414;border:1px solid #2e2e2e;color:#f5f0e8;padding:10px 12px;border-radius:8px;font-family:'Outfit',sans-serif;font-size:.88rem;outline:none">
+      <div style="font-size:.68rem;color:#585044;margin-top:4px">Si usás el mismo email que esta cuenta, dejalo en blanco</div>
+    </div>
     <button onclick="iniciarPagoMP()" id="btnPagarMP"
        style="display:block;width:100%;padding:15px;background:#009ee3;color:#fff;border-radius:10px;font-weight:700;font-size:1rem;border:none;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
       💳 Pagar con Mercado Pago →
@@ -4894,6 +4900,7 @@ async function iniciarPagoMP(){
       body: JSON.stringify({
         tenantId: currentTenant?.id,
         email:    currentTenant?.email || '',
+        mpEmail:  (document.getElementById('mpEmailInput')?.value || '').trim() || undefined,
         nombre:   currentTenant?.nombre || ''
       })
     });
