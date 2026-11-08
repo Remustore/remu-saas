@@ -3,8 +3,9 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 const MP_TOKEN_PROD = Deno.env.get('MP_ACCESS_TOKEN')      ?? '';
 const MP_TOKEN_TEST = Deno.env.get('MP_ACCESS_TOKEN_TEST') ?? '';
 
-// Precio único del plan — cambiar acá para todos
-const PRECIO_PLAN = 10000;
+// Plan de suscripción mensual creado en MP (creado una sola vez con setup-mp-plan)
+const MP_PLAN_ID   = '5d98f94b739046ce97fadcf1b1353373';
+const PRECIO_PLAN  = 10000;
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -34,34 +35,39 @@ serve(async (req) => {
       );
     }
 
-    // Checkout Pro — sin restricción de email, cualquier cuenta de MP puede pagar
-    const body = {
-      items: [{
-        title:       `${isTest ? '[PRUEBA] ' : ''}Remu Gestión · Plan Completo`,
-        description: `Suscripción mensual — ${nombre || tenantId}`,
-        quantity:    1,
-        unit_price:  monto,
-        currency_id: 'ARS',
-      }],
-      external_reference: tenantId,
-      back_url:           'https://remugestion.ar?mp_ok=1',
-      notification_url:   'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
-      auto_return:        'approved',
-    };
-
-    const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method:  'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify(body),
-    });
-
-    if (!mpRes.ok) {
-      const err = await mpRes.text();
-      throw new Error(`MP error ${mpRes.status}: ${err}`);
+    // Suscripción desde plan — sin restricción de email, cobro mensual automático
+    // En modo test usamos Checkout Pro (pago único) porque el plan no tiene modo sandbox
+    let mp: any;
+    if (isTest) {
+      const body = {
+        items: [{ title: '[PRUEBA] Remu Gestión · Plan Completo', quantity: 1, unit_price: monto, currency_id: 'ARS' }],
+        external_reference: tenantId,
+        back_url:           'https://remugestion.ar?mp_ok=1',
+        notification_url:   'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
+        auto_return:        'approved',
+      };
+      const r = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(`MP error ${r.status}: ${await r.text()}`);
+      mp = await r.json();
+    } else {
+      const body = {
+        preapproval_plan_id: MP_PLAN_ID,
+        external_reference:  tenantId,
+        back_url:            'https://remugestion.ar?mp_ok=1',
+        notification_url:    'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
+      };
+      const r = await fetch('https://api.mercadopago.com/preapproval', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(`MP error ${r.status}: ${await r.text()}`);
+      mp = await r.json();
     }
 
-    const mp = await mpRes.json();
-    console.log(`[create-mp-preference] ${isTest ? 'TEST ' : ''}OK: ${tenantId} | $${monto} | pref: ${mp.id}`);
+    console.log(`[create-mp-preference] ${isTest ? 'TEST ' : ''}OK: ${tenantId} | $${monto} | id: ${mp.id}`);
 
     return new Response(JSON.stringify({ init_point: mp.init_point, id: mp.id, monto, test: isTest }), {
       headers: { ...cors, 'Content-Type': 'application/json' },
