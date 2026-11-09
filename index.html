@@ -14579,13 +14579,21 @@ function _rwS6(){
     <div style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:800;color:#c9a84c;margin-bottom:4px">${esc(__rw.nombre||'Tu negocio')} está listo</div>
     <div style="font-size:.82rem;color:#a89880;margin-bottom:20px">Tu cuenta fue creada. Activá tu plan para acceder al sistema.</div>
 
-    <div style="background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.35);border-radius:14px;padding:20px;margin-bottom:22px;text-align:left">
-      <div style="font-size:.68rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">⚡ Activar suscripción</div>
-      <div style="font-size:.85rem;color:#f0ede6;margin-bottom:4px">Plan <strong>${tierLabel}</strong> · <strong>$${tierPrecio}/mes</strong></div>
-      <div style="font-size:.73rem;color:#a89880;margin-bottom:14px">Pago mensual automático · Sin contratos · Cancelás cuando querés</div>
-      <button id="rwPagarBtn" onclick="_rwActivarSuscripcion(this)" style="width:100%;background:#c9a84c;color:#080808;border:none;border-radius:9px;padding:13px;font-size:.9rem;font-weight:800;cursor:pointer;font-family:'Outfit',sans-serif;letter-spacing:.01em">
-        💳 Pagar con Mercado Pago →
-      </button>
+    <div style="background:#0d1117;border:1.5px solid rgba(201,168,76,.3);border-radius:14px;padding:20px;margin-bottom:22px;text-align:left">
+      <div style="font-size:.68rem;font-weight:700;color:#c9a84c;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">⚡ Activar plan — $${tierPrecio}/mes</div>
+      <div style="font-size:.73rem;color:#a89880;margin-bottom:12px">Transferí por Mercado Pago al siguiente alias:</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-family:monospace;font-size:1.15rem;font-weight:800;color:#009ee3;letter-spacing:1px">remustoremj</span>
+        <button onclick="navigator.clipboard.writeText('remustoremj').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar',2000)})"
+          style="padding:5px 12px;background:rgba(0,158,227,.15);color:#009ee3;border:1px solid rgba(0,158,227,.3);border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600">
+          Copiar
+        </button>
+      </div>
+      <div style="font-size:.7rem;color:#585044;margin-bottom:14px">A nombre de Rensi Ignacio · Monto: $10.000 ARS</div>
+      <a href="https://wa.me/5493472628087?text=${encodeURIComponent('Hola! Te envío el comprobante de pago para activar mi cuenta de Remu Gestión. Ya transferí $10.000 al alias remustoremj.')}" target="_blank"
+        style="display:block;padding:13px;background:rgba(37,211,102,.12);color:#25d366;border-radius:9px;font-size:.88rem;font-weight:700;text-decoration:none;text-align:center;border:1px solid rgba(37,211,102,.25);font-family:'Outfit',sans-serif">
+        📲 Enviar comprobante por WhatsApp
+      </a>
     </div>
 
     ${_card('🔗','Tu link de clientes — precios y turnos en uno', linkUnificado)}

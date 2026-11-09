@@ -46,9 +46,13 @@ serve(async (req) => {
         currency_id: 'ARS',
       }],
       external_reference: tenantId,
-      back_url:           'https://remugestion.ar?mp_ok=1',
-      notification_url:   'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
-      auto_return:        'approved',
+      back_url: {
+        success: 'https://remugestion.ar?mp_ok=1',
+        failure: 'https://remugestion.ar?mp_fail=1',
+        pending: 'https://remugestion.ar?mp_pending=1',
+      },
+      notification_url: 'https://xycagqxhpwrbdurrjkdl.supabase.co/functions/v1/mp-webhook',
+      auto_return:      'approved',
     };
     const r = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
