@@ -613,17 +613,23 @@ textarea{resize:vertical;min-height:70px;}
         <div style="display:flex;align-items:center;gap:8px;font-size:.83rem;color:#f5f0e8"><span style="color:#4caf7d">✓</span> Actualizaciones y soporte incluidos</div>
       </div>
     </div>
-    <button onclick="iniciarPagoMP()" id="btnPagarMP"
-       style="display:block;width:100%;padding:15px;background:#009ee3;color:#fff;border-radius:10px;font-weight:700;font-size:1rem;border:none;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
-      💳 Pagar con Mercado Pago →
-    </button>
-    <button onclick="confirmarPagoMP()" id="btnYaPague"
-       style="display:none;width:100%;padding:13px;background:rgba(76,175,125,.15);color:#4caf7d;border:1px solid rgba(76,175,125,.3);border-radius:10px;font-weight:600;font-size:.9rem;cursor:pointer;margin-bottom:10px;font-family:'Outfit',sans-serif">
-      ✓ Ya pagué → Activar ahora
-    </button>
+    <!-- Alias MP para transferencia -->
+    <div style="background:#0d1117;border:1.5px solid rgba(201,168,76,.3);border-radius:12px;padding:16px;margin-bottom:12px">
+      <div style="font-size:.68rem;color:#a89880;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Transferí por Mercado Pago</div>
+      <div style="font-size:.75rem;color:#a89880;margin-bottom:6px">Monto: <strong style="color:#c9a84c">$10.000 ARS</strong></div>
+      <div style="font-size:.72rem;color:#a89880;margin-bottom:6px">A nombre de: <strong style="color:#f5f0e8">Rensi Ignacio</strong></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <span style="font-family:monospace;font-size:1.1rem;font-weight:800;color:#009ee3;letter-spacing:1px">remustoremj</span>
+        <button onclick="navigator.clipboard.writeText('remustoremj').then(()=>{this.textContent='✓ Copiado';setTimeout(()=>this.textContent='Copiar',2000)})"
+          style="padding:5px 12px;background:rgba(0,158,227,.15);color:#009ee3;border:1px solid rgba(0,158,227,.3);border-radius:6px;font-size:.75rem;cursor:pointer;font-family:'Outfit',sans-serif;font-weight:600">
+          Copiar
+        </button>
+      </div>
+      <div style="font-size:.68rem;color:#585044;margin-top:4px">Una vez transferido, enviá el comprobante por WhatsApp</div>
+    </div>
     <a id="trialWaLink" href="#" target="_blank"
-       style="display:block;padding:11px;background:transparent;color:#a89880;border-radius:10px;font-size:.82rem;text-decoration:none;margin-bottom:8px;border:1px solid #242424">
-      💬 Activar por WhatsApp
+       style="display:block;padding:13px;background:rgba(37,211,102,.12);color:#25d366;border-radius:10px;font-size:.88rem;font-weight:600;text-decoration:none;margin-bottom:10px;border:1px solid rgba(37,211,102,.25);text-align:center;font-family:'Outfit',sans-serif">
+      📲 Enviar comprobante por WhatsApp
     </a>
     <!-- Activación con código -->
     <div style="margin-bottom:12px">
@@ -4820,7 +4826,7 @@ async function showTrialScreen(diasVencido){
   // WA link dinámico
   const soporteTel = localStorage.getItem('remu_soporte_tel') || '5493472628087';
   const waLink = document.getElementById('trialWaLink');
-  if(waLink) waLink.href = `https://wa.me/${soporteTel}?text=${encodeURIComponent('Hola! Quiero activar mi suscripción de Remu Gestión — '+nombre)}`;
+  if(waLink) waLink.href = `https://wa.me/${soporteTel}?text=${encodeURIComponent('Hola! Te envío el comprobante de pago para activar mi cuenta de Remu Gestión — '+nombre+'. Ya transferí $10.000 al alias remustoremj.')}`;
 
   // Precio según tier del tenant
   const tier = currentTenant?.modulos?.tier || 'completo';
