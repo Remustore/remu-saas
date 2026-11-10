@@ -749,8 +749,16 @@ textarea{resize:vertical;min-height:70px;}
     <button class="sa-logout" onclick="doSuperLogout()">⎋ Salir</button>
   </div>
   <div class="sa-content">
-    <div class="sa-title">Panel de administración</div>
-    <div class="sa-sub">Gestioná clientes, usuarios y configuraciones del sistema</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
+      <div>
+        <div class="sa-title" style="margin-bottom:2px">Panel de administración</div>
+        <div class="sa-sub">Gestioná clientes, usuarios y configuraciones del sistema</div>
+      </div>
+      <button onclick="loadTenants(this)" style="display:flex;align-items:center;gap:7px;padding:10px 18px;background:rgba(201,168,76,.12);color:#c9a84c;border:1.5px solid rgba(201,168,76,.35);border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;font-family:var(--fb);flex-shrink:0"
+        title="Actualizar lista de clientes">
+        ↻ Actualizar
+      </button>
+    </div>
     <div class="sa-grid">
       <!-- CREAR TENANT -->
       <div class="sa-card">
@@ -4157,12 +4165,14 @@ function showSaMsg(txt, tipo){
   if(tipo === 'ok') setTimeout(()=>el.style.display='none', 5000);
 }
 
-async function loadTenants(){
+async function loadTenants(btn){
+  if(btn){ btn.textContent = '↻ Cargando...'; btn.disabled = true; }
   // Pre-fill MP link config from localStorage
   const savedMpLink = localStorage.getItem('remu_mp_link');
   const mpInp = document.getElementById('saInputMpLink');
   if(mpInp && savedMpLink && !mpInp.value) mpInp.value = savedMpLink;
   const { data, error } = await sb.from('tenants').select('*').neq('id', MP_SYSTEM_TENANT_ID).order('created_at', { ascending:false });
+  if(btn){ btn.textContent = '↻ Actualizar'; btn.disabled = false; }
   const el = document.getElementById('tenantsList');
   if(error || !data){ el.innerHTML='<div style="color:var(--bad);font-size:.8rem">Error al cargar</div>'; return; }
   if(!data.length){ el.innerHTML='<div style="color:var(--mut);font-size:.8rem">Sin clientes aún</div>'; return; }
