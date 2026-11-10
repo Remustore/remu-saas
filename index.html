@@ -22523,6 +22523,25 @@ function _mFCS_onSrvChange(){
   if(precioEl) precioEl.value = precio > 0 ? precio : '';
 }
 
+function _mFCS_filtrar(q){
+  var sel  = document.getElementById('mFCS_srv');
+  if(!sel || !window._mFCS_servicios) return;
+  var q2   = (q||'').toLowerCase().trim();
+  var prev = sel.value;
+  var lista = q2
+    ? window._mFCS_servicios.filter(function(s){
+        return ((s.sector||'') + ' ' + (s.nombre||'')).toLowerCase().includes(q2);
+      })
+    : window._mFCS_servicios;
+  sel.innerHTML = lista.map(function(s){
+    var sel2 = String(s.id) === String(prev) ? ' selected' : '';
+    var pFmt = (parseFloat(s.precio)||0) > 0 ? ' — ' + fmt(s.precio) : '';
+    return '<option value="' + s.id + '" data-precio="' + (parseFloat(s.precio)||0) + '"' + sel2 + '>'
+         + esc((s.sector ? s.sector + ': ' : '') + s.nombre) + pFmt + '</option>';
+  }).join('');
+  if(sel.options.length > 0) _mFCS_onSrvChange();
+}
+
 function _mostrarModalFinalizarConServicio(turno, servicios){
   _mFCS_cerrar();
 
@@ -22540,17 +22559,28 @@ function _mostrarModalFinalizarConServicio(turno, servicios){
   var lStyle = 'display:block;font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px;margin-top:14px';
   var l0Style= 'display:block;font-size:.67rem;color:#a89880;text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px';
 
+  // Guardar lista completa para el buscador
+  window._mFCS_servicios = servicios;
+
   // Servicio selector (o texto si no hay servicios configurados)
   var srvBlock;
   if(hasSvcs){
-    var optsHtml = servicios.map(function(s){
-      var sel   = String(s.id) === currentSrvId ? ' selected' : '';
-      var pFmt  = (parseFloat(s.precio)||0) > 0 ? ' — ' + fmt(s.precio) : '';
-      var label = esc((s.sector ? s.sector + ': ' : '') + s.nombre) + pFmt;
-      return '<option value="' + s.id + '" data-precio="' + (parseFloat(s.precio)||0) + '"' + sel + '>' + label + '</option>';
-    }).join('');
+    var _buildOpts = function(lista, selectedId){
+      return lista.map(function(s){
+        var sel  = String(s.id) === String(selectedId) ? ' selected' : '';
+        var pFmt = (parseFloat(s.precio)||0) > 0 ? ' — ' + fmt(s.precio) : '';
+        var lbl  = esc((s.sector ? s.sector + ': ' : '') + s.nombre) + pFmt;
+        return '<option value="' + s.id + '" data-precio="' + (parseFloat(s.precio)||0) + '"' + sel + '>' + lbl + '</option>';
+      }).join('');
+    };
+    var optsHtml = _buildOpts(servicios, currentSrvId);
+    var currentNombre = currentSrv ? ((currentSrv.sector ? currentSrv.sector + ': ' : '') + currentSrv.nombre) : '';
     srvBlock = '<label style="' + l0Style + '">Servicio realizado</label>'
-             + '<select id="mFCS_srv" onchange="_mFCS_onSrvChange()" style="' + sStyle + '">' + optsHtml + '</select>';
+             + '<input id="mFCS_buscar" type="text" placeholder="🔍 Escribí para buscar..." value="' + esc(currentNombre) + '" autocomplete="off"'
+             + ' style="' + iStyle + ';margin-bottom:4px"'
+             + ' oninput="_mFCS_filtrar(this.value)"'
+             + ' onfocus="this.select()">'
+             + '<select id="mFCS_srv" onchange="_mFCS_onSrvChange();var n=this.options[this.selectedIndex]&&this.options[this.selectedIndex].text;document.getElementById(\'mFCS_buscar\').value=n||\'\';" size="1" style="' + sStyle + '">' + optsHtml + '</select>';
   } else {
     srvBlock = '<label style="' + l0Style + '">Servicio</label>'
              + '<div style="font-size:.88rem;color:#f5f0e8;padding:8px 0 12px">' + esc(turno.servicioNombre||'Servicio') + '</div>';
@@ -22679,9 +22709,9 @@ async function _mFCS_fiado(){
     var _sPrecios = (typeof S!=='undefined' && Array.isArray(S.precios) && S.precios.length) ? S.precios : [];
     var svcs;
     if(_sPrecios.length){
-      // S.precios es la fuente de verdad — siempre tiene los precios actuales
+      // S.precios es la fuente de verdad — incluir TODOS los servicios para cobro (aunque estén deshabilitados para reservas)
       svcs = _sPrecios
-        .filter(function(p){ return p.nombre && (p.disponibilidad||'disponible')!=='no_disponible'; })
+        .filter(function(p){ return p.nombre && !p.nombre.startsWith('__'); })
         .map(function(p){ return { id:p.id, nombre:p.nombre, sector:p.categoria||'', precio:parseFloat(p.precio)||0, duracion:p.duracion||30 }; });
     } else {
       svcs = cfg.servicios || [];
