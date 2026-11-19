@@ -23225,15 +23225,18 @@ async function _mFCS_fiado(){
         .eq('fecha', turno.fecha).eq('hora', h5).eq('nombre', turno.cliente)
         .neq('estado', 'bloqueado').neq('estado', 'pendiente')
         .limit(1);
+      var fullUpd = {
+        estado: estado, empleado_id: empN, servicio_id: srvN,
+        precio: turno.precio||0, metodo: turno.metodo||'',
+        empleado_nombre: turno.empleadoNombre||'', servicio_nombre: turno.servicioNombre||'',
+      };
       if(ex.data && ex.data.length){
-        await sb.from('turnos_solicitudes')
-          .update({ estado: estado, empleado_id: empN, servicio_id: srvN })
-          .eq('id', ex.data[0].id);
+        await sb.from('turnos_solicitudes').update(fullUpd).eq('id', ex.data[0].id);
       } else {
         await sb.from('turnos_solicitudes').insert({
           tenant_id: currentTenant.id, nombre: turno.cliente, tel: turno.tel||'',
-          fecha: turno.fecha, hora: h5, estado: estado,
-          empleado_id: empN, servicio_id: srvN,
+          fecha: turno.fecha, hora: h5,
+          ...fullUpd,
           created_at: new Date().toISOString()
         });
       }
@@ -23348,13 +23351,22 @@ async function _mFCS_fiado(){
       if(!currentTenant||!currentTenant.id) return r;
       var sid = String(id||'');
       try {
+        var turno = typeof getTurnos==='function'
+          ? getTurnos().find(function(t){ return String(t.id)===sid; }) : null;
+        var sbUpd = {
+          estado:          nuevoEstado,
+          precio:          turno ? (turno.precio||0)         : 0,
+          metodo:          turno ? (turno.metodo||'')         : '',
+          empleado_id:     turno ? (parseInt(turno.empleadoId)||null) : null,
+          servicio_id:     turno ? (turno.servicioId||null)   : null,
+          empleado_nombre: turno ? (turno.empleadoNombre||'') : '',
+          servicio_nombre: turno ? (turno.servicioNombre||'') : '',
+        };
         if(sid.startsWith('sb_')){
           await sb.from('turnos_solicitudes')
-            .update({ estado: nuevoEstado })
+            .update(sbUpd)
             .eq('id', sid.slice(3)).eq('tenant_id', currentTenant.id);
         } else {
-          var turno = typeof getTurnos==='function'
-            ? getTurnos().find(function(t){ return String(t.id)===sid; }) : null;
           if(turno && nuevoEstado !== 'cancelado'){
             await _upsertTurnoSb(turno, nuevoEstado);
           }
