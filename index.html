@@ -13257,6 +13257,48 @@ function cajEmpCambiarModo(){
   rCajaEmpleadas();
 }
 
+async function _cajaBuscarFechaEnSb(fecha){
+  const el = document.getElementById('cajaEmpleadasGrid');
+  if(el) el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:12px;text-align:center">🔄 Buscando datos en la nube...</div>';
+  try {
+    const cfg = typeof getTurnosCfg==='function' ? getTurnosCfg() : {servicios:[],empleados:[]};
+    const res = await sb.from('turnos_solicitudes').select('*')
+      .eq('tenant_id', currentTenant.id)
+      .eq('fecha', fecha)
+      .in('estado', ['terminado','no_vino']);
+    if(res.error || !res.data || !res.data.length){
+      if(el) el.innerHTML = '<div style="color:var(--mut);font-size:.82rem;padding:12px;text-align:center">Sin datos para esa fecha en la nube</div>';
+      return;
+    }
+    const locales = typeof getTurnos==='function' ? getTurnos() : [];
+    let changed = false;
+    res.data.forEach(function(s){
+      const h5 = (s.hora||'').substring(0,5);
+      const ya = locales.some(t=>t.fecha===s.fecha&&t.hora===h5&&t.cliente===s.nombre);
+      if(ya) return;
+      const srv = s.servicio_id && s.servicio_id!=='__aconfirmar__'
+        ? (cfg.servicios||[]).find(x=>String(x.id)===String(s.servicio_id)) : null;
+      const emp = s.empleado_id
+        ? (cfg.empleados||[]).find(e=>String(e.id)===String(s.empleado_id))
+        : (cfg.empleados&&cfg.empleados[0]);
+      locales.push({
+        id:'sb_'+s.id, cliente:s.nombre||'', tel:s.tel||'',
+        fecha:s.fecha, hora:h5,
+        empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'',
+        servicioId:s.servicio_id||'',
+        servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(srv?srv.nombre:(s.servicio_id||'Servicio')),
+        sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30,
+        precio:s.precio||(srv?srv.precio||0:0),
+        metodo:s.metodo||'Efectivo',
+        notas:'', estado:s.estado, creadoEn:s.created_at||new Date().toISOString()
+      });
+      changed = true;
+    });
+    if(changed && typeof saveTurnosLocal==='function') saveTurnosLocal(locales);
+  } catch(e){ console.warn('[cajaBuscarFechaEnSb]', e); }
+  rCajaEmpleadas();
+}
+
 function rCajaEmpleadas(){
   const el = document.getElementById('cajaEmpleadasGrid');
   if(!el) return;
@@ -13274,6 +13316,11 @@ function rCajaEmpleadas(){
   } else {
     const fecha = fechaEl.value;
     todosTerminados = getTurnos().filter(t=>t.fecha===fecha&&t.estado==='terminado');
+    // Si es una fecha pasada con 0 turnos, intentar traer desde Supabase
+    if(!todosTerminados.length && fecha < tod() && typeof sb!=='undefined' && sb && currentTenant){
+      _cajaBuscarFechaEnSb(fecha);
+      return;
+    }
   }
 
   // Solo los que tienen precio y empleada — los que entran en la caja
