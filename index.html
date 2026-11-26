@@ -20874,38 +20874,44 @@ function rSmartAlerts(){
 // 2. Eliminar turno individual — borra de localStorage sin posibilidad de recuperar
 function eliminarTurnoAdmin(id){
   if(typeof _confirmarModal !== 'function') return;
-  _confirmarModal('¿Eliminar este turno? Esta acción no se puede deshacer.', function(){
+  _confirmarModal('¿Eliminar este turno? Esta acción no se puede deshacer.', async function(){
     try {
       var todos = typeof getTurnos === 'function' ? getTurnos() : [];
       var turno = todos.find(function(t){ return String(t.id) === String(id); });
       var restantes = todos.filter(function(t){ return String(t.id) !== String(id); });
-      if(typeof saveTurnosLocal === 'function') saveTurnosLocal(restantes);
-      if(typeof _removeFromPendingQueue === 'function') _removeFromPendingQueue(id);
-      if(typeof rTurnos === 'function') rTurnos();
-      if(typeof showToast === 'function') showToast('Turno eliminado ✓');
-      // Borrar de Supabase
+
+      // 1. Borrar de Supabase PRIMERO y esperar confirmación
       if(turno && sb && currentTenant && currentTenant.id){
         var sbRealId = turno._sbId
           || (String(turno.id||'').startsWith('sb_') ? String(turno.id).slice(3) : null);
-        // Registrar en lista de borrados para que el sync no lo vuelva a agregar
         if(sbRealId && typeof _deletedSbIds !== 'undefined') _deletedSbIds.add(String(sbRealId));
+        var sbErr = null;
         if(sbRealId){
-          sb.from('turnos_solicitudes').delete()
-            .eq('id', sbRealId)
-            .eq('tenant_id', currentTenant.id)
-            .then(function(){});
+          var r1 = await sb.from('turnos_solicitudes').delete()
+            .eq('id', sbRealId).eq('tenant_id', currentTenant.id);
+          sbErr = r1.error;
         } else if(turno.fecha && turno.hora && turno.cliente){
-          sb.from('turnos_solicitudes').delete()
+          var r2 = await sb.from('turnos_solicitudes').delete()
             .eq('tenant_id', currentTenant.id)
             .eq('fecha', turno.fecha)
             .eq('hora', (turno.hora||'').substring(0,5))
             .eq('nombre', turno.cliente)
-            .neq('estado','bloqueado')
-            .then(function(){});
+            .neq('estado','bloqueado');
+          sbErr = r2.error;
+        }
+        if(sbErr){
+          if(typeof showToast === 'function') showToast('⚠ Error al eliminar en la nube: ' + (sbErr.message||''), 'err');
+          return; // No borrar local si Supabase falló
         }
       }
+
+      // 2. Solo borrar local una vez que Supabase confirmó
+      if(typeof saveTurnosLocal === 'function') saveTurnosLocal(restantes);
+      if(typeof _removeFromPendingQueue === 'function') _removeFromPendingQueue(id);
+      if(typeof rTurnos === 'function') rTurnos();
+      if(typeof showToast === 'function') showToast('Turno eliminado ✓');
     } catch(e) {
-      if(typeof showToast === 'function') showToast('Error al eliminar');
+      if(typeof showToast === 'function') showToast('Error al eliminar: ' + (e.message||String(e)), 'err');
     }
   });
 }
@@ -23335,7 +23341,10 @@ async function _mFCS_fiado(){
         if(typeof rTurnos==='function') rTurnos();
         if(typeof rCajas==='function')  rCajas();
       }
-    } catch(e){ console.warn('[syncFromSupabase]', e); }
+    } catch(e){
+      console.warn('[syncFromSupabase]', e);
+      if(typeof showToast === 'function') showToast('⚠ Error al sincronizar: ' + (e.message||String(e)), 'err');
+    }
     finally { _syncing=false; _lastSync=Date.now(); }
   }
   window._syncEstadosDeSupabase    = _syncFromSupabase;
@@ -23410,7 +23419,10 @@ async function _mFCS_fiado(){
           }
           /* cancelado: liberarSlotSupabase ya borró todo */
         }
-      } catch(e){ console.warn('[_doEstadoTurno→sb]', e); }
+      } catch(e){
+        console.warn('[_doEstadoTurno→sb]', e);
+        if(typeof showToast === 'function') showToast('⚠ No se guardó en la nube: ' + (e.message||String(e)), 'err');
+      }
       return r;
     };
   }
