@@ -20887,6 +20887,8 @@ function eliminarTurnoAdmin(id){
       if(turno && sb && currentTenant && currentTenant.id){
         var sbRealId = turno._sbId
           || (String(turno.id||'').startsWith('sb_') ? String(turno.id).slice(3) : null);
+        // Registrar en lista de borrados para que el sync no lo vuelva a agregar
+        if(sbRealId && typeof _deletedSbIds !== 'undefined') _deletedSbIds.add(String(sbRealId));
         if(sbRealId){
           sb.from('turnos_solicitudes').delete()
             .eq('id', sbRealId)
@@ -23213,8 +23215,9 @@ async function _mFCS_fiado(){
 
   /* ══ TURNOS — Supabase como fuente de verdad ════════════════════════ */
 
-  var _lastSync = 0;
-  var _syncing  = false;
+  var _lastSync    = 0;
+  var _syncing     = false;
+  var _deletedSbIds = new Set(); // IDs de Supabase borrados localmente — el sync no los vuelve a agregar
 
   /* ── D. _upsertTurnoSb: insert o update sync row en Supabase ── */
   async function _upsertTurnoSb(turno, estado){
@@ -23281,6 +23284,8 @@ async function _mFCS_fiado(){
       var changed = false;
 
       res.data.forEach(function(s){
+        // No re-agregar un turno que el usuario acaba de borrar
+        if(_deletedSbIds.has(String(s.id))) return;
         var h5 = (s.hora||'').substring(0,5);
         var li = locales.findIndex(function(t){ return t.fecha===s.fecha && t.hora===h5 && t.cliente===s.nombre; });
         if(li !== -1){
