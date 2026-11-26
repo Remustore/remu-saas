@@ -1517,6 +1517,7 @@ $$;</pre>
           <input type="date" id="turnosFecha" onchange="rTurnos()" style="padding:7px 12px;font-size:.85rem;flex:1;max-width:180px">
           <button class="btn bsm" onclick="cambiarFechaTurnos(1)">▶</button>
           <button class="btn bgh bsm" onclick="irHoyTurnos()">Hoy</button>
+          <button class="btn bsm" id="btnSyncTurnos" title="Recargar datos desde el servidor" onclick="(async()=>{const b=document.getElementById('btnSyncTurnos');b.disabled=true;b.textContent='⏳';try{await _reloadTurnosCache();if(typeof rTurnos==='function')rTurnos();if(typeof rCajas==='function')rCajas();b.textContent='✓';setTimeout(()=>{b.textContent='🔄';b.disabled=false;},1500);}catch(e){b.textContent='⚠';b.disabled=false;showToast('Error al sincronizar: '+(e.message||e),'err');}})()">🔄</button>
           <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
             <button class="tab active" id="vistaListaBtn" onclick="setVistaTurnos('lista')">📋 Lista</button>
             <button class="tab" id="vistaHorarioBtn" onclick="setVistaTurnos('horario')">🕐 Horario</button>
@@ -1794,6 +1795,7 @@ $$;</pre>
           <input type="date" id="turnosTecFecha" onchange="rTurnosTec()" style="padding:7px 12px;font-size:.85rem;flex:1;max-width:180px">
           <button class="btn bsm" onclick="cambiarFechaTurnosTec(1)">▶</button>
           <button class="btn bgh bsm" onclick="irHoyTurnosTec()">Hoy</button>
+          <button class="btn bsm" id="btnSyncTurnosTec" title="Recargar datos desde el servidor" onclick="(async()=>{const b=document.getElementById('btnSyncTurnosTec');b.disabled=true;b.textContent='⏳';try{await _reloadTurnosCache();if(typeof rTurnosTec==='function')rTurnosTec();b.textContent='✓';setTimeout(()=>{b.textContent='🔄';b.disabled=false;},1500);}catch(e){b.textContent='⚠';b.disabled=false;}})()">🔄</button>
         </div>
       </div>
 
