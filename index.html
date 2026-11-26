@@ -20885,8 +20885,13 @@ function eliminarTurnoAdmin(id){
       if(typeof showToast === 'function') showToast('Turno eliminado ✓');
       // Borrar de Supabase
       if(turno && sb && currentTenant && currentTenant.id){
-        if(turno._sbId){
-          sb.from('turnos_solicitudes').delete().eq('id', turno._sbId).then(function(){});
+        var sbRealId = turno._sbId
+          || (String(turno.id||'').startsWith('sb_') ? String(turno.id).slice(3) : null);
+        if(sbRealId){
+          sb.from('turnos_solicitudes').delete()
+            .eq('id', sbRealId)
+            .eq('tenant_id', currentTenant.id)
+            .then(function(){});
         } else if(turno.fecha && turno.hora && turno.cliente){
           sb.from('turnos_solicitudes').delete()
             .eq('tenant_id', currentTenant.id)
@@ -23285,6 +23290,17 @@ async function _mFCS_fiado(){
           if(s.origen==='admin' && locales[li].notas==='Turno solicitado online'){
             locales[li].notas = ''; changed = true;
           }
+          // Si el local tiene precio 0 pero Supabase tiene precio real, actualizar
+          if(s.precio && s.precio > 0 && !(locales[li].precio > 0)){
+            locales[li].precio = s.precio; changed = true;
+          }
+          if(s.metodo && !locales[li].metodo){
+            locales[li].metodo = s.metodo; changed = true;
+          }
+          // Asegurar que el _sbId esté seteado para que el delete funcione
+          if(!locales[li]._sbId && s.id){
+            locales[li]._sbId = s.id; changed = true;
+          }
           return;
         }
         if(finals[s.estado] && s.fecha < inicioMes) return;
@@ -23294,12 +23310,15 @@ async function _mFCS_fiado(){
           ? (cfg.empleados||[]).find(function(e){ return String(e.id)===String(s.empleado_id); })
           : (cfg.empleados&&cfg.empleados[0]);
         locales.push({
-          id:'sb_'+s.id, cliente:s.nombre||'', tel:s.tel||'',
+          id:'sb_'+s.id, _sbId:s.id, cliente:s.nombre||'', tel:s.tel||'',
           fecha:s.fecha, hora:h5,
-          empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'',
+          empleadoId: s.empleado_id ? String(s.empleado_id) : (emp?String(emp.id):''),
+          empleadoNombre: s.empleado_nombre || (emp?emp.nombre:''),
           servicioId:s.servicio_id||'',
-          servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(srv?srv.nombre:(s.servicio_id||'Servicio')),
-          sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30, precio:srv?(srv.precio||0):0,
+          servicioNombre:s.servicio_id==='__aconfirmar__'?'📋 A confirmar':(s.servicio_nombre||(srv?srv.nombre:(s.servicio_id||'Servicio'))),
+          sector:srv?(srv.sector||''):'', duracion:srv?(srv.duracion||30):30,
+          precio: s.precio || (srv?(srv.precio||0):0),
+          metodo: s.metodo || '',
           notas:s.servicio_id==='__aconfirmar__'?'Definir servicio al llegar el cliente':(s.origen==='admin'?'':'Turno solicitado online'),
           estado:s.estado, creadoEn:s.created_at||new Date().toISOString()
         });
