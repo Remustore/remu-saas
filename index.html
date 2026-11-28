@@ -11153,8 +11153,11 @@ async function _updateEstadoSb(obj, nuevoEstado, precio, metodo){
   return result;
 }
 
+let _reloadingCache = false;
 async function _reloadTurnosCache(){
   if(!sb||!currentTenant?.id) return;
+  if(_reloadingCache) return; // evitar llamadas concurrentes
+  _reloadingCache = true;
   try {
     const _rdDesde = new Date(Date.now()-60*864e5).toISOString().slice(0,10);
     const _rdHasta = new Date(Date.now()+183*864e5).toISOString().slice(0,10);
@@ -11199,6 +11202,7 @@ async function _reloadTurnosCache(){
       _saveTurnosLS(mapped);
     }
   } catch(e){ console.warn('[_reloadTurnosCache]', e.message); }
+  finally { _reloadingCache = false; }
 }
 
 function _saveTurnosLS(turnos){
@@ -11233,13 +11237,21 @@ async function migrarTurnosManual(btn){
   btn.disabled=false; btn.textContent=orig;
 }
 
+let _realtimeDebounceTimer = null;
 function _initTurnosRealtime(tenantId){
   if(!sb||!tenantId) return;
   // Evitar suscripciones duplicadas si loadAll corre más de una vez
   if(_turnosRealtimeCh){ try{ sb.removeChannel(_turnosRealtimeCh); }catch(e){} _turnosRealtimeCh = null; }
   _turnosRealtimeCh = sb.channel('remu-turnos-'+tenantId)
     .on('postgres_changes',{event:'*',schema:'public',table:'turnos_solicitudes',filter:'tenant_id=eq.'+tenantId},
-      ()=>{ _reloadTurnosCache().then(()=>{ if(typeof rTurnos==='function') rTurnos(); }); })
+      ()=>{
+        // Debounce: esperar 800ms sin nuevos eventos antes de recargar
+        // Evita múltiples recargas concurrentes cuando hay ráfagas de cambios (ej. startup cleanup)
+        clearTimeout(_realtimeDebounceTimer);
+        _realtimeDebounceTimer = setTimeout(()=>{
+          _reloadTurnosCache().then(()=>{ if(typeof rTurnos==='function') rTurnos(); });
+        }, 800);
+      })
     .subscribe();
 }
 
