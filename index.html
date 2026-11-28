@@ -11181,7 +11181,18 @@ async function _reloadTurnosCache(){
       // y como fallback por (fecha+hora+nombre+empleado) para filas sin ref_id
       const _seenRefId = new Map(); // ref_id → turno (el primero gana)
       const _seenSlot  = new Map(); // 'fecha|hora|nombre|empleado' → turno
-      const _remotoRaw = data.map(r=>({..._mapSbTurno(r), _sbId:r.id}));
+      // Índice del cache local por _sbId para rescatar precio/metodo que Supabase puede tener en 0
+      // (turnos terminados antes del fix que guardó precio — Supabase dice 0, local tiene el real)
+      const _cacheBysbId = new Map((_turnosCache||[]).filter(t=>t._sbId).map(t=>[String(t._sbId), t]));
+
+      const _remotoRaw = data.map(r=>{
+        const t = {..._mapSbTurno(r), _sbId:r.id};
+        // Si Supabase dice precio=0 pero el cache local tiene precio real, conservarlo
+        const local = _cacheBysbId.get(String(r.id));
+        if(local && !(t.precio > 0) && local.precio > 0) t.precio = local.precio;
+        if(local && !t.metodo && local.metodo)           t.metodo = local.metodo;
+        return t;
+      });
       const remoto = [];
       for(const t of _remotoRaw){
         const refKey = t.id ? String(t.id) : null;
@@ -11194,8 +11205,6 @@ async function _reloadTurnosCache(){
       }
       const refIdsRemotos = new Set(remoto.map(t=>String(t.id)));
       // Conservar turnos guardados localmente que aún no terminaron de sincronizarse a Supabase
-      // (sin _sbId y sin aparecer todavía en el remoto): un evento realtime disparado por OTRO
-      // turno no debe borrar de la vista uno recién creado que sigue "en vuelo" hacia el servidor.
       const pendientes = (_turnosCache||[]).filter(t=>!t._sbId && !refIdsRemotos.has(String(t.id)));
       const mapped = [...remoto, ...pendientes];
       _turnosCache = mapped;
