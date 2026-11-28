@@ -23892,6 +23892,24 @@ async function _mFCS_fiado(){
   setTimeout(_syncFromSupabase, 4000);
   setTimeout(function(){ if(typeof resyncTurnosToSupabase==='function') resyncTurnosToSupabase(); }, 7000);
 
+  /* ── K2. Recarga al volver al foco — multi-dispositivo ──
+     Cuando el usuario vuelve a la pestaña o desbloquea el celular, forzar
+     recarga desde Supabase para que compu y celular siempre estén en sync. */
+  var _lastVisibleReload = 0;
+  document.addEventListener('visibilitychange', function(){
+    if(document.visibilityState === 'visible'){
+      var ahora = Date.now();
+      // Solo recargar si pasaron más de 30s desde la última vez (evitar doble-reload)
+      if(ahora - _lastVisibleReload > 30000){
+        _lastVisibleReload = ahora;
+        _reloadTurnosCache().then(function(){
+          if(typeof rTurnos === 'function') rTurnos();
+          if(typeof rCajas  === 'function') rCajas();
+        });
+      }
+    }
+  });
+
   /* ── L. Asistente IA — piloto solo para Rocaspana ── */
   (function(){
     var TENANTS_IA = [
