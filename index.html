@@ -13305,7 +13305,7 @@ async function _cajaBuscarFechaEnSb(fecha){
         ? (cfg.empleados||[]).find(e=>String(e.id)===String(s.empleado_id))
         : (cfg.empleados&&cfg.empleados[0]);
       locales.push({
-        id:'sb_'+s.id, cliente:s.nombre||'', tel:s.tel||'',
+        id:'sb_'+s.id, _sbId:s.id, cliente:s.nombre||'', tel:s.tel||'',
         fecha:s.fecha, hora:h5,
         empleadoId:emp?emp.id:'', empleadoNombre:emp?emp.nombre:'',
         servicioId:s.servicio_id||'',
